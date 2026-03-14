@@ -1,0 +1,182 @@
+package axion.client.tool
+
+import axion.client.AxionClientState
+import axion.client.selection.SelectionController
+import axion.client.selection.blockPosOrNull
+import axion.client.symmetry.SymmetryAwareOperationDispatcher
+import axion.common.model.AxionSubtool
+import axion.common.model.BlockRegion
+import axion.common.model.SelectionState
+import axion.common.operation.StackRegionOperation
+import net.minecraft.client.MinecraftClient
+
+object StackToolController {
+    private val dispatcher = SymmetryAwareOperationDispatcher()
+
+    fun onEndTick(client: MinecraftClient) {
+        if (!isStackActive() && AxionClientState.stackToolState !is StackToolState.Idle) {
+            reset()
+        }
+    }
+
+    fun currentPreview(): StackPreviewState? = when (val state = AxionClientState.stackToolState) {
+        StackToolState.Idle,
+        is StackToolState.FirstCornerSet,
+        is StackToolState.RegionDefined,
+            -> null
+
+        is StackToolState.PreviewingStack -> state.preview
+    }
+
+    fun handlePrimaryAction(client: MinecraftClient): Boolean {
+        if (!isStackActive()) {
+            return false
+        }
+
+        return when (AxionClientState.stackToolState) {
+            StackToolState.Idle,
+            is StackToolState.FirstCornerSet,
+            is StackToolState.RegionDefined,
+                -> setFirstCorner()
+
+            is StackToolState.PreviewingStack -> {
+                reset()
+                true
+            }
+        }
+    }
+
+    fun handleSecondaryAction(client: MinecraftClient): Boolean {
+        if (!isStackActive()) {
+            return false
+        }
+
+        return when (val state = AxionClientState.stackToolState) {
+            StackToolState.Idle -> false
+            is StackToolState.FirstCornerSet -> setSecondCorner()
+            is StackToolState.RegionDefined -> setSecondCorner()
+            is StackToolState.PreviewingStack -> confirm(state.preview)
+        }
+    }
+
+    fun handleMiddleAction(client: MinecraftClient): Boolean {
+        if (!isStackActive()) {
+            return false
+        }
+
+        val state = AxionClientState.stackToolState
+        if (state !is StackToolState.RegionDefined) {
+            return false
+        }
+
+        val expanded = SelectionController.expandRegionToCurrentTarget(state.region) ?: return false
+        val nextState = StackToolState.RegionDefined(state.firstCorner, expanded)
+        AxionClientState.updateStackToolState(nextState)
+        syncSelectionState(nextState)
+        return true
+    }
+
+    fun handleScroll(client: MinecraftClient, scrollAmount: Double): Boolean {
+        if (!isStackActive() || scrollAmount.compareTo(0.0) == 0) {
+            return false
+        }
+
+        val nextState = when (val state = AxionClientState.stackToolState) {
+            StackToolState.Idle,
+            is StackToolState.FirstCornerSet,
+                -> return false
+
+            is StackToolState.RegionDefined -> {
+                val world = client.world ?: return false
+                val clipboard = ClipboardCaptureService.capture(world, state.region)
+                val preview = StackPlacementService.createInitialPreview(
+                    client = client,
+                    firstCorner = state.firstCorner,
+                    sourceRegion = state.region,
+                    clipboardBuffer = clipboard,
+                    scrollAmount = scrollAmount,
+                ) ?: return false
+                StackToolState.PreviewingStack(preview)
+            }
+
+            is StackToolState.PreviewingStack -> {
+                val preview = StackPlacementService.nudgePreview(state.preview, scrollAmount)
+                if (preview == null) {
+                    StackToolState.RegionDefined(state.preview.firstCorner, state.preview.sourceRegion)
+                } else {
+                    StackToolState.PreviewingStack(preview)
+                }
+            }
+        }
+
+        AxionClientState.updateStackToolState(nextState)
+        syncSelectionState(nextState)
+        return true
+    }
+
+    fun reset() {
+        val nextState = StackToolState.Idle
+        AxionClientState.updateStackToolState(nextState)
+        syncSelectionState(nextState)
+    }
+
+    private fun confirm(preview: StackPreviewState): Boolean {
+        dispatcher.dispatch(
+            StackRegionOperation(
+                sourceRegion = preview.sourceRegion,
+                clipboardBuffer = preview.clipboardBuffer,
+                step = preview.step,
+                repeatCount = preview.repeatCount,
+            ),
+        )
+        reset()
+        return true
+    }
+
+    private fun setFirstCorner(): Boolean {
+        val firstCorner = SelectionController.currentTarget().blockPosOrNull()?.toImmutable() ?: return false
+        val nextState = StackToolState.FirstCornerSet(firstCorner)
+        AxionClientState.updateStackToolState(nextState)
+        syncSelectionState(nextState)
+        return true
+    }
+
+    private fun setSecondCorner(): Boolean {
+        val secondCorner = SelectionController.currentTarget().blockPosOrNull()?.toImmutable() ?: return false
+        val firstCorner = when (val state = AxionClientState.stackToolState) {
+            StackToolState.Idle -> return false
+            is StackToolState.FirstCornerSet -> state.firstCorner
+            is StackToolState.RegionDefined -> state.firstCorner
+            is StackToolState.PreviewingStack -> state.preview.firstCorner
+        }
+        val nextState = StackToolState.RegionDefined(
+            firstCorner,
+            BlockRegion(firstCorner, secondCorner).normalized(),
+        )
+        AxionClientState.updateStackToolState(nextState)
+        syncSelectionState(nextState)
+        return true
+    }
+
+    private fun syncSelectionState(state: StackToolState) {
+        val selectionState = when (state) {
+            StackToolState.Idle -> SelectionState.Idle
+            is StackToolState.FirstCornerSet -> SelectionState.FirstCornerSet(state.firstCorner)
+            is StackToolState.RegionDefined -> SelectionState.RegionDefined(
+                state.firstCorner,
+                state.region.oppositeCorner(state.firstCorner),
+            )
+            is StackToolState.PreviewingStack -> SelectionState.RegionDefined(
+                state.preview.firstCorner,
+                state.preview.sourceRegion.oppositeCorner(state.preview.firstCorner),
+            )
+        }
+
+        AxionClientState.updateSelection(selectionState)
+    }
+
+    private fun isStackActive(): Boolean {
+        return AxionToolSelectionController.isAxionSlotActive() &&
+            AxionToolSelectionController.selectedSubtool() == AxionSubtool.STACK
+    }
+}

@@ -1,0 +1,118 @@
+package axion.client.render
+
+import axion.client.AxionClientState
+import axion.client.selection.SelectionBounds
+import axion.common.model.SelectionState
+import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext
+import net.minecraft.client.MinecraftClient
+import net.minecraft.client.render.RenderLayers
+import net.minecraft.client.render.VertexRendering
+import net.minecraft.util.math.BlockPos
+import net.minecraft.util.math.Box
+import net.minecraft.util.shape.VoxelShapes
+
+object SelectionBoxRenderer {
+    private const val REGION_COLOR: Int = 0xFF71D6FF.toInt()
+    private const val ANCHOR_COLOR: Int = 0xFFB3F3FF.toInt()
+    private const val SECOND_CORNER_COLOR: Int = 0xFFFFD27A.toInt()
+    private const val LINE_WIDTH: Float = 2.0f
+    private const val CORNER_LINE_WIDTH: Float = 2.5f
+    private const val CORNER_MARKER_INSET: Double = 0.32
+
+    fun render(context: WorldRenderContext) {
+        val client = MinecraftClient.getInstance()
+        val camera = client.gameRenderer.camera ?: return
+        val consumers = context.consumers() ?: return
+        val consumer = consumers.getBuffer(RenderLayers.lines())
+        val matrixStack = context.matrices()
+        val cameraPos = camera.cameraPos
+        val state = AxionClientState.selectionState
+
+        when (state) {
+            SelectionState.Idle -> return
+
+            is SelectionState.FirstCornerSet -> {
+                PulsingCuboidRenderer.render(
+                    context = context,
+                    box = SelectionBounds.outlineBox(SelectionBounds.blockBox(state.firstCorner)),
+                    outlineColor = ANCHOR_COLOR,
+                    lineWidth = CORNER_LINE_WIDTH,
+                )
+                drawCornerMarker(
+                    matrixStack = matrixStack,
+                    consumer = consumer,
+                    cameraPos = cameraPos,
+                    pos = state.firstCorner,
+                    color = ANCHOR_COLOR,
+                )
+            }
+
+            is SelectionState.RegionDefined -> {
+                PulsingCuboidRenderer.render(
+                    context = context,
+                    box = SelectionBounds.outlineBox(SelectionBounds.regionBox(state.region())),
+                    outlineColor = REGION_COLOR,
+                    lineWidth = LINE_WIDTH,
+                )
+                drawCornerMarker(matrixStack, consumer, cameraPos, state.firstCorner, ANCHOR_COLOR)
+                drawCornerMarker(matrixStack, consumer, cameraPos, state.secondCorner, SECOND_CORNER_COLOR)
+            }
+        }
+    }
+
+    private fun drawCornerMarker(
+        matrixStack: net.minecraft.client.util.math.MatrixStack,
+        consumer: net.minecraft.client.render.VertexConsumer,
+        cameraPos: net.minecraft.util.math.Vec3d,
+        pos: BlockPos,
+        color: Int,
+    ) {
+        drawOutline(
+            matrixStack = matrixStack,
+            consumer = consumer,
+            cameraPos = cameraPos,
+            box = SelectionBounds.outlineBox(SelectionBounds.blockBox(pos)),
+            color = color,
+            lineWidth = CORNER_LINE_WIDTH,
+        )
+        drawOutline(
+            matrixStack = matrixStack,
+            consumer = consumer,
+            cameraPos = cameraPos,
+            box = cornerMarkerBox(pos),
+            color = color,
+            lineWidth = CORNER_LINE_WIDTH,
+        )
+    }
+
+    private fun cornerMarkerBox(pos: BlockPos): Box {
+        return Box(
+            pos.x + CORNER_MARKER_INSET,
+            pos.y + CORNER_MARKER_INSET,
+            pos.z + CORNER_MARKER_INSET,
+            pos.x + 1.0 - CORNER_MARKER_INSET,
+            pos.y + 1.0 - CORNER_MARKER_INSET,
+            pos.z + 1.0 - CORNER_MARKER_INSET,
+        )
+    }
+
+    private fun drawOutline(
+        matrixStack: net.minecraft.client.util.math.MatrixStack,
+        consumer: net.minecraft.client.render.VertexConsumer,
+        cameraPos: net.minecraft.util.math.Vec3d,
+        box: Box,
+        color: Int,
+        lineWidth: Float,
+    ) {
+        VertexRendering.drawOutline(
+            matrixStack,
+            consumer,
+            VoxelShapes.cuboid(box),
+            -cameraPos.x,
+            -cameraPos.y,
+            -cameraPos.z,
+            color,
+            lineWidth,
+        )
+    }
+}

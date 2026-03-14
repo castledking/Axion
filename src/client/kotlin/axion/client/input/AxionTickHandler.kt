@@ -1,0 +1,70 @@
+package axion.client.input
+
+import axion.client.history.UndoRedoController
+import axion.client.network.AxionServerConnection
+import axion.client.selection.SelectionController
+import axion.client.symmetry.SymmetryController
+import axion.client.tool.AxionToolSelectionController
+import axion.client.tool.EraseToolController
+import axion.client.tool.ExtrudeToolController
+import axion.client.tool.PlacementToolController
+import axion.client.tool.SmearToolController
+import axion.client.tool.StackToolController
+import net.minecraft.client.MinecraftClient
+
+object AxionTickHandler {
+    fun onEndTick(client: MinecraftClient) {
+        AxionServerConnection.onEndTick()
+        AxionInteractionRouter.onEndTick(client)
+        val player = client.player ?: return
+        AxionToolSelectionController.syncWithPlayerSlot(player.inventory.selectedSlot)
+
+        while (AxionKeybindings.selectAxionTool.wasPressed()) {
+            AxionToolSelectionController.toggleAxionTool(player.inventory.selectedSlot)
+        }
+
+        while (AxionKeybindings.nextSubtool.wasPressed()) {
+            AxionToolSelectionController.cycleSubtool(step = 1)
+        }
+
+        while (AxionKeybindings.previousSubtool.wasPressed()) {
+            AxionToolSelectionController.cycleSubtool(step = -1)
+        }
+
+        while (AxionKeybindings.toolDeleteAction.wasPressed()) {
+            AxionInteractionRouter.handleDeleteAction(client)
+        }
+
+        while (AxionKeybindings.symmetryToggleRotation.wasPressed()) {
+            SymmetryController.toggleRotational()
+        }
+
+        while (AxionKeybindings.symmetryToggleMirror.wasPressed()) {
+            SymmetryController.toggleMirrorY()
+        }
+
+        while (AxionKeybindings.undoAction.wasPressed()) {
+            if (client.currentScreen == null && AxionModifierKeys.isControlDown(client)) {
+                if (AxionModifierKeys.isShiftDown(client)) {
+                    UndoRedoController.redo(client)
+                } else {
+                    UndoRedoController.undo(client)
+                }
+            }
+        }
+
+        while (AxionKeybindings.redoAction.wasPressed()) {
+            if (client.currentScreen == null && AxionModifierKeys.isControlDown(client)) {
+                UndoRedoController.redo(client)
+            }
+        }
+
+        SelectionController.onEndTick(client)
+        SymmetryController.onEndTick(client)
+        PlacementToolController.onEndTick(client)
+        EraseToolController.onEndTick(client)
+        StackToolController.onEndTick(client)
+        SmearToolController.onEndTick(client)
+        ExtrudeToolController.onEndTick(client)
+    }
+}

@@ -1,0 +1,47 @@
+name: Axion
+version: 0.1.0
+main: axion.server.paper.AxionPaperPlugin
+api-version: "1.21"
+folia-supported: true
+author: CASTLEDKING
+website: https://castled.codes
+dependencies:
+  server:
+    WorldGuard:
+      load: BEFORE
+      required: false
+      join-classpath: false
+permissions:
+  axion.use:
+    default: op
+    description: Allows authoritative Axion editing operations.
+  axion.tool.clone:
+    default: op
+    description: Allows Axion clone operations.
+  axion.tool.move:
+    default: op
+    description: Allows Axion move operations.
+  axion.tool.stack:
+    default: op
+    description: Allows Axion stack operations.
+  axion.tool.smear:
+    default: op
+    description: Allows Axion smear operations.
+  axion.tool.extrude:
+    default: op
+    description: Allows Axion extrude operations.
+  axion.tool.erase:
+    default: op
+    description: Allows Axion erase operations.
+  axion.symmetry:
+    default: op
+    description: Allows symmetry-expanded Axion operations.
+  axion.undo:
+    default: op
+    description: Allows Axion undo and redo operations.
+  axion.largeedits:
+    default: false
+    description: Allows higher configured edit limits for Axion.
+  axion.admin.timing:
+    default: op
+    description: Allows Axion timing summary and reset commands.
