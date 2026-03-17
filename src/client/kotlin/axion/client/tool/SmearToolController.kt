@@ -69,8 +69,8 @@ object SmearToolController {
             return false
         }
 
-        val expanded = SelectionController.expandRegionToCurrentTarget(state.region) ?: return false
-        val nextState = SmearToolState.RegionDefined(state.firstCorner, expanded)
+        val expanded = SelectionController.expandRegionToCurrentTarget(client, state.region) ?: return false
+        val nextState = SmearToolState.RegionDefined(state.region.remapCorner(state.firstCorner, expanded), expanded)
         AxionClientState.updateSmearToolState(nextState)
         syncSelectionState(nextState)
         return true

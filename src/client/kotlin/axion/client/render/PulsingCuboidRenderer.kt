@@ -53,6 +53,7 @@ object PulsingCuboidRenderer {
         cameraPos: Vec3d,
         box: Box,
         alpha: Int,
+        color: Int = 0xFFFFFFFF.toInt(),
     ) {
         val minX = (box.minX - cameraPos.x).toFloat()
         val minY = (box.minY - cameraPos.y).toFloat()
@@ -61,13 +62,16 @@ object PulsingCuboidRenderer {
         val maxY = (box.maxY - cameraPos.y).toFloat()
         val maxZ = (box.maxZ - cameraPos.z).toFloat()
         val entry = matrixStack.peek()
+        val red = (color shr 16) and 0xFF
+        val green = (color shr 8) and 0xFF
+        val blue = color and 0xFF
 
-        emitQuad(consumer, entry, minX, minY, minZ, maxX, minY, minZ, maxX, maxY, minZ, minX, maxY, minZ, 0f, 0f, -1f, alpha)
-        emitQuad(consumer, entry, minX, minY, maxZ, minX, maxY, maxZ, maxX, maxY, maxZ, maxX, minY, maxZ, 0f, 0f, 1f, alpha)
-        emitQuad(consumer, entry, minX, minY, minZ, minX, maxY, minZ, minX, maxY, maxZ, minX, minY, maxZ, -1f, 0f, 0f, alpha)
-        emitQuad(consumer, entry, maxX, minY, minZ, maxX, minY, maxZ, maxX, maxY, maxZ, maxX, maxY, minZ, 1f, 0f, 0f, alpha)
-        emitQuad(consumer, entry, minX, maxY, minZ, maxX, maxY, minZ, maxX, maxY, maxZ, minX, maxY, maxZ, 0f, 1f, 0f, alpha)
-        emitQuad(consumer, entry, minX, minY, minZ, minX, minY, maxZ, maxX, minY, maxZ, maxX, minY, minZ, 0f, -1f, 0f, alpha)
+        emitQuad(consumer, entry, minX, minY, minZ, maxX, minY, minZ, maxX, maxY, minZ, minX, maxY, minZ, 0f, 0f, -1f, red, green, blue, alpha)
+        emitQuad(consumer, entry, minX, minY, maxZ, minX, maxY, maxZ, maxX, maxY, maxZ, maxX, minY, maxZ, 0f, 0f, 1f, red, green, blue, alpha)
+        emitQuad(consumer, entry, minX, minY, minZ, minX, maxY, minZ, minX, maxY, maxZ, minX, minY, maxZ, -1f, 0f, 0f, red, green, blue, alpha)
+        emitQuad(consumer, entry, maxX, minY, minZ, maxX, minY, maxZ, maxX, maxY, maxZ, maxX, maxY, minZ, 1f, 0f, 0f, red, green, blue, alpha)
+        emitQuad(consumer, entry, minX, maxY, minZ, maxX, maxY, minZ, maxX, maxY, maxZ, minX, maxY, maxZ, 0f, 1f, 0f, red, green, blue, alpha)
+        emitQuad(consumer, entry, minX, minY, minZ, minX, minY, maxZ, maxX, minY, maxZ, maxX, minY, minZ, 0f, -1f, 0f, red, green, blue, alpha)
     }
 
     private fun emitQuad(
@@ -88,12 +92,15 @@ object PulsingCuboidRenderer {
         normalX: Float,
         normalY: Float,
         normalZ: Float,
+        red: Int,
+        green: Int,
+        blue: Int,
         alpha: Int,
     ) {
-        consumer.vertex(entry, x1, y1, z1).color(255, 255, 255, alpha).normal(entry, normalX, normalY, normalZ)
-        consumer.vertex(entry, x2, y2, z2).color(255, 255, 255, alpha).normal(entry, normalX, normalY, normalZ)
-        consumer.vertex(entry, x3, y3, z3).color(255, 255, 255, alpha).normal(entry, normalX, normalY, normalZ)
-        consumer.vertex(entry, x4, y4, z4).color(255, 255, 255, alpha).normal(entry, normalX, normalY, normalZ)
+        consumer.vertex(entry, x1, y1, z1).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
+        consumer.vertex(entry, x2, y2, z2).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
+        consumer.vertex(entry, x3, y3, z3).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
+        consumer.vertex(entry, x4, y4, z4).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
     }
 
     private fun pulsingAlpha(): Int {

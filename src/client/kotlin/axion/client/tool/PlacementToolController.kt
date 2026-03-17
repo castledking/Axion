@@ -77,7 +77,7 @@ object PlacementToolController {
             is CloneToolState.FirstCornerSet,
                 -> false
 
-            is CloneToolState.RegionDefined -> expandSelectionFace(state.region)
+            is CloneToolState.RegionDefined -> expandSelectionFace(client, state.region)
             is CloneToolState.PreviewingOffset -> reanchorPreview(state.preview)
             is CloneToolState.AwaitingConfirm -> reanchorPreview(state.preview)
         }
@@ -135,10 +135,12 @@ object PlacementToolController {
         return true
     }
 
-    private fun expandSelectionFace(region: BlockRegion): Boolean {
-        val expandedRegion = SelectionController.expandRegionToCurrentTarget(region) ?: return false
+    private fun expandSelectionFace(client: MinecraftClient, region: BlockRegion): Boolean {
+        val expandedRegion = SelectionController.expandRegionToCurrentTarget(client, region) ?: return false
         val mode = AxionClientState.placementToolState.modeOrNull() ?: activeMode() ?: return false
-        val firstCorner = AxionClientState.placementToolState.firstCornerOrNull() ?: expandedRegion.start
+        val firstCorner = AxionClientState.placementToolState.firstCornerOrNull()
+            ?.let { region.remapCorner(it, expandedRegion) }
+            ?: expandedRegion.start
         val nextState = CloneToolState.RegionDefined(mode, firstCorner, expandedRegion)
         AxionClientState.updatePlacementToolState(nextState)
         syncSelectionState(nextState)

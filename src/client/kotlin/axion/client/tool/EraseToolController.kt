@@ -63,8 +63,8 @@ object EraseToolController {
             return false
         }
 
-        val expanded = SelectionController.expandRegionToCurrentTarget(state.region) ?: return false
-        val nextState = EraseToolState.RegionDefined(state.firstCorner, expanded)
+        val expanded = SelectionController.expandRegionToCurrentTarget(client, state.region) ?: return false
+        val nextState = EraseToolState.RegionDefined(state.region.remapCorner(state.firstCorner, expanded), expanded)
         AxionClientState.updateEraseToolState(nextState)
         syncSelectionState(nextState)
         return true

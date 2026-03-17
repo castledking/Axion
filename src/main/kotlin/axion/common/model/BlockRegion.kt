@@ -3,6 +3,7 @@ package axion.common.model
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Box
 import net.minecraft.util.math.Vec3i
+import kotlin.math.abs
 
 data class BlockRegion(
     val start: BlockPos,
@@ -39,13 +40,32 @@ data class BlockRegion(
         val max = normalized.end
 
         return when (face) {
-            RegionFace.DOWN -> BlockRegion(BlockPos(min.x, minOf(target.y, max.y), min.z), max)
-            RegionFace.UP -> BlockRegion(min, BlockPos(max.x, maxOf(target.y, min.y), max.z))
-            RegionFace.NORTH -> BlockRegion(BlockPos(min.x, min.y, minOf(target.z, max.z)), max)
-            RegionFace.SOUTH -> BlockRegion(min, BlockPos(max.x, max.y, maxOf(target.z, min.z)))
-            RegionFace.WEST -> BlockRegion(BlockPos(minOf(target.x, max.x), min.y, min.z), max)
-            RegionFace.EAST -> BlockRegion(min, BlockPos(maxOf(target.x, min.x), max.y, max.z))
+            RegionFace.DOWN -> BlockRegion(BlockPos(min.x, minOf(target.y, min.y), min.z), max)
+            RegionFace.UP -> BlockRegion(min, BlockPos(max.x, maxOf(target.y, max.y), max.z))
+            RegionFace.NORTH -> BlockRegion(BlockPos(min.x, min.y, minOf(target.z, min.z)), max)
+            RegionFace.SOUTH -> BlockRegion(min, BlockPos(max.x, max.y, maxOf(target.z, max.z)))
+            RegionFace.WEST -> BlockRegion(BlockPos(minOf(target.x, min.x), min.y, min.z), max)
+            RegionFace.EAST -> BlockRegion(min, BlockPos(maxOf(target.x, max.x), max.y, max.z))
         }.normalized()
+    }
+
+    fun expandFaces(target: BlockPos, faces: Iterable<RegionFace>): BlockRegion {
+        return faces.fold(normalized()) { region, face ->
+            region.expandFace(face, target)
+        }
+    }
+
+    fun extendFace(face: RegionFace, amount: Int = 1): BlockRegion {
+        val normalized = normalized()
+        val clampedAmount = amount.coerceAtLeast(1)
+        return when (face) {
+            RegionFace.DOWN -> BlockRegion(normalized.start.add(0, -clampedAmount, 0), normalized.end)
+            RegionFace.UP -> BlockRegion(normalized.start, normalized.end.add(0, clampedAmount, 0))
+            RegionFace.NORTH -> BlockRegion(normalized.start.add(0, 0, -clampedAmount), normalized.end)
+            RegionFace.SOUTH -> BlockRegion(normalized.start, normalized.end.add(0, 0, clampedAmount))
+            RegionFace.WEST -> BlockRegion(normalized.start.add(-clampedAmount, 0, 0), normalized.end)
+            RegionFace.EAST -> BlockRegion(normalized.start, normalized.end.add(clampedAmount, 0, 0))
+        }
     }
 
     fun size(): Vec3i {
@@ -70,6 +90,16 @@ data class BlockRegion(
         )
     }
 
+    fun remapCorner(anchor: BlockPos, targetRegion: BlockRegion): BlockPos {
+        val source = normalized()
+        val target = targetRegion.normalized()
+        return BlockPos(
+            if (selectMinSide(anchor.x, source.start.x, source.end.x)) target.start.x else target.end.x,
+            if (selectMinSide(anchor.y, source.start.y, source.end.y)) target.start.y else target.end.y,
+            if (selectMinSide(anchor.z, source.start.z, source.end.z)) target.start.z else target.end.z,
+        )
+    }
+
     fun toBox(): Box {
         val normalized = normalized()
         return Box(
@@ -80,5 +110,13 @@ data class BlockRegion(
             normalized.end.y + 1.0,
             normalized.end.z + 1.0,
         )
+    }
+
+    private fun selectMinSide(value: Int, min: Int, max: Int): Boolean {
+        return when {
+            value <= min -> true
+            value >= max -> false
+            else -> abs(value - min) <= abs(value - max)
+        }
     }
 }

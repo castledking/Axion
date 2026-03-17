@@ -1,8 +1,6 @@
 package axion.client.render
 
-import axion.client.symmetry.SymmetryOperationExpander
 import axion.client.tool.SmearToolController
-import axion.common.operation.SmearRegionOperation
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext
 
 object SmearPreviewRenderer {
@@ -11,20 +9,10 @@ object SmearPreviewRenderer {
 
     fun render(context: WorldRenderContext) {
         val preview = SmearToolController.currentPreview() ?: return
-        val destinationRegions = SymmetryOperationExpander.expand(
-            SmearRegionOperation(
-                sourceRegion = preview.sourceRegion,
-                clipboardBuffer = preview.clipboardBuffer,
-                step = preview.step,
-                repeatCount = preview.repeatCount,
-            ),
-        ).filterIsInstance<SmearRegionOperation>()
-            .flatMap { operation ->
-                val source = operation.sourceRegion.normalized()
-                (1..operation.repeatCount).map { index ->
-                    source.offset(operation.step.multiply(index)).normalized()
-                }
-            }
+        val source = preview.sourceRegion.normalized()
+        val destinationRegions = (1..preview.repeatCount).map { index ->
+            source.offset(preview.step.multiply(index)).normalized()
+        }
             .distinct()
 
         if (destinationRegions.isEmpty()) {

@@ -69,8 +69,8 @@ object StackToolController {
             return false
         }
 
-        val expanded = SelectionController.expandRegionToCurrentTarget(state.region) ?: return false
-        val nextState = StackToolState.RegionDefined(state.firstCorner, expanded)
+        val expanded = SelectionController.expandRegionToCurrentTarget(client, state.region) ?: return false
+        val nextState = StackToolState.RegionDefined(state.region.remapCorner(state.firstCorner, expanded), expanded)
         AxionClientState.updateStackToolState(nextState)
         syncSelectionState(nextState)
         return true

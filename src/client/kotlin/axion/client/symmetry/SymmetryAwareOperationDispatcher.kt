@@ -34,22 +34,7 @@ class SymmetryAwareOperationDispatcher : OperationDispatcher {
             return
         }
 
-        val config = ActiveSymmetryConfig.current()
-        val expandedOperation = SymmetryOperationExpander.expand(operation, config).let { expanded ->
-            when (expanded.size) {
-                0 -> null
-                1 -> expanded.first()
-                else -> axion.common.operation.CompositeOperation(expanded)
-            }
-        } ?: return
-
-        val basePlan = planner.plan(targetWorld, expandedOperation)
-        val plan = if (operation is axion.common.operation.ExtrudeOperation) {
-            SymmetryWritePlanExpander.expand(basePlan, config)
-        } else {
-            basePlan
-        }
-
+        val plan = planner.plan(targetWorld, operation)
         if (plan.writes.isEmpty()) {
             return
         }

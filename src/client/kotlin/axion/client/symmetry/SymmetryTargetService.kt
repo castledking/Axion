@@ -16,10 +16,13 @@ object SymmetryTargetService {
                     target.face.direction.offsetY * 0.5,
                     target.face.direction.offsetZ * 0.5,
                 )
-                SymmetryAnchor(blockCenter.add(faceOffset))
+                SymmetryAnchor(
+                    position = blockCenter.add(faceOffset),
+                    face = target.face.direction,
+                )
             }
 
-            is AxionTarget.BlockTarget -> SymmetryAnchor(Vec3d.ofCenter(target.blockPos))
+            is AxionTarget.BlockTarget -> SymmetryAnchor(position = Vec3d.ofCenter(target.blockPos))
             AxionTarget.MissTarget -> null
         }
     }

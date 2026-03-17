@@ -66,15 +66,50 @@ object SelectionController {
         is SelectionState.RegionDefined -> state.firstCorner
     }
 
-    fun expandRegionToCurrentTarget(region: BlockRegion): BlockRegion? {
-        val targetBlock = currentTarget.blockPosOrNull()?.toImmutable() ?: return null
-        val hitPos = currentTarget.hitPosOrNull() ?: return null
-        val face = SelectionBounds.pickFace(region, hitPos)
-        return region.expandFace(face, targetBlock)
+    fun expandRegionToCurrentTarget(client: MinecraftClient, region: BlockRegion): BlockRegion? {
+        val targetBlock = currentTarget.blockPosOrNull()?.toImmutable()
+        val targetHitPos = currentTarget.hitPosOrNull()
+        if (targetBlock != null && targetHitPos != null) {
+            val outwardFace = SelectionBounds.outwardFaceToward(region, targetBlock, targetHitPos)
+            if (outwardFace != null) {
+                return region.expandFace(outwardFace, targetBlock)
+            }
+        }
+
+        val cameraEntity = client.cameraEntity ?: client.player ?: return null
+        val faceHit = SelectionBounds.raycastFace(
+            region = region,
+            origin = cameraEntity.getCameraPosVec(1.0f),
+            direction = cameraEntity.getRotationVec(1.0f),
+            maxDistance = AxionTargeting.DEFAULT_REACH,
+        ) ?: currentTarget.hitPosOrNull()?.let { hitPos ->
+            SelectionBounds.FaceHit(
+                face = SelectionBounds.pickFace(region, hitPos),
+                point = hitPos,
+            )
+        } ?: return null
+
+        return if (targetBlock != null && isBeyondFace(region, faceHit.face, targetBlock)) {
+            region.expandFace(faceHit.face, targetBlock)
+        } else {
+            region.extendFace(faceHit.face)
+        }
     }
 
     private fun isRegionSelectionContext(): Boolean {
         return AxionToolSelectionController.isAxionSlotActive() &&
             AxionToolSelectionController.selectedSubtool().usesRegionSelection
+    }
+
+    private fun isBeyondFace(region: BlockRegion, face: axion.common.model.RegionFace, target: BlockPos): Boolean {
+        val normalized = region.normalized()
+        return when (face) {
+            axion.common.model.RegionFace.DOWN -> target.y < normalized.start.y
+            axion.common.model.RegionFace.UP -> target.y > normalized.end.y
+            axion.common.model.RegionFace.NORTH -> target.z < normalized.start.z
+            axion.common.model.RegionFace.SOUTH -> target.z > normalized.end.z
+            axion.common.model.RegionFace.WEST -> target.x < normalized.start.x
+            axion.common.model.RegionFace.EAST -> target.x > normalized.end.x
+        }
     }
 }

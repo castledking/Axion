@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.gradle.language.jvm.tasks.ProcessResources
 
 plugins {
     id("fabric-loom") version "1.15.4"
@@ -37,13 +38,23 @@ dependencies {
     modImplementation("net.fabricmc:fabric-loader:${property("loader_version")}")
     modImplementation("net.fabricmc.fabric-api:fabric-api:${property("fabric_version")}")
     modImplementation("net.fabricmc:fabric-language-kotlin:${property("fabric_kotlin_version")}")
+    testImplementation(kotlin("test"))
 }
 
 tasks.processResources {
+    doFirst {
+        delete(layout.buildDirectory.dir("resources/main"))
+    }
     inputs.property("version", modVersion)
 
     filesMatching("fabric.mod.json") {
         expand("version" to modVersion)
+    }
+}
+
+tasks.named<ProcessResources>("processClientResources") {
+    doFirst {
+        delete(layout.buildDirectory.dir("resources/client"))
     }
 }
 
@@ -63,6 +74,10 @@ java {
     sourceCompatibility = JavaVersion.VERSION_21
     targetCompatibility = JavaVersion.VERSION_21
     withSourcesJar()
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 tasks.jar {

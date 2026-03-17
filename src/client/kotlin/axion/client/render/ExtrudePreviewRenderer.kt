@@ -2,9 +2,6 @@ package axion.client.render
 
 import axion.client.network.LocalWritePlanner
 import axion.client.selection.SelectionBounds
-import axion.client.symmetry.ActiveSymmetryConfig
-import axion.client.symmetry.SymmetryTransformService
-import axion.client.symmetry.SymmetryWritePlanExpander
 import axion.client.tool.ExtrudeCommitService
 import axion.client.tool.ExtrudeToolController
 import axion.common.operation.ExtrudeMode
@@ -28,18 +25,13 @@ object ExtrudePreviewRenderer {
         val world = client.world ?: return
         val camera = client.gameRenderer.camera ?: return
         val cameraPos = camera.cameraPos
-        val consumers = context.consumers() ?: return
+        val consumers = context.consumers()
         val consumer = consumers.getBuffer(RenderLayers.lines())
         val matrixStack = context.matrices()
-        val config = ActiveSymmetryConfig.current()
-        val sourcePositions = if (ActiveSymmetryConfig.hasDerivedTransforms(config)) {
-            SymmetryTransformService.transformedBlocks(config!!, preview.footprint)
-        } else {
-            preview.footprint
-        }
-        val destinationPlan = SymmetryWritePlanExpander.expand(
-            LocalWritePlanner().plan(world, ExtrudeCommitService.toOperation(preview, ExtrudeMode.EXTEND)),
-            config,
+        val sourcePositions = preview.footprint
+        val destinationPlan = LocalWritePlanner().plan(
+            world,
+            ExtrudeCommitService.toOperation(preview, ExtrudeMode.EXTEND),
         )
         val destinationPositions = destinationPlan.writes.map { it.pos }.distinct()
 

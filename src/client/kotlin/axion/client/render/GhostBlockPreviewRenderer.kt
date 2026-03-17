@@ -11,11 +11,14 @@ import net.minecraft.util.math.Box
 object GhostBlockPreviewRenderer {
     private const val GHOST_ALPHA: Int = 44
     private const val MAX_GHOST_BLOCKS: Int = 1536
+    private const val DEFAULT_GHOST_COLOR: Int = 0xFFFFFFFF.toInt()
 
     fun render(
         context: WorldRenderContext,
         clipboard: ClipboardBuffer,
         origins: Collection<BlockPos>,
+        color: Int = DEFAULT_GHOST_COLOR,
+        alpha: Int = GHOST_ALPHA,
     ) {
         if (origins.isEmpty()) {
             return
@@ -56,7 +59,8 @@ object GhostBlockPreviewRenderer {
                             blockPos.y + maxY,
                             blockPos.z + maxZ,
                         ),
-                        alpha = GHOST_ALPHA,
+                        alpha = alpha,
+                        color = color,
                     )
                 }
             }

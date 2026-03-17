@@ -1,6 +1,5 @@
 package axion.client.input
 
-import axion.client.selection.SelectionController
 import axion.client.symmetry.SymmetryController
 import axion.client.symmetry.SymmetryPlacementController
 import axion.client.tool.AxionToolSelectionController
@@ -56,7 +55,8 @@ object AxionInteractionRouter {
     }
 
     fun consumePrimaryAction(client: MinecraftClient): Boolean {
-        if (!handlePrimaryAction(client)) {
+        val handled = handlePrimaryAction(client)
+        if (!handled && !shouldCapturePrimaryAction()) {
             return false
         }
 
@@ -66,7 +66,8 @@ object AxionInteractionRouter {
     }
 
     fun consumeSecondaryAction(client: MinecraftClient): Boolean {
-        if (!handleSecondaryAction(client)) {
+        val handled = handleSecondaryAction(client)
+        if (!handled && !shouldCaptureSecondaryAction()) {
             return false
         }
 
@@ -176,5 +177,13 @@ object AxionInteractionRouter {
             scrollAmount = scrollAmount,
             altHeld = altHeld,
         )
+    }
+
+    private fun shouldCapturePrimaryAction(): Boolean {
+        return AxionToolSelectionController.isAxionSlotActive()
+    }
+
+    private fun shouldCaptureSecondaryAction(): Boolean {
+        return AxionToolSelectionController.isAxionSlotActive()
     }
 }

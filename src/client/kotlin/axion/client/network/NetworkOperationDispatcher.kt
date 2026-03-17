@@ -1,7 +1,5 @@
 package axion.client.network
 
-import axion.client.symmetry.SymmetryOperationExpander
-import axion.client.symmetry.ActiveSymmetryConfig
 import axion.common.operation.SmearRegionOperation
 import axion.common.operation.StackRegionOperation
 import axion.common.operation.ClearRegionOperation
@@ -11,28 +9,23 @@ import axion.common.operation.EditOperation
 import axion.common.operation.ExtrudeOperation
 import axion.common.operation.OperationDispatcher
 import axion.protocol.ClipboardCellPayload
-import axion.protocol.AxionOperationType
 import axion.protocol.AxionExtrudeMode
 import axion.protocol.AxionProtocolCodec
 import axion.protocol.AxionRemoteOperation
 import axion.protocol.ClearRegionRequest
 import axion.protocol.CloneRegionRequest
-import axion.protocol.DoubleVector3
 import axion.protocol.ExtrudeRequest
 import axion.protocol.IntVector3
 import axion.protocol.OperationBatchRequest
 import axion.protocol.SmearRegionRequest
 import axion.protocol.StackRegionRequest
-import axion.protocol.SymmetryConfigPayload
 import net.minecraft.command.argument.BlockArgumentParser
 
 class NetworkOperationDispatcher : OperationDispatcher {
     override fun dispatch(operation: EditOperation) {
         val flattened = flattenOperations(operation)
-        val expanded = SymmetryOperationExpander.expand(operation)
-        val remoteOperations = expanded.flatMap(::flattenOperations).mapNotNull(::toRemoteOperation)
-        val expandedFlat = expanded.flatMap(::flattenOperations)
-        if (remoteOperations.size != expandedFlat.size) {
+        val remoteOperations = flattened.mapNotNull(::toRemoteOperation)
+        if (remoteOperations.size != flattened.size) {
             AxionServerConnection.notifyPlayerOnce("This Axion tool is not server-backed yet.")
             return
         }
@@ -58,7 +51,7 @@ class NetworkOperationDispatcher : OperationDispatcher {
                 OperationBatchRequest(
                     requestId = requestId,
                     operations = remoteOperations,
-                    usesSymmetry = expandedFlat != flattened || remoteOperations.any { it is ExtrudeRequest && it.symmetry != null },
+                    usesSymmetry = false,
                 ),
             ),
         )
@@ -120,19 +113,7 @@ class NetworkOperationDispatcher : OperationDispatcher {
                     axion.common.operation.ExtrudeMode.EXTEND -> AxionExtrudeMode.EXTEND
                     axion.common.operation.ExtrudeMode.SHRINK -> AxionExtrudeMode.SHRINK
                 },
-                symmetry = ActiveSymmetryConfig.current()
-                    ?.takeIf(ActiveSymmetryConfig::hasDerivedTransforms)
-                    ?.let { config ->
-                        SymmetryConfigPayload(
-                            anchor = DoubleVector3(
-                                config.anchor.position.x,
-                                config.anchor.position.y,
-                                config.anchor.position.z,
-                            ),
-                            rotationalEnabled = config.rotationalEnabled,
-                            mirrorYEnabled = config.mirrorYEnabled,
-                        )
-                    },
+                symmetry = null,
             )
 
             else -> null
