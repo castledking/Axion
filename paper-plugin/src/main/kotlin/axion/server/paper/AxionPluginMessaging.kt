@@ -5,6 +5,7 @@ import axion.protocol.AxionProtocol
 import axion.protocol.AxionProtocolCodec
 import axion.protocol.AxionTransportCodec
 import axion.protocol.ClientHello
+import axion.protocol.NoClipStateRequest
 import axion.protocol.OperationBatchRequest
 import axion.protocol.OperationBatchResult
 import axion.protocol.RedoRequest
@@ -16,6 +17,7 @@ import org.bukkit.plugin.messaging.PluginMessageListener
 class AxionPluginMessaging(
     private val plugin: AxionPaperPlugin,
     private val policyService: AxionPolicyService,
+    private val noClipService: AxionNoClipService,
 ) : PluginMessageListener {
     private val timingStats = AxionTimingStatsTracker(
         plugin = plugin,
@@ -34,11 +36,21 @@ class AxionPluginMessaging(
             return
         }
 
-        when (val decoded = AxionProtocolCodec.decodeClientMessage(message)) {
+        val decoded = decodeClientMessage(message) ?: return
+        when (decoded) {
             is ClientHello -> handleHello(player, decoded)
+            is NoClipStateRequest -> handleNoClipState(player, decoded)
             is OperationBatchRequest -> handleOperationBatch(player, decoded)
             is UndoRequest -> handleUndo(player, decoded)
             is RedoRequest -> handleRedo(player, decoded)
+        }
+    }
+
+    private fun decodeClientMessage(message: ByteArray): AxionClientMessage? {
+        return if (AxionTransportCodec.isClientFrame(message)) {
+            AxionClientMessageAssembler.consume(message)
+        } else {
+            AxionProtocolCodec.decodeClientMessage(message)
         }
     }
 
@@ -66,6 +78,10 @@ class AxionPluginMessaging(
             plannedWriteCount = request.operations.sumOf { operationService.estimatedWriteCount(it) },
             timing = timing,
         )
+    }
+
+    private fun handleNoClipState(player: Player, request: NoClipStateRequest) {
+        noClipService.setArmed(player, request.armed)
     }
 
     private fun handleUndo(player: Player, request: UndoRequest) {
@@ -160,6 +176,7 @@ class AxionPluginMessaging(
             types.contains(axion.protocol.AxionOperationType.STACK_REGION) -> "Stack"
             types.contains(axion.protocol.AxionOperationType.SMEAR_REGION) -> "Smear"
             types.contains(axion.protocol.AxionOperationType.EXTRUDE) -> "Extrude"
+            types.contains(axion.protocol.AxionOperationType.PLACE_BLOCKS) -> "Place"
             types == setOf(axion.protocol.AxionOperationType.CLEAR_REGION) -> "Erase"
             else -> "Edit"
         }

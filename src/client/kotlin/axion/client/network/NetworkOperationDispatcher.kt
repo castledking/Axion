@@ -1,27 +1,31 @@
 package axion.client.network
 
-import axion.common.operation.SmearRegionOperation
-import axion.common.operation.StackRegionOperation
 import axion.common.operation.ClearRegionOperation
 import axion.common.operation.CloneRegionOperation
 import axion.common.operation.CompositeOperation
 import axion.common.operation.EditOperation
 import axion.common.operation.ExtrudeOperation
 import axion.common.operation.OperationDispatcher
-import axion.protocol.ClipboardCellPayload
+import axion.common.operation.SmearRegionOperation
+import axion.common.operation.StackRegionOperation
+import axion.common.operation.SymmetryPlacementOperation
 import axion.protocol.AxionExtrudeMode
-import axion.protocol.AxionProtocolCodec
 import axion.protocol.AxionRemoteOperation
+import axion.protocol.ClipboardCellPayload
 import axion.protocol.ClearRegionRequest
 import axion.protocol.CloneRegionRequest
 import axion.protocol.ExtrudeRequest
 import axion.protocol.IntVector3
 import axion.protocol.OperationBatchRequest
+import axion.protocol.PlaceBlocksRequest
+import axion.protocol.PlacedBlockPayload
 import axion.protocol.SmearRegionRequest
 import axion.protocol.StackRegionRequest
 import net.minecraft.command.argument.BlockArgumentParser
 
-class NetworkOperationDispatcher : OperationDispatcher {
+class NetworkOperationDispatcher(
+    private val recordHistory: Boolean = true,
+) : OperationDispatcher {
     override fun dispatch(operation: EditOperation) {
         val flattened = flattenOperations(operation)
         val remoteOperations = flattened.mapNotNull(::toRemoteOperation)
@@ -46,13 +50,12 @@ class NetworkOperationDispatcher : OperationDispatcher {
         AxionServerConnection.clearStatusMessage(AxionServerConnection.PLUGIN_REQUIRED_MESSAGE)
         val requestId = AxionServerConnection.nextRequestId()
         AxionRequestTracker.register(requestId, AxionRequestTracker.RequestKind.Operation)
-        AxionServerConnection.sendClientBytes(
-            AxionProtocolCodec.encodeClientMessage(
-                OperationBatchRequest(
-                    requestId = requestId,
-                    operations = remoteOperations,
-                    usesSymmetry = false,
-                ),
+        AxionServerConnection.sendClientMessage(
+            OperationBatchRequest(
+                requestId = requestId,
+                operations = remoteOperations,
+                usesSymmetry = false,
+                recordHistory = recordHistory,
             ),
         )
     }
@@ -114,6 +117,16 @@ class NetworkOperationDispatcher : OperationDispatcher {
                     axion.common.operation.ExtrudeMode.SHRINK -> AxionExtrudeMode.SHRINK
                 },
                 symmetry = null,
+            )
+
+            is SymmetryPlacementOperation -> PlaceBlocksRequest(
+                placements = operation.placements.map { placement ->
+                    PlacedBlockPayload(
+                        pos = placement.pos.toProtocolVector(),
+                        blockState = BlockArgumentParser.stringifyBlockState(placement.state),
+                        blockEntityData = placement.blockEntityData?.nbt?.toString(),
+                    )
+                },
             )
 
             else -> null

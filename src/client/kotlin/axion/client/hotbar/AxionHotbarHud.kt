@@ -24,6 +24,9 @@ object AxionHotbarHud {
         if (client.options.hudHidden) {
             return
         }
+        if (!AxionToolSelectionController.isCreativeModeAllowed()) {
+            return
+        }
 
         val sideSlot = AxionHudLayout.sideSlot(
             client = client,

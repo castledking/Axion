@@ -6,13 +6,20 @@ plugins {
 group = rootProject.group
 version = rootProject.version
 
+base {
+    archivesName.set("axion-plugin")
+}
+
 repositories {
     maven("https://repo.papermc.io/repository/maven-public/")
+    maven("https://repo.codemc.io/repository/maven-releases/")
+    maven("https://repo.codemc.io/repository/maven-snapshots/")
     mavenCentral()
 }
 
 dependencies {
     implementation(project(":protocol"))
+    compileOnly("com.github.retrooper:packetevents-spigot:2.11.2")
     paperweight.paperDevBundle("${property("paper_version")}")
 }
 

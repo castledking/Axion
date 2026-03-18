@@ -1,6 +1,7 @@
 package axion.client.input
 
 import axion.client.history.UndoRedoController
+import axion.client.mode.ClientModeController
 import axion.client.network.AxionServerConnection
 import axion.client.selection.SelectionController
 import axion.client.symmetry.SymmetryController
@@ -18,49 +19,58 @@ object AxionTickHandler {
         AxionInteractionRouter.onEndTick(client)
         val player = client.player ?: return
         AxionToolSelectionController.syncWithPlayerSlot(player.inventory.selectedSlot)
+        ClientModeController.enforceCreativeMode(client)
+        if (client.currentScreen == null) {
+            ClientModeController.handleToggleKeypresses(client)
 
-        while (AxionKeybindings.selectAxionTool.wasPressed()) {
-            AxionToolSelectionController.toggleAxionTool(player.inventory.selectedSlot)
-        }
+            while (AxionKeybindings.selectAxionTool.wasPressed()) {
+                AxionToolSelectionController.toggleAxionTool(player.inventory.selectedSlot)
+            }
 
-        while (AxionKeybindings.nextSubtool.wasPressed()) {
-            AxionToolSelectionController.cycleSubtool(step = 1)
-        }
+            while (AxionKeybindings.nextSubtool.wasPressed()) {
+                AxionToolSelectionController.cycleSubtool(step = 1)
+            }
 
-        while (AxionKeybindings.previousSubtool.wasPressed()) {
-            AxionToolSelectionController.cycleSubtool(step = -1)
-        }
+            while (AxionKeybindings.previousSubtool.wasPressed()) {
+                AxionToolSelectionController.cycleSubtool(step = -1)
+            }
 
-        while (AxionKeybindings.toolDeleteAction.wasPressed()) {
-            AxionInteractionRouter.handleDeleteAction(client)
-        }
+            while (AxionKeybindings.toolDeleteAction.wasPressed()) {
+                AxionInteractionRouter.handleDeleteAction(client)
+            }
 
-        while (AxionKeybindings.symmetryToggleRotation.wasPressed()) {
-            SymmetryController.toggleRotational()
-        }
-
-        while (AxionKeybindings.symmetryToggleMirror.wasPressed()) {
-            SymmetryController.toggleMirrorY()
-        }
-
-        while (AxionKeybindings.undoAction.wasPressed()) {
-            if (client.currentScreen == null && AxionModifierKeys.isControlDown(client)) {
-                if (AxionModifierKeys.isShiftDown(client)) {
-                    UndoRedoController.redo(client)
-                } else {
-                    UndoRedoController.undo(client)
+            while (AxionKeybindings.symmetryToggleRotation.wasPressed()) {
+                if (!PlacementToolController.handleRotateAction()) {
+                    SymmetryController.toggleRotational()
                 }
             }
-        }
 
-        while (AxionKeybindings.redoAction.wasPressed()) {
-            if (client.currentScreen == null && AxionModifierKeys.isControlDown(client)) {
-                UndoRedoController.redo(client)
+            while (AxionKeybindings.symmetryToggleMirror.wasPressed()) {
+                if (!PlacementToolController.handleMirrorAction()) {
+                    SymmetryController.toggleMirrorY()
+                }
+            }
+
+            while (AxionKeybindings.undoAction.wasPressed()) {
+                if (AxionModifierKeys.isControlDown(client)) {
+                    if (AxionModifierKeys.isShiftDown(client)) {
+                        UndoRedoController.redo(client)
+                    } else {
+                        UndoRedoController.undo(client)
+                    }
+                }
+            }
+
+            while (AxionKeybindings.redoAction.wasPressed()) {
+                if (AxionModifierKeys.isControlDown(client)) {
+                    UndoRedoController.redo(client)
+                }
             }
         }
 
         SelectionController.onEndTick(client)
         SymmetryController.onEndTick(client)
+        ClientModeController.onEndTick(client)
         PlacementToolController.onEndTick(client)
         EraseToolController.onEndTick(client)
         StackToolController.onEndTick(client)

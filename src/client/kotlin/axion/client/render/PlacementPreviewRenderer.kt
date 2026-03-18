@@ -2,11 +2,7 @@ package axion.client.render
 
 import axion.client.selection.SelectionBounds
 import axion.client.tool.PlacementToolController
-import axion.client.tool.PlacementCommitService
 import axion.client.tool.PlacementToolMode
-import axion.common.operation.CloneRegionOperation
-import axion.common.operation.CompositeOperation
-import axion.common.operation.EditOperation
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext
 
 object PlacementPreviewRenderer {
@@ -24,15 +20,6 @@ object PlacementPreviewRenderer {
             PlacementToolMode.CLONE -> CLONE_DESTINATION_COLOR
             PlacementToolMode.MOVE -> MOVE_DESTINATION_COLOR
         }
-        val cloneOperations = flattenOperations(PlacementCommitService.toOperation(preview))
-            .filterIsInstance<CloneRegionOperation>()
-        if (cloneOperations.isEmpty()) {
-            return
-        }
-
-        val destinationRegions = cloneOperations.map { operation ->
-            preview.sourceRegion.offset(operation.destinationOrigin.subtract(preview.sourceRegion.minCorner())).normalized()
-        }
         if (preview.mode == PlacementToolMode.MOVE) {
             PulsingCuboidRenderer.render(
                 context = context,
@@ -42,33 +29,24 @@ object PlacementPreviewRenderer {
             )
             GhostBlockPreviewRenderer.render(
                 context = context,
-                clipboard = preview.clipboardBuffer,
+                clipboard = preview.sourceClipboardBuffer,
                 origins = listOf(preview.sourceRegion.minCorner()),
                 color = MOVE_SOURCE_COLOR,
                 alpha = MOVE_SOURCE_GHOST_ALPHA,
             )
         }
-        destinationRegions.forEach { region ->
-            PulsingCuboidRenderer.render(
-                context = context,
-                box = SelectionBounds.outlineBox(SelectionBounds.regionBox(region)),
-                outlineColor = destinationColor,
-                lineWidth = LINE_WIDTH,
-            )
-        }
+        PulsingCuboidRenderer.render(
+            context = context,
+            box = SelectionBounds.outlineBox(SelectionBounds.regionBox(preview.destinationRegion)),
+            outlineColor = destinationColor,
+            lineWidth = LINE_WIDTH,
+        )
         GhostBlockPreviewRenderer.render(
             context = context,
-            clipboard = preview.clipboardBuffer,
-            origins = cloneOperations.map { it.destinationOrigin },
+            clipboard = preview.destinationClipboardBuffer,
+            origins = listOf(preview.destinationRegion.minCorner()),
             color = destinationColor,
             alpha = if (preview.mode == PlacementToolMode.MOVE) MOVE_DESTINATION_GHOST_ALPHA else DEFAULT_GHOST_ALPHA,
         )
-    }
-
-    private fun flattenOperations(operation: EditOperation): List<EditOperation> {
-        return when (operation) {
-            is CompositeOperation -> operation.operations.flatMap(::flattenOperations)
-            else -> listOf(operation)
-        }
     }
 }

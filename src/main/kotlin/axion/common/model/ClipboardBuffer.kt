@@ -8,7 +8,11 @@ data class ClipboardBuffer(
     val size: Vec3i,
     val cells: List<ClipboardCell>,
 ) {
-    fun nonAirCells(): List<ClipboardCell> = cells.filterNot { it.state.isAir }
+    private val cachedNonAirCells: List<ClipboardCell> by lazy(LazyThreadSafetyMode.NONE) {
+        cells.filterNot { it.state.isAir }
+    }
+
+    fun nonAirCells(): List<ClipboardCell> = cachedNonAirCells
 }
 
 data class ClipboardCell(

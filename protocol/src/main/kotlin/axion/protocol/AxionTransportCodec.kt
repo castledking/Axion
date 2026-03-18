@@ -15,8 +15,8 @@ enum class AxionCompressionMode {
 object AxionTransportCodec {
     const val COMPRESSION_THRESHOLD_BYTES: Int = 32 * 1024
     const val MAX_CHUNK_BYTES: Int = 24 * 1024
-    const val MAX_SERIALIZED_BYTES: Int = 2 * 1024 * 1024
-    const val MAX_CHUNKS: Int = 128
+    const val MAX_SERIALIZED_BYTES: Int = 8 * 1024 * 1024
+    const val MAX_CHUNKS: Int = 512
 
     fun encodeServerMessage(message: AxionServerMessage, transferId: Long): List<ByteArray> {
         val rawPayload = AxionProtocolCodec.encodeServerMessage(message)
@@ -52,6 +52,40 @@ object AxionTransportCodec {
         }
     }
 
+    fun encodeClientMessage(message: AxionClientMessage, transferId: Long): List<ByteArray> {
+        val rawPayload = AxionProtocolCodec.encodeClientMessage(message)
+        require(rawPayload.size <= MAX_SERIALIZED_BYTES) {
+            "Serialized Axion message exceeded maximum size"
+        }
+
+        val compression = if (rawPayload.size >= COMPRESSION_THRESHOLD_BYTES) {
+            AxionCompressionMode.GZIP
+        } else {
+            AxionCompressionMode.NONE
+        }
+        val encodedPayload = applyCompression(rawPayload, compression)
+        if (encodedPayload.size <= MAX_CHUNK_BYTES) {
+            return listOf(encodeClientSingleFrame(compression, encodedPayload))
+        }
+
+        val chunkCount = ((encodedPayload.size + MAX_CHUNK_BYTES - 1) / MAX_CHUNK_BYTES)
+        require(chunkCount <= MAX_CHUNKS) {
+            "Axion message required too many chunks"
+        }
+
+        return List(chunkCount) { chunkIndex ->
+            val start = chunkIndex * MAX_CHUNK_BYTES
+            val end = minOf(encodedPayload.size, start + MAX_CHUNK_BYTES)
+            encodeClientChunkFrame(
+                transferId = transferId,
+                compression = compression,
+                chunkCount = chunkCount,
+                chunkIndex = chunkIndex,
+                payload = encodedPayload.copyOfRange(start, end),
+            )
+        }
+    }
+
     fun decodeServerFrame(bytes: ByteArray): DecodedServerFrame {
         DataInputStream(ByteArrayInputStream(bytes)).use { input ->
             return when (input.readUnsignedByte()) {
@@ -78,8 +112,50 @@ object AxionTransportCodec {
         }
     }
 
+    fun isClientFrame(bytes: ByteArray): Boolean {
+        return bytes.size >= CLIENT_MAGIC.size &&
+            bytes[0] == CLIENT_MAGIC[0] &&
+            bytes[1] == CLIENT_MAGIC[1] &&
+            bytes[2] == CLIENT_MAGIC[2]
+    }
+
+    fun decodeClientFrame(bytes: ByteArray): DecodedClientFrame {
+        require(isClientFrame(bytes)) {
+            "Unknown Axion client transport frame"
+        }
+
+        DataInputStream(ByteArrayInputStream(bytes)).use { input ->
+            repeat(CLIENT_MAGIC.size) { input.readByte() }
+            return when (input.readUnsignedByte()) {
+                SINGLE_FRAME -> {
+                    val compression = AxionCompressionMode.entries[input.readUnsignedByte()]
+                    val payload = input.readNBytes(input.readInt())
+                    DecodedClientFrame.Complete(
+                        decodeClientPayload(payload, compression),
+                    )
+                }
+
+                CHUNK_FRAME -> {
+                    DecodedClientFrame.Chunk(
+                        transferId = input.readLong(),
+                        compression = AxionCompressionMode.entries[input.readUnsignedByte()],
+                        chunkCount = input.readInt(),
+                        chunkIndex = input.readInt(),
+                        payload = input.readNBytes(input.readInt()),
+                    )
+                }
+
+                else -> error("Unknown Axion client transport frame")
+            }
+        }
+    }
+
     fun decodeServerPayload(payload: ByteArray, compression: AxionCompressionMode): AxionServerMessage {
         return AxionProtocolCodec.decodeServerMessage(removeCompression(payload, compression))
+    }
+
+    fun decodeClientPayload(payload: ByteArray, compression: AxionCompressionMode): AxionClientMessage {
+        return AxionProtocolCodec.decodeClientMessage(removeCompression(payload, compression))
     }
 
     fun removeCompression(payload: ByteArray, compression: AxionCompressionMode): ByteArray {
@@ -134,6 +210,42 @@ object AxionTransportCodec {
         return output.toByteArray()
     }
 
+    private fun encodeClientSingleFrame(
+        compression: AxionCompressionMode,
+        payload: ByteArray,
+    ): ByteArray {
+        val output = ByteArrayOutputStream()
+        DataOutputStream(output).use { data ->
+            data.write(CLIENT_MAGIC)
+            data.writeByte(SINGLE_FRAME)
+            data.writeByte(compression.ordinal)
+            data.writeInt(payload.size)
+            data.write(payload)
+        }
+        return output.toByteArray()
+    }
+
+    private fun encodeClientChunkFrame(
+        transferId: Long,
+        compression: AxionCompressionMode,
+        chunkCount: Int,
+        chunkIndex: Int,
+        payload: ByteArray,
+    ): ByteArray {
+        val output = ByteArrayOutputStream()
+        DataOutputStream(output).use { data ->
+            data.write(CLIENT_MAGIC)
+            data.writeByte(CHUNK_FRAME)
+            data.writeLong(transferId)
+            data.writeByte(compression.ordinal)
+            data.writeInt(chunkCount)
+            data.writeInt(chunkIndex)
+            data.writeInt(payload.size)
+            data.write(payload)
+        }
+        return output.toByteArray()
+    }
+
     sealed interface DecodedServerFrame {
         data class Complete(
             val message: AxionServerMessage,
@@ -148,6 +260,21 @@ object AxionTransportCodec {
         ) : DecodedServerFrame
     }
 
+    sealed interface DecodedClientFrame {
+        data class Complete(
+            val message: AxionClientMessage,
+        ) : DecodedClientFrame
+
+        data class Chunk(
+            val transferId: Long,
+            val compression: AxionCompressionMode,
+            val chunkCount: Int,
+            val chunkIndex: Int,
+            val payload: ByteArray,
+        ) : DecodedClientFrame
+    }
+
     private const val SINGLE_FRAME: Int = 1
     private const val CHUNK_FRAME: Int = 2
+    private val CLIENT_MAGIC: ByteArray = byteArrayOf('A'.code.toByte(), 'X'.code.toByte(), 'C'.code.toByte())
 }

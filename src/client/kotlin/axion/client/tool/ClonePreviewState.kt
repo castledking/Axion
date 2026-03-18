@@ -9,8 +9,10 @@ data class ClonePreviewState(
     val mode: PlacementToolMode,
     val firstCorner: BlockPos,
     val sourceRegion: BlockRegion,
-    val clipboardBuffer: ClipboardBuffer,
+    val sourceClipboardBuffer: ClipboardBuffer,
+    val destinationClipboardBuffer: ClipboardBuffer,
     val anchor: BlockPos,
     val offset: Vec3i,
     val destinationRegion: BlockRegion,
+    val transform: PlacementTransform = PlacementTransform(),
 )

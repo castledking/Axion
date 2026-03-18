@@ -3,6 +3,7 @@ package axion.client.tool
 import axion.client.AxionClientState
 import axion.common.model.AxionSubtool
 import axion.common.model.ToolSelectionState
+import net.minecraft.client.MinecraftClient
 import net.minecraft.util.math.MathHelper
 
 object AxionToolSelectionController {
@@ -12,13 +13,22 @@ object AxionToolSelectionController {
 
     fun currentState(): ToolSelectionState = AxionClientState.toolSelectionState
 
-    fun isAxionSlotActive(): Boolean = currentState() is ToolSelectionState.Axion
+    fun isCreativeModeAllowed(): Boolean = MinecraftClient.getInstance().player?.isInCreativeMode == true
+
+    fun isAxionSlotActive(): Boolean = isCreativeModeAllowed() && currentState() is ToolSelectionState.Axion
 
     fun isAxionSelected(): Boolean = isAxionSlotActive()
 
     fun selectedSubtool(): AxionSubtool = AxionClientState.selectedSubtool
 
     fun syncWithPlayerSlot(selectedSlot: Int) {
+        if (!isCreativeModeAllowed()) {
+            if (currentState() is ToolSelectionState.Axion) {
+                AxionClientState.updateToolSelection(ToolSelectionState.Vanilla(selectedSlot))
+            }
+            return
+        }
+
         when (val state = currentState()) {
             is ToolSelectionState.Vanilla -> {
                 if (state.slot != selectedSlot) {
@@ -35,6 +45,10 @@ object AxionToolSelectionController {
     }
 
     fun toggleAxionTool(selectedSlot: Int) {
+        if (!isCreativeModeAllowed()) {
+            return
+        }
+
         when (currentState()) {
             is ToolSelectionState.Axion -> AxionClientState.updateToolSelection(ToolSelectionState.Vanilla(selectedSlot))
             is ToolSelectionState.Vanilla -> AxionClientState.updateToolSelection(ToolSelectionState.Axion(selectedSlot))
@@ -42,6 +56,10 @@ object AxionToolSelectionController {
     }
 
     fun cycleSubtool(step: Int) {
+        if (!isCreativeModeAllowed()) {
+            return
+        }
+
         val state = currentState()
         if (state !is ToolSelectionState.Axion || step == 0) {
             return
@@ -51,6 +69,10 @@ object AxionToolSelectionController {
     }
 
     fun handleHotbarScroll(currentVanillaSlot: Int, scrollAmount: Double, altHeld: Boolean): ScrollOutcome {
+        if (!isCreativeModeAllowed()) {
+            return ScrollOutcome.PassThrough
+        }
+
         val direction = scrollAmount.compareTo(0.0)
         if (direction == 0) {
             return ScrollOutcome.PassThrough

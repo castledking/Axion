@@ -18,6 +18,7 @@ enum class AxionOperationType {
     STACK_REGION,
     SMEAR_REGION,
     EXTRUDE,
+    PLACE_BLOCKS,
 }
 
 enum class AxionResultCode {
@@ -60,6 +61,7 @@ data class OperationBatchRequest(
     val requestId: Long,
     val operations: List<AxionRemoteOperation>,
     val usesSymmetry: Boolean = false,
+    val recordHistory: Boolean = true,
 ) : AxionClientMessage
 
 data class UndoRequest(
@@ -70,6 +72,10 @@ data class UndoRequest(
 data class RedoRequest(
     val requestId: Long,
     val transactionId: Long,
+) : AxionClientMessage
+
+data class NoClipStateRequest(
+    val armed: Boolean,
 ) : AxionClientMessage
 
 sealed interface AxionRemoteOperation {
@@ -93,6 +99,12 @@ data class CloneRegionRequest(
 
 data class ClipboardCellPayload(
     val offset: IntVector3,
+    val blockState: String,
+    val blockEntityData: String? = null,
+)
+
+data class PlacedBlockPayload(
+    val pos: IntVector3,
     val blockState: String,
     val blockEntityData: String? = null,
 )
@@ -136,6 +148,12 @@ data class ExtrudeRequest(
     val symmetry: SymmetryConfigPayload? = null,
 ) : AxionRemoteOperation {
     override val type: AxionOperationType = AxionOperationType.EXTRUDE
+}
+
+data class PlaceBlocksRequest(
+    val placements: List<PlacedBlockPayload>,
+) : AxionRemoteOperation {
+    override val type: AxionOperationType = AxionOperationType.PLACE_BLOCKS
 }
 
 sealed interface AxionServerMessage

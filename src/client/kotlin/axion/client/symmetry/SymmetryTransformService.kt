@@ -2,6 +2,7 @@ package axion.client.symmetry
 
 import axion.common.model.SymmetryConfig
 import net.minecraft.util.math.BlockPos
+import net.minecraft.util.math.Direction
 import net.minecraft.util.math.Vec3d
 import net.minecraft.util.math.Vec3i
 
@@ -66,6 +67,18 @@ object SymmetryTransformService {
             Vec3i(rotated.x, -rotated.y, rotated.z)
         } else {
             rotated
+        }
+    }
+
+    fun transformDirection(
+        direction: Direction,
+        transform: SymmetryTransformSpec,
+    ): Direction {
+        val transformed = transformVector(direction.vector, transform)
+        return Direction.entries.first { candidate ->
+            candidate.offsetX == transformed.x &&
+                candidate.offsetY == transformed.y &&
+                candidate.offsetZ == transformed.z
         }
     }
 

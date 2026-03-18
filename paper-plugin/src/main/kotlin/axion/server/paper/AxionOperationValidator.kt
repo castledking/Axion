@@ -5,6 +5,7 @@ import axion.protocol.ClearRegionRequest
 import axion.protocol.CloneRegionRequest
 import axion.protocol.ExtrudeRequest
 import axion.protocol.IntVector3
+import axion.protocol.PlaceBlocksRequest
 import axion.protocol.AxionResultCode
 import axion.protocol.AxionResultSource
 import axion.protocol.SmearRegionRequest
@@ -33,6 +34,7 @@ class AxionOperationValidator(
             is StackRegionRequest -> validateRepeatedClipboard(operation.sourceOrigin, operation.cells, operation.step, operation.repeatCount)
             is SmearRegionRequest -> validateRepeatedClipboard(operation.sourceOrigin, operation.cells, operation.step, operation.repeatCount)
             is ExtrudeRequest -> validateExtrude(operation)
+            is PlaceBlocksRequest -> validatePlacedBlocks(operation)
         }
     }
 
@@ -43,7 +45,21 @@ class AxionOperationValidator(
             is StackRegionRequest -> operation.cells.size * maxOf(operation.repeatCount, 0)
             is SmearRegionRequest -> operation.cells.size * maxOf(operation.repeatCount, 0)
             is ExtrudeRequest -> policy.maxExtrudeWrites
+            is PlaceBlocksRequest -> operation.placements.size
         }
+    }
+
+    private fun validatePlacedBlocks(operation: PlaceBlocksRequest): AxionRejection? {
+        operation.placements.forEach { placement ->
+            if (placement.pos.y < world.minHeight || placement.pos.y >= world.maxHeight) {
+                return AxionRejection(
+                    code = AxionResultCode.VALIDATION_FAILED,
+                    source = AxionResultSource.REQUEST,
+                    message = "Edit is outside build height",
+                )
+            }
+        }
+        return null
     }
 
     private fun validateBounds(a: IntVector3, b: IntVector3): AxionRejection? {

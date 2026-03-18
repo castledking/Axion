@@ -1,10 +1,7 @@
 package axion.client.render
 
-import axion.client.network.LocalWritePlanner
 import axion.client.selection.SelectionBounds
-import axion.client.tool.ExtrudeCommitService
 import axion.client.tool.ExtrudeToolController
-import axion.common.operation.ExtrudeMode
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.render.RenderLayers
@@ -22,18 +19,13 @@ object ExtrudePreviewRenderer {
     fun render(context: WorldRenderContext) {
         val preview = ExtrudeToolController.currentPreview() ?: return
         val client = MinecraftClient.getInstance()
-        val world = client.world ?: return
         val camera = client.gameRenderer.camera ?: return
         val cameraPos = camera.cameraPos
         val consumers = context.consumers()
         val consumer = consumers.getBuffer(RenderLayers.lines())
         val matrixStack = context.matrices()
         val sourcePositions = preview.footprint
-        val destinationPlan = LocalWritePlanner().plan(
-            world,
-            ExtrudeCommitService.toOperation(preview, ExtrudeMode.EXTEND),
-        )
-        val destinationPositions = destinationPlan.writes.map { it.pos }.distinct()
+        val destinationPositions = preview.extrudePositions
 
         renderPositions(
             positions = sourcePositions,

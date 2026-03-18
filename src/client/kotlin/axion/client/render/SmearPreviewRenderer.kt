@@ -9,22 +9,9 @@ object SmearPreviewRenderer {
 
     fun render(context: WorldRenderContext) {
         val preview = SmearToolController.currentPreview() ?: return
-        val source = preview.sourceRegion.normalized()
-        val destinationRegions = (1..preview.repeatCount).map { index ->
-            source.offset(preview.step.multiply(index)).normalized()
-        }
-            .distinct()
-
-        if (destinationRegions.isEmpty()) {
-            return
-        }
-
         RepeatPreviewRenderer.render(
             context = context,
-            preview = preview.copy(
-                repeatCount = destinationRegions.size,
-                destinationRegions = destinationRegions,
-            ),
+            preview = preview,
             destinationColor = DESTINATION_COLOR,
             lineWidth = LINE_WIDTH,
         )

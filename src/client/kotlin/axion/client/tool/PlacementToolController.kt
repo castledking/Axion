@@ -14,6 +14,13 @@ object PlacementToolController {
 
     fun onEndTick(client: MinecraftClient) {
         val state = AxionClientState.placementToolState
+        if (!isPlacementActive()) {
+            if (state !is CloneToolState.Idle) {
+                reset()
+            }
+            return
+        }
+
         val activeMode = activeMode()
         if (state !is CloneToolState.Idle && state.modeOrNull() != activeMode) {
             reset()
@@ -116,6 +123,42 @@ object PlacementToolController {
             is CloneToolState.AwaitingConfirm -> {
                 CloneToolState.PreviewingOffset(ClonePlacementService.nudgePreview(client, state.preview, scrollAmount))
             }
+        }
+
+        AxionClientState.updatePlacementToolState(nextState)
+        syncSelectionState(nextState)
+        return true
+    }
+
+    fun handleRotateAction(): Boolean {
+        val nextState = when (val state = AxionClientState.placementToolState) {
+            is CloneToolState.PreviewingOffset -> CloneToolState.AwaitingConfirm(
+                ClonePlacementService.rotatePreview(state.preview),
+            )
+
+            is CloneToolState.AwaitingConfirm -> CloneToolState.AwaitingConfirm(
+                ClonePlacementService.rotatePreview(state.preview),
+            )
+
+            else -> return false
+        }
+
+        AxionClientState.updatePlacementToolState(nextState)
+        syncSelectionState(nextState)
+        return true
+    }
+
+    fun handleMirrorAction(): Boolean {
+        val nextState = when (val state = AxionClientState.placementToolState) {
+            is CloneToolState.PreviewingOffset -> CloneToolState.AwaitingConfirm(
+                ClonePlacementService.mirrorPreview(state.preview),
+            )
+
+            is CloneToolState.AwaitingConfirm -> CloneToolState.AwaitingConfirm(
+                ClonePlacementService.mirrorPreview(state.preview),
+            )
+
+            else -> return false
         }
 
         AxionClientState.updatePlacementToolState(nextState)

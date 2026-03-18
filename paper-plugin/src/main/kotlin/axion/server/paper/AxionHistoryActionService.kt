@@ -126,12 +126,10 @@ class AxionHistoryActionService(
     ): Boolean {
         return changes.all { change ->
             val expected = if (expectNewState) change.newState else change.oldState
-            val expectedPayload = if (expectNewState) change.newBlockEntityData else change.oldBlockEntityData
-            world.getBlockAt(change.pos.x, change.pos.y, change.pos.z).blockData.getAsString(false) == expected &&
-                PaperBlockEntitySnapshotService.capture(
-                    world,
-                    BlockPos(change.pos.x, change.pos.y, change.pos.z),
-                ) == expectedPayload
+            // Block entities can legitimately drift after an edit due to timers, inventory changes,
+            // or server-side normalization. For undo/redo safety we still require the block state
+            // itself to match the top-of-stack target, but we do not reject on exact NBT mismatch.
+            world.getBlockAt(change.pos.x, change.pos.y, change.pos.z).blockData.getAsString(false) == expected
         }
     }
 

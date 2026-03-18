@@ -5,6 +5,7 @@ import axion.client.history.HistoryManager
 import axion.common.operation.EditOperation
 import axion.common.operation.OperationDispatcher
 import net.minecraft.client.MinecraftClient
+import net.minecraft.text.Text
 
 class LocalOperationDispatcher : OperationDispatcher {
     private val validator = PermissiveOperationValidator()
@@ -13,6 +14,7 @@ class LocalOperationDispatcher : OperationDispatcher {
 
     override fun dispatch(operation: EditOperation) {
         if (!validator.validate(operation)) {
+            MinecraftClient.getInstance().player?.sendMessage(Text.literal(validator.lastFailureMessage ?: "Axion edit canceled."), false)
             return
         }
 

@@ -9,15 +9,19 @@ import axion.client.network.PermissiveOperationValidator
 import axion.common.operation.EditOperation
 import axion.common.operation.OperationDispatcher
 import net.minecraft.client.MinecraftClient
+import net.minecraft.text.Text
 
-class SymmetryAwareOperationDispatcher : OperationDispatcher {
+class SymmetryAwareOperationDispatcher(
+    private val recordHistory: Boolean = true,
+) : OperationDispatcher {
     private val validator = PermissiveOperationValidator()
     private val planner = LocalWritePlanner()
     private val applier = LocalOperationApplier()
-    private val networkDispatcher = NetworkOperationDispatcher()
+    private val networkDispatcher = NetworkOperationDispatcher(recordHistory = recordHistory)
 
     override fun dispatch(operation: EditOperation) {
         if (!validator.validate(operation)) {
+            MinecraftClient.getInstance().player?.sendMessage(Text.literal(validator.lastFailureMessage ?: "Axion edit canceled."), false)
             return
         }
 
@@ -39,7 +43,9 @@ class SymmetryAwareOperationDispatcher : OperationDispatcher {
             return
         }
 
-        HistoryManager.record(targetWorld, plan.label, plan.writes)
+        if (recordHistory) {
+            HistoryManager.record(targetWorld, plan.label, plan.writes)
+        }
         applier.apply(targetWorld, plan)
     }
 }

@@ -11,7 +11,8 @@ object SelectionController {
     private var currentTarget: AxionTarget = AxionTarget.MissTarget
 
     fun onEndTick(client: MinecraftClient) {
-        currentTarget = if (AxionToolSelectionController.isAxionSlotActive()) {
+        val modeActive = AxionClientState.globalModeState.infiniteReachEnabled
+        currentTarget = if (AxionToolSelectionController.isAxionSlotActive() || modeActive) {
             SelectionRaycast.raycast(client)
         } else {
             AxionTarget.MissTarget

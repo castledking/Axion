@@ -11,6 +11,7 @@ import axion.protocol.ExtrudeRequest
 import axion.protocol.IntVector3
 import axion.protocol.OperationBatchRequest
 import axion.protocol.OperationBatchResult
+import axion.protocol.PlaceBlocksRequest
 import axion.protocol.SmearRegionRequest
 import axion.protocol.StackRegionRequest
 import org.bukkit.Location
@@ -128,6 +129,7 @@ class AxionOperationService(
                     is CloneRegionRequest -> validator.blockCount(operation)
                     is StackRegionRequest -> validator.blockCount(operation)
                     is SmearRegionRequest -> validator.blockCount(operation)
+                    is PlaceBlocksRequest -> validator.blockCount(operation)
                 }
             }
             else -> totalBlocks
@@ -145,9 +147,10 @@ class AxionOperationService(
             return rejected(request.requestId, player, world, request.operations, request.usesSymmetry, plannedWriteValidation)
         }
 
+        val plannedTransactionId = if (request.recordHistory) history.nextTransactionId() else null
         val result = AxionCommittedDiffBuilder(world).build(
             requestId = request.requestId,
-            transactionId = history.nextTransactionId(),
+            transactionId = plannedTransactionId,
             label = actionLabel(request.operations),
             operations = request.operations,
             touchedOverride = touchedOverride,
@@ -160,6 +163,7 @@ class AxionOperationService(
                     is StackRegionRequest -> applyStack(world, operation)
                     is SmearRegionRequest -> applySmear(world, operation)
                     is ExtrudeRequest -> applyExtrude(world, resolvedExtrudePlans.getValue(operation))
+                    is PlaceBlocksRequest -> applyPlacements(world, operation)
                 }
             }
         }
@@ -237,6 +241,17 @@ class AxionOperationService(
                 pos = net.minecraft.core.BlockPos(write.pos.x, write.pos.y, write.pos.z),
                 blockStateString = write.blockState,
                 blockEntityPayload = write.blockEntityData,
+            )
+        }
+    }
+
+    private fun applyPlacements(world: World, operation: PlaceBlocksRequest) {
+        operation.placements.forEach { placement ->
+            PaperBlockEntitySnapshotService.apply(
+                world = world,
+                pos = net.minecraft.core.BlockPos(placement.pos.x, placement.pos.y, placement.pos.z),
+                blockStateString = placement.blockState,
+                blockEntityPayload = placement.blockEntityData,
             )
         }
     }
@@ -352,12 +367,14 @@ class AxionOperationService(
         val hasStack = operations.any { it is StackRegionRequest }
         val hasSmear = operations.any { it is SmearRegionRequest }
         val hasExtrude = operations.any { it is ExtrudeRequest }
+        val hasPlace = operations.any { it is PlaceBlocksRequest }
         return when {
             hasClone && hasClear -> "Move"
             hasClone -> "Clone"
             hasStack -> "Stack"
             hasSmear -> "Smear"
             hasExtrude -> "Extrude"
+            hasPlace -> "Place"
             hasClear && operations.size == 1 -> "Erase"
             else -> "Edit"
         }
@@ -393,6 +410,7 @@ class AxionOperationService(
             is StackRegionRequest -> operation.cells.size * maxOf(operation.repeatCount, 0)
             is SmearRegionRequest -> operation.cells.size * maxOf(operation.repeatCount, 0)
             is ExtrudeRequest -> 4096
+            is PlaceBlocksRequest -> operation.placements.size
         }
     }
 
@@ -411,6 +429,7 @@ class AxionOperationService(
             AxionOperationType.STACK_REGION,
             AxionOperationType.SMEAR_REGION,
             AxionOperationType.EXTRUDE,
+            AxionOperationType.PLACE_BLOCKS,
         )
     }
 }

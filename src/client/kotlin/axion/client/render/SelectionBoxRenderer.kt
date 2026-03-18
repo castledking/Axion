@@ -12,9 +12,9 @@ import net.minecraft.util.math.Box
 import net.minecraft.util.shape.VoxelShapes
 
 object SelectionBoxRenderer {
-    private const val REGION_COLOR: Int = 0xFF71D6FF.toInt()
-    private const val ANCHOR_COLOR: Int = 0xFFB3F3FF.toInt()
-    private const val SECOND_CORNER_COLOR: Int = 0xFFFFD27A.toInt()
+    private const val REGION_COLOR: Int = 0xFFFFFFFF.toInt()
+    private const val ANCHOR_COLOR: Int = 0xFFFFFFFF.toInt()
+    private const val SECOND_CORNER_COLOR: Int = 0xFFFFFFFF.toInt()
     private const val LINE_WIDTH: Float = 2.0f
     private const val CORNER_LINE_WIDTH: Float = 2.5f
     private const val CORNER_MARKER_INSET: Double = 0.32

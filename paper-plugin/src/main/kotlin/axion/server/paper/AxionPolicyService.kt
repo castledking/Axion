@@ -7,6 +7,7 @@ import axion.protocol.ClearRegionRequest
 import axion.protocol.CloneRegionRequest
 import axion.protocol.ExtrudeRequest
 import axion.protocol.IntVector3
+import axion.protocol.PlaceBlocksRequest
 import axion.protocol.SmearRegionRequest
 import axion.protocol.StackRegionRequest
 import org.bukkit.World
@@ -162,16 +163,16 @@ class AxionPolicyService(
         return AxionWorldPolicy(
             enabled = getBoolean(worldSection, "enabled", getBoolean(defaultSection, "enabled", true)),
             tools = tools,
-            maxBlocksPerBatch = getInt(worldSection, "max-blocks-per-batch", getInt(defaultSection, "max-blocks-per-batch", 32_768)),
-            maxClipboardCells = getInt(worldSection, "max-clipboard-cells", getInt(defaultSection, "max-clipboard-cells", 32_768)),
+            maxBlocksPerBatch = getInt(worldSection, "max-blocks-per-batch", getInt(defaultSection, "max-blocks-per-batch", 262_144)),
+            maxClipboardCells = getInt(worldSection, "max-clipboard-cells", getInt(defaultSection, "max-clipboard-cells", 262_144)),
             maxRepeatCount = getInt(worldSection, "max-repeat-count", getInt(defaultSection, "max-repeat-count", 64)),
-            maxTotalWrites = getInt(worldSection, "max-total-writes", getInt(defaultSection, "max-total-writes", 262_144)),
+            maxTotalWrites = getInt(worldSection, "max-total-writes", getInt(defaultSection, "max-total-writes", 2_097_152)),
             maxExtrudeFootprintSize = getInt(
                 worldSection,
                 "max-extrude-footprint-size",
-                getInt(defaultSection, "max-extrude-footprint-size", 4_096),
+                getInt(defaultSection, "max-extrude-footprint-size", 32_768),
             ),
-            maxExtrudeWrites = getInt(worldSection, "max-extrude-writes", getInt(defaultSection, "max-extrude-writes", 4_096)),
+            maxExtrudeWrites = getInt(worldSection, "max-extrude-writes", getInt(defaultSection, "max-extrude-writes", 32_768)),
             historyBudget = HistoryBudget(
                 maxEntries = getInt(worldSection, "history.max-entries", getInt(defaultSection, "history.max-entries", 100)),
                 maxBytes = getInt(worldSection, "history.max-bytes", getInt(defaultSection, "history.max-bytes", 64 * 1024 * 1024)),
@@ -199,6 +200,7 @@ class AxionPolicyService(
         val hasStack = operations.any { it is StackRegionRequest }
         val hasSmear = operations.any { it is SmearRegionRequest }
         val hasExtrude = operations.any { it is ExtrudeRequest }
+        val hasPlace = operations.any { it is PlaceBlocksRequest }
         return when {
             hasClone && hasClear && operations.all { it is CloneRegionRequest || it is ClearRegionRequest } -> AxionToolKind.MOVE
             hasClone -> AxionToolKind.CLONE
@@ -206,6 +208,7 @@ class AxionPolicyService(
             hasSmear -> AxionToolKind.SMEAR
             hasExtrude -> AxionToolKind.EXTRUDE
             hasClear -> AxionToolKind.ERASE
+            hasPlace -> null
             else -> null
         }
     }
@@ -219,6 +222,7 @@ class AxionPolicyService(
                 is StackRegionRequest -> AxionToolKind.STACK
                 is SmearRegionRequest -> AxionToolKind.SMEAR
                 is ExtrudeRequest -> AxionToolKind.EXTRUDE
+                is PlaceBlocksRequest -> null
             }
         }
     }

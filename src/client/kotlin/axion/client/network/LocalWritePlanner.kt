@@ -156,7 +156,7 @@ class LocalWritePlanner {
         writes: MutableList<BlockWrite>,
     ) {
         operation.placements.forEach { placement ->
-            appendWrite(placement.pos, placement.state, null, overlay, writes)
+            appendWrite(placement.pos, placement.state, placement.blockEntityData, overlay, writes)
         }
     }
 

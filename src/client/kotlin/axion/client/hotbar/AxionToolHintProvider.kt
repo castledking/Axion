@@ -79,6 +79,8 @@ object AxionToolHintProvider {
             is CloneToolState.AwaitingConfirm,
                 -> listOf(
                     ToolHintEntry("Scroll", "Adjust preview offset"),
+                    ToolHintEntry("R", "Rotate 90 degrees"),
+                    ToolHintEntry("F", "Mirror preview"),
                     ToolHintEntry("RMB", "Confirm placement"),
                     ToolHintEntry("LMB", "Cancel preview"),
                     ToolHintEntry("MMB", "Reanchor preview"),
@@ -95,6 +97,8 @@ object AxionToolHintProvider {
                 preview?.let {
                     add("Offset: ${formatAxis(it.offset)} x ${formatStepLength(it.offset)}")
                     add("Destination: ${formatRegionSize(it.destinationRegion)}")
+                    add("Rotation: ${it.transform.normalizedRotationQuarterTurns * 90}deg")
+                    add("Mirror: ${if (it.transform.mirrored) "On" else "Off"}")
                 }
             },
             footer = symmetrySummary(),

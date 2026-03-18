@@ -72,10 +72,6 @@ object RegionRepeatPlacementService {
         repeatCount: Int,
     ): RepeatRegionPreview {
         val normalized = sourceRegion.normalized()
-        val destinationRegions = (1..repeatCount).map { index ->
-            normalized.offset(step.multiply(index)).normalized()
-        }
-
         return RepeatRegionPreview(
             firstCorner = firstCorner,
             sourceRegion = normalized,
@@ -83,7 +79,6 @@ object RegionRepeatPlacementService {
             step = step,
             scrollSign = scrollSign,
             repeatCount = repeatCount,
-            destinationRegions = destinationRegions,
         )
     }
 

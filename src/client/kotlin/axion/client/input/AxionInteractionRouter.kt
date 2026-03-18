@@ -54,6 +54,10 @@ object AxionInteractionRouter {
         return true
     }
 
+    fun ownsPrimaryAction(): Boolean {
+        return shouldCapturePrimaryAction()
+    }
+
     fun consumePrimaryAction(client: MinecraftClient): Boolean {
         val handled = handlePrimaryAction(client)
         if (!handled && !shouldCapturePrimaryAction()) {

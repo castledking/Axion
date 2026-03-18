@@ -7,6 +7,7 @@ import axion.protocol.CommittedBlockChangePayload
 import axion.protocol.ExtrudeRequest
 import axion.protocol.IntVector3
 import axion.protocol.OperationBatchResult
+import axion.protocol.PlaceBlocksRequest
 import axion.protocol.SmearRegionRequest
 import axion.protocol.StackRegionRequest
 import net.minecraft.core.BlockPos
@@ -17,7 +18,7 @@ class AxionCommittedDiffBuilder(
 ) {
     fun build(
         requestId: Long,
-        transactionId: Long,
+        transactionId: Long?,
         label: String,
         operations: List<AxionRemoteOperation>,
         touchedOverride: Set<IntVector3>? = null,
@@ -93,6 +94,7 @@ class AxionCommittedDiffBuilder(
                     is StackRegionRequest -> collectRepeatedClipboard(touched, operation.sourceOrigin, operation.cells, operation.step, operation.repeatCount)
                     is SmearRegionRequest -> collectRepeatedClipboard(touched, operation.sourceOrigin, operation.cells, operation.step, operation.repeatCount)
                     is ExtrudeRequest -> Unit
+                    is PlaceBlocksRequest -> operation.placements.forEach { touched += it.pos }
                 }
             }
             return touched

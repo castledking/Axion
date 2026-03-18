@@ -12,5 +12,4 @@ data class RepeatRegionPreview(
     val step: Vec3i,
     val scrollSign: Int,
     val repeatCount: Int,
-    val destinationRegions: List<BlockRegion>,
 )

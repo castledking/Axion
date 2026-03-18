@@ -19,3 +19,6 @@ minecraft*.pom
 *.json
 MANIFEST.MF
 *.tiny
+.gradle/
+*.class
+**/build/

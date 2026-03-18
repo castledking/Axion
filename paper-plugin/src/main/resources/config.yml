@@ -1,12 +1,12 @@
 limits:
   default:
     enabled: true
-    max-blocks-per-batch: 32768
-    max-clipboard-cells: 32768
+    max-blocks-per-batch: 262144
+    max-clipboard-cells: 262144
     max-repeat-count: 64
-    max-total-writes: 262144
-    max-extrude-footprint-size: 4096
-    max-extrude-writes: 4096
+    max-total-writes: 2097152
+    max-extrude-footprint-size: 32768
+    max-extrude-writes: 32768
     large-edit-multiplier: 4
     history:
       max-entries: 100

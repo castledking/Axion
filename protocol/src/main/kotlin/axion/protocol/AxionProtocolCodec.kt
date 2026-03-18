@@ -22,6 +22,7 @@ object AxionProtocolCodec {
                     data.writeInt(message.operations.size)
                     message.operations.forEach { writeOperation(data, it) }
                     data.writeBoolean(message.usesSymmetry)
+                    data.writeBoolean(message.recordHistory)
                 }
 
                 is UndoRequest -> {
@@ -34,6 +35,11 @@ object AxionProtocolCodec {
                     data.writeByte(4)
                     data.writeLong(message.requestId)
                     data.writeLong(message.transactionId)
+                }
+
+                is NoClipStateRequest -> {
+                    data.writeByte(5)
+                    data.writeBoolean(message.armed)
                 }
             }
         }
@@ -63,6 +69,7 @@ object AxionProtocolCodec {
                     requestId = data.readLong(),
                     operations = List(data.readInt()) { readOperation(data) },
                     usesSymmetry = data.readBoolean(),
+                    recordHistory = data.readBoolean(),
                 )
 
                 3 -> UndoRequest(
@@ -73,6 +80,10 @@ object AxionProtocolCodec {
                 4 -> RedoRequest(
                     requestId = data.readLong(),
                     transactionId = data.readLong(),
+                )
+
+                5 -> NoClipStateRequest(
+                    armed = data.readBoolean(),
                 )
 
                 else -> null
@@ -211,6 +222,18 @@ object AxionProtocolCodec {
                     output.writeBoolean(operation.symmetry.mirrorYEnabled)
                 }
             }
+
+            is PlaceBlocksRequest -> {
+                output.writeInt(operation.placements.size)
+                operation.placements.forEach { placement ->
+                    writeVector(output, placement.pos)
+                    output.writeUTF(placement.blockState)
+                    output.writeBoolean(placement.blockEntityData != null)
+                    if (placement.blockEntityData != null) {
+                        output.writeUTF(placement.blockEntityData)
+                    }
+                }
+            }
         }
     }
 
@@ -256,6 +279,16 @@ object AxionProtocolCodec {
                     )
                 } else {
                     null
+                },
+            )
+
+            AxionOperationType.PLACE_BLOCKS -> PlaceBlocksRequest(
+                placements = List(input.readInt()) {
+                    PlacedBlockPayload(
+                        pos = readVector(input),
+                        blockState = input.readUTF(),
+                        blockEntityData = input.readNullableUtf(),
+                    )
                 },
             )
         }

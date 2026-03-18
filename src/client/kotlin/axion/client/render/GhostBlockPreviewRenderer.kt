@@ -13,6 +13,13 @@ object GhostBlockPreviewRenderer {
     private const val MAX_GHOST_BLOCKS: Int = 1536
     private const val DEFAULT_GHOST_COLOR: Int = 0xFFFFFFFF.toInt()
 
+    fun maxOriginsFor(nonAirCellCount: Int): Int {
+        if (nonAirCellCount <= 0) {
+            return 0
+        }
+        return MAX_GHOST_BLOCKS / nonAirCellCount
+    }
+
     fun render(
         context: WorldRenderContext,
         clipboard: ClipboardBuffer,
@@ -25,7 +32,15 @@ object GhostBlockPreviewRenderer {
         }
 
         val occupiedCells = clipboard.nonAirCells()
-        if (occupiedCells.isEmpty() || occupiedCells.size * origins.size > MAX_GHOST_BLOCKS) {
+        if (occupiedCells.isEmpty()) {
+            return
+        }
+        val maxOrigins = maxOriginsFor(occupiedCells.size)
+        if (maxOrigins <= 0) {
+            return
+        }
+        val boundedOrigins = origins.asSequence().take(maxOrigins).toList()
+        if (boundedOrigins.isEmpty()) {
             return
         }
 
@@ -38,7 +53,7 @@ object GhostBlockPreviewRenderer {
         val matrixStack = context.matrices()
         val shapeContext = ShapeContext.absent()
 
-        origins.forEach { origin ->
+        boundedOrigins.forEach { origin ->
             occupiedCells.forEach { cell ->
                 val blockPos = cell.absolutePos(origin)
                 val shape = cell.state.getOutlineShape(world, blockPos, shapeContext)

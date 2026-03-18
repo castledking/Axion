@@ -3,10 +3,12 @@ package axion.client.network
 import axion.AxionMod
 import axion.client.history.HistoryManager
 import axion.client.history.RemoteHistoryAdapter
+import axion.protocol.AxionClientMessage
 import axion.protocol.AxionOperationType
 import axion.protocol.AxionProtocol
-import axion.protocol.AxionProtocolCodec
+import axion.protocol.AxionTransportCodec
 import axion.protocol.ClientHello
+import axion.protocol.NoClipStateRequest
 import axion.protocol.OperationBatchResult
 import axion.protocol.RedoRequest
 import axion.protocol.ServerHello
@@ -32,7 +34,9 @@ object AxionServerConnection {
 
     private var state: State = State.Disconnected
     private var nextRequestId: Long = 1L
+    private var nextTransferId: Long = 1L
     private var lastStatusMessage: String? = null
+    private var lastSentNoClipArmed: Boolean? = null
 
     fun initialize() {
         PayloadTypeRegistry.playC2S().register(AxionPluginPayload.ID, AxionPluginPayload.CODEC)
@@ -47,10 +51,14 @@ object AxionServerConnection {
         ClientPlayConnectionEvents.JOIN.register(ClientPlayConnectionEvents.Join { _, _, client ->
             if (client.server != null) {
                 state = State.Disconnected
+                lastSentNoClipArmed = null
+                nextTransferId = 1L
                 return@Join
             }
 
             state = State.AwaitingHello
+            lastSentNoClipArmed = null
+            nextTransferId = 1L
             send(
                 ClientHello(
                     protocolVersion = AxionProtocol.PROTOCOL_VERSION,
@@ -67,6 +75,8 @@ object AxionServerConnection {
         ClientPlayConnectionEvents.DISCONNECT.register(ClientPlayConnectionEvents.Disconnect { _, client ->
             state = State.Disconnected
             lastStatusMessage = null
+            lastSentNoClipArmed = null
+            nextTransferId = 1L
             AxionRequestTracker.clear()
             AxionServerMessageAssembler.clear()
             client.execute { }
@@ -104,8 +114,32 @@ object AxionServerConnection {
         }
     }
 
-    fun sendClientBytes(bytes: ByteArray) {
-        ClientPlayNetworking.send(AxionPluginPayload(bytes))
+    fun sendClientMessage(message: AxionClientMessage) {
+        AxionTransportCodec.encodeClientMessage(message, nextTransferId++)
+            .forEach { payload ->
+                ClientPlayNetworking.send(AxionPluginPayload(payload))
+            }
+    }
+
+    fun syncNoClipState(armed: Boolean) {
+        when (state) {
+            State.Disconnected,
+            State.Unsupported,
+                -> return
+
+            State.AwaitingHello,
+            is State.Available,
+                -> Unit
+        }
+
+        if (lastSentNoClipArmed == armed) {
+            return
+        }
+
+        lastSentNoClipArmed = armed
+        sendClientMessage(
+            NoClipStateRequest(armed = armed),
+        )
     }
 
     fun onEndTick() {
@@ -115,12 +149,10 @@ object AxionServerConnection {
     fun requestUndo(transactionId: Long) {
         val requestId = nextRequestId()
         AxionRequestTracker.register(requestId, AxionRequestTracker.RequestKind.Undo(transactionId))
-        sendClientBytes(
-            AxionProtocolCodec.encodeClientMessage(
-                UndoRequest(
-                    requestId = requestId,
-                    transactionId = transactionId,
-                ),
+        sendClientMessage(
+            UndoRequest(
+                requestId = requestId,
+                transactionId = transactionId,
             ),
         )
     }
@@ -128,18 +160,16 @@ object AxionServerConnection {
     fun requestRedo(transactionId: Long) {
         val requestId = nextRequestId()
         AxionRequestTracker.register(requestId, AxionRequestTracker.RequestKind.Redo(transactionId))
-        sendClientBytes(
-            AxionProtocolCodec.encodeClientMessage(
-                RedoRequest(
-                    requestId = requestId,
-                    transactionId = transactionId,
-                ),
+        sendClientMessage(
+            RedoRequest(
+                requestId = requestId,
+                transactionId = transactionId,
             ),
         )
     }
 
     private fun send(message: ClientHello) {
-        sendClientBytes(AxionProtocolCodec.encodeClientMessage(message))
+        sendClientMessage(message)
     }
 
     private fun handleServerMessage(message: axion.protocol.AxionServerMessage) {

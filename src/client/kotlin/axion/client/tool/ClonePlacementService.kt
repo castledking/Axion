@@ -14,17 +14,24 @@ object ClonePlacementService {
         sourceRegion: BlockRegion,
         clipboardBuffer: ClipboardBuffer,
         offset: Vec3i,
+        transform: PlacementTransform = PlacementTransform(),
     ): ClonePreviewState {
         val normalized = sourceRegion.normalized()
         val anchor = normalized.minCorner()
+        val destinationClipboardBuffer = ClipboardTransformService.transform(clipboardBuffer, transform)
         return ClonePreviewState(
             mode = mode,
             firstCorner = firstCorner,
             sourceRegion = normalized,
-            clipboardBuffer = clipboardBuffer,
+            sourceClipboardBuffer = clipboardBuffer,
+            destinationClipboardBuffer = destinationClipboardBuffer,
             anchor = anchor,
             offset = offset,
-            destinationRegion = normalized.offset(offset).normalized(),
+            destinationRegion = BlockRegion(
+                anchor.add(offset),
+                anchor.add(offset).add(destinationClipboardBuffer.size).add(-1, -1, -1),
+            ).normalized(),
+            transform = transform,
         )
     }
 
@@ -44,8 +51,9 @@ object ClonePlacementService {
             mode = preview.mode,
             firstCorner = preview.firstCorner,
             sourceRegion = preview.sourceRegion,
-            clipboardBuffer = preview.clipboardBuffer,
+            clipboardBuffer = preview.sourceClipboardBuffer,
             offset = preview.offset.add(delta),
+            transform = preview.transform,
         )
     }
 
@@ -80,8 +88,31 @@ object ClonePlacementService {
             mode = preview.mode,
             firstCorner = preview.firstCorner,
             sourceRegion = preview.sourceRegion,
-            clipboardBuffer = preview.clipboardBuffer,
+            clipboardBuffer = preview.sourceClipboardBuffer,
             offset = offset,
+            transform = preview.transform,
+        )
+    }
+
+    fun rotatePreview(preview: ClonePreviewState): ClonePreviewState {
+        return createPreview(
+            mode = preview.mode,
+            firstCorner = preview.firstCorner,
+            sourceRegion = preview.sourceRegion,
+            clipboardBuffer = preview.sourceClipboardBuffer,
+            offset = preview.offset,
+            transform = preview.transform.rotateClockwise(),
+        )
+    }
+
+    fun mirrorPreview(preview: ClonePreviewState): ClonePreviewState {
+        return createPreview(
+            mode = preview.mode,
+            firstCorner = preview.firstCorner,
+            sourceRegion = preview.sourceRegion,
+            clipboardBuffer = preview.sourceClipboardBuffer,
+            offset = preview.offset,
+            transform = preview.transform.toggleMirror(),
         )
     }
 
