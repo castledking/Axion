@@ -13,6 +13,7 @@ An open-source building tool for Minecraft, inspired by [Axiom](https://axiom.mo
   - **Stack** -- repeat selections in a direction
   - **Move** -- relocate selections
   - **Extrude** -- push or pull faces of a selection
+- **Replace Mode** -- replace blocks
 - **Infinite Reach** -- edit blocks at any distance
 - **No Clip** -- fly through blocks for easier building
 - **Server Support** -- dedicated Paper plugin so everything works in multiplayer
