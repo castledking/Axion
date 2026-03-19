@@ -23,3 +23,5 @@ MANIFEST.MF
 *.class
 **/build/
 **/wiki/
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
