@@ -6,7 +6,7 @@
 Axion is an open-source Fabric building tool for Minecraft, inspired by Axiom. It adds fast in-game editing tools, long-range building utilities, symmetry, preview rendering, and server-backed editing when paired with the Axion Paper plugin.
 
 <p align="center">
-  <a href="https://modrinth.com/plugin/axion-paper-plugin"><img alt="Download on Modrinth" src="https://img.shields.io/badge/Download%20on-Modrinth-1bd96a?style=for-the-badge&logo=modrinth&logoColor=white"></a>
+  <a href="https://modrinth.com/plugin/axion"><img alt="Download on Modrinth" src="https://img.shields.io/badge/Download%20on-Modrinth-1bd96a?style=for-the-badge&logo=modrinth&logoColor=white"></a>
   <a href="https://github.com/castledking/Axion"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github"></a>
   <a href="https://github.com/castledking/Axion/issues"><img alt="GitHub Issues" src="https://img.shields.io/badge/GitHub-Issues-181717?style=for-the-badge&logo=github"></a>
   <a href="https://github.com/castledking/Axion/wiki"><img alt="Wiki" src="https://img.shields.io/badge/GitHub-Wiki-181717?style=for-the-badge&logo=github"></a>
