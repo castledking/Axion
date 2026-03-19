@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "axion",
+  "version": "${version}",
+  "name": "Axion",
+  "description": "Original in-world building workflows for Minecraft.",
+  "authors": [
+    "Towkio"
+  ],
+  "license": "All Rights Reserved",
+  "icon": "assets/axion/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "axion.AxionMod"
+    ],
+    "client": [
+      "axion.AxionClientMod"
+    ]
+  },
+  "mixins": [
+    "axion.client.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.18.4",
+    "minecraft": "~1.21.11",
+    "java": ">=21",
+    "fabric-api": "*",
+    "fabric-language-kotlin": ">=1.13.9+kotlin.2.3.10"
+  }
+}

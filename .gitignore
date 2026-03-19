@@ -26,3 +26,6 @@ MANIFEST.MF
 !gradle/wrapper/gradle-wrapper.jar
 !gradle/wrapper/gradle-wrapper.properties
 !gradle.properties
+!src/main/resources/**
+!src/client/resources/**
+!paper-plugin/src/main/resources/**
