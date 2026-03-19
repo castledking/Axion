@@ -184,7 +184,8 @@ object PlacementToolController {
         val firstCorner = AxionClientState.placementToolState.firstCornerOrNull()
             ?.let { region.remapCorner(it, expandedRegion) }
             ?: expandedRegion.start
-        val nextState = CloneToolState.RegionDefined(mode, firstCorner, expandedRegion)
+        val secondCorner = expandedRegion.oppositeCorner(firstCorner)
+        val nextState = CloneToolState.RegionDefined(mode, firstCorner, secondCorner, expandedRegion)
         AxionClientState.updatePlacementToolState(nextState)
         syncSelectionState(nextState)
         return true
@@ -222,6 +223,7 @@ object PlacementToolController {
         val nextState = CloneToolState.RegionDefined(
             mode,
             currentFirstCorner.toImmutable(),
+            secondCorner.toImmutable(),
             BlockRegion(currentFirstCorner.toImmutable(), secondCorner.toImmutable()).normalized(),
         )
         AxionClientState.updatePlacementToolState(nextState)
@@ -235,7 +237,7 @@ object PlacementToolController {
             is CloneToolState.FirstCornerSet -> SelectionState.FirstCornerSet(state.firstCorner)
             is CloneToolState.RegionDefined -> SelectionState.RegionDefined(
                 state.firstCorner,
-                state.region.oppositeCorner(state.firstCorner),
+                state.secondCorner,
             )
             is CloneToolState.PreviewingOffset -> SelectionState.RegionDefined(
                 state.preview.firstCorner,

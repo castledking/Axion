@@ -46,6 +46,7 @@ object EraseToolController {
 
         val nextState = EraseToolState.RegionDefined(
             firstCorner,
+            secondCorner,
             BlockRegion(firstCorner, secondCorner).normalized(),
         )
         AxionClientState.updateEraseToolState(nextState)
@@ -64,7 +65,9 @@ object EraseToolController {
         }
 
         val expanded = SelectionController.expandRegionToCurrentTarget(client, state.region) ?: return false
-        val nextState = EraseToolState.RegionDefined(state.region.remapCorner(state.firstCorner, expanded), expanded)
+        val remappedFirstCorner = state.region.remapCorner(state.firstCorner, expanded)
+        val remappedSecondCorner = expanded.oppositeCorner(remappedFirstCorner)
+        val nextState = EraseToolState.RegionDefined(remappedFirstCorner, remappedSecondCorner, expanded)
         AxionClientState.updateEraseToolState(nextState)
         syncSelectionState(nextState)
         return true
@@ -97,7 +100,7 @@ object EraseToolController {
             is EraseToolState.FirstCornerSet -> SelectionState.FirstCornerSet(state.firstCorner)
             is EraseToolState.RegionDefined -> SelectionState.RegionDefined(
                 state.firstCorner,
-                state.region.oppositeCorner(state.firstCorner),
+                state.secondCorner,
             )
         }
 

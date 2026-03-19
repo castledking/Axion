@@ -19,13 +19,16 @@ class AxionPluginMessaging(
     private val policyService: AxionPolicyService,
     private val noClipService: AxionNoClipService,
 ) : PluginMessageListener {
+    private val auditEnabled = plugin.config.getBoolean("audit.enabled", true)
     private val timingStats = AxionTimingStatsTracker(
         plugin = plugin,
+        enabled = auditEnabled,
         summaryEvery = plugin.config.getInt("audit.summary-every", 50),
     )
     private val auditLogger = AxionAuditLogger(
         plugin = plugin,
         statsTracker = timingStats,
+        enabled = auditEnabled,
         slowThresholdMillis = plugin.config.getLong("audit.slow-threshold-ms", 200L),
     )
     private val operationService = AxionOperationService(policyService)

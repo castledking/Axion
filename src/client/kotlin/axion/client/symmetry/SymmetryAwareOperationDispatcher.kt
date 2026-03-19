@@ -26,26 +26,29 @@ class SymmetryAwareOperationDispatcher(
         }
 
         val client = MinecraftClient.getInstance()
-        if (client.server == null) {
+        val server = client.server
+        if (server == null) {
             networkDispatcher.dispatch(operation)
             return
         }
 
-        val serverWorld = client.server?.getWorld(client.world?.registryKey)
-        val targetWorld = serverWorld
-        if (targetWorld == null) {
-            AxionMod.LOGGER.warn("Dropping operation {} because no local world is available", operation.kind)
-            return
-        }
+        val worldKey = client.world?.registryKey
+        server.execute {
+            val targetWorld = server.getWorld(worldKey)
+            if (targetWorld == null) {
+                AxionMod.LOGGER.warn("Dropping operation {} because no local world is available", operation.kind)
+                return@execute
+            }
 
-        val plan = planner.plan(targetWorld, operation)
-        if (plan.writes.isEmpty()) {
-            return
-        }
+            val plan = planner.plan(targetWorld, operation)
+            if (plan.writes.isEmpty()) {
+                return@execute
+            }
 
-        if (recordHistory) {
-            HistoryManager.record(targetWorld, plan.label, plan.writes)
+            if (recordHistory) {
+                HistoryManager.record(targetWorld, plan.label, plan.writes)
+            }
+            applier.apply(targetWorld, plan)
         }
-        applier.apply(targetWorld, plan)
     }
 }

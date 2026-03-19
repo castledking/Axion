@@ -10,6 +10,7 @@ sealed interface StackToolState {
 
     data class RegionDefined(
         val firstCorner: BlockPos,
+        val secondCorner: BlockPos,
         val region: BlockRegion,
     ) : StackToolState
 

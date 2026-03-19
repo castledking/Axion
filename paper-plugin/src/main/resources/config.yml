@@ -33,5 +33,6 @@ protection:
   worldguard:
     enabled: true
 audit:
+  enabled: true
   slow-threshold-ms: 200
   summary-every: 50

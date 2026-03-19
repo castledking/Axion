@@ -4,12 +4,16 @@ import org.bukkit.plugin.Plugin
 
 class AxionTimingStatsTracker(
     private val plugin: Plugin,
+    private val enabled: Boolean,
     private val summaryEvery: Int,
 ) {
     private val statsByOperation = linkedMapOf<String, OperationStats>()
     private var recordedActions: Int = 0
 
     fun record(operationSummary: String, timing: AxionTimingSnapshot) {
+        if (!enabled) {
+            return
+        }
         val stats = statsByOperation.getOrPut(operationSummary) { OperationStats() }
         stats.record(timing)
         recordedActions++
@@ -19,6 +23,9 @@ class AxionTimingStatsTracker(
     }
 
     fun logSummary(reason: String) {
+        if (!enabled) {
+            return
+        }
         if (statsByOperation.isEmpty()) {
             return
         }

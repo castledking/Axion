@@ -70,7 +70,9 @@ object SmearToolController {
         }
 
         val expanded = SelectionController.expandRegionToCurrentTarget(client, state.region) ?: return false
-        val nextState = SmearToolState.RegionDefined(state.region.remapCorner(state.firstCorner, expanded), expanded)
+        val remappedFirstCorner = state.region.remapCorner(state.firstCorner, expanded)
+        val remappedSecondCorner = expanded.oppositeCorner(remappedFirstCorner)
+        val nextState = SmearToolState.RegionDefined(remappedFirstCorner, remappedSecondCorner, expanded)
         AxionClientState.updateSmearToolState(nextState)
         syncSelectionState(nextState)
         return true
@@ -102,7 +104,11 @@ object SmearToolController {
             is SmearToolState.PreviewingSmear -> {
                 val preview = SmearPlacementService.nudgePreview(state.preview, scrollAmount)
                 if (preview == null) {
-                    SmearToolState.RegionDefined(state.preview.firstCorner, state.preview.sourceRegion)
+                    SmearToolState.RegionDefined(
+                        state.preview.firstCorner,
+                        state.preview.sourceRegion.oppositeCorner(state.preview.firstCorner),
+                        state.preview.sourceRegion,
+                    )
                 } else {
                     SmearToolState.PreviewingSmear(preview)
                 }
@@ -151,6 +157,7 @@ object SmearToolController {
         }
         val nextState = SmearToolState.RegionDefined(
             firstCorner,
+            secondCorner,
             BlockRegion(firstCorner, secondCorner).normalized(),
         )
         AxionClientState.updateSmearToolState(nextState)
@@ -164,7 +171,7 @@ object SmearToolController {
             is SmearToolState.FirstCornerSet -> SelectionState.FirstCornerSet(state.firstCorner)
             is SmearToolState.RegionDefined -> SelectionState.RegionDefined(
                 state.firstCorner,
-                state.region.oppositeCorner(state.firstCorner),
+                state.secondCorner,
             )
             is SmearToolState.PreviewingSmear -> SelectionState.RegionDefined(
                 state.preview.firstCorner,

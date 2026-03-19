@@ -1,0 +1,70 @@
+name: CD
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  release:
+    types:
+      - published
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || github.ref }}
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build project
+        run: ./gradlew clean build :paper-plugin:jar
+
+      - name: Collect release jars
+        if: github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v')
+        run: |
+          mkdir -p release-artifacts
+          cp "$(find build/libs -maxdepth 1 -type f -name 'axion-*.jar' ! -name '*-sources.jar' | head -n1)" release-artifacts/
+          cp "$(find paper-plugin/build/libs -maxdepth 1 -type f -name 'axion-plugin-*.jar' | head -n1)" release-artifacts/
+
+      - name: Upload release jars
+        if: github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-jars
+          path: release-artifacts/*
+          if-no-files-found: error
+
+  release:
+    if: github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download release jars
+        uses: actions/download-artifact@v4
+        with:
+          name: release-jars
+          path: release-artifacts
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.release.tag_name }}
+          name: ${{ github.event.release.name }}
+          fail_on_unmatched_files: true
+          files: |
+            release-artifacts/*

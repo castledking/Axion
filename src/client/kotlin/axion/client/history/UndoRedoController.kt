@@ -11,8 +11,13 @@ object UndoRedoController {
             return true
         }
 
-        val world = client.server?.getWorld(client.world?.registryKey) ?: return false
-        return HistoryManager.undo(world)
+        val server = client.server ?: return false
+        val worldKey = client.world?.registryKey
+        server.execute {
+            val world = server.getWorld(worldKey) ?: return@execute
+            HistoryManager.undo(world)
+        }
+        return true
     }
 
     fun redo(client: MinecraftClient): Boolean {
@@ -22,7 +27,12 @@ object UndoRedoController {
             return true
         }
 
-        val world = client.server?.getWorld(client.world?.registryKey) ?: return false
-        return HistoryManager.redo(world)
+        val server = client.server ?: return false
+        val worldKey = client.world?.registryKey
+        server.execute {
+            val world = server.getWorld(worldKey) ?: return@execute
+            HistoryManager.redo(world)
+        }
+        return true
     }
 }

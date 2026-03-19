@@ -30,7 +30,7 @@ object AxionClientBootstrap {
         HudElementRegistry.attachElementAfter(VanillaHudElements.HOTBAR, hintHudId, AxionToolHintHud::render)
         ClientTickEvents.END_CLIENT_TICK.register(AxionTickHandler::onEndTick)
         WorldRenderEvents.BEFORE_DEBUG_RENDER.register(TargetHighlightRenderer::render)
-        WorldRenderEvents.BEFORE_DEBUG_RENDER.register(SelectionBoxRenderer::render)
+        WorldRenderEvents.END_MAIN.register(SelectionBoxRenderer::render)
         WorldRenderEvents.BEFORE_DEBUG_RENDER.register(PlacementPreviewRenderer::render)
         WorldRenderEvents.BEFORE_DEBUG_RENDER.register(StackPreviewRenderer::render)
         WorldRenderEvents.BEFORE_DEBUG_RENDER.register(SmearPreviewRenderer::render)

@@ -70,7 +70,9 @@ object StackToolController {
         }
 
         val expanded = SelectionController.expandRegionToCurrentTarget(client, state.region) ?: return false
-        val nextState = StackToolState.RegionDefined(state.region.remapCorner(state.firstCorner, expanded), expanded)
+        val remappedFirstCorner = state.region.remapCorner(state.firstCorner, expanded)
+        val remappedSecondCorner = expanded.oppositeCorner(remappedFirstCorner)
+        val nextState = StackToolState.RegionDefined(remappedFirstCorner, remappedSecondCorner, expanded)
         AxionClientState.updateStackToolState(nextState)
         syncSelectionState(nextState)
         return true
@@ -102,7 +104,11 @@ object StackToolController {
             is StackToolState.PreviewingStack -> {
                 val preview = StackPlacementService.nudgePreview(state.preview, scrollAmount)
                 if (preview == null) {
-                    StackToolState.RegionDefined(state.preview.firstCorner, state.preview.sourceRegion)
+                    StackToolState.RegionDefined(
+                        state.preview.firstCorner,
+                        state.preview.sourceRegion.oppositeCorner(state.preview.firstCorner),
+                        state.preview.sourceRegion,
+                    )
                 } else {
                     StackToolState.PreviewingStack(preview)
                 }
@@ -151,6 +157,7 @@ object StackToolController {
         }
         val nextState = StackToolState.RegionDefined(
             firstCorner,
+            secondCorner,
             BlockRegion(firstCorner, secondCorner).normalized(),
         )
         AxionClientState.updateStackToolState(nextState)
@@ -164,7 +171,7 @@ object StackToolController {
             is StackToolState.FirstCornerSet -> SelectionState.FirstCornerSet(state.firstCorner)
             is StackToolState.RegionDefined -> SelectionState.RegionDefined(
                 state.firstCorner,
-                state.region.oppositeCorner(state.firstCorner),
+                state.secondCorner,
             )
             is StackToolState.PreviewingStack -> SelectionState.RegionDefined(
                 state.preview.firstCorner,

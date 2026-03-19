@@ -1,5 +1,6 @@
 package axion.client.history
 
+import axion.AxionMod
 import axion.client.network.BlockEntitySnapshotService
 import axion.client.network.BlockWrite
 import axion.common.history.BlockChange
@@ -101,9 +102,15 @@ object HistoryManager {
         }
 
         val entry = undoStack.removeLast()
-        applyChanges(world, entry.changes.asReversed().map { change ->
-            BlockWrite(change.pos, change.oldState, change.oldBlockEntityData?.copy())
-        })
+        try {
+            applyChanges(world, entry.changes.asReversed().map { change ->
+                BlockWrite(change.pos, change.oldState, change.oldBlockEntityData?.copy())
+            })
+        } catch (exception: Exception) {
+            AxionMod.LOGGER.error("Failed to undo Axion history entry {}", entry.id, exception)
+            undoStack.addLast(entry)
+            return false
+        }
         redoStack.addLast(entry)
         trimToBudget()
         return true
@@ -115,9 +122,15 @@ object HistoryManager {
         }
 
         val entry = redoStack.removeLast()
-        applyChanges(world, entry.changes.map { change ->
-            BlockWrite(change.pos, change.newState, change.newBlockEntityData?.copy())
-        })
+        try {
+            applyChanges(world, entry.changes.map { change ->
+                BlockWrite(change.pos, change.newState, change.newBlockEntityData?.copy())
+            })
+        } catch (exception: Exception) {
+            AxionMod.LOGGER.error("Failed to redo Axion history entry {}", entry.id, exception)
+            redoStack.addLast(entry)
+            return false
+        }
         undoStack.addLast(entry)
         trimToBudget()
         return true

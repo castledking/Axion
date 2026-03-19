@@ -14,6 +14,7 @@ sealed interface CloneToolState {
     data class RegionDefined(
         val mode: PlacementToolMode,
         val firstCorner: BlockPos,
+        val secondCorner: BlockPos,
         val region: BlockRegion,
     ) : CloneToolState
 

@@ -8,6 +8,7 @@ import axion.client.symmetry.SymmetryAwareOperationDispatcher
 import axion.common.model.SymmetryConfig
 import axion.common.model.SymmetryState
 import net.minecraft.client.MinecraftClient
+import net.minecraft.util.Hand
 
 object SymmetryPlacementController {
     private val dispatcher = SymmetryAwareOperationDispatcher()
@@ -22,18 +23,26 @@ object SymmetryPlacementController {
             return false
         }
         val config = currentConfig() ?: return false
+        if (!ActiveSymmetryConfig.hasDerivedTransforms(config)) {
+            return false
+        }
         if (AxionToolSelectionController.isAxionSlotActive()) {
             return false
         }
         val target = ModeTargeting.currentBlockTarget(client) ?: return false
-        val operation = BuildPlacementService.createDerivedPlacementOperation(
+        val operation = BuildPlacementService.createPlacementOperation(
             client = client,
             target = target,
             symmetryConfig = config,
             replaceMode = AxionClientState.globalModeState.replaceModeEnabled,
         )
-        operation?.let(dispatcher::dispatch)
-        return false
+        if (operation == null || operation.placements.size <= 1) {
+            return false
+        }
+
+        dispatcher.dispatch(operation)
+        client.player?.swingHand(Hand.MAIN_HAND)
+        return true
     }
 
     private fun currentConfig(): SymmetryConfig? {

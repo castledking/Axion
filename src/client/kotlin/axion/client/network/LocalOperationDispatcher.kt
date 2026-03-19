@@ -19,20 +19,27 @@ class LocalOperationDispatcher : OperationDispatcher {
         }
 
         val client = MinecraftClient.getInstance()
-        val serverWorld = client.server?.getWorld(client.world?.registryKey)
-        val targetWorld = serverWorld
-
-        if (targetWorld == null) {
-            AxionMod.LOGGER.warn("Dropping operation {} because no integrated server world is available", operation.kind)
+        val server = client.server
+        val worldKey = client.world?.registryKey
+        if (server == null) {
+            AxionMod.LOGGER.warn("Dropping operation {} because no integrated server is available", operation.kind)
             return
         }
 
-        val plan = planner.plan(targetWorld, operation)
-        if (plan.writes.isEmpty()) {
-            return
-        }
+        server.execute {
+            val targetWorld = server.getWorld(worldKey)
+            if (targetWorld == null) {
+                AxionMod.LOGGER.warn("Dropping operation {} because no integrated server world is available", operation.kind)
+                return@execute
+            }
 
-        HistoryManager.record(targetWorld, plan.label, plan.writes)
-        applier.apply(targetWorld, plan)
+            val plan = planner.plan(targetWorld, operation)
+            if (plan.writes.isEmpty()) {
+                return@execute
+            }
+
+            HistoryManager.record(targetWorld, plan.label, plan.writes)
+            applier.apply(targetWorld, plan)
+        }
     }
 }

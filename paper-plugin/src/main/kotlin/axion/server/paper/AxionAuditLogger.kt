@@ -10,6 +10,7 @@ import org.bukkit.plugin.Plugin
 class AxionAuditLogger(
     private val plugin: Plugin,
     private val statsTracker: AxionTimingStatsTracker,
+    private val enabled: Boolean,
     private val slowThresholdMillis: Long,
 ) {
     fun logAccepted(
@@ -24,6 +25,9 @@ class AxionAuditLogger(
         transactionId: Long?,
         timing: AxionTimingSnapshot,
     ) {
+        if (!enabled) {
+            return
+        }
         statsTracker.record(operationSummary, timing)
         log(
             level = if (timing.totalMillis >= slowThresholdMillis) LogLevel.WARN else LogLevel.INFO,
@@ -56,6 +60,9 @@ class AxionAuditLogger(
         rejection: AxionRejection,
         timing: AxionTimingSnapshot,
     ) {
+        if (!enabled) {
+            return
+        }
         statsTracker.record(operationSummary, timing)
         log(
             level = if (timing.totalMillis >= slowThresholdMillis) LogLevel.WARN else LogLevel.INFO,
@@ -91,6 +98,9 @@ class AxionAuditLogger(
         plannedWriteCount: Int,
         timing: AxionTimingSnapshot,
     ) {
+        if (!enabled) {
+            return
+        }
         logDenied(
             player = player,
             world = world,

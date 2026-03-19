@@ -2,6 +2,7 @@ package axion.client.mode
 import axion.client.AxionClientState
 import axion.client.input.AxionKeybindings
 import axion.client.network.AxionServerConnection
+import axion.client.symmetry.ActiveSymmetryConfig
 import axion.client.symmetry.SymmetryAwareOperationDispatcher
 import axion.client.symmetry.SymmetryBreakController
 import axion.client.tool.AxionToolSelectionController
@@ -199,7 +200,8 @@ object ClientModeController {
         val operation = BuildPlacementService.createPlacementOperation(
             client = client,
             target = target,
-            symmetryConfig = null,
+            symmetryConfig = ActiveSymmetryConfig.current()
+                ?.takeIf(ActiveSymmetryConfig::hasDerivedTransforms),
             replaceMode = state.replaceModeEnabled,
         ) ?: return false
         dispatcher.dispatch(operation)

@@ -3,6 +3,7 @@ package axion.server.paper
 import axion.protocol.CommittedBlockChangePayload
 import axion.protocol.OperationBatchResult
 import net.minecraft.core.BlockPos
+import org.bukkit.Bukkit
 import org.bukkit.World
 import org.bukkit.entity.Player
 
@@ -126,11 +127,24 @@ class AxionHistoryActionService(
     ): Boolean {
         return changes.all { change ->
             val expected = if (expectNewState) change.newState else change.oldState
-            // Block entities can legitimately drift after an edit due to timers, inventory changes,
-            // or server-side normalization. For undo/redo safety we still require the block state
-            // itself to match the top-of-stack target, but we do not reject on exact NBT mismatch.
-            world.getBlockAt(change.pos.x, change.pos.y, change.pos.z).blockData.getAsString(false) == expected
+            // Block entities and some transient block properties can legitimately drift after an
+            // edit due to timers, inventories, fluid updates, power state, or server-side
+            // normalization. Prefer an exact block-state match, but allow same-material matches
+            // so immediate redo remains reliable after a valid undo.
+            stateMatchesExpected(
+                current = world.getBlockAt(change.pos.x, change.pos.y, change.pos.z).blockData,
+                expected = expected,
+            )
         }
+    }
+
+    private fun stateMatchesExpected(current: org.bukkit.block.data.BlockData, expected: String): Boolean {
+        if (current.getAsString(false) == expected) {
+            return true
+        }
+
+        val expectedData = runCatching { Bukkit.createBlockData(expected) }.getOrNull() ?: return false
+        return current.material == expectedData.material
     }
 
     private fun applyState(world: World, pos: axion.protocol.IntVector3, state: String, blockEntityPayload: String?) {
