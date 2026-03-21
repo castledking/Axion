@@ -21,6 +21,14 @@ object AxionToolSelectionController {
 
     fun selectedSubtool(): AxionSubtool = AxionClientState.selectedSubtool
 
+    fun selectSubtool(subtool: AxionSubtool) {
+        if (!isCreativeModeAllowed() || !isAxionSlotActive()) {
+            return
+        }
+
+        AxionClientState.updateSelectedSubtool(subtool)
+    }
+
     fun syncWithPlayerSlot(selectedSlot: Int) {
         if (!isCreativeModeAllowed()) {
             if (currentState() is ToolSelectionState.Axion) {

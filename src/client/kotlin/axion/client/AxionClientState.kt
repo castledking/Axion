@@ -44,6 +44,9 @@ object AxionClientState {
     var globalModeState: GlobalModeState = GlobalModeState()
         private set
 
+    var middleClickMagicSelectEnabled: Boolean = false
+        private set
+
     fun updateToolSelection(state: ToolSelectionState) {
         toolSelectionState = state
     }
@@ -90,5 +93,9 @@ object AxionClientState {
 
     fun updateGlobalModes(state: GlobalModeState) {
         globalModeState = state
+    }
+
+    fun updateMiddleClickMagicSelect(enabled: Boolean) {
+        middleClickMagicSelectEnabled = enabled
     }
 }

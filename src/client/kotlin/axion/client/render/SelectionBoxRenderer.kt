@@ -3,7 +3,13 @@ package axion.client.render
 import axion.client.AxionClientState
 import axion.client.selection.SelectionBounds
 import axion.client.tool.AxionToolSelectionController
+import axion.client.tool.CloneToolState
+import axion.client.tool.EraseToolState
+import axion.client.tool.SmearToolState
+import axion.client.tool.StackToolState
 import axion.common.model.AxionSubtool
+import axion.common.model.ClipboardState
+import axion.common.model.ClipboardBuffer
 import axion.common.model.SelectionState
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext
 import net.minecraft.client.MinecraftClient
@@ -30,16 +36,42 @@ object SelectionBoxRenderer {
 
         val client = MinecraftClient.getInstance()
         val camera = client.gameRenderer.camera ?: return
-        val consumers = context.consumers() ?: return
+        val consumers = context.consumers()
         val consumer = consumers.getBuffer(RenderLayers.lines())
         val matrixStack = context.matrices()
         val cameraPos = camera.cameraPos
         val state = AxionClientState.selectionState
+        val pendingMagicSelection = AxionClientState.clipboardState as? ClipboardState.MagicSelection
 
         when (state) {
-            SelectionState.Idle -> return
+            SelectionState.Idle -> {
+                pendingMagicSelection ?: return
+                ClipboardSelectionRenderer.renderPulse(
+                    context = context,
+                    origin = pendingMagicSelection.region.minCorner(),
+                    region = pendingMagicSelection.region,
+                    clipboard = pendingMagicSelection.clipboardBuffer,
+                    outlineColor = REGION_COLOR,
+                    lineWidth = LINE_WIDTH,
+                    minAlpha = SELECTION_PULSE_MIN_ALPHA,
+                    maxAlpha = SELECTION_PULSE_MAX_ALPHA,
+                )
+                return
+            }
 
             is SelectionState.FirstCornerSet -> {
+                pendingMagicSelection?.let {
+                    ClipboardSelectionRenderer.renderPulse(
+                        context = context,
+                        origin = it.region.minCorner(),
+                        region = it.region,
+                        clipboard = it.clipboardBuffer,
+                        outlineColor = REGION_COLOR,
+                        lineWidth = LINE_WIDTH,
+                        minAlpha = SELECTION_PULSE_MIN_ALPHA,
+                        maxAlpha = SELECTION_PULSE_MAX_ALPHA,
+                    )
+                }
                 PulsingCuboidRenderer.renderShell(
                     context = context,
                     box = SelectionBounds.blockBox(state.firstCorner),
@@ -58,16 +90,51 @@ object SelectionBoxRenderer {
             }
 
             is SelectionState.RegionDefined -> {
-                PulsingCuboidRenderer.renderShell(
-                    context = context,
-                    box = SelectionBounds.regionBox(state.region()),
-                    outlineColor = REGION_COLOR,
-                    lineWidth = LINE_WIDTH,
-                    minAlpha = SELECTION_PULSE_MIN_ALPHA,
-                    maxAlpha = SELECTION_PULSE_MAX_ALPHA,
-                )
-                drawCornerMarker(matrixStack, consumer, cameraPos, state.firstCorner, ANCHOR_COLOR)
-                drawCornerMarker(matrixStack, consumer, cameraPos, state.secondCorner, SECOND_CORNER_COLOR)
+                val sparseClipboard = activeSparseClipboard()
+                val renderedSparse = sparseClipboard?.let { (origin, clipboard) ->
+                    ClipboardSelectionRenderer.renderPulse(
+                        context = context,
+                        origin = origin,
+                        region = state.region(),
+                        clipboard = clipboard,
+                        outlineColor = REGION_COLOR,
+                        lineWidth = LINE_WIDTH,
+                        minAlpha = SELECTION_PULSE_MIN_ALPHA,
+                        maxAlpha = SELECTION_PULSE_MAX_ALPHA,
+                    )
+                } == true
+                if (!renderedSparse) {
+                    PulsingCuboidRenderer.renderShell(
+                        context = context,
+                        box = SelectionBounds.regionBox(state.region()),
+                        outlineColor = REGION_COLOR,
+                        lineWidth = LINE_WIDTH,
+                        minAlpha = SELECTION_PULSE_MIN_ALPHA,
+                        maxAlpha = SELECTION_PULSE_MAX_ALPHA,
+                    )
+                    drawCornerMarker(matrixStack, consumer, cameraPos, state.firstCorner, ANCHOR_COLOR)
+                    drawCornerMarker(matrixStack, consumer, cameraPos, state.secondCorner, SECOND_CORNER_COLOR)
+                }
+            }
+        }
+    }
+
+    private fun activeSparseClipboard(): Pair<BlockPos, ClipboardBuffer>? {
+        return when (val state = AxionClientState.placementToolState) {
+            is CloneToolState.RegionDefined -> state.clipboardBuffer?.let { state.region.minCorner() to it }
+            is CloneToolState.PreviewingOffset -> state.preview.sourceClipboardBuffer.let { state.preview.sourceRegion.minCorner() to it }
+            is CloneToolState.AwaitingConfirm -> state.preview.sourceClipboardBuffer.let { state.preview.sourceRegion.minCorner() to it }
+            else -> when (val eraseState = AxionClientState.eraseToolState) {
+                is EraseToolState.RegionDefined -> eraseState.clipboardBuffer?.let { eraseState.region.minCorner() to it }
+                else -> when (val stackState = AxionClientState.stackToolState) {
+                    is StackToolState.RegionDefined -> stackState.clipboardBuffer?.let { stackState.region.minCorner() to it }
+                    is StackToolState.PreviewingStack -> stackState.preview.clipboardBuffer.let { stackState.preview.sourceRegion.minCorner() to it }
+                    else -> when (val smearState = AxionClientState.smearToolState) {
+                        is SmearToolState.RegionDefined -> smearState.clipboardBuffer?.let { smearState.region.minCorner() to it }
+                        is SmearToolState.PreviewingSmear -> smearState.preview.clipboardBuffer.let { smearState.preview.sourceRegion.minCorner() to it }
+                        else -> null
+                    }
+                }
             }
         }
     }

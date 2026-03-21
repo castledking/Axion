@@ -1,6 +1,7 @@
 package axion.client.tool
 
 import axion.common.model.BlockRegion
+import axion.common.model.ClipboardBuffer
 import net.minecraft.util.math.BlockPos
 
 sealed interface EraseToolState {
@@ -12,5 +13,6 @@ sealed interface EraseToolState {
         val firstCorner: BlockPos,
         val secondCorner: BlockPos,
         val region: BlockRegion,
+        val clipboardBuffer: ClipboardBuffer? = null,
     ) : EraseToolState
 }

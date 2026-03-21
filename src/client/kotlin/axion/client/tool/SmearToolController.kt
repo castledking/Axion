@@ -6,6 +6,7 @@ import axion.client.selection.blockPosOrNull
 import axion.client.symmetry.SymmetryAwareOperationDispatcher
 import axion.common.model.AxionSubtool
 import axion.common.model.BlockRegion
+import axion.common.model.ClipboardState
 import axion.common.model.SelectionState
 import axion.common.operation.SmearRegionOperation
 import net.minecraft.client.MinecraftClient
@@ -65,17 +66,27 @@ object SmearToolController {
         }
 
         val state = AxionClientState.smearToolState
-        if (state !is SmearToolState.RegionDefined) {
-            return false
-        }
+        return when (state) {
+            SmearToolState.Idle,
+            is SmearToolState.FirstCornerSet,
+                -> if (AxionClientState.middleClickMagicSelectEnabled) magicSelect(client) else false
 
-        val expanded = SelectionController.expandRegionToCurrentTarget(client, state.region) ?: return false
-        val remappedFirstCorner = state.region.remapCorner(state.firstCorner, expanded)
-        val remappedSecondCorner = expanded.oppositeCorner(remappedFirstCorner)
-        val nextState = SmearToolState.RegionDefined(remappedFirstCorner, remappedSecondCorner, expanded)
-        AxionClientState.updateSmearToolState(nextState)
-        syncSelectionState(nextState)
-        return true
+            is SmearToolState.RegionDefined -> {
+                if (AxionClientState.middleClickMagicSelectEnabled) {
+                    false
+                } else {
+                    val expanded = SelectionController.expandRegionToCurrentTarget(client, state.region) ?: return false
+                    val remappedFirstCorner = state.region.remapCorner(state.firstCorner, expanded)
+                    val remappedSecondCorner = expanded.oppositeCorner(remappedFirstCorner)
+                    val nextState = SmearToolState.RegionDefined(remappedFirstCorner, remappedSecondCorner, expanded, null)
+                    AxionClientState.updateSmearToolState(nextState)
+                    syncSelectionState(nextState)
+                    true
+                }
+            }
+
+            is SmearToolState.PreviewingSmear -> false
+        }
     }
 
     fun handleScroll(client: MinecraftClient, scrollAmount: Double): Boolean {
@@ -86,11 +97,24 @@ object SmearToolController {
         val nextState = when (val state = AxionClientState.smearToolState) {
             SmearToolState.Idle,
             is SmearToolState.FirstCornerSet,
-                -> return false
+                -> {
+                val magicSelection = AxionClientState.clipboardState as? ClipboardState.MagicSelection ?: return false
+                val preview = SmearPlacementService.createInitialPreview(
+                    client = client,
+                    firstCorner = when (state) {
+                        is SmearToolState.FirstCornerSet -> state.firstCorner
+                        else -> magicSelection.region.start
+                    },
+                    sourceRegion = magicSelection.region,
+                    clipboardBuffer = magicSelection.clipboardBuffer,
+                    scrollAmount = scrollAmount,
+                ) ?: return false
+                SmearToolState.PreviewingSmear(preview)
+            }
 
             is SmearToolState.RegionDefined -> {
                 val world = client.world ?: return false
-                val clipboard = ClipboardCaptureService.capture(world, state.region)
+                val clipboard = state.clipboardBuffer ?: ClipboardCaptureService.capture(world, state.region)
                 val preview = SmearPlacementService.createInitialPreview(
                     client = client,
                     firstCorner = state.firstCorner,
@@ -108,6 +132,7 @@ object SmearToolController {
                         state.preview.firstCorner,
                         state.preview.sourceRegion.oppositeCorner(state.preview.firstCorner),
                         state.preview.sourceRegion,
+                        state.preview.clipboardBuffer,
                     )
                 } else {
                     SmearToolState.PreviewingSmear(preview)
@@ -123,6 +148,7 @@ object SmearToolController {
     fun reset() {
         val nextState = SmearToolState.Idle
         AxionClientState.updateSmearToolState(nextState)
+        AxionClientState.updateClipboard(ClipboardState.Empty)
         syncSelectionState(nextState)
     }
 
@@ -143,6 +169,7 @@ object SmearToolController {
         val firstCorner = SelectionController.currentTarget().blockPosOrNull()?.toImmutable() ?: return false
         val nextState = SmearToolState.FirstCornerSet(firstCorner)
         AxionClientState.updateSmearToolState(nextState)
+        AxionClientState.updateClipboard(ClipboardState.Empty)
         syncSelectionState(nextState)
         return true
     }
@@ -159,9 +186,34 @@ object SmearToolController {
             firstCorner,
             secondCorner,
             BlockRegion(firstCorner, secondCorner).normalized(),
+            null,
         )
         AxionClientState.updateSmearToolState(nextState)
+        AxionClientState.updateClipboard(ClipboardState.Empty)
         syncSelectionState(nextState)
+        return true
+    }
+
+    private fun magicSelect(
+        client: MinecraftClient,
+    ): Boolean {
+        val world = client.world ?: return false
+        val seed = SelectionController.currentTarget().blockPosOrNull()?.toImmutable() ?: return false
+        val result = MagicSelectionService.select(world, seed) ?: return false
+        val merged = when (val clipboardState = AxionClientState.clipboardState) {
+            is ClipboardState.MagicSelection -> MagicSelectionService.merge(
+                existingRegion = clipboardState.region,
+                existingClipboard = clipboardState.clipboardBuffer,
+                addition = result,
+            )
+            ClipboardState.Empty -> result
+        }
+        AxionClientState.updateClipboard(
+            ClipboardState.MagicSelection(
+                region = merged.region,
+                clipboardBuffer = merged.clipboardBuffer,
+            ),
+        )
         return true
     }
 

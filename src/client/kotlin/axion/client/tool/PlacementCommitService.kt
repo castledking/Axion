@@ -11,7 +11,10 @@ import net.minecraft.util.math.BlockPos
 
 object PlacementCommitService {
     fun toOperation(preview: ClonePreviewState): EditOperation {
-        val cloneOperation = if (preview.transform.isIdentity() && !regionsOverlap(preview.sourceRegion, preview.destinationRegion)) {
+        val cloneOperation = if (preview.transform.isIdentity() &&
+            !regionsOverlap(preview.sourceRegion, preview.destinationRegion) &&
+            isFullCuboidCapture(preview.sourceRegion, preview.sourceClipboardBuffer)
+        ) {
             CloneRegionOperation(
                 sourceRegion = preview.sourceRegion,
                 destinationOrigin = preview.destinationRegion.minCorner(),
@@ -48,7 +51,10 @@ object PlacementCommitService {
         preview: ClonePreviewState,
         cloneOperation: EditOperation,
     ): EditOperation {
-        if (preview.transform.isIdentity() && !regionsOverlap(preview.sourceRegion, preview.destinationRegion)) {
+        if (preview.transform.isIdentity() &&
+            !regionsOverlap(preview.sourceRegion, preview.destinationRegion) &&
+            isFullCuboidCapture(preview.sourceRegion, preview.sourceClipboardBuffer)
+        ) {
             return CompositeOperation(
                 listOf(
                     cloneOperation,
@@ -65,10 +71,11 @@ object PlacementCommitService {
             )
         }
         val destinationPositions = destinationPlacements.mapTo(linkedSetOf()) { it.pos.toImmutable() }
+        val sourcePositions = preview.sourceClipboardBuffer.cells.mapTo(linkedSetOf()) { cell ->
+            preview.sourceRegion.minCorner().add(cell.offset).toImmutable()
+        }
         val sourceOnlyAirPlacements = buildList {
-            val source = preview.sourceRegion.normalized()
-            for (pos in BlockPos.iterate(source.minCorner(), source.maxCorner())) {
-                val immutablePos = pos.toImmutable()
+            for (immutablePos in sourcePositions) {
                 if (immutablePos !in destinationPositions) {
                     add(
                         SymmetryBlockPlacement(
@@ -95,5 +102,13 @@ object PlacementCommitService {
             left.maxCorner().y >= right.minCorner().y &&
             left.minCorner().z <= right.maxCorner().z &&
             left.maxCorner().z >= right.minCorner().z
+    }
+
+    private fun isFullCuboidCapture(
+        region: axion.common.model.BlockRegion,
+        clipboardBuffer: axion.common.model.ClipboardBuffer,
+    ): Boolean {
+        val size = region.normalized().size()
+        return (size.x * size.y * size.z) == clipboardBuffer.cells.size
     }
 }

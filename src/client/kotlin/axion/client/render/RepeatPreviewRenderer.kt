@@ -14,14 +14,26 @@ object RepeatPreviewRenderer {
         destinationColor: Int,
         lineWidth: Float,
     ) {
-        PulsingCuboidRenderer.renderShell(
+        val renderedSparseSource = ClipboardSelectionRenderer.renderPulse(
             context = context,
-            box = SelectionBounds.regionBox(preview.sourceRegion),
+            origin = preview.sourceRegion.minCorner(),
+            region = preview.sourceRegion,
+            clipboard = preview.clipboardBuffer,
             outlineColor = SOURCE_SELECTION_COLOR,
             lineWidth = lineWidth,
             minAlpha = 0,
             maxAlpha = 166,
         )
+        if (!renderedSparseSource) {
+            PulsingCuboidRenderer.renderShell(
+                context = context,
+                box = SelectionBounds.regionBox(preview.sourceRegion),
+                outlineColor = SOURCE_SELECTION_COLOR,
+                lineWidth = lineWidth,
+                minAlpha = 0,
+                maxAlpha = 166,
+            )
+        }
         val destinationRegions = RepeatPreviewLayout.destinationRegions(
             sourceRegion = preview.sourceRegion,
             step = preview.step,

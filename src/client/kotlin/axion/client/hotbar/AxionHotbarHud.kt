@@ -1,5 +1,6 @@
 package axion.client.hotbar
 
+import axion.client.AxionClientState
 import axion.client.input.AxionModifierKeys
 import axion.client.tool.AxionToolSelectionController
 import axion.common.model.AxionSubtool
@@ -11,12 +12,10 @@ object AxionHotbarHud {
     private const val OUTER_BACKGROUND: Int = 0xB0101010.toInt()
     private const val INNER_BACKGROUND: Int = 0xAA1E1E1E.toInt()
     private const val BORDER_NEUTRAL: Int = 0xFF7C7C7C.toInt()
+    private const val BORDER_HOVER: Int = 0xFFD8D8D8.toInt()
     private const val BORDER_SELECTED: Int = 0xFFFFFFFF.toInt()
     private const val TEXT_SELECTED: Int = 0xFFFFFFFF.toInt()
     private const val TEXT_IDLE: Int = 0xFFE2C884.toInt()
-    private const val STRIP_ENTRY_HEIGHT: Int = 18
-    private const val STRIP_ENTRY_WIDTH: Int = 42
-    private const val STRIP_ENTRY_GAP: Int = 2
 
     fun render(context: DrawContext, tickCounter: net.minecraft.client.render.RenderTickCounter) {
         val client = MinecraftClient.getInstance()
@@ -50,6 +49,17 @@ object AxionHotbarHud {
                 context = context,
                 sideSlot = sideSlot,
                 selected = activeSubtool,
+                hovered = AxionAltMenuController.hoveredSubtool(client, context.scaledWindowWidth, context.scaledWindowHeight),
+                textRenderer = client.textRenderer,
+            )
+            renderMiddleClickToggle(
+                context = context,
+                sideSlot = sideSlot,
+                hovered = AxionAltMenuController.isHoveringMiddleClickToggle(
+                    client,
+                    context.scaledWindowWidth,
+                    context.scaledWindowHeight,
+                ),
                 textRenderer = client.textRenderer,
             )
         }
@@ -80,32 +90,62 @@ object AxionHotbarHud {
         context: DrawContext,
         sideSlot: AxionHudLayout.SlotBounds,
         selected: AxionSubtool,
+        hovered: AxionSubtool?,
         textRenderer: net.minecraft.client.font.TextRenderer,
     ) {
-        val (originX, originBottom) = AxionHudLayout.stripOrigin(sideSlot)
+        AxionHudLayout.stripEntries(sideSlot).forEach { entry ->
+            val highlighted = entry.subtool == selected
+            val hover = entry.subtool == hovered
+            val borderColor = when {
+                highlighted -> BORDER_SELECTED
+                hover -> BORDER_HOVER
+                else -> BORDER_NEUTRAL
+            }
+            val textColor = if (highlighted || hover) TEXT_SELECTED else TEXT_IDLE
 
-        AxionSubtool.entries.forEachIndexed { index, subtool ->
-            val boxY = originBottom - ((index + 1) * (STRIP_ENTRY_HEIGHT + STRIP_ENTRY_GAP))
-            val highlighted = subtool == selected
-            val borderColor = if (highlighted) BORDER_SELECTED else BORDER_NEUTRAL
-            val textColor = if (highlighted) TEXT_SELECTED else TEXT_IDLE
-
-            context.fill(originX - (STRIP_ENTRY_WIDTH - sideSlot.size), boxY, originX + sideSlot.size, boxY + STRIP_ENTRY_HEIGHT, OUTER_BACKGROUND)
-            context.drawStrokedRectangle(originX - (STRIP_ENTRY_WIDTH - sideSlot.size), boxY, STRIP_ENTRY_WIDTH, STRIP_ENTRY_HEIGHT, borderColor)
+            context.fill(entry.x, entry.y, entry.x + entry.width, entry.y + entry.height, OUTER_BACKGROUND)
+            context.drawStrokedRectangle(entry.x, entry.y, entry.width, entry.height, borderColor)
             context.drawTextWithShadow(
                 textRenderer,
-                subtool.shortLabel,
-                originX - (STRIP_ENTRY_WIDTH - sideSlot.size) + 4,
-                boxY + 5,
+                entry.subtool.shortLabel,
+                entry.x + 4,
+                entry.y + 5,
                 textColor,
             )
             context.drawTextWithShadow(
                 textRenderer,
-                Formatting.GRAY.toString() + subtool.displayName,
-                originX - (STRIP_ENTRY_WIDTH - sideSlot.size) + 18,
-                boxY + 5,
+                Formatting.GRAY.toString() + entry.subtool.displayName,
+                entry.x + 18,
+                entry.y + 5,
                 textColor,
             )
         }
+    }
+
+    private fun renderMiddleClickToggle(
+        context: DrawContext,
+        sideSlot: AxionHudLayout.SlotBounds,
+        hovered: Boolean,
+        textRenderer: net.minecraft.client.font.TextRenderer,
+    ) {
+        val bounds = AxionHudLayout.middleClickToggleBounds(sideSlot)
+        val enabled = AxionClientState.middleClickMagicSelectEnabled
+        val borderColor = when {
+            enabled -> BORDER_SELECTED
+            hovered -> BORDER_HOVER
+            else -> BORDER_NEUTRAL
+        }
+        val textColor = if (enabled || hovered) TEXT_SELECTED else TEXT_IDLE
+        val label = if (enabled) "MMB: Magic Select" else "MMB: Extend Face"
+
+        context.fill(bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + bounds.height, OUTER_BACKGROUND)
+        context.drawStrokedRectangle(bounds.x, bounds.y, bounds.width, bounds.height, borderColor)
+        context.drawCenteredTextWithShadow(
+            textRenderer,
+            label,
+            bounds.x + (bounds.width / 2),
+            bounds.y + 5,
+            textColor,
+        )
     }
 }

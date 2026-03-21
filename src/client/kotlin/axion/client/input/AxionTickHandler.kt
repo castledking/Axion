@@ -1,5 +1,6 @@
 package axion.client.input
 
+import axion.client.hotbar.AxionAltMenuController
 import axion.client.history.UndoRedoController
 import axion.client.mode.ClientModeController
 import axion.client.network.AxionServerConnection
@@ -20,7 +21,8 @@ object AxionTickHandler {
         val player = client.player ?: return
         AxionToolSelectionController.syncWithPlayerSlot(player.inventory.selectedSlot)
         ClientModeController.enforceCreativeMode(client)
-        if (client.currentScreen == null) {
+        AxionAltMenuController.onEndTick(client)
+        if (client.currentScreen == null && !AxionAltMenuController.isActive(client)) {
             ClientModeController.handleToggleKeypresses(client)
 
             while (AxionKeybindings.selectAxionTool.wasPressed()) {

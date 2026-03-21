@@ -22,6 +22,10 @@ import net.minecraft.util.math.Vec3i
 import kotlin.math.abs
 
 object AxionToolHintProvider {
+    private fun middleClickLabel(): String {
+        return if (AxionClientState.middleClickMagicSelectEnabled) "Magic select" else "Expand nearest face"
+    }
+
     fun currentPanel(): ToolHintPanel? {
         if (!AxionToolSelectionController.isAxionSlotActive()) {
             return null
@@ -58,18 +62,19 @@ object AxionToolHintProvider {
             CloneToolState.Idle -> listOf(
                 ToolHintEntry("LMB", "Set first corner"),
                 ToolHintEntry("RMB", "Set second corner"),
-                ToolHintEntry("MMB", "Expand face after selection"),
+                ToolHintEntry("MMB", if (AxionClientState.middleClickMagicSelectEnabled) "Magic select" else "Disabled until region exists"),
                 ToolHintEntry("Scroll", "Start preview"),
             )
 
             is CloneToolState.FirstCornerSet -> listOf(
                 ToolHintEntry("LMB", "Reset first corner"),
                 ToolHintEntry("RMB", "Set second corner"),
+                ToolHintEntry("MMB", if (AxionClientState.middleClickMagicSelectEnabled) "Magic select" else "Disabled until region exists"),
                 ToolHintEntry("Scroll", "Disabled until region exists"),
             )
 
             is CloneToolState.RegionDefined -> listOf(
-                ToolHintEntry("MMB", "Expand nearest face"),
+                ToolHintEntry("MMB", middleClickLabel()),
                 ToolHintEntry("Scroll", "Move preview"),
                 ToolHintEntry("LMB", "Restart source selection"),
                 ToolHintEntry("RMB", "Set second corner again"),
@@ -123,17 +128,18 @@ object AxionToolHintProvider {
             StackToolState.Idle -> listOf(
                 ToolHintEntry("LMB", "Set first corner"),
                 ToolHintEntry("RMB", "Set second corner"),
-                ToolHintEntry("MMB", "Expand face after selection"),
+                ToolHintEntry("MMB", if (AxionClientState.middleClickMagicSelectEnabled) "Magic select" else "Disabled until region exists"),
                 ToolHintEntry("Scroll", "Pick axis and repeat"),
             )
 
             is StackToolState.FirstCornerSet -> listOf(
                 ToolHintEntry("LMB", "Reset first corner"),
                 ToolHintEntry("RMB", "Set second corner"),
+                ToolHintEntry("MMB", if (AxionClientState.middleClickMagicSelectEnabled) "Magic select" else "Disabled until region exists"),
             )
 
             is StackToolState.RegionDefined -> listOf(
-                ToolHintEntry("MMB", "Expand nearest face"),
+                ToolHintEntry("MMB", middleClickLabel()),
                 ToolHintEntry("Scroll", "Start stack preview"),
                 ToolHintEntry("LMB", "Restart selection"),
                 ToolHintEntry("RMB", "Set second corner again"),
@@ -168,17 +174,18 @@ object AxionToolHintProvider {
             SmearToolState.Idle -> listOf(
                 ToolHintEntry("LMB", "Set first corner"),
                 ToolHintEntry("RMB", "Set second corner"),
-                ToolHintEntry("MMB", "Expand face after selection"),
+                ToolHintEntry("MMB", if (AxionClientState.middleClickMagicSelectEnabled) "Magic select" else "Disabled until region exists"),
                 ToolHintEntry("Scroll", "Pick axis and repeat"),
             )
 
             is SmearToolState.FirstCornerSet -> listOf(
                 ToolHintEntry("LMB", "Reset first corner"),
                 ToolHintEntry("RMB", "Set second corner"),
+                ToolHintEntry("MMB", if (AxionClientState.middleClickMagicSelectEnabled) "Magic select" else "Disabled until region exists"),
             )
 
             is SmearToolState.RegionDefined -> listOf(
-                ToolHintEntry("MMB", "Expand nearest face"),
+                ToolHintEntry("MMB", middleClickLabel()),
                 ToolHintEntry("Scroll", "Start smear preview"),
                 ToolHintEntry("LMB", "Restart selection"),
                 ToolHintEntry("RMB", "Set second corner again"),
@@ -211,17 +218,18 @@ object AxionToolHintProvider {
             EraseToolState.Idle -> listOf(
                 ToolHintEntry("LMB", "Set first corner"),
                 ToolHintEntry("RMB", "Set second corner"),
-                ToolHintEntry("MMB", "Expand face after selection"),
+                ToolHintEntry("MMB", if (AxionClientState.middleClickMagicSelectEnabled) "Magic select" else "Disabled until region exists"),
             )
 
             is EraseToolState.FirstCornerSet -> listOf(
                 ToolHintEntry("LMB", "Reset first corner"),
                 ToolHintEntry("RMB", "Set second corner"),
+                ToolHintEntry("MMB", if (AxionClientState.middleClickMagicSelectEnabled) "Magic select" else "Disabled until region exists"),
             )
 
             is EraseToolState.RegionDefined -> listOf(
                 ToolHintEntry("Del", "Erase selection"),
-                ToolHintEntry("MMB", "Expand nearest face"),
+                ToolHintEntry("MMB", middleClickLabel()),
                 ToolHintEntry("LMB", "Reset first corner"),
                 ToolHintEntry("RMB", "Reset second corner"),
             )

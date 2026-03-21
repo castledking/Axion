@@ -17,14 +17,26 @@ object PlacementPreviewRenderer {
 
     fun render(context: WorldRenderContext) {
         val preview = PlacementToolController.currentPreview() ?: return
-        PulsingCuboidRenderer.renderShell(
+        val renderedSparseSource = ClipboardSelectionRenderer.renderPulse(
             context = context,
-            box = SelectionBounds.regionBox(preview.sourceRegion),
+            origin = preview.sourceRegion.minCorner(),
+            region = preview.sourceRegion,
+            clipboard = preview.sourceClipboardBuffer,
             outlineColor = SOURCE_SELECTION_COLOR,
             lineWidth = LINE_WIDTH,
             minAlpha = 0,
             maxAlpha = 166,
         )
+        if (!renderedSparseSource) {
+            PulsingCuboidRenderer.renderShell(
+                context = context,
+                box = SelectionBounds.regionBox(preview.sourceRegion),
+                outlineColor = SOURCE_SELECTION_COLOR,
+                lineWidth = LINE_WIDTH,
+                minAlpha = 0,
+                maxAlpha = 166,
+            )
+        }
         val destinationColor = when (preview.mode) {
             PlacementToolMode.CLONE -> CLONE_DESTINATION_COLOR
             PlacementToolMode.MOVE -> MOVE_DESTINATION_COLOR

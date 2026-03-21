@@ -1,5 +1,6 @@
 package axion.mixin.client
 
+import axion.client.hotbar.AxionAltMenuController
 import axion.client.input.AxionInteractionRouter
 import axion.client.input.AxionModifierKeys
 import axion.client.mode.ClientModeController
@@ -20,6 +21,11 @@ abstract class MouseMixin {
 
     @Inject(method = ["onMouseButton"], at = [At("HEAD")], cancellable = true)
     private fun axionHandleMouseButton(window: Long, mouseInput: MouseInput, action: Int, ci: CallbackInfo) {
+        if (AxionAltMenuController.handleMouseButton(client, mouseInput.button(), action)) {
+            ci.cancel()
+            return
+        }
+
         if (client.currentScreen != null || action != GLFW.GLFW_PRESS) {
             return
         }
