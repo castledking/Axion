@@ -82,6 +82,11 @@ object AxionToolHintProvider {
                     ToolHintEntry("R", "Rotate 90 degrees"),
                     ToolHintEntry("F", "Mirror preview"),
                     ToolHintEntry("RMB", "Confirm placement"),
+                    if (mode == PlacementToolMode.CLONE) {
+                        ToolHintEntry("Shift+RMB", "Confirm and keep preview")
+                    } else {
+                        ToolHintEntry("Shift+RMB", "Same as confirm")
+                    },
                     ToolHintEntry("LMB", "Cancel preview"),
                     ToolHintEntry("MMB", "Reanchor preview"),
                 )

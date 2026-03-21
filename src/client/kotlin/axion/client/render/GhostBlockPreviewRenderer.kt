@@ -4,9 +4,17 @@ import axion.common.model.ClipboardBuffer
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext
 import net.minecraft.block.ShapeContext
 import net.minecraft.client.MinecraftClient
+import net.minecraft.client.render.LightmapTextureManager
+import net.minecraft.client.render.OverlayTexture
+import net.minecraft.client.render.RenderLayer
 import net.minecraft.client.render.RenderLayers
+import net.minecraft.client.render.VertexConsumer
+import net.minecraft.client.render.VertexConsumerProvider
+import net.minecraft.client.util.math.MatrixStack
+import net.minecraft.client.render.model.BlockModelPart
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Box
+import net.minecraft.util.math.random.Random
 
 object GhostBlockPreviewRenderer {
     private const val GHOST_ALPHA: Int = 44
@@ -26,6 +34,7 @@ object GhostBlockPreviewRenderer {
         origins: Collection<BlockPos>,
         color: Int = DEFAULT_GHOST_COLOR,
         alpha: Int = GHOST_ALPHA,
+        textured: Boolean = false,
     ) {
         if (origins.isEmpty()) {
             return
@@ -41,6 +50,11 @@ object GhostBlockPreviewRenderer {
         }
         val boundedOrigins = origins.asSequence().take(maxOrigins).toList()
         if (boundedOrigins.isEmpty()) {
+            return
+        }
+
+        if (textured) {
+            renderTextured(context, occupiedCells, boundedOrigins, alpha)
             return
         }
 
@@ -79,6 +93,92 @@ object GhostBlockPreviewRenderer {
                     )
                 }
             }
+        }
+    }
+
+    private fun renderTextured(
+        context: WorldRenderContext,
+        occupiedCells: List<axion.common.model.ClipboardCell>,
+        origins: List<BlockPos>,
+        alpha: Int,
+    ) {
+        val client = MinecraftClient.getInstance()
+        val world = client.world ?: return
+        val consumers = context.consumers() ?: return
+        val matrixStack = context.matrices()
+        val camera = client.gameRenderer.camera ?: return
+        val cameraPos = camera.cameraPos
+        val blockRenderManager = client.blockRenderManager
+        val alphaScale = alpha / 255.0f
+        val consumer = AlphaVertexConsumer(consumers.getBuffer(RenderLayers.translucentMovingBlock()), alphaScale)
+        val random = Random.create(0L)
+
+        origins.forEach { origin ->
+            occupiedCells.forEach { cell ->
+                val blockPos = cell.absolutePos(origin)
+                val model = blockRenderManager.getModel(cell.state)
+                val parts = mutableListOf<BlockModelPart>()
+                random.setSeed(cell.state.hashCode().toLong())
+                model.addParts(random, parts)
+                if (parts.isEmpty()) {
+                    return@forEach
+                }
+                matrixStack.push()
+                matrixStack.translate(
+                    blockPos.x - cameraPos.x,
+                    blockPos.y - cameraPos.y,
+                    blockPos.z - cameraPos.z,
+                )
+                renderTexturedParts(
+                    matrixStack = matrixStack,
+                    consumer = consumer,
+                    parts = parts,
+                    light = LightmapTextureManager.MAX_LIGHT_COORDINATE,
+                    overlay = OverlayTexture.DEFAULT_UV,
+                )
+                matrixStack.pop()
+            }
+        }
+    }
+
+    private fun renderTexturedParts(
+        matrixStack: MatrixStack,
+        consumer: VertexConsumer,
+        parts: List<BlockModelPart>,
+        light: Int,
+        overlay: Int,
+    ) {
+        val entry = matrixStack.peek()
+        parts.forEach { part ->
+            part.getQuads(null).forEach { quad ->
+                consumer.quad(entry, quad, 1.0f, 1.0f, 1.0f, 1.0f, light, overlay)
+            }
+            net.minecraft.util.math.Direction.entries.forEach { direction ->
+                part.getQuads(direction).forEach { quad ->
+                    consumer.quad(entry, quad, 1.0f, 1.0f, 1.0f, 1.0f, light, overlay)
+                }
+            }
+        }
+    }
+
+    private class AlphaVertexConsumer(
+        private val delegate: VertexConsumer,
+        private val alphaScale: Float,
+    ) : VertexConsumer by delegate {
+        override fun color(red: Int, green: Int, blue: Int, alpha: Int): VertexConsumer {
+            delegate.color(red, green, blue, scaledAlpha(alpha))
+            return this
+        }
+
+        override fun color(color: Int): VertexConsumer {
+            val alpha = scaledAlpha((color ushr 24) and 0xFF)
+            val rgb = color and 0x00FFFFFF
+            delegate.color((alpha shl 24) or rgb)
+            return this
+        }
+
+        private fun scaledAlpha(alpha: Int): Int {
+            return (alpha * alphaScale).toInt().coerceIn(0, 255)
         }
     }
 }

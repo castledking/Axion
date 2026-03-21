@@ -9,6 +9,7 @@ object PlacementPreviewRenderer {
     private const val MOVE_SOURCE_COLOR: Int = 0xFFFF7A7A.toInt()
     private const val CLONE_DESTINATION_COLOR: Int = 0xFFFFB347.toInt()
     private const val MOVE_DESTINATION_COLOR: Int = 0xFF7EE6A6.toInt()
+    private const val SOURCE_SELECTION_COLOR: Int = 0xFFFFFFFF.toInt()
     private const val LINE_WIDTH: Float = 1.75f
     private const val DEFAULT_GHOST_ALPHA: Int = 44
     private const val MOVE_SOURCE_GHOST_ALPHA: Int = 34
@@ -16,6 +17,14 @@ object PlacementPreviewRenderer {
 
     fun render(context: WorldRenderContext) {
         val preview = PlacementToolController.currentPreview() ?: return
+        PulsingCuboidRenderer.renderShell(
+            context = context,
+            box = SelectionBounds.regionBox(preview.sourceRegion),
+            outlineColor = SOURCE_SELECTION_COLOR,
+            lineWidth = LINE_WIDTH,
+            minAlpha = 0,
+            maxAlpha = 166,
+        )
         val destinationColor = when (preview.mode) {
             PlacementToolMode.CLONE -> CLONE_DESTINATION_COLOR
             PlacementToolMode.MOVE -> MOVE_DESTINATION_COLOR
@@ -47,6 +56,8 @@ object PlacementPreviewRenderer {
             origins = listOf(preview.destinationRegion.minCorner()),
             color = destinationColor,
             alpha = if (preview.mode == PlacementToolMode.MOVE) MOVE_DESTINATION_GHOST_ALPHA else DEFAULT_GHOST_ALPHA,
+            textured = true,
         )
+        PreviewDirectionArrowRenderer.render(context, preview.destinationRegion)
     }
 }

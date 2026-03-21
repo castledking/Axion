@@ -6,6 +6,7 @@ import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext
 
 object RepeatPreviewRenderer {
     private const val MAX_REGION_OUTLINES: Int = 96
+    private const val SOURCE_SELECTION_COLOR: Int = 0xFFFFFFFF.toInt()
 
     fun render(
         context: WorldRenderContext,
@@ -13,6 +14,14 @@ object RepeatPreviewRenderer {
         destinationColor: Int,
         lineWidth: Float,
     ) {
+        PulsingCuboidRenderer.renderShell(
+            context = context,
+            box = SelectionBounds.regionBox(preview.sourceRegion),
+            outlineColor = SOURCE_SELECTION_COLOR,
+            lineWidth = lineWidth,
+            minAlpha = 0,
+            maxAlpha = 166,
+        )
         val destinationRegions = RepeatPreviewLayout.destinationRegions(
             sourceRegion = preview.sourceRegion,
             step = preview.step,
@@ -57,6 +66,14 @@ object RepeatPreviewRenderer {
             context = context,
             clipboard = preview.clipboardBuffer,
             origins = ghostOrigins,
+            textured = true,
         )
+        val arrowRegion = RepeatPreviewLayout.aggregateRegion(
+            sourceRegion = preview.sourceRegion,
+            step = preview.step,
+            startIndex = preview.repeatCount,
+            endIndex = preview.repeatCount,
+        ) ?: preview.sourceRegion
+        PreviewDirectionArrowRenderer.render(context, arrowRegion)
     }
 }

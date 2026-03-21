@@ -11,27 +11,37 @@ import net.minecraft.util.math.BlockPos
 
 object PlacementCommitService {
     fun toOperation(preview: ClonePreviewState): EditOperation {
-        val cloneOperation = if (preview.transform.isIdentity()) {
+        val cloneOperation = if (preview.transform.isIdentity() && !regionsOverlap(preview.sourceRegion, preview.destinationRegion)) {
             CloneRegionOperation(
                 sourceRegion = preview.sourceRegion,
                 destinationOrigin = preview.destinationRegion.minCorner(),
             )
         } else {
-            SymmetryPlacementOperation(
-                preview.destinationClipboardBuffer.cells.map { cell ->
-                    SymmetryBlockPlacement(
-                        pos = preview.destinationRegion.minCorner().add(cell.offset),
-                        state = cell.state,
-                        blockEntityData = cell.blockEntityData?.copy(),
-                    )
-                },
-            )
+            buildClonePlacementOperation(preview)
         }
 
         return when (preview.mode) {
             PlacementToolMode.CLONE -> cloneOperation
             PlacementToolMode.MOVE -> buildMoveOperation(preview, cloneOperation)
         }
+    }
+
+    private fun buildClonePlacementOperation(preview: ClonePreviewState): SymmetryPlacementOperation {
+        val sourceRegion = preview.sourceRegion.normalized()
+        return SymmetryPlacementOperation(
+            preview.destinationClipboardBuffer.cells.mapNotNull { cell ->
+                val destinationPos = preview.destinationRegion.minCorner().add(cell.offset).toImmutable()
+                if (sourceRegion.contains(destinationPos) && cell.state.isAir) {
+                    null
+                } else {
+                    SymmetryBlockPlacement(
+                        pos = destinationPos,
+                        state = cell.state,
+                        blockEntityData = cell.blockEntityData?.copy(),
+                    )
+                }
+            },
+        )
     }
 
     private fun buildMoveOperation(
