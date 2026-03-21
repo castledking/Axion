@@ -2,6 +2,7 @@ package axion.client.tool
 
 import axion.client.AxionClientState
 import axion.common.model.AxionSubtool
+import axion.common.model.ClipboardState
 import axion.common.model.ToolSelectionState
 import net.minecraft.client.MinecraftClient
 import net.minecraft.util.math.MathHelper
@@ -32,6 +33,7 @@ object AxionToolSelectionController {
     fun syncWithPlayerSlot(selectedSlot: Int) {
         if (!isCreativeModeAllowed()) {
             if (currentState() is ToolSelectionState.Axion) {
+                clearTransientSelection()
                 AxionClientState.updateToolSelection(ToolSelectionState.Vanilla(selectedSlot))
             }
             return
@@ -46,6 +48,7 @@ object AxionToolSelectionController {
 
             is ToolSelectionState.Axion -> {
                 if (state.previousVanillaSlot != selectedSlot) {
+                    clearTransientSelection()
                     AxionClientState.updateToolSelection(ToolSelectionState.Vanilla(selectedSlot))
                 }
             }
@@ -58,7 +61,10 @@ object AxionToolSelectionController {
         }
 
         when (currentState()) {
-            is ToolSelectionState.Axion -> AxionClientState.updateToolSelection(ToolSelectionState.Vanilla(selectedSlot))
+            is ToolSelectionState.Axion -> {
+                clearTransientSelection()
+                AxionClientState.updateToolSelection(ToolSelectionState.Vanilla(selectedSlot))
+            }
             is ToolSelectionState.Vanilla -> AxionClientState.updateToolSelection(ToolSelectionState.Axion(selectedSlot))
         }
     }
@@ -101,9 +107,14 @@ object AxionToolSelectionController {
             AxionClientState.updateToolSelection(ToolSelectionState.Axion(previousVanillaSlot = currentVanillaSlot))
             ScrollOutcome.Consumed
         } else {
+            clearTransientSelection()
             AxionClientState.updateToolSelection(ToolSelectionState.Vanilla(slot = nextIndex))
             ScrollOutcome.SelectVanilla(nextIndex)
         }
+    }
+
+    private fun clearTransientSelection() {
+        AxionClientState.updateClipboard(ClipboardState.Empty)
     }
 
     sealed interface ScrollOutcome {
