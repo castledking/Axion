@@ -38,6 +38,7 @@ Axion brings high-speed creative building tools directly into Minecraft with cle
   - **Stack** -- repeat selections in a direction
   - **Move** -- relocate selections
   - **Extrude** -- push or pull faces of a selection
+- **Magic Select** -- select similar blobs
 - **Replace Mode** -- replace blocks
 - **Infinite Reach** -- edit blocks at any distance
 - **No Clip** -- fly through blocks for easier building
