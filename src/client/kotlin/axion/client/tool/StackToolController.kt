@@ -8,6 +8,7 @@ import axion.common.model.AxionSubtool
 import axion.common.model.BlockRegion
 import axion.common.model.ClipboardState
 import axion.common.model.SelectionState
+import axion.common.operation.CompositeOperation
 import axion.common.operation.StackRegionOperation
 import net.minecraft.client.MinecraftClient
 
@@ -126,7 +127,7 @@ object StackToolController {
             }
 
             is StackToolState.PreviewingStack -> {
-                val preview = StackPlacementService.nudgePreview(state.preview, scrollAmount)
+                val preview = StackPlacementService.nudgePreview(client, state.preview, scrollAmount)
                 if (preview == null) {
                     StackToolState.RegionDefined(
                         state.preview.firstCorner,
@@ -153,13 +154,25 @@ object StackToolController {
     }
 
     private fun confirm(preview: StackPreviewState): Boolean {
-        dispatcher.dispatch(
+        val currentOperation = StackRegionOperation(
+            sourceRegion = preview.sourceRegion,
+            clipboardBuffer = preview.clipboardBuffer,
+            step = preview.step,
+            repeatCount = preview.repeatCount,
+        )
+        val committedOperations = preview.committedSegments.map { segment ->
             StackRegionOperation(
-                sourceRegion = preview.sourceRegion,
-                clipboardBuffer = preview.clipboardBuffer,
-                step = preview.step,
-                repeatCount = preview.repeatCount,
-            ),
+                sourceRegion = segment.sourceRegion,
+                clipboardBuffer = segment.clipboardBuffer,
+                step = segment.step,
+                repeatCount = segment.repeatCount,
+            )
+        }
+        dispatcher.dispatch(
+            when {
+                committedOperations.isEmpty() -> currentOperation
+                else -> CompositeOperation(committedOperations + currentOperation)
+            },
         )
         reset()
         return true

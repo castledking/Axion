@@ -18,10 +18,16 @@ object StackPlacementService {
             sourceRegion = sourceRegion,
             clipboardBuffer = clipboardBuffer,
             scrollAmount = scrollAmount,
+            mode = RegionRepeatPlacementService.Mode.STACK,
         )
     }
 
-    fun nudgePreview(preview: StackPreviewState, scrollAmount: Double): StackPreviewState? {
-        return RegionRepeatPlacementService.nudgePreview(preview, scrollAmount)
+    fun nudgePreview(client: MinecraftClient, preview: StackPreviewState, scrollAmount: Double): StackPreviewState? {
+        return RegionRepeatPlacementService.nudgePreview(
+            client = client,
+            preview = preview,
+            scrollAmount = scrollAmount,
+            mode = RegionRepeatPlacementService.Mode.STACK,
+        )
     }
 }

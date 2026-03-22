@@ -18,10 +18,16 @@ object SmearPlacementService {
             sourceRegion = sourceRegion,
             clipboardBuffer = clipboardBuffer,
             scrollAmount = scrollAmount,
+            mode = RegionRepeatPlacementService.Mode.SMEAR,
         )
     }
 
-    fun nudgePreview(preview: SmearPreviewState, scrollAmount: Double): SmearPreviewState? {
-        return RegionRepeatPlacementService.nudgePreview(preview, scrollAmount)
+    fun nudgePreview(client: MinecraftClient, preview: SmearPreviewState, scrollAmount: Double): SmearPreviewState? {
+        return RegionRepeatPlacementService.nudgePreview(
+            client = client,
+            preview = preview,
+            scrollAmount = scrollAmount,
+            mode = RegionRepeatPlacementService.Mode.SMEAR,
+        )
     }
 }

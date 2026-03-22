@@ -8,6 +8,7 @@ import axion.common.model.AxionSubtool
 import axion.common.model.BlockRegion
 import axion.common.model.ClipboardState
 import axion.common.model.SelectionState
+import axion.common.operation.CompositeOperation
 import axion.common.operation.SmearRegionOperation
 import net.minecraft.client.MinecraftClient
 
@@ -126,7 +127,7 @@ object SmearToolController {
             }
 
             is SmearToolState.PreviewingSmear -> {
-                val preview = SmearPlacementService.nudgePreview(state.preview, scrollAmount)
+                val preview = SmearPlacementService.nudgePreview(client, state.preview, scrollAmount)
                 if (preview == null) {
                     SmearToolState.RegionDefined(
                         state.preview.firstCorner,
@@ -153,13 +154,25 @@ object SmearToolController {
     }
 
     private fun confirm(preview: SmearPreviewState): Boolean {
-        dispatcher.dispatch(
+        val currentOperation = SmearRegionOperation(
+            sourceRegion = preview.sourceRegion,
+            clipboardBuffer = preview.clipboardBuffer,
+            step = preview.step,
+            repeatCount = preview.repeatCount,
+        )
+        val committedOperations = preview.committedSegments.map { segment ->
             SmearRegionOperation(
-                sourceRegion = preview.sourceRegion,
-                clipboardBuffer = preview.clipboardBuffer,
-                step = preview.step,
-                repeatCount = preview.repeatCount,
-            ),
+                sourceRegion = segment.sourceRegion,
+                clipboardBuffer = segment.clipboardBuffer,
+                step = segment.step,
+                repeatCount = segment.repeatCount,
+            )
+        }
+        dispatcher.dispatch(
+            when {
+                committedOperations.isEmpty() -> currentOperation
+                else -> CompositeOperation(committedOperations + currentOperation)
+            },
         )
         reset()
         return true
