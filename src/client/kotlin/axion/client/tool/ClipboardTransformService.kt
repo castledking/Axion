@@ -32,10 +32,10 @@ object ClipboardTransformService {
     }
 
     fun transformedOffset(size: Vec3i, offset: Vec3i, transform: PlacementTransform): Vec3i {
-        val mirroredOffset = if (transform.mirrored) {
-            Vec3i(size.x - 1 - offset.x, offset.y, offset.z)
-        } else {
-            offset
+        val mirroredOffset = when (transform.mirrorAxis) {
+            PlacementMirrorAxis.NONE -> offset
+            PlacementMirrorAxis.X -> Vec3i(size.x - 1 - offset.x, offset.y, offset.z)
+            PlacementMirrorAxis.Z -> Vec3i(offset.x, offset.y, size.z - 1 - offset.z)
         }
 
         return when (transform.normalizedRotationQuarterTurns) {
@@ -50,10 +50,10 @@ object ClipboardTransformService {
         state: net.minecraft.block.BlockState,
         transform: PlacementTransform,
     ): net.minecraft.block.BlockState {
-        val mirroredState = if (transform.mirrored) {
-            state.mirror(BlockMirror.FRONT_BACK)
-        } else {
-            state
+        val mirroredState = when (transform.mirrorAxis) {
+            PlacementMirrorAxis.NONE -> state
+            PlacementMirrorAxis.X -> state.mirror(BlockMirror.FRONT_BACK)
+            PlacementMirrorAxis.Z -> state.mirror(BlockMirror.LEFT_RIGHT)
         }
 
         return when (transform.normalizedRotationQuarterTurns) {

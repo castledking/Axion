@@ -62,6 +62,19 @@ object AxionAltMenuController {
         )
     }
 
+    fun isHoveringKeepExistingToggle(client: MinecraftClient, screenWidth: Int, screenHeight: Int): Boolean {
+        if (!isActive(client)) {
+            return false
+        }
+
+        val sideSlot = AxionHudLayout.sideSlot(client, screenWidth, screenHeight)
+        val bounds = AxionHudLayout.keepExistingToggleBounds(sideSlot)
+        return bounds.contains(
+            client.mouse.getScaledX(client.window),
+            client.mouse.getScaledY(client.window),
+        )
+    }
+
     fun handleMouseButton(client: MinecraftClient, button: Int, action: Int): Boolean {
         if (!isActive(client)) {
             return false
@@ -70,6 +83,10 @@ object AxionAltMenuController {
         if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && action == GLFW.GLFW_PRESS) {
             if (isHoveringMiddleClickToggle(client, client.window.scaledWidth, client.window.scaledHeight)) {
                 AxionClientState.updateMiddleClickMagicSelect(!AxionClientState.middleClickMagicSelectEnabled)
+                return true
+            }
+            if (isHoveringKeepExistingToggle(client, client.window.scaledWidth, client.window.scaledHeight)) {
+                AxionClientState.updateKeepExisting(!AxionClientState.keepExistingEnabled)
                 return true
             }
             hoveredSubtool(

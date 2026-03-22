@@ -1,10 +1,12 @@
 package axion.client.symmetry
 
 import axion.common.model.SymmetryConfig
+import axion.common.model.SymmetryMirrorAxis
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Direction
 import net.minecraft.util.math.Vec3d
 import net.minecraft.util.math.Vec3i
+import kotlin.math.roundToInt
 
 object SymmetryTransformService {
     fun transformedBlocks(config: SymmetryConfig, sourceBlock: BlockPos): List<BlockPos> {
@@ -23,15 +25,18 @@ object SymmetryTransformService {
     }
 
     fun activeTransforms(config: SymmetryConfig): List<SymmetryTransformSpec> {
-        val transforms = linkedSetOf(SymmetryTransformSpec(rotationQuarterTurns = 0, mirrorY = false))
+        val transforms = linkedSetOf(SymmetryTransformSpec(rotationQuarterTurns = 0))
         val baseRotations = if (config.rotationalEnabled) 0..3 else 0..0
         baseRotations.forEach { turns ->
-            transforms += SymmetryTransformSpec(rotationQuarterTurns = turns, mirrorY = false)
+            transforms += SymmetryTransformSpec(rotationQuarterTurns = turns)
         }
 
-        if (config.mirrorYEnabled) {
+        if (config.mirrorEnabled) {
             baseRotations.forEach { turns ->
-                transforms += SymmetryTransformSpec(rotationQuarterTurns = turns, mirrorY = true)
+                transforms += SymmetryTransformSpec(
+                    rotationQuarterTurns = turns,
+                    mirrorAxis = config.mirrorAxis,
+                )
             }
         }
 
@@ -43,13 +48,31 @@ object SymmetryTransformService {
         anchor: Vec3d,
         transform: SymmetryTransformSpec,
     ): BlockPos {
-        val transformedCenter = applyTransform(
-            point = Vec3d.ofCenter(sourceBlock),
-            anchor = anchor,
-            rotationQuarterTurns = transform.rotationQuarterTurns,
-            mirrorY = transform.mirrorY,
+        val anchorX2 = (anchor.x * 2.0).roundToInt()
+        val anchorY2 = (anchor.y * 2.0).roundToInt()
+        val anchorZ2 = (anchor.z * 2.0).roundToInt()
+
+        val centerX2 = sourceBlock.x * 2 + 1
+        val centerY2 = sourceBlock.y * 2 + 1
+        val centerZ2 = sourceBlock.z * 2 + 1
+
+        val relative = rotate(
+            x = centerX2 - anchorX2,
+            y = centerY2 - anchorY2,
+            z = centerZ2 - anchorZ2,
+            quarterTurns = transform.rotationQuarterTurns,
         )
-        return BlockPos.ofFloored(transformedCenter)
+        val mirrored = mirror(relative, transform.mirrorAxis)
+
+        val transformedCenterX2 = anchorX2 + mirrored.x
+        val transformedCenterY2 = anchorY2 + mirrored.y
+        val transformedCenterZ2 = anchorZ2 + mirrored.z
+
+        return BlockPos(
+            Math.floorDiv(transformedCenterX2 - 1, 2),
+            Math.floorDiv(transformedCenterY2 - 1, 2),
+            Math.floorDiv(transformedCenterZ2 - 1, 2),
+        )
     }
 
     fun transformVector(
@@ -63,10 +86,10 @@ object SymmetryTransformService {
             else -> Vec3i(vector.z, vector.y, -vector.x)
         }
 
-        return if (transform.mirrorY) {
-            Vec3i(rotated.x, -rotated.y, rotated.z)
-        } else {
-            rotated
+        return when (transform.mirrorAxis) {
+            null -> rotated
+            SymmetryMirrorAxis.X -> Vec3i(-rotated.x, rotated.y, rotated.z)
+            SymmetryMirrorAxis.Z -> Vec3i(rotated.x, rotated.y, -rotated.z)
         }
     }
 
@@ -82,24 +105,25 @@ object SymmetryTransformService {
         }
     }
 
-    private fun applyTransform(point: Vec3d, anchor: Vec3d, rotationQuarterTurns: Int, mirrorY: Boolean): Vec3d {
-        val relativeX = point.x - anchor.x
-        val relativeY = point.y - anchor.y
-        val relativeZ = point.z - anchor.z
-
-        val rotated = when (Math.floorMod(rotationQuarterTurns, 4)) {
-            0 -> Vec3d(relativeX, relativeY, relativeZ)
-            1 -> Vec3d(-relativeZ, relativeY, relativeX)
-            2 -> Vec3d(-relativeX, relativeY, -relativeZ)
-            else -> Vec3d(relativeZ, relativeY, -relativeX)
+    private fun rotate(x: Int, y: Int, z: Int, quarterTurns: Int): Vec3i {
+        return when (Math.floorMod(quarterTurns, 4)) {
+            0 -> Vec3i(x, y, z)
+            1 -> Vec3i(-z, y, x)
+            2 -> Vec3i(-x, y, -z)
+            else -> Vec3i(z, y, -x)
         }
+    }
 
-        val mirroredY = if (mirrorY) -rotated.y else rotated.y
-        return anchor.add(rotated.x, mirroredY, rotated.z)
+    private fun mirror(vector: Vec3i, axis: SymmetryMirrorAxis?): Vec3i {
+        return when (axis) {
+            null -> vector
+            SymmetryMirrorAxis.X -> Vec3i(-vector.x, vector.y, vector.z)
+            SymmetryMirrorAxis.Z -> Vec3i(vector.x, vector.y, -vector.z)
+        }
     }
 }
 
 data class SymmetryTransformSpec(
     val rotationQuarterTurns: Int,
-    val mirrorY: Boolean,
+    val mirrorAxis: SymmetryMirrorAxis? = null,
 )

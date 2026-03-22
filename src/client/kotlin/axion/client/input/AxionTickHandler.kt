@@ -43,14 +43,18 @@ object AxionTickHandler {
             }
 
             while (AxionKeybindings.symmetryToggleRotation.wasPressed()) {
-                if (!PlacementToolController.handleRotateAction()) {
-                    SymmetryController.toggleRotational()
+                if (AxionModifierKeys.isControlDown(client)) {
+                    if (!PlacementToolController.handleRotateAction()) {
+                        SymmetryController.toggleRotational()
+                    }
                 }
             }
 
             while (AxionKeybindings.symmetryToggleMirror.wasPressed()) {
-                if (!PlacementToolController.handleMirrorAction()) {
-                    SymmetryController.toggleMirrorY()
+                if (AxionModifierKeys.isControlDown(client)) {
+                    if (!PlacementToolController.handleMirrorAction(client)) {
+                        SymmetryController.toggleMirror(client)
+                    }
                 }
             }
 

@@ -27,9 +27,17 @@ class AxionConfigScreen(
         )
 
         addDrawableChild(
+            ButtonWidget.builder(
+                Text.translatable("axion.config.magic_select.templates.button"),
+            ) {
+                client?.setScreen(MagicSelectMaskConfigScreen(this))
+            }.dimensions(centerX - 110, centerY + 20, 220, 20).build(),
+        )
+
+        addDrawableChild(
             ButtonWidget.builder(Text.translatable("gui.done")) {
                 close()
-            }.dimensions(centerX - 100, centerY + 34, 200, 20).build(),
+            }.dimensions(centerX - 100, centerY + 58, 200, 20).build(),
         )
     }
 
@@ -60,6 +68,14 @@ class AxionConfigScreen(
                 0x8A8A8A,
             )
         }
+
+        context.drawCenteredTextWithShadow(
+            textRenderer,
+            Text.translatable("axion.config.magic_select.templates.summary"),
+            width / 2,
+            (height / 2) + 2,
+            0xBFBFBF,
+        )
     }
 
     private fun commandToggleLabel(): Text {

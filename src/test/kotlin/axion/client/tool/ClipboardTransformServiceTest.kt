@@ -26,7 +26,7 @@ class ClipboardTransformServiceTest {
         val transformedOffset = ClipboardTransformService.transformedOffset(
             size = Vec3i(2, 1, 3),
             offset = Vec3i(0, 0, 0),
-            PlacementTransform(rotationQuarterTurns = 1, mirrored = true),
+            PlacementTransform(rotationQuarterTurns = 1, mirrorAxis = PlacementMirrorAxis.X),
         )
 
         assertEquals(Vec3i(2, 0, 1), transformedOffset)

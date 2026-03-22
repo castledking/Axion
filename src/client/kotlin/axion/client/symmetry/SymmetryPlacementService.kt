@@ -36,13 +36,15 @@ object SymmetryPlacementService {
         val derivedPlacements = SymmetryTransformService.activeTransforms(config)
             .asSequence()
             .filterNot { transform ->
-                transform.rotationQuarterTurns == 0 && !transform.mirrorY
+                transform.rotationQuarterTurns == 0 && transform.mirrorAxis == null
             }
-            .mapNotNull { transform ->
+            .map { transform ->
                 val derivedPos = SymmetryTransformService.transformBlock(placementPos, config.anchor.position, transform)
-                if (derivedPos == placementPos || !world.isInBuildLimit(derivedPos)) {
-                    return@mapNotNull null
-                }
+                derivedPos to SymmetryTransformService.transformDirection(placementContext.side, transform)
+            }
+            .filter { (derivedPos, _) -> derivedPos != placementPos && world.isInBuildLimit(derivedPos) }
+            .distinctBy { (derivedPos, _) -> derivedPos }
+            .mapNotNull { (derivedPos, derivedSide) ->
                 derivedPlacement(
                     player = player,
                     hand = hand,
@@ -50,10 +52,9 @@ object SymmetryPlacementService {
                     blockItem = blockItem,
                     originalContext = placementContext,
                     derivedPos = derivedPos,
-                    derivedSide = SymmetryTransformService.transformDirection(placementContext.side, transform),
+                    derivedSide = derivedSide,
                 )
             }
-            .distinctBy { it.pos }
             .toList()
 
         return SymmetryPlacementResult(

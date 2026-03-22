@@ -219,7 +219,8 @@ object AxionProtocolCodec {
                 if (operation.symmetry != null) {
                     writeDoubleVector(output, operation.symmetry.anchor)
                     output.writeBoolean(operation.symmetry.rotationalEnabled)
-                    output.writeBoolean(operation.symmetry.mirrorYEnabled)
+                    output.writeBoolean(operation.symmetry.mirrorEnabled)
+                    output.writeUTF(operation.symmetry.mirrorAxis.name)
                 }
             }
 
@@ -275,7 +276,8 @@ object AxionProtocolCodec {
                     SymmetryConfigPayload(
                         anchor = readDoubleVector(input),
                         rotationalEnabled = input.readBoolean(),
-                        mirrorYEnabled = input.readBoolean(),
+                        mirrorEnabled = input.readBoolean(),
+                        mirrorAxis = SymmetryMirrorAxisPayload.valueOf(input.readUTF()),
                     )
                 } else {
                     null

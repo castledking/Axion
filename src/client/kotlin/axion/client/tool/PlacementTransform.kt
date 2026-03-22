@@ -1,8 +1,14 @@
 package axion.client.tool
 
+enum class PlacementMirrorAxis {
+    NONE,
+    X,
+    Z,
+}
+
 data class PlacementTransform(
     val rotationQuarterTurns: Int = 0,
-    val mirrored: Boolean = false,
+    val mirrorAxis: PlacementMirrorAxis = PlacementMirrorAxis.NONE,
 ) {
     val normalizedRotationQuarterTurns: Int = Math.floorMod(rotationQuarterTurns, 4)
 
@@ -10,11 +16,11 @@ data class PlacementTransform(
         return copy(rotationQuarterTurns = normalizedRotationQuarterTurns + 1)
     }
 
-    fun toggleMirror(): PlacementTransform {
-        return copy(mirrored = !mirrored)
+    fun toggleMirror(axis: PlacementMirrorAxis): PlacementTransform {
+        return copy(mirrorAxis = if (mirrorAxis == axis) PlacementMirrorAxis.NONE else axis)
     }
 
     fun isIdentity(): Boolean {
-        return normalizedRotationQuarterTurns == 0 && !mirrored
+        return normalizedRotationQuarterTurns == 0 && mirrorAxis == PlacementMirrorAxis.NONE
     }
 }

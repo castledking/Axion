@@ -1,6 +1,7 @@
 package axion.client.render
 
 import axion.client.tool.SmearToolController
+import axion.client.tool.RegionRepeatPlacementService
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext
 
 object SmearPreviewRenderer {
@@ -12,6 +13,7 @@ object SmearPreviewRenderer {
         RepeatPreviewRenderer.render(
             context = context,
             preview = preview,
+            mode = RegionRepeatPlacementService.Mode.SMEAR,
             destinationColor = DESTINATION_COLOR,
             lineWidth = LINE_WIDTH,
         )

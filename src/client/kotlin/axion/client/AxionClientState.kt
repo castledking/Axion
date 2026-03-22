@@ -47,6 +47,9 @@ object AxionClientState {
     var middleClickMagicSelectEnabled: Boolean = false
         private set
 
+    var keepExistingEnabled: Boolean = false
+        private set
+
     fun updateToolSelection(state: ToolSelectionState) {
         toolSelectionState = state
     }
@@ -97,5 +100,9 @@ object AxionClientState {
 
     fun updateMiddleClickMagicSelect(enabled: Boolean) {
         middleClickMagicSelectEnabled = enabled
+    }
+
+    fun updateKeepExisting(enabled: Boolean) {
+        keepExistingEnabled = enabled
     }
 }

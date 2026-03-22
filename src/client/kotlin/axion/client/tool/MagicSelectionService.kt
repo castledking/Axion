@@ -1,23 +1,26 @@
 package axion.client.tool
 
+import axion.client.config.AxionClientConfig
 import axion.client.network.BlockEntitySnapshotService
 import axion.common.model.BlockRegion
 import axion.common.model.ClipboardBuffer
 import axion.common.model.ClipboardCell
 import net.minecraft.block.BlockState
-import net.minecraft.registry.tag.BlockTags
+import net.minecraft.registry.Registries
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Vec3i
 import net.minecraft.world.World
 
 object MagicSelectionService {
-    private const val DEFAULT_RADIUS: Int = 4
+    private const val DEFAULT_RADIUS: Int = 8
     private const val DEFAULT_RADIUS_SQUARED: Int = DEFAULT_RADIUS * DEFAULT_RADIUS
 
     data class Result(
         val region: BlockRegion,
         val clipboardBuffer: ClipboardBuffer,
     )
+
+    fun defaultBrushSize(): Int = DEFAULT_RADIUS
 
     fun select(world: World, center: BlockPos): Result? {
         val seedState = world.getBlockState(center)
@@ -37,6 +40,10 @@ object MagicSelectionService {
                         }
 
                         val pos = BlockPos(x, y, z)
+                        if (pos == center) {
+                            add(pos.toImmutable())
+                            continue
+                        }
                         val state = world.getBlockState(pos)
                         if (matchesFamily(seedState, state)) {
                             add(pos.toImmutable())
@@ -119,15 +126,27 @@ object MagicSelectionService {
         if (candidateState.isAir) {
             return false
         }
-        if (candidateState.isOf(seedState.block)) {
-            return true
+        return AxionClientConfig.enabledMagicSelectTemplates().any { template ->
+            template.rules().any { rule -> rule.matches(seedState, candidateState) } ||
+                template.selectedCustomMaskIds
+                    .mapNotNull(AxionClientConfig::customMaskById)
+                    .any { mask ->
+                        mask.rules().any { rule -> rule.matches(seedState, candidateState) } ||
+                            matchesCustomBlocks(mask.customBlockIds, seedState, candidateState)
+                    }
         }
-        if (seedState.isIn(BlockTags.DIRT) && candidateState.isIn(BlockTags.DIRT)) {
-            return true
+    }
+
+    private fun matchesCustomBlocks(
+        customBlockIds: Set<String>,
+        seedState: BlockState,
+        candidateState: BlockState,
+    ): Boolean {
+        if (customBlockIds.isEmpty()) {
+            return false
         }
-        if (seedState.isIn(BlockTags.BASE_STONE_OVERWORLD) && candidateState.isIn(BlockTags.BASE_STONE_OVERWORLD)) {
-            return true
-        }
-        return false
+        val seedId = Registries.BLOCK.getId(seedState.block).toString()
+        val candidateId = Registries.BLOCK.getId(candidateState.block).toString()
+        return seedId in customBlockIds && candidateId in customBlockIds
     }
 }

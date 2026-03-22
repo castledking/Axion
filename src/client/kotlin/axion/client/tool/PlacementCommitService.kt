@@ -1,5 +1,6 @@
 package axion.client.tool
 
+import axion.client.AxionClientState
 import axion.common.operation.ClearRegionOperation
 import axion.common.operation.CloneRegionOperation
 import axion.common.operation.CompositeOperation
@@ -31,10 +32,11 @@ object PlacementCommitService {
 
     private fun buildClonePlacementOperation(preview: ClonePreviewState): SymmetryPlacementOperation {
         val sourceRegion = preview.sourceRegion.normalized()
+        val keepExisting = AxionClientState.keepExistingEnabled
         return SymmetryPlacementOperation(
             preview.destinationClipboardBuffer.cells.mapNotNull { cell ->
                 val destinationPos = preview.destinationRegion.minCorner().add(cell.offset).toImmutable()
-                if (sourceRegion.contains(destinationPos) && cell.state.isAir) {
+                if (keepExisting && sourceRegion.contains(destinationPos)) {
                     null
                 } else {
                     SymmetryBlockPlacement(

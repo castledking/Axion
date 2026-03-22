@@ -1,5 +1,6 @@
 package axion.client.input
 
+import axion.client.config.MagicSelectMaskConfigScreen
 import axion.client.symmetry.SymmetryController
 import axion.client.symmetry.SymmetryPlacementController
 import axion.client.tool.AxionToolSelectionController
@@ -112,6 +113,11 @@ object AxionInteractionRouter {
     }
 
     fun handleMiddleAction(client: MinecraftClient): Boolean {
+        if (AxionModifierKeys.isShiftDown(client) && supportsMagicSelectConfigShortcut()) {
+            client.setScreen(MagicSelectMaskConfigScreen(client.currentScreen))
+            return true
+        }
+
         return when (AxionToolSelectionController.selectedSubtool()) {
             AxionSubtool.CLONE,
             AxionSubtool.MOVE,
@@ -189,5 +195,18 @@ object AxionInteractionRouter {
 
     private fun shouldCaptureSecondaryAction(): Boolean {
         return AxionToolSelectionController.isAxionSlotActive()
+    }
+
+    private fun supportsMagicSelectConfigShortcut(): Boolean {
+        return when (AxionToolSelectionController.selectedSubtool()) {
+            AxionSubtool.CLONE,
+            AxionSubtool.MOVE,
+            AxionSubtool.STACK,
+            AxionSubtool.SMEAR,
+            AxionSubtool.ERASE,
+                -> AxionToolSelectionController.isAxionSlotActive()
+
+            else -> false
+        }
     }
 }

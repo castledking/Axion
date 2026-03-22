@@ -1,16 +1,24 @@
 package axion.client.render
 
+import axion.client.network.BlockWrite
+import axion.client.network.LocalWritePlanner
 import axion.client.selection.SelectionBounds
+import axion.client.tool.RegionRepeatPlacementService
 import axion.client.tool.RepeatRegionPreview
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext
+import net.minecraft.client.MinecraftClient
+import net.minecraft.util.math.BlockPos
 
 object RepeatPreviewRenderer {
     private const val MAX_REGION_OUTLINES: Int = 96
+    private const val MAX_COLLISION_PULSE_BLOCKS: Int = 2048
     private const val SOURCE_SELECTION_COLOR: Int = 0xFFFFFFFF.toInt()
+    private val writePlanner = LocalWritePlanner()
 
     fun render(
         context: WorldRenderContext,
         preview: RepeatRegionPreview,
+        mode: RegionRepeatPlacementService.Mode,
         destinationColor: Int,
         lineWidth: Float,
     ) {
@@ -34,6 +42,18 @@ object RepeatPreviewRenderer {
                 maxAlpha = 166,
             )
         }
+
+        if (mode == RegionRepeatPlacementService.Mode.SMEAR) {
+            renderCollisionAware(
+                context = context,
+                preview = preview,
+                mode = mode,
+                destinationColor = destinationColor,
+                lineWidth = lineWidth,
+            )
+            return
+        }
+
         val destinationRegions = RepeatPreviewLayout.destinationRegions(
             sourceRegion = preview.sourceRegion,
             step = preview.step,
@@ -80,6 +100,45 @@ object RepeatPreviewRenderer {
             origins = ghostOrigins,
             textured = true,
         )
+        renderArrow(context, preview)
+    }
+
+    private fun renderCollisionAware(
+        context: WorldRenderContext,
+        preview: RepeatRegionPreview,
+        mode: RegionRepeatPlacementService.Mode,
+        destinationColor: Int,
+        lineWidth: Float,
+    ) {
+        val world = MinecraftClient.getInstance().world ?: return
+        val finalWrites = linkedMapOf<BlockPos, BlockWrite>()
+        writePlanner.plan(world, RegionRepeatPlacementService.toOperation(preview, mode)).writes.forEach { write ->
+            finalWrites[write.pos.toImmutable()] = write
+        }
+        val renderedWrites = finalWrites.values.filterNot { it.state.isAir }
+        if (renderedWrites.isNotEmpty()) {
+            ClipboardSelectionRenderer.renderPulsePositions(
+                context = context,
+                positions = renderedWrites.asSequence().map { it.pos }.take(MAX_COLLISION_PULSE_BLOCKS).toList(),
+                outlineColor = destinationColor,
+                lineWidth = lineWidth,
+                minAlpha = 0,
+                maxAlpha = 110,
+            )
+            GhostBlockPreviewRenderer.renderWrites(
+                context = context,
+                writes = renderedWrites,
+                color = destinationColor,
+                textured = true,
+            )
+        }
+        renderArrow(context, preview)
+    }
+
+    private fun renderArrow(
+        context: WorldRenderContext,
+        preview: RepeatRegionPreview,
+    ) {
         val arrowRegion = RepeatPreviewLayout.aggregateRegion(
             sourceRegion = preview.sourceRegion,
             step = preview.step,

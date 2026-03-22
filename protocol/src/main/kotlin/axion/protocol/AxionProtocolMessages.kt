@@ -134,10 +134,16 @@ enum class AxionExtrudeMode {
     SHRINK,
 }
 
+enum class SymmetryMirrorAxisPayload {
+    X,
+    Z,
+}
+
 data class SymmetryConfigPayload(
     val anchor: DoubleVector3,
     val rotationalEnabled: Boolean,
-    val mirrorYEnabled: Boolean,
+    val mirrorEnabled: Boolean,
+    val mirrorAxis: SymmetryMirrorAxisPayload,
 )
 
 data class ExtrudeRequest(

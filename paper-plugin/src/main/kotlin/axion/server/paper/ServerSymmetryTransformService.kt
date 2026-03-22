@@ -3,49 +3,75 @@ package axion.server.paper
 import axion.protocol.DoubleVector3
 import axion.protocol.IntVector3
 import axion.protocol.SymmetryConfigPayload
+import axion.protocol.SymmetryMirrorAxisPayload
+import kotlin.math.roundToInt
 
 object ServerSymmetryTransformService {
     fun activeTransforms(config: SymmetryConfigPayload?): List<TransformSpec> {
-        if (config == null || (!config.rotationalEnabled && !config.mirrorYEnabled)) {
-            return listOf(TransformSpec(0, false))
+        if (config == null || (!config.rotationalEnabled && !config.mirrorEnabled)) {
+            return listOf(TransformSpec(0))
         }
 
-        val transforms = linkedSetOf(TransformSpec(0, false))
+        val transforms = linkedSetOf(TransformSpec(0))
         val rotations = if (config.rotationalEnabled) 0..3 else 0..0
         rotations.forEach { turns ->
-            transforms += TransformSpec(turns, false)
+            transforms += TransformSpec(turns)
         }
-        if (config.mirrorYEnabled) {
+        if (config.mirrorEnabled) {
             rotations.forEach { turns ->
-                transforms += TransformSpec(turns, true)
+                transforms += TransformSpec(turns, config.mirrorAxis)
             }
         }
         return transforms.toList()
     }
 
     fun transformBlock(source: IntVector3, anchor: DoubleVector3, transform: TransformSpec): IntVector3 {
-        val centerX = source.x + 0.5
-        val centerY = source.y + 0.5
-        val centerZ = source.z + 0.5
-        val relativeX = centerX - anchor.x
-        val relativeY = centerY - anchor.y
-        val relativeZ = centerZ - anchor.z
-        val rotated = when (Math.floorMod(transform.rotationQuarterTurns, 4)) {
-            0 -> Triple(relativeX, relativeY, relativeZ)
-            1 -> Triple(-relativeZ, relativeY, relativeX)
-            2 -> Triple(-relativeX, relativeY, -relativeZ)
-            else -> Triple(relativeZ, relativeY, -relativeX)
-        }
-        val mirroredY = if (transform.mirrorY) -rotated.second else rotated.second
-        return IntVector3(
-            kotlin.math.floor(anchor.x + rotated.first).toInt(),
-            kotlin.math.floor(anchor.y + mirroredY).toInt(),
-            kotlin.math.floor(anchor.z + rotated.third).toInt(),
+        val anchorX2 = (anchor.x * 2.0).roundToInt()
+        val anchorY2 = (anchor.y * 2.0).roundToInt()
+        val anchorZ2 = (anchor.z * 2.0).roundToInt()
+
+        val centerX2 = source.x * 2 + 1
+        val centerY2 = source.y * 2 + 1
+        val centerZ2 = source.z * 2 + 1
+
+        val rotated = rotate(
+            x = centerX2 - anchorX2,
+            y = centerY2 - anchorY2,
+            z = centerZ2 - anchorZ2,
+            quarterTurns = transform.rotationQuarterTurns,
         )
+        val mirrored = mirror(rotated, transform.mirrorAxis)
+
+        val transformedCenterX2 = anchorX2 + mirrored.first
+        val transformedCenterY2 = anchorY2 + mirrored.second
+        val transformedCenterZ2 = anchorZ2 + mirrored.third
+
+        return IntVector3(
+            Math.floorDiv(transformedCenterX2 - 1, 2),
+            Math.floorDiv(transformedCenterY2 - 1, 2),
+            Math.floorDiv(transformedCenterZ2 - 1, 2),
+        )
+    }
+
+    private fun rotate(x: Int, y: Int, z: Int, quarterTurns: Int): Triple<Int, Int, Int> {
+        return when (Math.floorMod(quarterTurns, 4)) {
+            0 -> Triple(x, y, z)
+            1 -> Triple(-z, y, x)
+            2 -> Triple(-x, y, -z)
+            else -> Triple(z, y, -x)
+        }
+    }
+
+    private fun mirror(vector: Triple<Int, Int, Int>, axis: SymmetryMirrorAxisPayload?): Triple<Int, Int, Int> {
+        return when (axis) {
+            null -> vector
+            SymmetryMirrorAxisPayload.X -> Triple(-vector.first, vector.second, vector.third)
+            SymmetryMirrorAxisPayload.Z -> Triple(vector.first, vector.second, -vector.third)
+        }
     }
 
     data class TransformSpec(
         val rotationQuarterTurns: Int,
-        val mirrorY: Boolean,
+        val mirrorAxis: SymmetryMirrorAxisPayload? = null,
     )
 }

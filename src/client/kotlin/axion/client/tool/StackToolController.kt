@@ -8,8 +8,6 @@ import axion.common.model.AxionSubtool
 import axion.common.model.BlockRegion
 import axion.common.model.ClipboardState
 import axion.common.model.SelectionState
-import axion.common.operation.CompositeOperation
-import axion.common.operation.StackRegionOperation
 import net.minecraft.client.MinecraftClient
 
 object StackToolController {
@@ -154,26 +152,7 @@ object StackToolController {
     }
 
     private fun confirm(preview: StackPreviewState): Boolean {
-        val currentOperation = StackRegionOperation(
-            sourceRegion = preview.sourceRegion,
-            clipboardBuffer = preview.clipboardBuffer,
-            step = preview.step,
-            repeatCount = preview.repeatCount,
-        )
-        val committedOperations = preview.committedSegments.map { segment ->
-            StackRegionOperation(
-                sourceRegion = segment.sourceRegion,
-                clipboardBuffer = segment.clipboardBuffer,
-                step = segment.step,
-                repeatCount = segment.repeatCount,
-            )
-        }
-        dispatcher.dispatch(
-            when {
-                committedOperations.isEmpty() -> currentOperation
-                else -> CompositeOperation(committedOperations + currentOperation)
-            },
-        )
+        dispatcher.dispatch(RegionRepeatPlacementService.toOperation(preview, StackPlacementService.repeatMode()))
         reset()
         return true
     }

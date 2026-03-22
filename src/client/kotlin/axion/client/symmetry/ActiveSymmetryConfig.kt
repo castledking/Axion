@@ -13,6 +13,6 @@ object ActiveSymmetryConfig {
     }
 
     fun hasDerivedTransforms(config: SymmetryConfig?): Boolean {
-        return config != null && (config.rotationalEnabled || config.mirrorYEnabled)
+        return config != null && (config.rotationalEnabled || config.mirrorEnabled)
     }
 }

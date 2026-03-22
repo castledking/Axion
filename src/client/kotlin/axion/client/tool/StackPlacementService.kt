@@ -1,5 +1,6 @@
 package axion.client.tool
 
+import axion.client.AxionClientState
 import axion.common.model.BlockRegion
 import axion.common.model.ClipboardBuffer
 import net.minecraft.client.MinecraftClient
@@ -18,7 +19,7 @@ object StackPlacementService {
             sourceRegion = sourceRegion,
             clipboardBuffer = clipboardBuffer,
             scrollAmount = scrollAmount,
-            mode = RegionRepeatPlacementService.Mode.STACK,
+            mode = repeatMode(),
         )
     }
 
@@ -27,7 +28,15 @@ object StackPlacementService {
             client = client,
             preview = preview,
             scrollAmount = scrollAmount,
-            mode = RegionRepeatPlacementService.Mode.STACK,
+            mode = repeatMode(),
         )
+    }
+
+    fun repeatMode(): RegionRepeatPlacementService.Mode {
+        return if (AxionClientState.keepExistingEnabled) {
+            RegionRepeatPlacementService.Mode.SMEAR
+        } else {
+            RegionRepeatPlacementService.Mode.STACK
+        }
     }
 }

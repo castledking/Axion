@@ -146,21 +146,23 @@ object BuildPlacementService {
         return axion.client.symmetry.SymmetryTransformService.activeTransforms(config)
             .asSequence()
             .filterNot { transform ->
-                transform.rotationQuarterTurns == 0 && !transform.mirrorY
+                transform.rotationQuarterTurns == 0 && transform.mirrorAxis == null
             }
-            .mapNotNull { transform ->
+            .map { transform ->
                 val derivedPos = axion.client.symmetry.SymmetryTransformService.transformBlock(
                     sourceBlock = primaryPos,
                     anchor = config.anchor.position,
                     transform = transform,
                 )
-                if (derivedPos == primaryPos) {
-                    return@mapNotNull null
-                }
                 val derivedSide = axion.client.symmetry.SymmetryTransformService.transformDirection(
                     target.hitResult.side,
                     transform,
                 )
+                derivedPos to derivedSide
+            }
+            .filter { (derivedPos, _) -> derivedPos != primaryPos }
+            .distinctBy { (derivedPos, _) -> derivedPos }
+            .mapNotNull { (derivedPos, derivedSide) ->
                 if (replaceMode) {
                     createReplacePlacementAt(
                         world = world,

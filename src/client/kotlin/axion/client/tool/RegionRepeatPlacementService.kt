@@ -3,6 +3,10 @@ package axion.client.tool
 import axion.common.model.BlockRegion
 import axion.common.model.ClipboardBuffer
 import axion.common.model.ClipboardCell
+import axion.common.operation.CompositeOperation
+import axion.common.operation.EditOperation
+import axion.common.operation.SmearRegionOperation
+import axion.common.operation.StackRegionOperation
 import net.minecraft.block.Blocks
 import net.minecraft.client.MinecraftClient
 import net.minecraft.util.math.BlockPos
@@ -58,6 +62,29 @@ object RegionRepeatPlacementService {
             nudgeCurrentSegment(preview, scrollDirection)
         } else {
             redirectPreview(preview, currentDirection, scrollDirection, mode)
+        }
+    }
+
+    fun toOperation(preview: RepeatRegionPreview, mode: Mode): EditOperation {
+        val currentOperation = toOperation(
+            sourceRegion = preview.sourceRegion,
+            clipboardBuffer = preview.clipboardBuffer,
+            step = preview.step,
+            repeatCount = preview.repeatCount,
+            mode = mode,
+        )
+        val committedOperations = preview.committedSegments.map { segment ->
+            toOperation(
+                sourceRegion = segment.sourceRegion,
+                clipboardBuffer = segment.clipboardBuffer,
+                step = segment.step,
+                repeatCount = segment.repeatCount,
+                mode = mode,
+            )
+        }
+        return when {
+            committedOperations.isEmpty() -> currentOperation
+            else -> CompositeOperation(committedOperations + currentOperation)
         }
     }
 
@@ -130,6 +157,30 @@ object RegionRepeatPlacementService {
             repeatCount = repeatCount,
             committedSegments = committedSegments,
         )
+    }
+
+    private fun toOperation(
+        sourceRegion: BlockRegion,
+        clipboardBuffer: ClipboardBuffer,
+        step: Vec3i,
+        repeatCount: Int,
+        mode: Mode,
+    ): EditOperation {
+        return when (mode) {
+            Mode.STACK -> StackRegionOperation(
+                sourceRegion = sourceRegion,
+                clipboardBuffer = clipboardBuffer,
+                step = step,
+                repeatCount = repeatCount,
+            )
+
+            Mode.SMEAR -> SmearRegionOperation(
+                sourceRegion = sourceRegion,
+                clipboardBuffer = clipboardBuffer,
+                step = step,
+                repeatCount = repeatCount,
+            )
+        }
     }
 
     private fun foldPreview(

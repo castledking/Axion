@@ -105,19 +105,29 @@ object ClonePlacementService {
         )
     }
 
-    fun mirrorPreview(preview: ClonePreviewState): ClonePreviewState {
+    fun mirrorPreview(preview: ClonePreviewState, client: MinecraftClient): ClonePreviewState {
+        val axis = dominantMirrorAxis(client)
         return createPreview(
             mode = preview.mode,
             firstCorner = preview.firstCorner,
             sourceRegion = preview.sourceRegion,
             clipboardBuffer = preview.sourceClipboardBuffer,
             offset = preview.offset,
-            transform = preview.transform.toggleMirror(),
+            transform = preview.transform.toggleMirror(axis),
         )
     }
 
     private fun dominantLookDirection(client: MinecraftClient): Direction {
         val look = client.player?.rotationVecClient ?: return Direction.UP
         return Direction.getFacing(look)
+    }
+
+    private fun dominantMirrorAxis(client: MinecraftClient): PlacementMirrorAxis {
+        val look = client.player?.rotationVecClient ?: return PlacementMirrorAxis.X
+        return if (kotlin.math.abs(look.x) >= kotlin.math.abs(look.z)) {
+            PlacementMirrorAxis.X
+        } else {
+            PlacementMirrorAxis.Z
+        }
     }
 }

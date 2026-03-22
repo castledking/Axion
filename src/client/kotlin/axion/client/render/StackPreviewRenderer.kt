@@ -1,5 +1,6 @@
 package axion.client.render
 
+import axion.client.tool.StackPlacementService
 import axion.client.tool.StackToolController
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext
 
@@ -12,6 +13,7 @@ object StackPreviewRenderer {
         RepeatPreviewRenderer.render(
             context = context,
             preview = preview,
+            mode = StackPlacementService.repeatMode(),
             destinationColor = DESTINATION_COLOR,
             lineWidth = LINE_WIDTH,
         )

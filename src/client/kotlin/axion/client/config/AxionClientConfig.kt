@@ -2,6 +2,10 @@ package axion.client.config
 
 import com.google.gson.GsonBuilder
 import net.fabricmc.loader.api.FabricLoader
+import net.minecraft.item.Item
+import net.minecraft.item.Items
+import net.minecraft.registry.Registries
+import net.minecraft.util.Identifier
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -22,13 +26,136 @@ object AxionClientConfig {
             ?.contains("mac") == true
     }
 
-    fun useCommandModifierOnMac(): Boolean {
-        return isMacOs() && data.useCommandModifierOnMac
-    }
+    fun useCommandModifierOnMac(): Boolean = isMacOs() && data.useCommandModifierOnMac
 
     fun setUseCommandModifierOnMac(enabled: Boolean) {
         data = data.copy(useCommandModifierOnMac = isMacOs() && enabled)
         save()
+    }
+
+    fun magicSelectTemplates(): List<MagicSelectTemplateConfig> = data.magicSelectTemplates
+
+    fun enabledMagicSelectTemplates(): List<MagicSelectTemplateConfig> = data.magicSelectTemplates.filter { it.enabled }
+
+    fun templateById(id: String): MagicSelectTemplateConfig? = data.magicSelectTemplates.firstOrNull { it.id == id }
+
+    fun magicSelectCustomMasks(): List<MagicSelectCustomMask> = data.magicSelectCustomMasks
+
+    fun customMaskById(id: String): MagicSelectCustomMask? = data.magicSelectCustomMasks.firstOrNull { it.id == id }
+
+    fun updateMagicSelectTemplate(template: MagicSelectTemplateConfig) {
+        data = data.copy(
+            magicSelectTemplates = data.magicSelectTemplates.map { existing ->
+                if (existing.id == template.id) template else existing
+            },
+        )
+        save()
+    }
+
+    fun setMagicSelectTemplateEnabled(templateId: String, enabled: Boolean) {
+        templateById(templateId)?.let { template ->
+            updateMagicSelectTemplate(template.copy(enabled = enabled))
+        }
+    }
+
+    fun setMagicSelectTemplateSelectedCustomMasks(templateId: String, selectedCustomMaskIds: Set<String>) {
+        templateById(templateId)?.let { template ->
+            updateMagicSelectTemplate(template.copy(selectedCustomMaskIds = selectedCustomMaskIds))
+        }
+    }
+
+    fun setMagicSelectTemplateCustomBlocks(templateId: String, customBlockIds: Set<String>) {
+        templateById(templateId)?.let { template ->
+            updateMagicSelectTemplate(template.copy(customBlockIds = customBlockIds))
+        }
+    }
+
+    fun addMagicSelectTemplate(): String {
+        val nextIndex = data.nextMagicTemplateIndex
+        val template = MagicSelectTemplateConfig(
+            id = "template_$nextIndex",
+            name = "New Template $nextIndex",
+            enabled = false,
+            ruleIds = emptySet(),
+        )
+        data = data.copy(
+            nextMagicTemplateIndex = nextIndex + 1,
+            magicSelectTemplates = data.magicSelectTemplates + template,
+        )
+        save()
+        return template.id
+    }
+
+    fun createMagicSelectCustomMask(
+        name: String,
+        ruleIds: Set<String>,
+        customBlockIds: Set<String>,
+    ): String {
+        val nextIndex = data.nextMagicCustomMaskIndex
+        val candidateMask = MagicSelectCustomMask(
+            id = "custom_mask_$nextIndex",
+            name = name.trim().ifEmpty { "New Mask $nextIndex" },
+            ruleIds = ruleIds,
+            customBlockIds = customBlockIds,
+        )
+        val mask = sanitizeCustomMask(candidateMask)
+            ?: error("Custom mask must contain at least one rule or block")
+        data = data.copy(
+            nextMagicCustomMaskIndex = nextIndex + 1,
+            magicSelectCustomMasks = data.magicSelectCustomMasks + mask,
+        )
+        save()
+        return mask.id
+    }
+
+    fun deleteMagicSelectTemplate(templateId: String) {
+        data = data.copy(
+            magicSelectTemplates = data.magicSelectTemplates.filterNot { it.id == templateId },
+        )
+        save()
+    }
+
+    fun magicSelectTemplateSummary(): String {
+        val enabledNames = enabledMagicSelectTemplates().map { it.name }
+        return when {
+            enabledNames.isEmpty() -> "No Template"
+            else -> enabledNames.joinToString(", ")
+        }
+    }
+
+    fun templateIcons(template: MagicSelectTemplateConfig): List<Item> {
+        val ruleIcons = buildList {
+            addAll(template.rules().flatMap { it.icons })
+            addAll(
+                template.selectedCustomMaskIds
+                    .mapNotNull(::customMaskById)
+                    .flatMap(::customMaskIcons),
+            )
+        }.distinct()
+        return when {
+            ruleIcons.isEmpty() -> listOf(Items.NAME_TAG)
+            ruleIcons.size == 1 -> ruleIcons
+            else -> ruleIcons.take(2)
+        }
+    }
+
+    fun customMaskIcons(mask: MagicSelectCustomMask): List<Item> {
+        val ruleIcons = mask.rules().flatMap { it.icons }.distinct()
+        if (ruleIcons.isNotEmpty()) {
+            return ruleIcons.take(2)
+        }
+
+        val blockIcons = mask.customBlockIds.mapNotNull { blockId ->
+            Identifier.tryParse(blockId)?.let(Registries.BLOCK::get)
+                ?.asItem()
+                ?.takeIf { it != Items.AIR }
+        }.distinct()
+
+        return when {
+            blockIcons.isEmpty() -> listOf(Items.NAME_TAG)
+            blockIcons.size == 1 -> blockIcons
+            else -> blockIcons.take(2)
+        }
     }
 
     private fun load(): Data {
@@ -37,11 +164,62 @@ object AxionClientConfig {
                 return@runCatching Data.default()
             }
             Files.newBufferedReader(path).use { reader ->
-                gson.fromJson(reader, Data::class.java) ?: Data.default()
+                val fileData = gson.fromJson(reader, FileData::class.java) ?: return@use Data.default()
+                val defaults = Data.default()
+                val loadedCustomMasks = fileData.magicSelectCustomMasks
+                    ?.mapNotNull(::sanitizeCustomMask)
+                    ?: defaults.magicSelectCustomMasks
+                val validCustomMaskIds = loadedCustomMasks.map { it.id }.toSet()
+                val loadedTemplates = fileData.magicSelectTemplates
+                    ?.mapNotNull { sanitizeTemplate(it, validCustomMaskIds) }
+                    ?.takeIf { it.isNotEmpty() }
+                    ?: defaults.magicSelectTemplates
+
+                Data(
+                    useCommandModifierOnMac = fileData.useCommandModifierOnMac ?: defaults.useCommandModifierOnMac,
+                    nextMagicTemplateIndex = maxOf(
+                        fileData.nextMagicTemplateIndex ?: defaults.nextMagicTemplateIndex,
+                        loadedTemplates.size + 1,
+                    ),
+                    nextMagicCustomMaskIndex = maxOf(
+                        fileData.nextMagicCustomMaskIndex ?: defaults.nextMagicCustomMaskIndex,
+                        loadedCustomMasks.size + 1,
+                    ),
+                    magicSelectTemplates = loadedTemplates,
+                    magicSelectCustomMasks = loadedCustomMasks,
+                )
             }
         }.getOrElse {
             Data.default()
         }
+    }
+
+    private fun sanitizeTemplate(
+        template: MagicSelectTemplateConfig,
+        validCustomMaskIds: Set<String>,
+    ): MagicSelectTemplateConfig? {
+        val sanitizedName = template.name.trim().ifEmpty { return null }
+        val sanitizedRules = template.ruleIds.filter { MagicSelectRule.fromId(it) != null }.toSet()
+        return template.copy(
+            name = sanitizedName,
+            ruleIds = sanitizedRules,
+            customBlockIds = template.customBlockIds.filter { it.isNotBlank() }.toSet(),
+            selectedCustomMaskIds = template.selectedCustomMaskIds.filter { it in validCustomMaskIds }.toSet(),
+        )
+    }
+
+    private fun sanitizeCustomMask(mask: MagicSelectCustomMask): MagicSelectCustomMask? {
+        val sanitizedName = mask.name.trim().ifEmpty { return null }
+        val sanitizedRules = mask.ruleIds.filter { MagicSelectRule.fromId(it) in MagicSelectRule.customMaskRules() }.toSet()
+        val sanitizedBlocks = mask.customBlockIds.filter { it.isNotBlank() }.toSet()
+        if (sanitizedRules.isEmpty() && sanitizedBlocks.isEmpty()) {
+            return null
+        }
+        return mask.copy(
+            name = sanitizedName,
+            ruleIds = sanitizedRules,
+            customBlockIds = sanitizedBlocks,
+        )
     }
 
     private fun save() {
@@ -55,14 +233,47 @@ object AxionClientConfig {
 
     data class Data(
         val useCommandModifierOnMac: Boolean,
+        val nextMagicTemplateIndex: Int,
+        val nextMagicCustomMaskIndex: Int,
+        val magicSelectTemplates: List<MagicSelectTemplateConfig>,
+        val magicSelectCustomMasks: List<MagicSelectCustomMask>,
     ) {
         companion object {
             fun default(): Data {
                 val isMac = System.getProperty("os.name")
                     ?.lowercase()
                     ?.contains("mac") == true
-                return Data(useCommandModifierOnMac = isMac)
+                return Data(
+                    useCommandModifierOnMac = isMac,
+                    nextMagicTemplateIndex = 3,
+                    nextMagicCustomMaskIndex = 1,
+                    magicSelectTemplates = listOf(
+                        MagicSelectTemplateConfig(
+                            id = "template_1",
+                            name = "Dirt Types",
+                            enabled = false,
+                            ruleIds = setOf(MagicSelectRule.DIRT_TYPES.id),
+                            customBlockIds = emptySet(),
+                        ),
+                        MagicSelectTemplateConfig(
+                            id = "template_2",
+                            name = "Stone Types",
+                            enabled = false,
+                            ruleIds = setOf(MagicSelectRule.STONE_TYPES.id),
+                            customBlockIds = emptySet(),
+                        ),
+                    ),
+                    magicSelectCustomMasks = emptyList(),
+                )
             }
         }
     }
+
+    private data class FileData(
+        val useCommandModifierOnMac: Boolean? = null,
+        val nextMagicTemplateIndex: Int? = null,
+        val nextMagicCustomMaskIndex: Int? = null,
+        val magicSelectTemplates: List<MagicSelectTemplateConfig>? = null,
+        val magicSelectCustomMasks: List<MagicSelectCustomMask>? = null,
+    )
 }

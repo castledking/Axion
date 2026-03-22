@@ -34,6 +34,32 @@ object ClipboardSelectionRenderer {
         return true
     }
 
+    fun renderPulsePositions(
+        context: WorldRenderContext,
+        positions: Collection<BlockPos>,
+        outlineColor: Int,
+        lineWidth: Float,
+        minAlpha: Int,
+        maxAlpha: Int,
+    ): Boolean {
+        if (positions.isEmpty()) {
+            return false
+        }
+
+        positions.forEach { pos ->
+            PulsingCuboidRenderer.renderShell(
+                context = context,
+                box = SelectionBounds.blockBox(pos),
+                outlineColor = outlineColor,
+                lineWidth = lineWidth,
+                minAlpha = minAlpha,
+                maxAlpha = maxAlpha,
+                fillColor = outlineColor,
+            )
+        }
+        return true
+    }
+
     fun isSparse(region: BlockRegion, clipboard: ClipboardBuffer): Boolean {
         val size = region.normalized().size()
         return (size.x * size.y * size.z) != clipboard.cells.size

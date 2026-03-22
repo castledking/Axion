@@ -1,7 +1,6 @@
 package axion.client.tool
 
 import axion.client.AxionClientState
-import axion.client.input.AxionModifierKeys
 import axion.client.selection.SelectionController
 import axion.client.selection.blockPosOrNull
 import axion.client.symmetry.SymmetryAwareOperationDispatcher
@@ -67,13 +66,12 @@ object PlacementToolController {
             return false
         }
 
-        val keepPreview = AxionModifierKeys.isShiftDown(client)
         return when (val state = AxionClientState.placementToolState) {
             CloneToolState.Idle -> false
             is CloneToolState.FirstCornerSet -> setSecondCorner(state.firstCorner)
             is CloneToolState.RegionDefined -> setSecondCorner(state.firstCorner)
-            is CloneToolState.PreviewingOffset -> confirm(state.preview, keepPreview)
-            is CloneToolState.AwaitingConfirm -> confirm(state.preview, keepPreview)
+            is CloneToolState.PreviewingOffset -> confirm(state.preview)
+            is CloneToolState.AwaitingConfirm -> confirm(state.preview)
         }
     }
 
@@ -172,14 +170,14 @@ object PlacementToolController {
         return true
     }
 
-    fun handleMirrorAction(): Boolean {
+    fun handleMirrorAction(client: MinecraftClient): Boolean {
         val nextState = when (val state = AxionClientState.placementToolState) {
             is CloneToolState.PreviewingOffset -> CloneToolState.AwaitingConfirm(
-                ClonePlacementService.mirrorPreview(state.preview),
+                ClonePlacementService.mirrorPreview(state.preview, client),
             )
 
             is CloneToolState.AwaitingConfirm -> CloneToolState.AwaitingConfirm(
-                ClonePlacementService.mirrorPreview(state.preview),
+                ClonePlacementService.mirrorPreview(state.preview, client),
             )
 
             else -> return false
@@ -197,9 +195,9 @@ object PlacementToolController {
         syncSelectionState(state)
     }
 
-    private fun confirm(preview: ClonePreviewState, keepPreview: Boolean = false): Boolean {
+    private fun confirm(preview: ClonePreviewState): Boolean {
         dispatcher.dispatch(PlacementCommitService.toOperation(preview))
-        if (keepPreview && preview.mode == PlacementToolMode.CLONE) {
+        if (preview.mode == PlacementToolMode.CLONE) {
             val state = CloneToolState.AwaitingConfirm(preview)
             AxionClientState.updatePlacementToolState(state)
             syncSelectionState(state)

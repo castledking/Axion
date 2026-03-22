@@ -78,12 +78,17 @@ object AxionHudLayout {
         return stripEntries(sideSlot).firstOrNull { it.contains(mouseX, mouseY) }?.subtool
     }
 
-    fun middleClickToggleBounds(sideSlot: SlotBounds): ToggleButtonBounds {
+    private fun leftColumnToggleBounds(sideSlot: SlotBounds, row: Int): ToggleButtonBounds {
         val entries = stripEntries(sideSlot)
         val width = 136
         val height = STRIP_ENTRY_HEIGHT
         val x = entries.firstOrNull()?.x?.minus(width + STRIP_GAP) ?: (sideSlot.x - width - STRIP_GAP)
-        val y = entries.lastOrNull()?.y ?: (sideSlot.y - height - STRIP_GAP)
+        val baseY = entries.lastOrNull()?.y ?: (sideSlot.y - height - STRIP_GAP)
+        val y = baseY - ((height + STRIP_ENTRY_GAP) * row)
         return ToggleButtonBounds(x = x, y = y, width = width, height = height)
     }
+
+    fun middleClickToggleBounds(sideSlot: SlotBounds): ToggleButtonBounds = leftColumnToggleBounds(sideSlot, row = 1)
+
+    fun keepExistingToggleBounds(sideSlot: SlotBounds): ToggleButtonBounds = leftColumnToggleBounds(sideSlot, row = 0)
 }

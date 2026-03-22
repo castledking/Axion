@@ -27,7 +27,7 @@ object PulsingCuboidRenderer {
     ) {
         val client = MinecraftClient.getInstance()
         val camera = client.gameRenderer.camera ?: return
-        val consumers = context.consumers() ?: return
+        val consumers = context.consumers()
         val cameraPos = camera.cameraPos
         val matrixStack = context.matrices()
 
@@ -57,10 +57,11 @@ object PulsingCuboidRenderer {
         lineWidth: Float,
         minAlpha: Int = DEFAULT_MIN_ALPHA,
         maxAlpha: Int = DEFAULT_MAX_ALPHA,
+        fillColor: Int = 0xFFFFFFFF.toInt(),
     ) {
         val client = MinecraftClient.getInstance()
         val camera = client.gameRenderer.camera ?: return
-        val consumers = context.consumers() ?: return
+        val consumers = context.consumers()
         val cameraPos = camera.cameraPos
         val matrixStack = context.matrices()
         val alpha = pulsingAlpha(minAlpha, maxAlpha)
@@ -72,6 +73,7 @@ object PulsingCuboidRenderer {
             cameraPos = cameraPos,
             box = SelectionBounds.outlineBox(box),
             alpha = alpha,
+            color = fillColor,
         )
 
         VertexRendering.drawOutline(
@@ -140,6 +142,10 @@ object PulsingCuboidRenderer {
         consumer.vertex(entry, x2, y2, z2).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
         consumer.vertex(entry, x3, y3, z3).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
         consumer.vertex(entry, x4, y4, z4).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
+        consumer.vertex(entry, x4, y4, z4).color(red, green, blue, alpha).normal(entry, -normalX, -normalY, -normalZ)
+        consumer.vertex(entry, x3, y3, z3).color(red, green, blue, alpha).normal(entry, -normalX, -normalY, -normalZ)
+        consumer.vertex(entry, x2, y2, z2).color(red, green, blue, alpha).normal(entry, -normalX, -normalY, -normalZ)
+        consumer.vertex(entry, x1, y1, z1).color(red, green, blue, alpha).normal(entry, -normalX, -normalY, -normalZ)
     }
 
     private fun renderFaceQuads(
