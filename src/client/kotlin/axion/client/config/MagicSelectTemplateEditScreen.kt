@@ -37,7 +37,7 @@ class MagicSelectTemplateEditScreen(
         rows.clear()
 
         val centerX = width / 2
-        val contentWidth = 320
+        val contentWidth = 360
         val leftX = centerX - (contentWidth / 2)
         var y = 118
 
@@ -122,7 +122,7 @@ class MagicSelectTemplateEditScreen(
         super.render(context, mouseX, mouseY, deltaTicks)
 
         val centerX = width / 2
-        val contentWidth = 320
+        val contentWidth = 360
         val leftX = centerX - (contentWidth / 2)
 
         context.drawCenteredTextWithShadow(textRenderer, title, centerX, 20, 0xFFFFFF)

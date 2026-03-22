@@ -131,14 +131,55 @@ object MagicSelectionService {
             return seedState.block == candidateState.block
         }
         return enabledTemplates.any { template ->
-            template.rules().any { rule -> rule.matches(seedState, candidateState) } ||
+            templateMatches(template, seedState, candidateState) ||
                 template.selectedCustomMaskIds
                     .mapNotNull(AxionClientConfig::customMaskById)
-                    .any { mask ->
-                        mask.rules().any { rule -> rule.matches(seedState, candidateState) } ||
-                            matchesCustomBlocks(mask.customBlockIds, seedState, candidateState)
-                    }
+                    .any { mask -> customMaskMatches(mask, seedState, candidateState) }
         }
+    }
+
+    private fun templateMatches(
+        template: axion.client.config.MagicSelectTemplateConfig,
+        seedState: BlockState,
+        candidateState: BlockState,
+    ): Boolean {
+        return groupMatches(
+            ruleMatcher = { state -> template.rules().any { rule -> rule.matches(state, state) } },
+            customBlockIds = template.customBlockIds,
+            seedState = seedState,
+            candidateState = candidateState,
+        )
+    }
+
+    private fun customMaskMatches(
+        mask: axion.client.config.MagicSelectCustomMask,
+        seedState: BlockState,
+        candidateState: BlockState,
+    ): Boolean {
+        return groupMatches(
+            ruleMatcher = { state -> mask.rules().any { rule -> rule.matches(state, state) } },
+            customBlockIds = mask.customBlockIds,
+            seedState = seedState,
+            candidateState = candidateState,
+        )
+    }
+
+    private fun groupMatches(
+        ruleMatcher: (BlockState) -> Boolean,
+        customBlockIds: Set<String>,
+        seedState: BlockState,
+        candidateState: BlockState,
+    ): Boolean {
+        return stateMatchesGroup(seedState, ruleMatcher, customBlockIds) &&
+            stateMatchesGroup(candidateState, ruleMatcher, customBlockIds)
+    }
+
+    private fun stateMatchesGroup(
+        state: BlockState,
+        ruleMatcher: (BlockState) -> Boolean,
+        customBlockIds: Set<String>,
+    ): Boolean {
+        return ruleMatcher(state) || blockId(state) in customBlockIds
     }
 
     private fun matchesCustomBlocks(
@@ -149,8 +190,10 @@ object MagicSelectionService {
         if (customBlockIds.isEmpty()) {
             return false
         }
-        val seedId = Registries.BLOCK.getId(seedState.block).toString()
-        val candidateId = Registries.BLOCK.getId(candidateState.block).toString()
+        val seedId = blockId(seedState)
+        val candidateId = blockId(candidateState)
         return seedId in customBlockIds && candidateId in customBlockIds
     }
+
+    private fun blockId(state: BlockState): String = Registries.BLOCK.getId(state.block).toString()
 }

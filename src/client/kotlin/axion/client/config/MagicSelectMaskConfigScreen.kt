@@ -20,13 +20,15 @@ class MagicSelectMaskConfigScreen(
     override fun init() {
         rows.clear()
         val centerX = width / 2
+        val contentWidth = 360
+        val leftX = centerX - (contentWidth / 2)
         var y = 58
 
         addDrawableChild(
             ButtonWidget.builder(Text.translatable("axion.config.magic_select.add.button")) {
                 val templateId = AxionClientConfig.addMagicSelectTemplate()
                 client?.setScreen(MagicSelectTemplateEditScreen(this, templateId))
-            }.dimensions(centerX - 130, y, 260, 20).build(),
+            }.dimensions(leftX, y, contentWidth, 20).build(),
         )
         y += 30
 
@@ -34,23 +36,23 @@ class MagicSelectMaskConfigScreen(
             ButtonWidget.builder(Text.translatable("axion.config.magic_select.disable_all.button")) {
                 AxionClientConfig.disableAllMagicSelectTemplates()
                 clearAndInit()
-            }.dimensions(centerX - 130, y, 260, 20).build(),
+            }.dimensions(leftX, y, contentWidth, 20).build(),
         )
         y += 30
 
         AxionClientConfig.magicSelectTemplates().forEach { template ->
-            val contentX = centerX - 130
+            val contentX = leftX
             rows += TemplateRow(template = template, contentX = contentX, y = y)
             addDrawableChild(
                 ButtonWidget.builder(stateLabel(template)) {
                     AxionClientConfig.setMagicSelectTemplateEnabled(template.id, !template.enabled)
                     clearAndInit()
-                }.dimensions(centerX + 30, y, 44, 20).build(),
+                }.dimensions(leftX + contentWidth - 98, y, 44, 20).build(),
             )
             addDrawableChild(
                 ButtonWidget.builder(Text.translatable("axion.config.magic_select.edit.button")) {
                     client?.setScreen(MagicSelectTemplateEditScreen(this, template.id))
-                }.dimensions(centerX + 80, y, 50, 20).build(),
+                }.dimensions(leftX + contentWidth - 50, y, 50, 20).build(),
             )
             y += 24
         }
