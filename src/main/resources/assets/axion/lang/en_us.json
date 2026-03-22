@@ -45,6 +45,8 @@
   "axion.config.magic_select.custom_mask.confirm": "Confirm Creation",
   "axion.config.magic_select.custom_mask.save": "Confirm Changes",
   "axion.config.magic_select.custom_mask.delete": "Delete Mask",
+  "axion.config.magic_select.custom_mask.clear": "Clear Mask",
+  "axion.config.magic_select.custom_mask.custom": "Custom",
   "axion.config.magic_select.blocks.title": "Magic Select Blocks",
   "axion.config.magic_select.blocks.description": "Search and click blocks to toggle exact matching for this template.",
   "axion.config.magic_select.blocks.prev": "Prev",

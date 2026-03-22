@@ -13,29 +13,46 @@ import net.minecraft.world.World
 
 object MagicSelectionService {
     private const val DEFAULT_RADIUS: Int = 8
-    private const val DEFAULT_RADIUS_SQUARED: Int = DEFAULT_RADIUS * DEFAULT_RADIUS
+    private const val MIN_RADIUS: Int = 1
+    private const val MAX_RADIUS: Int = 16
+    private var brushRadius: Int = DEFAULT_RADIUS
 
     data class Result(
         val region: BlockRegion,
         val clipboardBuffer: ClipboardBuffer,
     )
 
-    fun defaultBrushSize(): Int = DEFAULT_RADIUS
+    fun defaultBrushSize(): Int = brushRadius
+
+    fun adjustBrushSize(scrollAmount: Double): Int? {
+        val direction = scrollAmount.compareTo(0.0)
+        if (direction == 0) {
+            return null
+        }
+        val nextRadius = (brushRadius + direction).coerceIn(MIN_RADIUS, MAX_RADIUS)
+        if (nextRadius == brushRadius) {
+            return null
+        }
+        brushRadius = nextRadius
+        return brushRadius
+    }
 
     fun select(world: World, center: BlockPos): Result? {
+        val radius = brushRadius
+        val radiusSquared = radius * radius
         val seedState = world.getBlockState(center)
         if (seedState.isAir) {
             return null
         }
 
         val selectedPositions = buildList {
-            for (x in center.x - DEFAULT_RADIUS..center.x + DEFAULT_RADIUS) {
-                for (y in center.y - DEFAULT_RADIUS..center.y + DEFAULT_RADIUS) {
-                    for (z in center.z - DEFAULT_RADIUS..center.z + DEFAULT_RADIUS) {
+            for (x in center.x - radius..center.x + radius) {
+                for (y in center.y - radius..center.y + radius) {
+                    for (z in center.z - radius..center.z + radius) {
                         val dx = x - center.x
                         val dy = y - center.y
                         val dz = z - center.z
-                        if ((dx * dx) + (dy * dy) + (dz * dz) > DEFAULT_RADIUS_SQUARED) {
+                        if ((dx * dx) + (dy * dy) + (dz * dz) > radiusSquared) {
                             continue
                         }
 
@@ -144,8 +161,9 @@ object MagicSelectionService {
         candidateState: BlockState,
     ): Boolean {
         return groupMatches(
-            ruleMatcher = { state -> template.rules().any { rule -> rule.matches(state, state) } },
+            ruleMatcher = { state -> template.rules().any { rule -> rule.includes(state) } },
             customBlockIds = template.customBlockIds,
+            excludedBlockIds = emptySet(),
             seedState = seedState,
             candidateState = candidateState,
         )
@@ -157,8 +175,9 @@ object MagicSelectionService {
         candidateState: BlockState,
     ): Boolean {
         return groupMatches(
-            ruleMatcher = { state -> mask.rules().any { rule -> rule.matches(state, state) } },
+            ruleMatcher = { state -> mask.rules().any { rule -> rule.includes(state) } },
             customBlockIds = mask.customBlockIds,
+            excludedBlockIds = mask.excludedBlockIds,
             seedState = seedState,
             candidateState = candidateState,
         )
@@ -167,19 +186,25 @@ object MagicSelectionService {
     private fun groupMatches(
         ruleMatcher: (BlockState) -> Boolean,
         customBlockIds: Set<String>,
+        excludedBlockIds: Set<String>,
         seedState: BlockState,
         candidateState: BlockState,
     ): Boolean {
-        return stateMatchesGroup(seedState, ruleMatcher, customBlockIds) &&
-            stateMatchesGroup(candidateState, ruleMatcher, customBlockIds)
+        return stateMatchesGroup(seedState, ruleMatcher, customBlockIds, excludedBlockIds) &&
+            stateMatchesGroup(candidateState, ruleMatcher, customBlockIds, excludedBlockIds)
     }
 
     private fun stateMatchesGroup(
         state: BlockState,
         ruleMatcher: (BlockState) -> Boolean,
         customBlockIds: Set<String>,
+        excludedBlockIds: Set<String>,
     ): Boolean {
-        return ruleMatcher(state) || blockId(state) in customBlockIds
+        val blockId = blockId(state)
+        if (blockId in excludedBlockIds) {
+            return false
+        }
+        return ruleMatcher(state) || blockId in customBlockIds
     }
 
     private fun matchesCustomBlocks(

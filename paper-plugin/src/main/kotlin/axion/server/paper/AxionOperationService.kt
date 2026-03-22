@@ -6,9 +6,11 @@ import axion.protocol.AxionResultCode
 import axion.protocol.AxionResultSource
 import axion.protocol.ClipboardCellPayload
 import axion.protocol.ClearRegionRequest
+import axion.protocol.CloneEntitiesRequest
 import axion.protocol.CloneRegionRequest
 import axion.protocol.ExtrudeRequest
 import axion.protocol.IntVector3
+import axion.protocol.MoveEntitiesRequest
 import axion.protocol.OperationBatchRequest
 import axion.protocol.OperationBatchResult
 import axion.protocol.PlaceBlocksRequest
@@ -126,7 +128,9 @@ class AxionOperationService(
                 when (operation) {
                     is ExtrudeRequest -> resolvedExtrudePlans.getValue(operation).writes.size
                     is ClearRegionRequest -> validator.blockCount(operation)
+                    is CloneEntitiesRequest -> validator.blockCount(operation)
                     is CloneRegionRequest -> validator.blockCount(operation)
+                    is MoveEntitiesRequest -> validator.blockCount(operation)
                     is StackRegionRequest -> validator.blockCount(operation)
                     is SmearRegionRequest -> validator.blockCount(operation)
                     is PlaceBlocksRequest -> validator.blockCount(operation)
@@ -148,6 +152,8 @@ class AxionOperationService(
         }
 
         val plannedTransactionId = if (request.recordHistory) history.nextTransactionId() else null
+        var entityMoves: List<CommittedEntityMove> = emptyList()
+        var entityClones: List<CommittedEntityClone> = emptyList()
         val result = AxionCommittedDiffBuilder(world).build(
             requestId = request.requestId,
             transactionId = plannedTransactionId,
@@ -156,20 +162,28 @@ class AxionOperationService(
             touchedOverride = touchedOverride,
             timing = timing,
         ) {
+            val appliedEntityMoves = mutableListOf<CommittedEntityMove>()
+            val appliedEntityClones = mutableListOf<CommittedEntityClone>()
             request.operations.forEach { operation ->
                 when (operation) {
                     is ClearRegionRequest -> applyClear(world, operation)
+                    is CloneEntitiesRequest -> appliedEntityClones += PaperEntityCloneService.clone(world, operation)
                     is CloneRegionRequest -> applyClone(world, operation)
+                    is MoveEntitiesRequest -> appliedEntityMoves += PaperEntityMoveService.move(world, operation)
                     is StackRegionRequest -> applyStack(world, operation)
                     is SmearRegionRequest -> applySmear(world, operation)
                     is ExtrudeRequest -> applyExtrude(world, resolvedExtrudePlans.getValue(operation))
                     is PlaceBlocksRequest -> applyPlacements(world, operation)
                 }
             }
+            entityMoves = appliedEntityMoves
+            entityClones = appliedEntityClones
         }
         val transactionId = result.transactionId
         val actionLabel = result.actionLabel
-        if (result.accepted && transactionId != null && actionLabel != null && result.changes.isNotEmpty()) {
+        if (result.accepted && transactionId != null && actionLabel != null &&
+            (result.changes.isNotEmpty() || entityMoves.isNotEmpty() || entityClones.isNotEmpty())
+        ) {
             history.recordNormal(
                 player.uniqueId,
                 ServerHistoryTransaction(
@@ -178,6 +192,8 @@ class AxionOperationService(
                     worldName = world.name,
                     historyBudget = policyService.historyBudget(world),
                     changes = result.changes,
+                    entityMoves = entityMoves,
+                    entityClones = entityClones,
                 ),
                 policyService.historyBudget(world),
             )
@@ -363,6 +379,7 @@ class AxionOperationService(
 
     private fun actionLabel(operations: List<AxionRemoteOperation>): String {
         val hasClone = operations.any { it is CloneRegionRequest }
+        val hasCloneEntities = operations.any { it is CloneEntitiesRequest }
         val hasClear = operations.any { it is ClearRegionRequest }
         val hasStack = operations.any { it is StackRegionRequest }
         val hasSmear = operations.any { it is SmearRegionRequest }
@@ -370,7 +387,7 @@ class AxionOperationService(
         val hasPlace = operations.any { it is PlaceBlocksRequest }
         return when {
             hasClone && hasClear -> "Move"
-            hasClone -> "Clone"
+            hasClone || hasCloneEntities -> "Clone"
             hasStack -> "Stack"
             hasSmear -> "Smear"
             hasExtrude -> "Extrude"
@@ -407,6 +424,8 @@ class AxionOperationService(
         return when (operation) {
             is ClearRegionRequest -> estimateRegionCount(operation.min, operation.max)
             is CloneRegionRequest -> estimateRegionCount(operation.sourceMin, operation.sourceMax)
+            is CloneEntitiesRequest -> 0
+            is MoveEntitiesRequest -> 0
             is StackRegionRequest -> operation.cells.size * maxOf(operation.repeatCount, 0)
             is SmearRegionRequest -> operation.cells.size * maxOf(operation.repeatCount, 0)
             is ExtrudeRequest -> 4096
@@ -426,10 +445,13 @@ class AxionOperationService(
         val SUPPORTED_OPERATIONS: Set<AxionOperationType> = setOf(
             AxionOperationType.CLEAR_REGION,
             AxionOperationType.CLONE_REGION,
+            AxionOperationType.CLONE_ENTITIES,
+            AxionOperationType.MOVE_ENTITIES,
             AxionOperationType.STACK_REGION,
             AxionOperationType.SMEAR_REGION,
             AxionOperationType.EXTRUDE,
             AxionOperationType.PLACE_BLOCKS,
         )
     }
+
 }

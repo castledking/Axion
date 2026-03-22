@@ -2,9 +2,12 @@ package axion.client.tool
 
 import axion.client.AxionClientState
 import axion.common.operation.ClearRegionOperation
+import axion.common.operation.CloneEntitiesOperation
 import axion.common.operation.CloneRegionOperation
 import axion.common.operation.CompositeOperation
 import axion.common.operation.EditOperation
+import axion.common.operation.EntityMoveMirrorAxis
+import axion.common.operation.MoveEntitiesOperation
 import axion.common.operation.SymmetryBlockPlacement
 import axion.common.operation.SymmetryPlacementOperation
 import net.minecraft.block.Blocks
@@ -12,7 +15,9 @@ import net.minecraft.util.math.BlockPos
 
 object PlacementCommitService {
     fun toOperation(preview: ClonePreviewState): EditOperation {
-        val cloneOperation = if (preview.transform.isIdentity() &&
+        val copyAir = AxionClientState.copyAirEnabled
+        val cloneOperation = if (copyAir &&
+            preview.transform.isIdentity() &&
             !regionsOverlap(preview.sourceRegion, preview.destinationRegion) &&
             isFullCuboidCapture(preview.sourceRegion, preview.sourceClipboardBuffer)
         ) {
@@ -25,7 +30,25 @@ object PlacementCommitService {
         }
 
         return when (preview.mode) {
-            PlacementToolMode.CLONE -> cloneOperation
+            PlacementToolMode.CLONE -> {
+                if (!AxionClientState.copyEntitiesEnabled) {
+                    cloneOperation
+                } else {
+                    compositeWithOptionalEntityClone(
+                        operations = listOf(cloneOperation),
+                        entityCloneOperation = CloneEntitiesOperation(
+                            sourceRegion = preview.sourceRegion,
+                            destinationOrigin = preview.destinationRegion.minCorner(),
+                            rotationQuarterTurns = preview.transform.normalizedRotationQuarterTurns,
+                            mirrorAxis = when (preview.transform.mirrorAxis) {
+                                PlacementMirrorAxis.NONE -> EntityMoveMirrorAxis.NONE
+                                PlacementMirrorAxis.X -> EntityMoveMirrorAxis.X
+                                PlacementMirrorAxis.Z -> EntityMoveMirrorAxis.Z
+                            },
+                        ),
+                    )
+                }
+            }
             PlacementToolMode.MOVE -> buildMoveOperation(preview, cloneOperation)
         }
     }
@@ -33,10 +56,13 @@ object PlacementCommitService {
     private fun buildClonePlacementOperation(preview: ClonePreviewState): SymmetryPlacementOperation {
         val sourceRegion = preview.sourceRegion.normalized()
         val keepExisting = AxionClientState.keepExistingEnabled
+        val copyAir = AxionClientState.copyAirEnabled
         return SymmetryPlacementOperation(
             preview.destinationClipboardBuffer.cells.mapNotNull { cell ->
                 val destinationPos = preview.destinationRegion.minCorner().add(cell.offset).toImmutable()
-                if (keepExisting && sourceRegion.contains(destinationPos)) {
+                if (!copyAir && cell.state.isAir) {
+                    null
+                } else if (keepExisting && sourceRegion.contains(destinationPos)) {
                     null
                 } else {
                     SymmetryBlockPlacement(
@@ -53,24 +79,45 @@ object PlacementCommitService {
         preview: ClonePreviewState,
         cloneOperation: EditOperation,
     ): EditOperation {
-        if (preview.transform.isIdentity() &&
+        val entityMoveOperation = if (AxionClientState.copyEntitiesEnabled) {
+            MoveEntitiesOperation(
+                sourceRegion = preview.sourceRegion,
+                destinationOrigin = preview.destinationRegion.minCorner(),
+                rotationQuarterTurns = preview.transform.normalizedRotationQuarterTurns,
+                mirrorAxis = when (preview.transform.mirrorAxis) {
+                    PlacementMirrorAxis.NONE -> EntityMoveMirrorAxis.NONE
+                    PlacementMirrorAxis.X -> EntityMoveMirrorAxis.X
+                    PlacementMirrorAxis.Z -> EntityMoveMirrorAxis.Z
+                },
+            )
+        } else {
+            null
+        }
+
+        if (AxionClientState.copyAirEnabled &&
+            preview.transform.isIdentity() &&
             !regionsOverlap(preview.sourceRegion, preview.destinationRegion) &&
             isFullCuboidCapture(preview.sourceRegion, preview.sourceClipboardBuffer)
         ) {
-            return CompositeOperation(
-                listOf(
+            return compositeWithOptionalEntityMove(
+                operations = listOf(
                     cloneOperation,
                     ClearRegionOperation(preview.sourceRegion),
                 ),
+                entityMoveOperation = entityMoveOperation,
             )
         }
 
-        val destinationPlacements = preview.destinationClipboardBuffer.cells.map { cell ->
-            SymmetryBlockPlacement(
-                pos = preview.destinationRegion.minCorner().add(cell.offset),
-                state = cell.state,
-                blockEntityData = cell.blockEntityData?.copy(),
-            )
+        val destinationPlacements = preview.destinationClipboardBuffer.cells.mapNotNull { cell ->
+            if (!AxionClientState.copyAirEnabled && cell.state.isAir) {
+                null
+            } else {
+                SymmetryBlockPlacement(
+                    pos = preview.destinationRegion.minCorner().add(cell.offset),
+                    state = cell.state,
+                    blockEntityData = cell.blockEntityData?.copy(),
+                )
+            }
         }
         val destinationPositions = destinationPlacements.mapTo(linkedSetOf()) { it.pos.toImmutable() }
         val sourcePositions = preview.sourceClipboardBuffer.cells.mapTo(linkedSetOf()) { cell ->
@@ -90,9 +137,42 @@ object PlacementCommitService {
             }
         }
 
-        return SymmetryPlacementOperation(
-            placements = sourceOnlyAirPlacements + destinationPlacements,
+        return compositeWithOptionalEntityMove(
+            operations = listOf(
+                SymmetryPlacementOperation(
+                    placements = sourceOnlyAirPlacements + destinationPlacements,
+                ),
+            ),
+            entityMoveOperation = entityMoveOperation,
         )
+    }
+
+    private fun compositeWithOptionalEntityMove(
+        operations: List<EditOperation>,
+        entityMoveOperation: MoveEntitiesOperation?,
+    ): EditOperation {
+        val flattened = if (entityMoveOperation == null) {
+            operations
+        } else {
+            operations + entityMoveOperation
+        }
+        return when (flattened.size) {
+            0 -> SymmetryPlacementOperation(emptyList())
+            1 -> flattened.first()
+            else -> CompositeOperation(flattened)
+        }
+    }
+
+    private fun compositeWithOptionalEntityClone(
+        operations: List<EditOperation>,
+        entityCloneOperation: CloneEntitiesOperation?,
+    ): EditOperation {
+        val flattened = if (entityCloneOperation == null) operations else operations + entityCloneOperation
+        return when (flattened.size) {
+            0 -> SymmetryPlacementOperation(emptyList())
+            1 -> flattened.first()
+            else -> CompositeOperation(flattened)
+        }
     }
 
     private fun regionsOverlap(a: axion.common.model.BlockRegion, b: axion.common.model.BlockRegion): Boolean {

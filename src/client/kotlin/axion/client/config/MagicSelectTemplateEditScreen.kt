@@ -5,7 +5,9 @@ import net.minecraft.client.gui.DrawContext
 import net.minecraft.client.gui.screen.Screen
 import net.minecraft.client.gui.widget.ButtonWidget
 import net.minecraft.client.gui.widget.TextFieldWidget
+import net.minecraft.text.MutableText
 import net.minecraft.text.Text
+import net.minecraft.util.Formatting
 
 class MagicSelectTemplateEditScreen(
     private val parent: Screen?,
@@ -15,13 +17,24 @@ class MagicSelectTemplateEditScreen(
         val mask: MagicSelectCustomMask,
         val contentX: Int,
         val y: Int,
-    )
+        val toggleX: Int,
+        val toggleWidth: Int,
+    ) {
+        fun containsToggle(mouseX: Double, mouseY: Double): Boolean {
+            return mouseX >= toggleX &&
+                mouseX < toggleX + toggleWidth &&
+                mouseY >= y &&
+                mouseY < y + 20
+        }
+    }
 
     private lateinit var nameField: TextFieldWidget
     private var selectedCustomMaskIds: MutableSet<String> = linkedSetOf()
     private var draftName: String = ""
     private var draftInitialized: Boolean = false
     private val rows = mutableListOf<MaskRow>()
+    private val selectedBorderColor = 0xFF58D06F.toInt()
+    private val idleBorderColor = 0xFF767676.toInt()
 
     private val template: MagicSelectTemplateConfig
         get() = AxionClientConfig.templateById(templateId)
@@ -57,16 +70,18 @@ class MagicSelectTemplateEditScreen(
         y += 30
 
         AxionClientConfig.magicSelectCustomMasks().forEach { mask ->
-            rows += MaskRow(mask = mask, contentX = leftX, y = y)
+            val toggleX = leftX + 46
+            val toggleWidth = contentWidth - 100
+            rows += MaskRow(mask = mask, contentX = leftX, y = y, toggleX = toggleX, toggleWidth = toggleWidth)
             addDrawableChild(
-                ButtonWidget.builder(maskStateLabel(mask)) {
+                ButtonWidget.builder(toggleLabel(mask.name, mask.id in selectedCustomMaskIds)) {
                     if (mask.id in selectedCustomMaskIds) {
                         selectedCustomMaskIds.remove(mask.id)
                     } else {
                         selectedCustomMaskIds.add(mask.id)
                     }
                     clearAndInit()
-                }.dimensions(leftX + contentWidth - 98, y, 44, 20).build(),
+                }.dimensions(toggleX, y, toggleWidth, 20).build(),
             )
             addDrawableChild(
                 ButtonWidget.builder(Text.translatable("axion.config.magic_select.edit.button")) {
@@ -172,12 +187,21 @@ class MagicSelectTemplateEditScreen(
             AxionClientConfig.customMaskIcons(row.mask).forEachIndexed { index, item ->
                 context.drawItem(item.defaultStack, row.contentX + (index * 18), row.y + 2)
             }
-            context.drawTextWithShadow(
+            context.drawStrokedRectangle(
+                row.toggleX,
+                row.y,
+                row.toggleWidth,
+                20,
+                if (row.mask.id in selectedCustomMaskIds) selectedBorderColor else idleBorderColor,
+            )
+        }
+
+        rows.firstOrNull { it.containsToggle(mouseX.toDouble(), mouseY.toDouble()) }?.let { row ->
+            context.drawTooltip(
                 textRenderer,
-                FormattedNameText.parse(row.mask.name),
-                row.contentX + 46,
-                row.y + 6,
-                0xFFFFFF,
+                activeTemplatesTooltip(row.mask.id),
+                mouseX,
+                mouseY,
             )
         }
     }
@@ -191,7 +215,42 @@ class MagicSelectTemplateEditScreen(
         )
     }
 
-    private fun maskStateLabel(mask: MagicSelectCustomMask): Text {
-        return Text.translatable(if (mask.id in selectedCustomMaskIds) "axion.config.toggle.on" else "axion.config.toggle.off")
+    private fun toggleLabel(name: String, enabled: Boolean): Text {
+        return Text.empty()
+            .append(FormattedNameText.parse(name))
+            .append(Text.literal(": "))
+            .append(Text.translatable(if (enabled) "axion.config.toggle.on" else "axion.config.toggle.off"))
+    }
+
+    private fun activeTemplatesTooltip(maskId: String): List<Text> {
+        val activeTemplates = AxionClientConfig.magicSelectTemplates()
+            .map { template ->
+                if (template.id == templateId) {
+                    template.copy(selectedCustomMaskIds = selectedCustomMaskIds.toSet())
+                } else {
+                    template
+                }
+            }
+            .filter { maskId in it.selectedCustomMaskIds }
+
+        if (activeTemplates.isEmpty()) {
+            return listOf(
+                Text.literal("Active in templates:").formatted(Formatting.GRAY),
+                Text.literal("None").formatted(Formatting.DARK_GRAY),
+            )
+        }
+
+        val lines = mutableListOf<Text>()
+        lines += Text.literal("Active in templates:").formatted(Formatting.GRAY)
+        activeTemplates.forEach { template ->
+            lines += bulletLine(FormattedNameText.parse(template.name))
+        }
+        return lines
+    }
+
+    private fun bulletLine(content: Text): Text {
+        val line: MutableText = Text.literal("• ").formatted(Formatting.GRAY)
+        line.append(content)
+        return line
     }
 }

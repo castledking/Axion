@@ -1,16 +1,23 @@
 package axion.client.input
 
+import axion.client.AxionClientState
 import axion.client.config.MagicSelectMaskConfigScreen
 import axion.client.symmetry.SymmetryController
 import axion.client.symmetry.SymmetryPlacementController
 import axion.client.tool.AxionToolSelectionController
+import axion.client.tool.CloneToolState
 import axion.client.tool.EraseToolController
+import axion.client.tool.EraseToolState
 import axion.client.tool.ExtrudeToolController
+import axion.client.tool.MagicSelectionService
 import axion.client.tool.PlacementToolController
+import axion.client.tool.SmearToolState
 import axion.client.tool.SmearToolController
+import axion.client.tool.StackToolState
 import axion.client.tool.StackToolController
 import axion.common.model.AxionSubtool
 import net.minecraft.client.MinecraftClient
+import net.minecraft.text.Text
 
 object AxionInteractionRouter {
     private var suppressPrimaryUntilRelease: Boolean = false
@@ -113,7 +120,7 @@ object AxionInteractionRouter {
     }
 
     fun handleMiddleAction(client: MinecraftClient): Boolean {
-        if (AxionModifierKeys.isShiftDown(client) && supportsMagicSelectConfigShortcut()) {
+        if (AxionModifierKeys.isControlDown(client) && supportsMagicSelectConfigShortcut()) {
             client.setScreen(MagicSelectMaskConfigScreen(client.currentScreen))
             return true
         }
@@ -145,6 +152,9 @@ object AxionInteractionRouter {
         ctrlHeld: Boolean,
     ): AxionToolSelectionController.ScrollOutcome {
         if (ctrlHeld && AxionToolSelectionController.isAxionSlotActive()) {
+            if (handleMagicSelectBrushScroll(client, scrollAmount)) {
+                return AxionToolSelectionController.ScrollOutcome.Consumed
+            }
             when (AxionToolSelectionController.selectedSubtool()) {
                 AxionSubtool.SETUP_SYMMETRY -> {
                     if (SymmetryController.handleScroll(client, scrollAmount)) {
@@ -205,6 +215,59 @@ object AxionInteractionRouter {
             AxionSubtool.SMEAR,
             AxionSubtool.ERASE,
                 -> AxionToolSelectionController.isAxionSlotActive()
+
+            else -> false
+        }
+    }
+
+    private fun handleMagicSelectBrushScroll(client: MinecraftClient, scrollAmount: Double): Boolean {
+        if (!AxionClientState.middleClickMagicSelectEnabled || !supportsMagicSelectBrushScroll()) {
+            return false
+        }
+        val nextBrushSize = MagicSelectionService.adjustBrushSize(scrollAmount) ?: return false
+        client.inGameHud.setOverlayMessage(Text.literal("Axion Magic Select Brush Size: $nextBrushSize"), false)
+        return true
+    }
+
+    private fun supportsMagicSelectBrushScroll(): Boolean {
+        return when (AxionToolSelectionController.selectedSubtool()) {
+            AxionSubtool.CLONE,
+            AxionSubtool.MOVE,
+                -> when (AxionClientState.placementToolState) {
+                    CloneToolState.Idle,
+                    is CloneToolState.FirstCornerSet,
+                    is CloneToolState.RegionDefined,
+                        -> true
+
+                    is CloneToolState.PreviewingOffset,
+                    is CloneToolState.AwaitingConfirm,
+                        -> false
+                }
+
+            AxionSubtool.STACK -> when (AxionClientState.stackToolState) {
+                StackToolState.Idle,
+                is StackToolState.FirstCornerSet,
+                is StackToolState.RegionDefined,
+                    -> true
+
+                is StackToolState.PreviewingStack -> false
+            }
+
+            AxionSubtool.SMEAR -> when (AxionClientState.smearToolState) {
+                SmearToolState.Idle,
+                is SmearToolState.FirstCornerSet,
+                is SmearToolState.RegionDefined,
+                    -> true
+
+                is SmearToolState.PreviewingSmear -> false
+            }
+
+            AxionSubtool.ERASE -> when (AxionClientState.eraseToolState) {
+                EraseToolState.Idle,
+                is EraseToolState.FirstCornerSet,
+                is EraseToolState.RegionDefined,
+                    -> true
+            }
 
             else -> false
         }

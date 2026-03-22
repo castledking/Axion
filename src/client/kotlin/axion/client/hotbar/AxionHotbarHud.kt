@@ -72,6 +72,26 @@ object AxionHotbarHud {
                 ),
                 textRenderer = client.textRenderer,
             )
+            renderCopyEntitiesToggle(
+                context = context,
+                sideSlot = sideSlot,
+                hovered = AxionAltMenuController.isHoveringCopyEntitiesToggle(
+                    client,
+                    context.scaledWindowWidth,
+                    context.scaledWindowHeight,
+                ),
+                textRenderer = client.textRenderer,
+            )
+            renderCopyAirToggle(
+                context = context,
+                sideSlot = sideSlot,
+                hovered = AxionAltMenuController.isHoveringCopyAirToggle(
+                    client,
+                    context.scaledWindowWidth,
+                    context.scaledWindowHeight,
+                ),
+                textRenderer = client.textRenderer,
+            )
         }
     }
 
@@ -174,6 +194,60 @@ object AxionHotbarHud {
         }
         val textColor = if (enabled || hovered) TEXT_SELECTED else TEXT_IDLE
         val label = if (enabled) "Keep Existing: ON" else "Keep Existing: OFF"
+
+        context.fill(bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + bounds.height, OUTER_BACKGROUND)
+        context.drawStrokedRectangle(bounds.x, bounds.y, bounds.width, bounds.height, borderColor)
+        context.drawCenteredTextWithShadow(
+            textRenderer,
+            label,
+            bounds.x + (bounds.width / 2),
+            bounds.y + 5,
+            textColor,
+        )
+    }
+
+    private fun renderCopyEntitiesToggle(
+        context: DrawContext,
+        sideSlot: AxionHudLayout.SlotBounds,
+        hovered: Boolean,
+        textRenderer: net.minecraft.client.font.TextRenderer,
+    ) {
+        val bounds = AxionHudLayout.copyEntitiesToggleBounds(sideSlot)
+        val enabled = AxionClientState.copyEntitiesEnabled
+        val borderColor = when {
+            enabled -> BORDER_SELECTED
+            hovered -> BORDER_HOVER
+            else -> BORDER_NEUTRAL
+        }
+        val textColor = if (enabled || hovered) TEXT_SELECTED else TEXT_IDLE
+        val label = if (enabled) "Copy Entities: ON" else "Copy Entities: OFF"
+
+        context.fill(bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + bounds.height, OUTER_BACKGROUND)
+        context.drawStrokedRectangle(bounds.x, bounds.y, bounds.width, bounds.height, borderColor)
+        context.drawCenteredTextWithShadow(
+            textRenderer,
+            label,
+            bounds.x + (bounds.width / 2),
+            bounds.y + 5,
+            textColor,
+        )
+    }
+
+    private fun renderCopyAirToggle(
+        context: DrawContext,
+        sideSlot: AxionHudLayout.SlotBounds,
+        hovered: Boolean,
+        textRenderer: net.minecraft.client.font.TextRenderer,
+    ) {
+        val bounds = AxionHudLayout.copyAirToggleBounds(sideSlot)
+        val enabled = AxionClientState.copyAirEnabled
+        val borderColor = when {
+            enabled -> BORDER_SELECTED
+            hovered -> BORDER_HOVER
+            else -> BORDER_NEUTRAL
+        }
+        val textColor = if (enabled || hovered) TEXT_SELECTED else TEXT_IDLE
+        val label = if (enabled) "Copy Air: ON" else "Copy Air: OFF"
 
         context.fill(bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + bounds.height, OUTER_BACKGROUND)
         context.drawStrokedRectangle(bounds.x, bounds.y, bounds.width, bounds.height, borderColor)

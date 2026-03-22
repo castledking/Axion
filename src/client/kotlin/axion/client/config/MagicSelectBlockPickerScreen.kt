@@ -34,6 +34,8 @@ class MagicSelectBlockPickerScreen(
     }
 
     private lateinit var searchField: TextFieldWidget
+    private lateinit var prevPageButton: ButtonWidget
+    private lateinit var nextPageButton: ButtonWidget
     private var selectedBlockIds: MutableSet<String> = linkedSetOf()
     private var page: Int = 0
     private var searchQuery: String = ""
@@ -70,12 +72,12 @@ class MagicSelectBlockPickerScreen(
         searchField.setChangedListener {
             searchQuery = it
             page = 0
-            clearAndInit()
+            updatePagingButtons()
         }
         addSelectableChild(searchField)
         setInitialFocus(searchField)
 
-        addDrawableChild(
+        prevPageButton = addDrawableChild(
             ButtonWidget.builder(Text.translatable("axion.config.magic_select.blocks.prev")) {
                 if (page > 0) {
                     page -= 1
@@ -93,7 +95,7 @@ class MagicSelectBlockPickerScreen(
             }.dimensions(centerX - 64, height - 34, 128, 20).build(),
         )
 
-        addDrawableChild(
+        nextPageButton = addDrawableChild(
             ButtonWidget.builder(Text.translatable("axion.config.magic_select.blocks.next")) {
                 if (page + 1 < pageCount()) {
                     page += 1
@@ -103,6 +105,8 @@ class MagicSelectBlockPickerScreen(
                 active = page + 1 < pageCount()
             },
         )
+
+        updatePagingButtons()
     }
 
     override fun close() {
@@ -183,6 +187,15 @@ class MagicSelectBlockPickerScreen(
         return ceil(filteredBlocks().size / TILES_PER_PAGE.toDouble()).toInt().coerceAtLeast(1)
     }
 
+    private fun updatePagingButtons() {
+        if (::prevPageButton.isInitialized) {
+            prevPageButton.active = page > 0
+        }
+        if (::nextPageButton.isInitialized) {
+            nextPageButton.active = page + 1 < pageCount()
+        }
+    }
+
     private fun tileBounds(): List<TileBounds> {
         val filtered = filteredBlocks()
         val start = (page * TILES_PER_PAGE).coerceAtMost(filtered.size)
@@ -190,7 +203,7 @@ class MagicSelectBlockPickerScreen(
         val visible = filtered.subList(start, end)
         val totalWidth = (COLUMNS * TILE_SIZE) + ((COLUMNS - 1) * TILE_GAP)
         val startX = (width / 2) - (totalWidth / 2)
-        val startY = 76
+        val startY = 88
 
         return visible.mapIndexed { index, entry ->
             val column = index % COLUMNS

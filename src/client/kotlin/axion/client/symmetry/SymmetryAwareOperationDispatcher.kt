@@ -41,12 +41,12 @@ class SymmetryAwareOperationDispatcher(
             }
 
             val plan = planner.plan(targetWorld, operation)
-            if (plan.writes.isEmpty()) {
+            if (plan.writes.isEmpty() && plan.entityMoves.isEmpty()) {
                 return@execute
             }
 
             if (recordHistory) {
-                HistoryManager.record(targetWorld, plan.label, plan.writes)
+                HistoryManager.record(targetWorld, plan)
             }
             applier.apply(targetWorld, plan)
         }

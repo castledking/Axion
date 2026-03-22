@@ -75,6 +75,32 @@ object AxionAltMenuController {
         )
     }
 
+    fun isHoveringCopyEntitiesToggle(client: MinecraftClient, screenWidth: Int, screenHeight: Int): Boolean {
+        if (!isActive(client)) {
+            return false
+        }
+
+        val sideSlot = AxionHudLayout.sideSlot(client, screenWidth, screenHeight)
+        val bounds = AxionHudLayout.copyEntitiesToggleBounds(sideSlot)
+        return bounds.contains(
+            client.mouse.getScaledX(client.window),
+            client.mouse.getScaledY(client.window),
+        )
+    }
+
+    fun isHoveringCopyAirToggle(client: MinecraftClient, screenWidth: Int, screenHeight: Int): Boolean {
+        if (!isActive(client)) {
+            return false
+        }
+
+        val sideSlot = AxionHudLayout.sideSlot(client, screenWidth, screenHeight)
+        val bounds = AxionHudLayout.copyAirToggleBounds(sideSlot)
+        return bounds.contains(
+            client.mouse.getScaledX(client.window),
+            client.mouse.getScaledY(client.window),
+        )
+    }
+
     fun handleMouseButton(client: MinecraftClient, button: Int, action: Int): Boolean {
         if (!isActive(client)) {
             return false
@@ -87,6 +113,14 @@ object AxionAltMenuController {
             }
             if (isHoveringKeepExistingToggle(client, client.window.scaledWidth, client.window.scaledHeight)) {
                 AxionClientState.updateKeepExisting(!AxionClientState.keepExistingEnabled)
+                return true
+            }
+            if (isHoveringCopyEntitiesToggle(client, client.window.scaledWidth, client.window.scaledHeight)) {
+                AxionClientState.updateCopyEntities(!AxionClientState.copyEntitiesEnabled)
+                return true
+            }
+            if (isHoveringCopyAirToggle(client, client.window.scaledWidth, client.window.scaledHeight)) {
+                AxionClientState.updateCopyAir(!AxionClientState.copyAirEnabled)
                 return true
             }
             hoveredSubtool(

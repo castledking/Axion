@@ -14,5 +14,11 @@ class LocalOperationApplier : OperationApplier {
         plan.writes.forEach { write ->
             BlockEntitySnapshotService.apply(world, write)
         }
+        if (plan.entityMoves.isNotEmpty()) {
+            LocalEntityMoveService.apply(world, plan.entityMoves)
+        }
+        if (plan.entityClones.isNotEmpty()) {
+            LocalEntityCloneService.apply(world, plan.entityClones)
+        }
     }
 }

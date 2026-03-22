@@ -34,7 +34,10 @@ object AxionToolHintProvider {
 
     private fun magicConfigHintEntries(): List<ToolHintEntry> {
         return if (AxionClientState.middleClickMagicSelectEnabled) {
-            listOf(ToolHintEntry("Shift+MMB", "Configure templates"))
+            listOf(
+                ToolHintEntry("Main Mod + MMB", "Configure templates", inline = true),
+                ToolHintEntry("Main Mod + Scroll", "Adjust brush size", inline = true),
+            )
         } else {
             emptyList()
         }
@@ -122,7 +125,6 @@ object AxionToolHintProvider {
             entries = entries,
             statusLines = buildList {
                 currentSelectionSize()?.let { add(Text.of("Selection: $it")) }
-                targetSummary()?.let { add(Text.of(it)) }
                 preview?.let {
                     add(Text.of("Offset: ${formatAxis(it.offset)} x ${formatStepLength(it.offset)}"))
                     add(Text.of("Destination: ${formatRegionSize(it.destinationRegion)}"))
@@ -130,6 +132,7 @@ object AxionToolHintProvider {
                     add(Text.of("Mirror: ${formatMirrorAxis(it.transform.mirrorAxis)}"))
                 }
                 appendMagicSelectInfo(this)
+                targetSummary()?.let { add(Text.of(it)) }
             },
             footer = symmetrySummary(),
         )
@@ -261,8 +264,8 @@ object AxionToolHintProvider {
             statusLines = buildList {
                 currentSelectionSize()?.let { add(Text.of("Selection: $it")) }
                 currentSelectionCorners()?.let { add(Text.of(it)) }
-                targetSummary()?.let { add(Text.of(it)) }
                 appendMagicSelectInfo(this)
+                targetSummary()?.let { add(Text.of(it)) }
             },
         )
     }
@@ -321,13 +324,13 @@ object AxionToolHintProvider {
         return buildList {
             currentSelectionSize()?.let { add(Text.of("Selection: $it")) }
             currentSelectionCorners()?.let { add(Text.of(it)) }
-            targetSummary()?.let { add(Text.of(it)) }
             preview?.let {
                 add(Text.of("Repeats: ${it.repeatCount}"))
                 add(Text.of("Step: ${formatAxis(it.step)} x ${formatStepLength(it.step)}"))
             }
             add(Text.of(modeText))
             appendMagicSelectInfo(this)
+            targetSummary()?.let { add(Text.of(it)) }
         }
     }
 

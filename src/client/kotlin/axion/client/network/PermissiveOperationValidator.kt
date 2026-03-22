@@ -3,8 +3,10 @@ package axion.client.network
 import axion.common.operation.EditOperation
 import axion.common.operation.ClearRegionOperation
 import axion.common.operation.CloneRegionOperation
+import axion.common.operation.CloneEntitiesOperation
 import axion.common.operation.CompositeOperation
 import axion.common.operation.ExtrudeOperation
+import axion.common.operation.MoveEntitiesOperation
 import axion.common.operation.OperationValidator
 import axion.common.operation.SmearRegionOperation
 import axion.common.operation.StackRegionOperation
@@ -49,6 +51,7 @@ class PermissiveOperationValidator : OperationValidator {
                 totalWrites = operation.sourceRegion.volume(),
                 blocksPerBatch = operation.sourceRegion.volume(),
             )
+            is CloneEntitiesOperation -> OperationEstimate()
             is StackRegionOperation -> OperationEstimate(
                 totalWrites = operation.clipboardBuffer.cells.size.toLong() * operation.repeatCount,
                 clipboardCells = operation.clipboardBuffer.cells.size,
@@ -65,6 +68,7 @@ class PermissiveOperationValidator : OperationValidator {
                 extrudeFootprint = operation.footprint.size,
                 extrudeWrites = operation.footprint.size,
             )
+            is MoveEntitiesOperation -> OperationEstimate()
             is SymmetryPlacementOperation -> OperationEstimate(
                 totalWrites = operation.placements.size.toLong(),
                 blocksPerBatch = operation.placements.size.toLong(),

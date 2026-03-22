@@ -75,10 +75,14 @@ enum class MagicSelectRule(
 
     fun matches(seedState: BlockState, candidateState: BlockState): Boolean = matcher(seedState, candidateState)
 
+    fun includes(state: BlockState): Boolean = matcher(state, state)
+
     companion object {
         fun fromId(id: String): MagicSelectRule? = entries.firstOrNull { it.id == id }
 
         fun customMaskRules(): List<MagicSelectRule> = listOf(
+            DIRT_TYPES,
+            STONE_TYPES,
             SLABS,
             STAIRS,
             WOOD,
@@ -104,6 +108,7 @@ data class MagicSelectCustomMask(
     val name: String,
     val ruleIds: Set<String>,
     val customBlockIds: Set<String>,
+    val excludedBlockIds: Set<String> = emptySet(),
 ) {
     fun rules(): List<MagicSelectRule> = ruleIds.mapNotNull(MagicSelectRule::fromId)
 }

@@ -2,9 +2,11 @@ package axion.server.paper
 
 import axion.protocol.AxionRemoteOperation
 import axion.protocol.ClearRegionRequest
+import axion.protocol.CloneEntitiesRequest
 import axion.protocol.CloneRegionRequest
 import axion.protocol.ExtrudeRequest
 import axion.protocol.IntVector3
+import axion.protocol.MoveEntitiesRequest
 import axion.protocol.PlaceBlocksRequest
 import axion.protocol.AxionResultCode
 import axion.protocol.AxionResultSource
@@ -31,6 +33,30 @@ class AxionOperationValidator(
                     )
             }
 
+            is CloneEntitiesRequest -> {
+                validateBounds(operation.sourceMin, operation.sourceMax)
+                    ?: validateBounds(
+                        operation.destinationOrigin,
+                        IntVector3(
+                            operation.destinationOrigin.x + abs(operation.sourceMax.x - operation.sourceMin.x),
+                            operation.destinationOrigin.y + abs(operation.sourceMax.y - operation.sourceMin.y),
+                            operation.destinationOrigin.z + abs(operation.sourceMax.z - operation.sourceMin.z),
+                        ),
+                    )
+            }
+
+            is MoveEntitiesRequest -> {
+                validateBounds(operation.sourceMin, operation.sourceMax)
+                    ?: validateBounds(
+                        operation.destinationOrigin,
+                        IntVector3(
+                            operation.destinationOrigin.x + abs(operation.sourceMax.x - operation.sourceMin.x),
+                            operation.destinationOrigin.y + abs(operation.sourceMax.y - operation.sourceMin.y),
+                            operation.destinationOrigin.z + abs(operation.sourceMax.z - operation.sourceMin.z),
+                        ),
+                    )
+            }
+
             is StackRegionRequest -> validateRepeatedClipboard(operation.sourceOrigin, operation.cells, operation.step, operation.repeatCount)
             is SmearRegionRequest -> validateRepeatedClipboard(operation.sourceOrigin, operation.cells, operation.step, operation.repeatCount)
             is ExtrudeRequest -> validateExtrude(operation)
@@ -42,6 +68,8 @@ class AxionOperationValidator(
         return when (operation) {
             is ClearRegionRequest -> blockCount(operation.min, operation.max)
             is CloneRegionRequest -> blockCount(operation.sourceMin, operation.sourceMax)
+            is CloneEntitiesRequest -> 0
+            is MoveEntitiesRequest -> 0
             is StackRegionRequest -> operation.cells.size * maxOf(operation.repeatCount, 0)
             is SmearRegionRequest -> operation.cells.size * maxOf(operation.repeatCount, 0)
             is ExtrudeRequest -> policy.maxExtrudeWrites

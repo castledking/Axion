@@ -236,6 +236,9 @@ object ClientModeController {
             noClipEnabled = !AxionClientState.globalModeState.noClipEnabled,
         )
         AxionClientState.updateGlobalModes(nextState)
+        if (nextState.noClipEnabled) {
+            enableFlightForNoClip(client)
+        }
         showToast(client, "No Clip", nextState.noClipEnabled)
     }
 
@@ -259,11 +262,42 @@ object ClientModeController {
         val player = client.player ?: return
         val active = AxionClientState.globalModeState.noClipEnabled && player.abilities.flying
         player.noClip = player.isSpectator || active
+        player.setNoGravity(player.isSpectator || active)
         client.server
             ?.playerManager
             ?.getPlayer(player.uuid)
             ?.let { serverPlayer ->
                 serverPlayer.noClip = serverPlayer.isSpectator || active
+                serverPlayer.setNoGravity(serverPlayer.isSpectator || active)
+            }
+    }
+
+    private fun enableFlightForNoClip(client: MinecraftClient) {
+        val player = client.player ?: return
+        if (!player.abilities.allowFlying || player.abilities.flying) {
+            return
+        }
+
+        player.abilities.flying = true
+        player.sendAbilitiesUpdate()
+        player.noClip = true
+        player.setNoGravity(true)
+        player.setOnGround(false)
+        player.horizontalCollision = false
+        player.verticalCollision = false
+        client.server
+            ?.playerManager
+            ?.getPlayer(player.uuid)
+            ?.let { serverPlayer ->
+                if (serverPlayer.abilities.allowFlying && !serverPlayer.abilities.flying) {
+                    serverPlayer.abilities.flying = true
+                    serverPlayer.noClip = true
+                    serverPlayer.setNoGravity(true)
+                    serverPlayer.setOnGround(false)
+                    serverPlayer.horizontalCollision = false
+                    serverPlayer.verticalCollision = false
+                    serverPlayer.sendAbilitiesUpdate()
+                }
             }
     }
 

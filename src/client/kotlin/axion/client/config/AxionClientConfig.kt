@@ -97,6 +97,7 @@ object AxionClientConfig {
         name: String,
         ruleIds: Set<String>,
         customBlockIds: Set<String>,
+        excludedBlockIds: Set<String> = emptySet(),
     ): String {
         val nextIndex = data.nextMagicCustomMaskIndex
         val candidateMask = MagicSelectCustomMask(
@@ -104,6 +105,7 @@ object AxionClientConfig {
             name = name.trim().ifEmpty { "New Mask $nextIndex" },
             ruleIds = ruleIds,
             customBlockIds = customBlockIds,
+            excludedBlockIds = excludedBlockIds,
         )
         val mask = sanitizeCustomMask(candidateMask)
             ?: error("Custom mask must contain at least one rule or block")
@@ -240,6 +242,7 @@ object AxionClientConfig {
         val sanitizedName = mask.name.trim().ifEmpty { return null }
         val sanitizedRules = mask.ruleIds.filter { MagicSelectRule.fromId(it) in MagicSelectRule.customMaskRules() }.toSet()
         val sanitizedBlocks = mask.customBlockIds.filter { it.isNotBlank() }.toSet()
+        val sanitizedExcluded = mask.excludedBlockIds.filter { it.isNotBlank() }.toSet()
         if (sanitizedRules.isEmpty() && sanitizedBlocks.isEmpty()) {
             return null
         }
@@ -247,6 +250,7 @@ object AxionClientConfig {
             name = sanitizedName,
             ruleIds = sanitizedRules,
             customBlockIds = sanitizedBlocks,
+            excludedBlockIds = sanitizedExcluded,
         )
     }
 
@@ -274,24 +278,41 @@ object AxionClientConfig {
                 return Data(
                     useCommandModifierOnMac = isMac,
                     nextMagicTemplateIndex = 3,
-                    nextMagicCustomMaskIndex = 1,
+                    nextMagicCustomMaskIndex = 3,
                     magicSelectTemplates = listOf(
                         MagicSelectTemplateConfig(
                             id = "template_1",
                             name = "Dirt Types",
                             enabled = false,
-                            ruleIds = setOf(MagicSelectRule.DIRT_TYPES.id),
+                            ruleIds = emptySet(),
                             customBlockIds = emptySet(),
+                            selectedCustomMaskIds = setOf("custom_mask_1"),
                         ),
                         MagicSelectTemplateConfig(
                             id = "template_2",
                             name = "Stone Types",
                             enabled = false,
-                            ruleIds = setOf(MagicSelectRule.STONE_TYPES.id),
+                            ruleIds = emptySet(),
                             customBlockIds = emptySet(),
+                            selectedCustomMaskIds = setOf("custom_mask_2"),
                         ),
                     ),
-                    magicSelectCustomMasks = emptyList(),
+                    magicSelectCustomMasks = listOf(
+                        MagicSelectCustomMask(
+                            id = "custom_mask_1",
+                            name = "Dirt Types",
+                            ruleIds = setOf(MagicSelectRule.DIRT_TYPES.id),
+                            customBlockIds = emptySet(),
+                            excludedBlockIds = emptySet(),
+                        ),
+                        MagicSelectCustomMask(
+                            id = "custom_mask_2",
+                            name = "Stone Types",
+                            ruleIds = setOf(MagicSelectRule.STONE_TYPES.id),
+                            customBlockIds = emptySet(),
+                            excludedBlockIds = emptySet(),
+                        ),
+                    ),
                 )
             }
         }

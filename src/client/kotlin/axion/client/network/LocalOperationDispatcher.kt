@@ -34,11 +34,11 @@ class LocalOperationDispatcher : OperationDispatcher {
             }
 
             val plan = planner.plan(targetWorld, operation)
-            if (plan.writes.isEmpty()) {
+            if (plan.writes.isEmpty() && plan.entityMoves.isEmpty()) {
                 return@execute
             }
 
-            HistoryManager.record(targetWorld, plan.label, plan.writes)
+            HistoryManager.record(targetWorld, plan)
             applier.apply(targetWorld, plan)
         }
     }

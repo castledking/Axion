@@ -2,10 +2,12 @@ package axion.server.paper
 
 import axion.protocol.AxionRemoteOperation
 import axion.protocol.ClearRegionRequest
+import axion.protocol.CloneEntitiesRequest
 import axion.protocol.CloneRegionRequest
 import axion.protocol.CommittedBlockChangePayload
 import axion.protocol.ExtrudeRequest
 import axion.protocol.IntVector3
+import axion.protocol.MoveEntitiesRequest
 import axion.protocol.OperationBatchResult
 import axion.protocol.PlaceBlocksRequest
 import axion.protocol.SmearRegionRequest
@@ -91,6 +93,8 @@ class AxionCommittedDiffBuilder(
                         )
                     }
 
+                    is CloneEntitiesRequest -> Unit
+                    is MoveEntitiesRequest -> Unit
                     is StackRegionRequest -> collectRepeatedClipboard(touched, operation.sourceOrigin, operation.cells, operation.step, operation.repeatCount)
                     is SmearRegionRequest -> collectRepeatedClipboard(touched, operation.sourceOrigin, operation.cells, operation.step, operation.repeatCount)
                     is ExtrudeRequest -> Unit

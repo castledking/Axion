@@ -4,9 +4,11 @@ import axion.protocol.AxionRemoteOperation
 import axion.protocol.AxionResultCode
 import axion.protocol.AxionResultSource
 import axion.protocol.ClearRegionRequest
+import axion.protocol.CloneEntitiesRequest
 import axion.protocol.CloneRegionRequest
 import axion.protocol.ExtrudeRequest
 import axion.protocol.IntVector3
+import axion.protocol.MoveEntitiesRequest
 import axion.protocol.PlaceBlocksRequest
 import axion.protocol.SmearRegionRequest
 import axion.protocol.StackRegionRequest
@@ -202,8 +204,10 @@ class AxionPolicyService(
         val hasExtrude = operations.any { it is ExtrudeRequest }
         val hasPlace = operations.any { it is PlaceBlocksRequest }
         return when {
-            hasClone && hasClear && operations.all { it is CloneRegionRequest || it is ClearRegionRequest } -> AxionToolKind.MOVE
-            hasClone -> AxionToolKind.CLONE
+            hasClone && hasClear && operations.all {
+                it is CloneRegionRequest || it is ClearRegionRequest || it is MoveEntitiesRequest
+            } -> AxionToolKind.MOVE
+            hasClone || operations.any { it is CloneEntitiesRequest } -> AxionToolKind.CLONE
             hasStack -> AxionToolKind.STACK
             hasSmear -> AxionToolKind.SMEAR
             hasExtrude -> AxionToolKind.EXTRUDE
@@ -219,6 +223,8 @@ class AxionPolicyService(
             when (operation) {
                 is ClearRegionRequest -> AxionToolKind.ERASE
                 is CloneRegionRequest -> AxionToolKind.CLONE
+                is CloneEntitiesRequest -> AxionToolKind.CLONE
+                is MoveEntitiesRequest -> null
                 is StackRegionRequest -> AxionToolKind.STACK
                 is SmearRegionRequest -> AxionToolKind.SMEAR
                 is ExtrudeRequest -> AxionToolKind.EXTRUDE

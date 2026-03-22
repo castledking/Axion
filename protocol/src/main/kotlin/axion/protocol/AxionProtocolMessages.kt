@@ -15,6 +15,8 @@ data class DoubleVector3(
 enum class AxionOperationType {
     CLEAR_REGION,
     CLONE_REGION,
+    CLONE_ENTITIES,
+    MOVE_ENTITIES,
     STACK_REGION,
     SMEAR_REGION,
     EXTRUDE,
@@ -82,6 +84,12 @@ sealed interface AxionRemoteOperation {
     val type: AxionOperationType
 }
 
+enum class PlacementMirrorAxisPayload {
+    NONE,
+    X,
+    Z,
+}
+
 data class ClearRegionRequest(
     val min: IntVector3,
     val max: IntVector3,
@@ -95,6 +103,26 @@ data class CloneRegionRequest(
     val destinationOrigin: IntVector3,
 ) : AxionRemoteOperation {
     override val type: AxionOperationType = AxionOperationType.CLONE_REGION
+}
+
+data class MoveEntitiesRequest(
+    val sourceMin: IntVector3,
+    val sourceMax: IntVector3,
+    val destinationOrigin: IntVector3,
+    val rotationQuarterTurns: Int,
+    val mirrorAxis: PlacementMirrorAxisPayload,
+) : AxionRemoteOperation {
+    override val type: AxionOperationType = AxionOperationType.MOVE_ENTITIES
+}
+
+data class CloneEntitiesRequest(
+    val sourceMin: IntVector3,
+    val sourceMax: IntVector3,
+    val destinationOrigin: IntVector3,
+    val rotationQuarterTurns: Int,
+    val mirrorAxis: PlacementMirrorAxisPayload,
+) : AxionRemoteOperation {
+    override val type: AxionOperationType = AxionOperationType.CLONE_ENTITIES
 }
 
 data class ClipboardCellPayload(

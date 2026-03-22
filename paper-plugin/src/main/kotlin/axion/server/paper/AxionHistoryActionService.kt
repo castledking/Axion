@@ -56,6 +56,8 @@ class AxionHistoryActionService(
                 newBlockEntityData = change.oldBlockEntityData,
             )
         }
+        PaperEntityMoveService.applyMoves(world, transaction.entityMoves, reverse = true)
+        PaperEntityCloneService.remove(world, transaction.entityClones)
 
         return OperationBatchResult(
             requestId = requestId,
@@ -108,6 +110,8 @@ class AxionHistoryActionService(
             applyState(world, change.pos, change.newState, change.newBlockEntityData)
             change
         }
+        PaperEntityMoveService.applyMoves(world, transaction.entityMoves, reverse = false)
+        PaperEntityCloneService.respawn(world, transaction.entityClones)
 
         return OperationBatchResult(
             requestId = requestId,

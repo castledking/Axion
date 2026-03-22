@@ -3,7 +3,12 @@ package axion.client.history
 import axion.AxionMod
 import axion.client.network.BlockEntitySnapshotService
 import axion.client.network.BlockWrite
+import axion.client.network.LocalEntityCloneService
+import axion.client.network.LocalEntityMoveService
+import axion.client.network.WritePlan
 import axion.common.history.BlockChange
+import axion.common.history.EntityCloneChange
+import axion.common.history.EntityMoveChange
 import axion.common.history.HistoryEntry
 import net.minecraft.block.Blocks
 import net.minecraft.world.World
@@ -17,8 +22,9 @@ object HistoryManager {
     private val redoStack = ArrayDeque<HistoryEntry>()
     private var nextEntryId: Long = 1L
 
-    fun record(world: World, label: String, writes: List<BlockWrite>) {
-        if (writes.isEmpty()) {
+    fun record(world: World, plan: WritePlan) {
+        val writes = plan.writes
+        if (writes.isEmpty() && plan.entityMoves.isEmpty() && plan.entityClones.isEmpty()) {
             return
         }
 
@@ -50,7 +56,19 @@ object HistoryManager {
             }
         }
 
-        if (changes.isEmpty()) {
+        val entityMoves = plan.entityMoves.map { move ->
+            EntityMoveChange(
+                entityId = move.entityId,
+                fromPos = move.fromPos,
+                toPos = move.toPos,
+                fromYaw = move.fromYaw,
+                fromPitch = move.fromPitch,
+                toYaw = move.toYaw,
+                toPitch = move.toPitch,
+            )
+        }
+
+        if (changes.isEmpty() && entityMoves.isEmpty() && plan.entityClones.isEmpty()) {
             return
         }
 
@@ -58,8 +76,18 @@ object HistoryManager {
             HistoryEntry(
                 id = nextEntryId++,
                 timestampMillis = System.currentTimeMillis(),
-                label = label,
+                label = plan.label,
                 changes = changes,
+                entityMoves = entityMoves,
+                entityClones = plan.entityClones.map { clone ->
+                    EntityCloneChange(
+                        entityId = clone.entityId,
+                        entityData = clone.entityData.copy(),
+                        pos = clone.pos,
+                        yaw = clone.yaw,
+                        pitch = clone.pitch,
+                    )
+                },
             ),
         )
     }
@@ -106,6 +134,8 @@ object HistoryManager {
             applyChanges(world, entry.changes.asReversed().map { change ->
                 BlockWrite(change.pos, change.oldState, change.oldBlockEntityData?.copy())
             })
+            applyEntityMoves(world, entry.entityMoves, reverse = true)
+            LocalEntityCloneService.remove(world, entry.entityClones)
         } catch (exception: Exception) {
             AxionMod.LOGGER.error("Failed to undo Axion history entry {}", entry.id, exception)
             undoStack.addLast(entry)
@@ -126,6 +156,8 @@ object HistoryManager {
             applyChanges(world, entry.changes.map { change ->
                 BlockWrite(change.pos, change.newState, change.newBlockEntityData?.copy())
             })
+            applyEntityMoves(world, entry.entityMoves, reverse = false)
+            LocalEntityCloneService.apply(world, entry.entityClones)
         } catch (exception: Exception) {
             AxionMod.LOGGER.error("Failed to redo Axion history entry {}", entry.id, exception)
             redoStack.addLast(entry)
@@ -149,6 +181,31 @@ object HistoryManager {
         changes.forEach { write ->
             BlockEntitySnapshotService.apply(world, write)
         }
+    }
+
+    private fun applyEntityMoves(
+        world: World,
+        moves: List<EntityMoveChange>,
+        reverse: Boolean,
+    ) {
+        if (moves.isEmpty()) {
+            return
+        }
+        LocalEntityMoveService.apply(
+            world = world,
+            moves = moves.map { move ->
+                axion.client.network.EntityMovePlan(
+                    entityId = move.entityId,
+                    fromPos = move.fromPos,
+                    toPos = move.toPos,
+                    fromYaw = move.fromYaw,
+                    fromPitch = move.fromPitch,
+                    toYaw = move.toYaw,
+                    toPitch = move.toPitch,
+                )
+            },
+            reverse = reverse,
+        )
     }
 
     private fun trimToBudget() {
@@ -178,7 +235,11 @@ object HistoryManager {
     }
 
     private fun estimateEntryBytes(entry: HistoryEntry): Int {
-        return 32 + entry.label.length * 2 + entry.changes.sumOf(::estimateChangeBytes)
+        return 32 +
+            entry.label.length * 2 +
+            entry.changes.sumOf(::estimateChangeBytes) +
+            entry.entityMoves.size * 80 +
+            entry.entityClones.sumOf(::estimateCloneBytes)
     }
 
     private fun estimateChangeBytes(change: BlockChange): Int {
@@ -187,5 +248,9 @@ object HistoryManager {
             change.newState.toString().length * 2 +
             (change.oldBlockEntityData?.nbt?.toString()?.length ?: 0) * 2 +
             (change.newBlockEntityData?.nbt?.toString()?.length ?: 0) * 2
+    }
+
+    private fun estimateCloneBytes(change: EntityCloneChange): Int {
+        return 96 + change.entityData.toString().length * 2
     }
 }

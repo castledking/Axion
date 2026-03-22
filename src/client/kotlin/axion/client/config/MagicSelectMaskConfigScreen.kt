@@ -13,9 +13,13 @@ class MagicSelectMaskConfigScreen(
         val template: MagicSelectTemplateConfig,
         val contentX: Int,
         val y: Int,
+        val toggleX: Int,
+        val toggleWidth: Int,
     )
 
     private val rows = mutableListOf<TemplateRow>()
+    private val selectedBorderColor = 0xFF58D06F.toInt()
+    private val idleBorderColor = 0xFF767676.toInt()
 
     override fun init() {
         rows.clear()
@@ -42,12 +46,14 @@ class MagicSelectMaskConfigScreen(
 
         AxionClientConfig.magicSelectTemplates().forEach { template ->
             val contentX = leftX
-            rows += TemplateRow(template = template, contentX = contentX, y = y)
+            val toggleX = leftX + 46
+            val toggleWidth = contentWidth - 100
+            rows += TemplateRow(template = template, contentX = contentX, y = y, toggleX = toggleX, toggleWidth = toggleWidth)
             addDrawableChild(
-                ButtonWidget.builder(stateLabel(template)) {
+                ButtonWidget.builder(toggleLabel(template.name, template.enabled)) {
                     AxionClientConfig.setMagicSelectTemplateEnabled(template.id, !template.enabled)
                     clearAndInit()
-                }.dimensions(leftX + contentWidth - 98, y, 44, 20).build(),
+                }.dimensions(toggleX, y, toggleWidth, 20).build(),
             )
             addDrawableChild(
                 ButtonWidget.builder(Text.translatable("axion.config.magic_select.edit.button")) {
@@ -92,17 +98,20 @@ class MagicSelectMaskConfigScreen(
             AxionClientConfig.templateIcons(row.template).forEachIndexed { index, item ->
                 context.drawItem(item.defaultStack, row.contentX + (index * 18), row.y + 2)
             }
-            context.drawTextWithShadow(
-                textRenderer,
-                FormattedNameText.parse(row.template.name),
-                row.contentX + 46,
-                row.y + 6,
-                0xFFFFFF,
+            context.drawStrokedRectangle(
+                row.toggleX,
+                row.y,
+                row.toggleWidth,
+                20,
+                if (row.template.enabled) selectedBorderColor else idleBorderColor,
             )
         }
     }
 
-    private fun stateLabel(template: MagicSelectTemplateConfig): Text {
-        return Text.translatable(if (template.enabled) "axion.config.toggle.on" else "axion.config.toggle.off")
+    private fun toggleLabel(name: String, enabled: Boolean): Text {
+        return Text.empty()
+            .append(FormattedNameText.parse(name))
+            .append(Text.literal(": "))
+            .append(Text.translatable(if (enabled) "axion.config.toggle.on" else "axion.config.toggle.off"))
     }
 }

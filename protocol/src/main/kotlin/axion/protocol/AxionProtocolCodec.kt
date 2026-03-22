@@ -194,6 +194,22 @@ object AxionProtocolCodec {
                 writeVector(output, operation.destinationOrigin)
             }
 
+            is CloneEntitiesRequest -> {
+                writeVector(output, operation.sourceMin)
+                writeVector(output, operation.sourceMax)
+                writeVector(output, operation.destinationOrigin)
+                output.writeInt(operation.rotationQuarterTurns)
+                output.writeUTF(operation.mirrorAxis.name)
+            }
+
+            is MoveEntitiesRequest -> {
+                writeVector(output, operation.sourceMin)
+                writeVector(output, operation.sourceMax)
+                writeVector(output, operation.destinationOrigin)
+                output.writeInt(operation.rotationQuarterTurns)
+                output.writeUTF(operation.mirrorAxis.name)
+            }
+
             is StackRegionRequest -> {
                 writeVector(output, operation.sourceOrigin)
                 writeVector(output, operation.clipboardSize)
@@ -249,6 +265,22 @@ object AxionProtocolCodec {
                 sourceMin = readVector(input),
                 sourceMax = readVector(input),
                 destinationOrigin = readVector(input),
+            )
+
+            AxionOperationType.CLONE_ENTITIES -> CloneEntitiesRequest(
+                sourceMin = readVector(input),
+                sourceMax = readVector(input),
+                destinationOrigin = readVector(input),
+                rotationQuarterTurns = input.readInt(),
+                mirrorAxis = PlacementMirrorAxisPayload.valueOf(input.readUTF()),
+            )
+
+            AxionOperationType.MOVE_ENTITIES -> MoveEntitiesRequest(
+                sourceMin = readVector(input),
+                sourceMax = readVector(input),
+                destinationOrigin = readVector(input),
+                rotationQuarterTurns = input.readInt(),
+                mirrorAxis = PlacementMirrorAxisPayload.valueOf(input.readUTF()),
             )
 
             AxionOperationType.STACK_REGION -> StackRegionRequest(

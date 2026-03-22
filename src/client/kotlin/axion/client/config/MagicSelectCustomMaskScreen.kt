@@ -37,8 +37,11 @@ class MagicSelectCustomMaskScreen(
 
     private lateinit var nameField: TextFieldWidget
     private lateinit var searchField: TextFieldWidget
+    private lateinit var prevPageButton: ButtonWidget
+    private lateinit var nextPageButton: ButtonWidget
     private var selectedRuleIds: MutableSet<String> = linkedSetOf()
     private var selectedBlockIds: MutableSet<String> = linkedSetOf()
+    private var excludedBlockIds: MutableSet<String> = linkedSetOf()
     private var draftName: String = ""
     private var draftInitialized: Boolean = false
     private var page: Int = 0
@@ -70,6 +73,7 @@ class MagicSelectCustomMaskScreen(
                 draftName = mask.name
                 selectedRuleIds = mask.ruleIds.toMutableSet()
                 selectedBlockIds = mask.customBlockIds.toMutableSet()
+                excludedBlockIds = mask.excludedBlockIds.toMutableSet()
             }
             draftInitialized = true
         }
@@ -81,12 +85,12 @@ class MagicSelectCustomMaskScreen(
         addSelectableChild(nameField)
         setInitialFocus(nameField)
 
-        searchField = TextFieldWidget(textRenderer, centerX - 130, 150, 260, 20, Text.empty())
+        searchField = TextFieldWidget(textRenderer, centerX - 130, 158, 260, 20, Text.empty())
         searchField.text = searchQuery
         searchField.setChangedListener {
             searchQuery = it
             page = 0
-            clearAndInit()
+            updatePagingButtons()
         }
         addSelectableChild(searchField)
 
@@ -110,7 +114,7 @@ class MagicSelectCustomMaskScreen(
             }
         }
 
-        addDrawableChild(
+        prevPageButton = addDrawableChild(
             ButtonWidget.builder(Text.translatable("axion.config.magic_select.blocks.prev")) {
                 if (page > 0) {
                     page -= 1
@@ -130,6 +134,7 @@ class MagicSelectCustomMaskScreen(
                             name = nameField.text,
                             ruleIds = selectedRuleIds.toSet(),
                             customBlockIds = selectedBlockIds.toSet(),
+                            excludedBlockIds = excludedBlockIds.toSet(),
                         ),
                     )
                 } else {
@@ -137,6 +142,7 @@ class MagicSelectCustomMaskScreen(
                         name = nameField.text,
                         ruleIds = selectedRuleIds.toSet(),
                         customBlockIds = selectedBlockIds.toSet(),
+                        excludedBlockIds = excludedBlockIds.toSet(),
                     )
                     AxionClientConfig.templateById(templateId)?.let { template ->
                         AxionClientConfig.setMagicSelectTemplateSelectedCustomMasks(
@@ -155,7 +161,7 @@ class MagicSelectCustomMaskScreen(
             },
         )
 
-        addDrawableChild(
+        nextPageButton = addDrawableChild(
             ButtonWidget.builder(Text.translatable("axion.config.magic_select.blocks.next")) {
                 if (page + 1 < pageCount()) {
                     page += 1
@@ -164,6 +170,15 @@ class MagicSelectCustomMaskScreen(
             }.dimensions(centerX + 70, height - 34, 60, 20).build().apply {
                 active = page + 1 < pageCount()
             },
+        )
+
+        addDrawableChild(
+            ButtonWidget.builder(Text.translatable("axion.config.magic_select.custom_mask.clear")) {
+                selectedRuleIds.clear()
+                selectedBlockIds.clear()
+                excludedBlockIds.clear()
+                clearAndInit()
+            }.dimensions(centerX - 186, height - 62, 120, 20).build(),
         )
 
         addDrawableChild(
@@ -185,6 +200,8 @@ class MagicSelectCustomMaskScreen(
                 }.dimensions(centerX + 70, height - 62, 120, 20).build(),
             )
         }
+
+        updatePagingButtons()
     }
 
     override fun close() {
@@ -198,11 +215,26 @@ class MagicSelectCustomMaskScreen(
 
         tileBounds().firstOrNull { it.contains(click.x(), click.y()) }?.let { tile ->
             val blockId = tile.entry.id.toString()
-            if (blockId in selectedBlockIds) {
-                selectedBlockIds.remove(blockId)
+            val selectedByRule = selectedRuleIds
+                .mapNotNull(MagicSelectRule::fromId)
+                .any { rule -> rule.includes(tile.entry.block.defaultState) }
+            val selectedByCustom = blockId in selectedBlockIds
+            val selectedByEffectiveState = isBlockSelected(blockId, tile.entry.block.defaultState)
+
+            if (selectedByEffectiveState) {
+                if (selectedByCustom) {
+                    selectedBlockIds.remove(blockId)
+                }
+                if (selectedByRule) {
+                    excludedBlockIds.add(blockId)
+                }
+            } else if (selectedByRule && blockId in excludedBlockIds) {
+                excludedBlockIds.remove(blockId)
             } else {
+                excludedBlockIds.remove(blockId)
                 selectedBlockIds.add(blockId)
             }
+            clearAndInit()
             return true
         }
 
@@ -260,7 +292,7 @@ class MagicSelectCustomMaskScreen(
 
         val hoveredTile = tileBounds().firstOrNull { it.contains(mouseX.toDouble(), mouseY.toDouble()) }
         tileBounds().forEach { tile ->
-            val selected = tile.entry.id.toString() in selectedBlockIds
+            val selected = isBlockSelected(tile.entry.id.toString(), tile.entry.block.defaultState)
             context.fill(tile.x, tile.y, tile.x + tile.size, tile.y + tile.size, 0xAA1A1A1A.toInt())
             context.drawStrokedRectangle(
                 tile.x,
@@ -299,6 +331,15 @@ class MagicSelectCustomMaskScreen(
         return ceil(filteredBlocks().size / TILES_PER_PAGE.toDouble()).toInt().coerceAtLeast(1)
     }
 
+    private fun updatePagingButtons() {
+        if (::prevPageButton.isInitialized) {
+            prevPageButton.active = page > 0
+        }
+        if (::nextPageButton.isInitialized) {
+            nextPageButton.active = page + 1 < pageCount()
+        }
+    }
+
     private fun tileBounds(): List<TileBounds> {
         val filtered = filteredBlocks()
         val start = (page * TILES_PER_PAGE).coerceAtMost(filtered.size)
@@ -306,7 +347,7 @@ class MagicSelectCustomMaskScreen(
         val visible = filtered.subList(start, end)
         val totalWidth = (COLUMNS * TILE_SIZE) + ((COLUMNS - 1) * TILE_GAP)
         val startX = (width / 2) - (totalWidth / 2)
-        val startY = 178
+        val startY = 218
 
         return visible.mapIndexed { index, entry ->
             val column = index % COLUMNS
@@ -321,11 +362,34 @@ class MagicSelectCustomMaskScreen(
     }
 
     private fun ruleToggleLabel(rule: MagicSelectRule): Text {
-        return Text.translatable(
-            "axion.config.magic_select.edit.rule_button",
-            Text.of(rule.displayName),
-            Text.translatable(if (rule.id in selectedRuleIds) "axion.config.toggle.on" else "axion.config.toggle.off"),
-        )
+        val statusKey = when {
+            rule.id !in selectedRuleIds -> "axion.config.toggle.off"
+            isRuleCustomized(rule) -> "axion.config.magic_select.custom_mask.custom"
+            else -> "axion.config.toggle.on"
+        }
+        return Text.translatable("axion.config.magic_select.edit.rule_button", Text.of(rule.displayName), Text.translatable(statusKey))
+    }
+
+    private fun isRuleCustomized(rule: MagicSelectRule): Boolean {
+        if (rule.id !in selectedRuleIds) {
+            return false
+        }
+        return excludedBlockIds.any { blockId ->
+            val block = Identifier.tryParse(blockId)?.let(Registries.BLOCK::get) ?: return@any false
+            rule.includes(block.defaultState)
+        }
+    }
+
+    private fun isBlockSelected(blockId: String, blockState: net.minecraft.block.BlockState): Boolean {
+        if (blockId in excludedBlockIds) {
+            return false
+        }
+        if (blockId in selectedBlockIds) {
+            return true
+        }
+        return selectedRuleIds
+            .mapNotNull(MagicSelectRule::fromId)
+            .any { rule -> rule.includes(blockState) }
     }
 
     private fun confirmButtonText(): Text {

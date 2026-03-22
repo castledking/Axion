@@ -5,4 +5,6 @@ data class HistoryEntry(
     val timestampMillis: Long,
     val label: String,
     val changes: List<BlockChange>,
+    val entityMoves: List<EntityMoveChange> = emptyList(),
+    val entityClones: List<EntityCloneChange> = emptyList(),
 )

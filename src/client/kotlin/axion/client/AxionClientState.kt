@@ -50,6 +50,12 @@ object AxionClientState {
     var keepExistingEnabled: Boolean = false
         private set
 
+    var copyEntitiesEnabled: Boolean = false
+        private set
+
+    var copyAirEnabled: Boolean = false
+        private set
+
     fun updateToolSelection(state: ToolSelectionState) {
         toolSelectionState = state
     }
@@ -104,5 +110,13 @@ object AxionClientState {
 
     fun updateKeepExisting(enabled: Boolean) {
         keepExistingEnabled = enabled
+    }
+
+    fun updateCopyEntities(enabled: Boolean) {
+        copyEntitiesEnabled = enabled
+    }
+
+    fun updateCopyAir(enabled: Boolean) {
+        copyAirEnabled = enabled
     }
 }

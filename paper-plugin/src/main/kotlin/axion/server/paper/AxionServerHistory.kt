@@ -92,7 +92,11 @@ class AxionServerHistory {
     }
 
     private fun estimateTransactionBytes(transaction: ServerHistoryTransaction): Int {
-        return 32 + transaction.label.length * 2 + transaction.changes.sumOf(::estimateChangeBytes)
+        return 32 +
+            transaction.label.length * 2 +
+            transaction.changes.sumOf(::estimateChangeBytes) +
+            transaction.entityMoves.size * 80 +
+            transaction.entityClones.sumOf(::estimateCloneBytes)
     }
 
     private fun estimateChangeBytes(change: axion.protocol.CommittedBlockChangePayload): Int {
@@ -101,6 +105,10 @@ class AxionServerHistory {
             change.newState.length * 2 +
             (change.oldBlockEntityData?.length ?: 0) * 2 +
             (change.newBlockEntityData?.length ?: 0) * 2
+    }
+
+    private fun estimateCloneBytes(change: CommittedEntityClone): Int {
+        return 96 + change.entityData.length * 2
     }
 
     private data class PlayerHistory(
@@ -115,4 +123,6 @@ data class ServerHistoryTransaction(
     val worldName: String,
     val historyBudget: HistoryBudget,
     val changes: List<CommittedBlockChangePayload>,
+    val entityMoves: List<CommittedEntityMove> = emptyList(),
+    val entityClones: List<CommittedEntityClone> = emptyList(),
 )

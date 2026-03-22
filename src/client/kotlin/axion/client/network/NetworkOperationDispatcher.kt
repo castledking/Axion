@@ -2,9 +2,11 @@ package axion.client.network
 
 import axion.common.operation.ClearRegionOperation
 import axion.common.operation.CloneRegionOperation
+import axion.common.operation.CloneEntitiesOperation
 import axion.common.operation.CompositeOperation
 import axion.common.operation.EditOperation
 import axion.common.operation.ExtrudeOperation
+import axion.common.operation.MoveEntitiesOperation
 import axion.common.operation.OperationDispatcher
 import axion.common.operation.SmearRegionOperation
 import axion.common.operation.StackRegionOperation
@@ -13,10 +15,13 @@ import axion.protocol.AxionExtrudeMode
 import axion.protocol.AxionRemoteOperation
 import axion.protocol.ClipboardCellPayload
 import axion.protocol.ClearRegionRequest
+import axion.protocol.CloneEntitiesRequest
 import axion.protocol.CloneRegionRequest
 import axion.protocol.ExtrudeRequest
 import axion.protocol.IntVector3
+import axion.protocol.MoveEntitiesRequest
 import axion.protocol.OperationBatchRequest
+import axion.protocol.PlacementMirrorAxisPayload
 import axion.protocol.PlaceBlocksRequest
 import axion.protocol.PlacedBlockPayload
 import axion.protocol.SmearRegionRequest
@@ -83,6 +88,36 @@ class NetworkOperationDispatcher(
                     sourceMin = source.minCorner().toProtocolVector(),
                     sourceMax = source.maxCorner().toProtocolVector(),
                     destinationOrigin = operation.destinationOrigin.toProtocolVector(),
+                )
+            }
+
+            is CloneEntitiesOperation -> {
+                val source = operation.sourceRegion.normalized()
+                CloneEntitiesRequest(
+                    sourceMin = source.minCorner().toProtocolVector(),
+                    sourceMax = source.maxCorner().toProtocolVector(),
+                    destinationOrigin = operation.destinationOrigin.toProtocolVector(),
+                    rotationQuarterTurns = operation.rotationQuarterTurns,
+                    mirrorAxis = when (operation.mirrorAxis) {
+                        axion.common.operation.EntityMoveMirrorAxis.NONE -> PlacementMirrorAxisPayload.NONE
+                        axion.common.operation.EntityMoveMirrorAxis.X -> PlacementMirrorAxisPayload.X
+                        axion.common.operation.EntityMoveMirrorAxis.Z -> PlacementMirrorAxisPayload.Z
+                    },
+                )
+            }
+
+            is MoveEntitiesOperation -> {
+                val source = operation.sourceRegion.normalized()
+                MoveEntitiesRequest(
+                    sourceMin = source.minCorner().toProtocolVector(),
+                    sourceMax = source.maxCorner().toProtocolVector(),
+                    destinationOrigin = operation.destinationOrigin.toProtocolVector(),
+                    rotationQuarterTurns = operation.rotationQuarterTurns,
+                    mirrorAxis = when (operation.mirrorAxis) {
+                        axion.common.operation.EntityMoveMirrorAxis.NONE -> PlacementMirrorAxisPayload.NONE
+                        axion.common.operation.EntityMoveMirrorAxis.X -> PlacementMirrorAxisPayload.X
+                        axion.common.operation.EntityMoveMirrorAxis.Z -> PlacementMirrorAxisPayload.Z
+                    },
                 )
             }
 

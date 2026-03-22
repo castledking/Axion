@@ -5,6 +5,7 @@ import net.minecraft.text.Text
 data class ToolHintEntry(
     val input: String,
     val action: String,
+    val inline: Boolean = false,
 )
 
 data class ToolHintPanel(
