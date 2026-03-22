@@ -12,7 +12,11 @@ object FormattedNameText {
             return Text.empty()
         }
 
-        val root = Text.empty()
+        if ('&' !in raw && '#' !in raw) {
+            return Text.literal(raw)
+        }
+
+        val root: MutableText = Text.literal("")
         val segment = StringBuilder()
         var style = Style.EMPTY
         var index = 0
