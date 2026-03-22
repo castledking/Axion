@@ -17,6 +17,7 @@ base {
 repositories {
     maven("https://maven.fabricmc.net/")
     maven("https://repo.papermc.io/repository/maven-public/")
+    maven("https://maven.terraformersmc.com/releases/")
     mavenCentral()
 }
 
@@ -38,6 +39,8 @@ dependencies {
     modImplementation("net.fabricmc:fabric-loader:${property("loader_version")}")
     modImplementation("net.fabricmc.fabric-api:fabric-api:${property("fabric_version")}")
     modImplementation("net.fabricmc:fabric-language-kotlin:${property("fabric_kotlin_version")}")
+    modCompileOnly("com.terraformersmc:modmenu:${property("modmenu_version")}")
+    modLocalRuntime("com.terraformersmc:modmenu:${property("modmenu_version")}")
     testImplementation(kotlin("test"))
 }
 

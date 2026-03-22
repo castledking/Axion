@@ -1,5 +1,6 @@
 package axion.client.input
 
+import axion.client.config.AxionConfigScreen
 import axion.client.hotbar.AxionAltMenuController
 import axion.client.history.UndoRedoController
 import axion.client.mode.ClientModeController
@@ -67,6 +68,10 @@ object AxionTickHandler {
                 if (AxionModifierKeys.isControlDown(client)) {
                     UndoRedoController.redo(client)
                 }
+            }
+
+            while (AxionKeybindings.openConfigScreen.wasPressed()) {
+                client.setScreen(AxionConfigScreen(client.currentScreen))
             }
         }
 

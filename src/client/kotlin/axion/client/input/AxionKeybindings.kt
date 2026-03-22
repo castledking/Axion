@@ -77,6 +77,12 @@ object AxionKeybindings {
         category,
     )
 
+    val openConfigScreen: KeyBinding = KeyBinding(
+        "key.${AxionMod.MOD_ID}.open_config_screen",
+        GLFW.GLFW_KEY_RIGHT_SHIFT,
+        category,
+    )
+
     fun register() {
         KeyBindingHelper.registerKeyBinding(selectAxionTool)
         KeyBindingHelper.registerKeyBinding(nextSubtool)
@@ -89,5 +95,6 @@ object AxionKeybindings {
         KeyBindingHelper.registerKeyBinding(symmetryToggleMirror)
         KeyBindingHelper.registerKeyBinding(undoAction)
         KeyBindingHelper.registerKeyBinding(redoAction)
+        KeyBindingHelper.registerKeyBinding(openConfigScreen)
     }
 }

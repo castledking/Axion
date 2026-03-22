@@ -1,5 +1,6 @@
 package axion.client
 
+import axion.client.config.AxionClientConfig
 import axion.client.hotbar.AxionHotbarHud
 import axion.client.hotbar.AxionToolHintHud
 import axion.client.input.AxionKeybindings
@@ -24,6 +25,7 @@ object AxionClientBootstrap {
     private val hintHudId: Identifier = Identifier.of("axion", "tool_hints")
 
     fun initialize() {
+        AxionClientConfig.initialize()
         AxionServerConnection.initialize()
         AxionKeybindings.register()
         HudElementRegistry.attachElementAfter(VanillaHudElements.HOTBAR, hudId, AxionHotbarHud::render)

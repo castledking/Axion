@@ -10,5 +10,12 @@
   "key.axion.symmetry_toggle_rotation": "Toggle Axion Symmetry Rotation",
   "key.axion.symmetry_toggle_mirror": "Toggle Axion Symmetry Mirror",
   "key.axion.undo_action": "Axion Undo",
-  "key.axion.redo_action": "Axion Redo"
+  "key.axion.redo_action": "Axion Redo",
+  "key.axion.open_config_screen": "Open Axion Config",
+  "axion.config.title": "Axion Configuration",
+  "axion.config.main_modifier.description": "Choose which main modifier Axion uses for Ctrl-based shortcuts.",
+  "axion.config.main_modifier.mac_only": "This option is only available on macOS.",
+  "axion.config.main_modifier.button": "Main Mod: %s",
+  "axion.config.main_modifier.ctrl": "Ctrl",
+  "axion.config.main_modifier.cmd": "CMD"
 }

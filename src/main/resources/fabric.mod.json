@@ -8,6 +8,11 @@
     "Towkio"
   ],
   "license": "All Rights Reserved",
+  "contact": {
+    "homepage": "https://castled.codes",
+    "issues": "https://github.com/castledking/Axion/issues",
+    "sources": "https://github.com/castledking/Axion"
+  },
   "icon": "assets/axion/icon.png",
   "environment": "*",
   "entrypoints": {
@@ -16,6 +21,9 @@
     ],
     "client": [
       "axion.AxionClientMod"
+    ],
+    "modmenu": [
+      "axion.client.compat.AxionModMenuIntegration"
     ]
   },
   "mixins": [
@@ -27,5 +35,8 @@
     "java": ">=21",
     "fabric-api": "*",
     "fabric-language-kotlin": ">=1.13.9+kotlin.2.3.10"
+  },
+  "suggests": {
+    "modmenu": "*"
   }
 }
