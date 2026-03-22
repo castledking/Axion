@@ -66,7 +66,7 @@ The mod works best with the companion Paper plugin. Without the plugin, multipla
 
 ## Links
 
-- Modrinth: https://modrinth.com/plugin/axion-plugin
+- Modrinth: https://modrinth.com/plugin/axion-paper-plugin
 - GitHub: https://github.com/castledking/Axion
 - Issues: https://github.com/castledking/Axion/issues
 - Wiki: https://github.com/castledking/Axion/wiki
