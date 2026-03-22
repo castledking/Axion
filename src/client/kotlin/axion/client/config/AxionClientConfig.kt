@@ -58,6 +58,13 @@ object AxionClientConfig {
         }
     }
 
+    fun disableAllMagicSelectTemplates() {
+        data = data.copy(
+            magicSelectTemplates = data.magicSelectTemplates.map { it.copy(enabled = false) },
+        )
+        save()
+    }
+
     fun setMagicSelectTemplateSelectedCustomMasks(templateId: String, selectedCustomMaskIds: Set<String>) {
         templateById(templateId)?.let { template ->
             updateMagicSelectTemplate(template.copy(selectedCustomMaskIds = selectedCustomMaskIds))
@@ -108,6 +115,27 @@ object AxionClientConfig {
         return mask.id
     }
 
+    fun updateMagicSelectCustomMask(mask: MagicSelectCustomMask) {
+        val sanitizedMask = sanitizeCustomMask(mask)
+            ?: error("Custom mask must contain at least one rule or block")
+        data = data.copy(
+            magicSelectCustomMasks = data.magicSelectCustomMasks.map { existing ->
+                if (existing.id == sanitizedMask.id) sanitizedMask else existing
+            },
+        )
+        save()
+    }
+
+    fun deleteMagicSelectCustomMask(maskId: String) {
+        data = data.copy(
+            magicSelectCustomMasks = data.magicSelectCustomMasks.filterNot { it.id == maskId },
+            magicSelectTemplates = data.magicSelectTemplates.map { template ->
+                template.copy(selectedCustomMaskIds = template.selectedCustomMaskIds - maskId)
+            },
+        )
+        save()
+    }
+
     fun deleteMagicSelectTemplate(templateId: String) {
         data = data.copy(
             magicSelectTemplates = data.magicSelectTemplates.filterNot { it.id == templateId },
@@ -118,7 +146,7 @@ object AxionClientConfig {
     fun magicSelectTemplateSummary(): String {
         val enabledNames = enabledMagicSelectTemplates().map { it.name }
         return when {
-            enabledNames.isEmpty() -> "No Template"
+            enabledNames.isEmpty() -> "Same Block"
             else -> enabledNames.joinToString(", ")
         }
     }

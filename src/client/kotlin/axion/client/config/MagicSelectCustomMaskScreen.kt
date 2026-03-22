@@ -16,7 +16,8 @@ import kotlin.math.ceil
 class MagicSelectCustomMaskScreen(
     private val parent: Screen?,
     private val templateId: String,
-) : Screen(Text.translatable("axion.config.magic_select.custom_mask.title")) {
+    private val maskId: String? = null,
+) : Screen(Text.empty()) {
     private data class BlockEntry(
         val block: Block,
         val id: Identifier,
@@ -58,10 +59,18 @@ class MagicSelectCustomMaskScreen(
         }.sortedBy { it.label }
     }
 
+    private val existingMask: MagicSelectCustomMask?
+        get() = maskId?.let(AxionClientConfig::customMaskById)
+
     override fun init() {
         val centerX = width / 2
         val topY = 40
         if (!draftInitialized) {
+            existingMask?.let { mask ->
+                draftName = mask.name
+                selectedRuleIds = mask.ruleIds.toMutableSet()
+                selectedBlockIds = mask.customBlockIds.toMutableSet()
+            }
             draftInitialized = true
         }
 
@@ -113,20 +122,31 @@ class MagicSelectCustomMaskScreen(
         )
 
         addDrawableChild(
-            ButtonWidget.builder(Text.translatable("axion.config.magic_select.custom_mask.confirm")) {
-                val customMaskId = AxionClientConfig.createMagicSelectCustomMask(
-                    name = nameField.text,
-                    ruleIds = selectedRuleIds.toSet(),
-                    customBlockIds = selectedBlockIds.toSet(),
-                )
-                AxionClientConfig.templateById(templateId)?.let { template ->
-                    AxionClientConfig.setMagicSelectTemplateSelectedCustomMasks(
-                        templateId,
-                        template.selectedCustomMaskIds + customMaskId,
+            ButtonWidget.builder(confirmButtonText()) {
+                val currentMask = existingMask
+                if (currentMask != null) {
+                    AxionClientConfig.updateMagicSelectCustomMask(
+                        currentMask.copy(
+                            name = nameField.text,
+                            ruleIds = selectedRuleIds.toSet(),
+                            customBlockIds = selectedBlockIds.toSet(),
+                        ),
                     )
-                }
-                if (parent is MagicSelectTemplateEditScreen) {
-                    parent.attachCreatedCustomMask(customMaskId)
+                } else {
+                    val customMaskId = AxionClientConfig.createMagicSelectCustomMask(
+                        name = nameField.text,
+                        ruleIds = selectedRuleIds.toSet(),
+                        customBlockIds = selectedBlockIds.toSet(),
+                    )
+                    AxionClientConfig.templateById(templateId)?.let { template ->
+                        AxionClientConfig.setMagicSelectTemplateSelectedCustomMasks(
+                            templateId,
+                            template.selectedCustomMaskIds + customMaskId,
+                        )
+                    }
+                    if (parent is MagicSelectTemplateEditScreen) {
+                        parent.attachCreatedCustomMask(customMaskId)
+                    }
                 }
                 draftInitialized = false
                 close()
@@ -151,6 +171,20 @@ class MagicSelectCustomMaskScreen(
                 close()
             }.dimensions(centerX - 60, height - 62, 120, 20).build(),
         )
+
+        if (existingMask != null) {
+            val currentMask = existingMask ?: return
+            addDrawableChild(
+                ButtonWidget.builder(Text.translatable("axion.config.magic_select.custom_mask.delete")) {
+                    AxionClientConfig.deleteMagicSelectCustomMask(currentMask.id)
+                    if (parent is MagicSelectTemplateEditScreen) {
+                        parent.detachDeletedCustomMask(currentMask.id)
+                    }
+                    draftInitialized = false
+                    close()
+                }.dimensions(centerX + 70, height - 62, 120, 20).build(),
+            )
+        }
     }
 
     override fun close() {
@@ -182,10 +216,10 @@ class MagicSelectCustomMaskScreen(
         val centerX = width / 2
         val leftX = centerX - 130
 
-        context.drawCenteredTextWithShadow(textRenderer, title, centerX, 18, 0xFFFFFF)
+        context.drawCenteredTextWithShadow(textRenderer, screenTitle(), centerX, 18, 0xFFFFFF)
         context.drawCenteredTextWithShadow(
             textRenderer,
-            Text.translatable("axion.config.magic_select.custom_mask.description"),
+            Text.translatable(descriptionKey()),
             centerX,
             30,
             0xBFBFBF,
@@ -291,6 +325,34 @@ class MagicSelectCustomMaskScreen(
             "axion.config.magic_select.edit.rule_button",
             Text.of(rule.displayName),
             Text.translatable(if (rule.id in selectedRuleIds) "axion.config.toggle.on" else "axion.config.toggle.off"),
+        )
+    }
+
+    private fun confirmButtonText(): Text {
+        return Text.translatable(
+            if (existingMask == null) {
+                "axion.config.magic_select.custom_mask.confirm"
+            } else {
+                "axion.config.magic_select.custom_mask.save"
+            },
+        )
+    }
+
+    private fun descriptionKey(): String {
+        return if (existingMask == null) {
+            "axion.config.magic_select.custom_mask.description"
+        } else {
+            "axion.config.magic_select.custom_mask.edit_description"
+        }
+    }
+
+    private fun screenTitle(): Text {
+        return Text.translatable(
+            if (existingMask == null) {
+                "axion.config.magic_select.custom_mask.title"
+            } else {
+                "axion.config.magic_select.custom_mask.edit_title"
+            },
         )
     }
 

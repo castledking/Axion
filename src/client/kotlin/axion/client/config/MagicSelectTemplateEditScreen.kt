@@ -37,7 +37,7 @@ class MagicSelectTemplateEditScreen(
         rows.clear()
 
         val centerX = width / 2
-        val contentWidth = 280
+        val contentWidth = 320
         val leftX = centerX - (contentWidth / 2)
         var y = 118
 
@@ -66,7 +66,13 @@ class MagicSelectTemplateEditScreen(
                         selectedCustomMaskIds.add(mask.id)
                     }
                     clearAndInit()
-                }.dimensions(leftX + contentWidth - 44, y, 44, 20).build(),
+                }.dimensions(leftX + contentWidth - 98, y, 44, 20).build(),
+            )
+            addDrawableChild(
+                ButtonWidget.builder(Text.translatable("axion.config.magic_select.edit.button")) {
+                    persistDraft(currentTemplate)
+                    client?.setScreen(MagicSelectCustomMaskScreen(this, currentTemplate.id, mask.id))
+                }.dimensions(leftX + contentWidth - 50, y, 50, 20).build(),
             )
             y += 24
         }
@@ -107,12 +113,16 @@ class MagicSelectTemplateEditScreen(
         selectedCustomMaskIds.add(maskId)
     }
 
+    fun detachDeletedCustomMask(maskId: String) {
+        selectedCustomMaskIds.remove(maskId)
+    }
+
     override fun render(context: DrawContext, mouseX: Int, mouseY: Int, deltaTicks: Float) {
         context.fill(0, 0, width, height, 0xB0101010.toInt())
         super.render(context, mouseX, mouseY, deltaTicks)
 
         val centerX = width / 2
-        val contentWidth = 280
+        val contentWidth = 320
         val leftX = centerX - (contentWidth / 2)
 
         context.drawCenteredTextWithShadow(textRenderer, title, centerX, 20, 0xFFFFFF)

@@ -126,7 +126,11 @@ object MagicSelectionService {
         if (candidateState.isAir) {
             return false
         }
-        return AxionClientConfig.enabledMagicSelectTemplates().any { template ->
+        val enabledTemplates = AxionClientConfig.enabledMagicSelectTemplates()
+        if (enabledTemplates.isEmpty()) {
+            return seedState.block == candidateState.block
+        }
+        return enabledTemplates.any { template ->
             template.rules().any { rule -> rule.matches(seedState, candidateState) } ||
                 template.selectedCustomMaskIds
                     .mapNotNull(AxionClientConfig::customMaskById)

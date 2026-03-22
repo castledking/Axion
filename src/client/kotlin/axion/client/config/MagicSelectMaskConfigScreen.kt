@@ -30,6 +30,14 @@ class MagicSelectMaskConfigScreen(
         )
         y += 30
 
+        addDrawableChild(
+            ButtonWidget.builder(Text.translatable("axion.config.magic_select.disable_all.button")) {
+                AxionClientConfig.disableAllMagicSelectTemplates()
+                clearAndInit()
+            }.dimensions(centerX - 130, y, 260, 20).build(),
+        )
+        y += 30
+
         AxionClientConfig.magicSelectTemplates().forEach { template ->
             val contentX = centerX - 130
             rows += TemplateRow(template = template, contentX = contentX, y = y)
