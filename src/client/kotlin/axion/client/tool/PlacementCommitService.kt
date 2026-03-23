@@ -103,8 +103,7 @@ object PlacementCommitService {
             null
         }
 
-        if (AxionClientState.copyAirEnabled &&
-            preview.transform.isIdentity() &&
+        if (preview.transform.isIdentity() &&
             !regionsOverlap(preview.sourceRegion, preview.destinationRegion) &&
             isFullCuboidCapture(preview.sourceRegion, preview.sourceClipboardBuffer)
         ) {

@@ -332,11 +332,27 @@ class AxionOperationService(
         repeatCount: Int,
         airOnly: Boolean,
     ) {
+        val captured = cells.map { cell ->
+            val sourcePos = IntVector3(
+                sourceOrigin.x + cell.offset.x,
+                sourceOrigin.y + cell.offset.y,
+                sourceOrigin.z + cell.offset.z,
+            )
+            ServerCapturedBlock(
+                offset = cell.offset,
+                blockState = world.getBlockAt(sourcePos.x, sourcePos.y, sourcePos.z).blockData.getAsString(false),
+                blockEntityData = PaperBlockEntitySnapshotService.capture(
+                    world,
+                    net.minecraft.core.BlockPos(sourcePos.x, sourcePos.y, sourcePos.z),
+                ),
+            )
+        }
+
         for (repeatIndex in 1..repeatCount) {
             val offsetX = step.x * repeatIndex
             val offsetY = step.y * repeatIndex
             val offsetZ = step.z * repeatIndex
-            cells.forEach { cell ->
+            captured.forEach { cell ->
                 val destination = IntVector3(
                     sourceOrigin.x + cell.offset.x + offsetX,
                     sourceOrigin.y + cell.offset.y + offsetY,
