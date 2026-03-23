@@ -34,7 +34,7 @@ class LocalOperationDispatcher : OperationDispatcher {
             }
 
             val plan = planner.plan(targetWorld, operation)
-            if (plan.writes.isEmpty() && plan.entityMoves.isEmpty()) {
+            if (plan.writes.isEmpty() && plan.entityMoves.isEmpty() && plan.entityClones.isEmpty() && plan.entityDeletes.isEmpty()) {
                 return@execute
             }
 

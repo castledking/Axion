@@ -5,6 +5,7 @@ import axion.protocol.ClearRegionRequest
 import axion.protocol.CloneEntitiesRequest
 import axion.protocol.CloneRegionRequest
 import axion.protocol.CommittedBlockChangePayload
+import axion.protocol.DeleteEntitiesRequest
 import axion.protocol.ExtrudeRequest
 import axion.protocol.IntVector3
 import axion.protocol.MoveEntitiesRequest
@@ -94,6 +95,7 @@ class AxionCommittedDiffBuilder(
                     }
 
                     is CloneEntitiesRequest -> Unit
+                    is DeleteEntitiesRequest -> Unit
                     is MoveEntitiesRequest -> Unit
                     is StackRegionRequest -> collectRepeatedClipboard(touched, operation.sourceOrigin, operation.cells, operation.step, operation.repeatCount)
                     is SmearRegionRequest -> collectRepeatedClipboard(touched, operation.sourceOrigin, operation.cells, operation.step, operation.repeatCount)

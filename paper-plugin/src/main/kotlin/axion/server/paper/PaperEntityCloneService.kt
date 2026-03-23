@@ -3,6 +3,7 @@ package axion.server.paper
 import axion.protocol.CloneEntitiesRequest
 import axion.protocol.PlacementMirrorAxisPayload
 import net.minecraft.nbt.CompoundTag
+import net.minecraft.nbt.ListTag
 import net.minecraft.util.ProblemReporter
 import net.minecraft.world.entity.EntityType
 import net.minecraft.world.entity.EntitySpawnReason
@@ -43,17 +44,32 @@ object PaperEntityCloneService {
                     entity.isValid &&
                     seen.add(entity.uniqueId)
             }
-            .mapNotNull { entity ->
-                val snapshot = capture(entity) ?: return@mapNotNull null
-                stripUuids(snapshot)
-                val entityId = UUID.randomUUID()
-                val target = transformLocation(entity.location, sourceMin.x, sourceMin.y, sourceMin.z, sizeX, sizeZ, operation)
-                spawnClone(level, snapshot.copy(), target, entityId)
-                CommittedEntityClone(
-                    entityId = entityId,
-                    entityData = snapshot.toString(),
-                    spawnLocation = target,
+            .flatMap { entity ->
+                val clones = planEntityTree(
+                    entity = entity,
+                    operation = operation,
+                    sourceMinX = sourceMin.x,
+                    sourceMinY = sourceMin.y,
+                    sourceMinZ = sourceMin.z,
+                    sizeX = sizeX,
+                    sizeZ = sizeZ,
+                    parentCloneId = null,
                 )
+                val spawned = linkedMapOf<UUID, net.minecraft.world.entity.Entity>()
+                clones.forEach { clone ->
+                    spawnClone(level, net.minecraft.nbt.TagParser.parseCompoundFully(clone.entityData), clone.spawnLocation, clone.entityId)
+                        ?.let { spawned[clone.entityId] = it }
+                }
+                clones.forEach { clone ->
+                    val parentId = clone.parentEntityId ?: return@forEach
+                    val child = spawned[clone.entityId] ?: return@forEach
+                    val parent = spawned[parentId] ?: return@forEach
+                    child.startRiding(parent, true, true)
+                }
+                spawned.values
+                    .filter { it.vehicle == null }
+                    .forEach(::refreshPassengerPositions)
+                clones.asSequence()
             }
             .toList()
     }
@@ -66,9 +82,20 @@ object PaperEntityCloneService {
 
     fun respawn(world: World, clones: List<CommittedEntityClone>) {
         val level = (world as CraftWorld).handle
+        val spawned = linkedMapOf<UUID, net.minecraft.world.entity.Entity>()
         clones.forEach { clone ->
             spawnClone(level, net.minecraft.nbt.TagParser.parseCompoundFully(clone.entityData), clone.spawnLocation, clone.entityId)
+                ?.let { spawned[clone.entityId] = it }
         }
+        clones.forEach { clone ->
+            val parentId = clone.parentEntityId ?: return@forEach
+            val child = spawned[clone.entityId] ?: return@forEach
+            val parent = spawned[parentId] ?: return@forEach
+            child.startRiding(parent, true, true)
+        }
+        spawned.values
+            .filter { it.vehicle == null }
+            .forEach(::refreshPassengerPositions)
     }
 
     private fun capture(entity: Entity): CompoundTag? {
@@ -76,7 +103,15 @@ object PaperEntityCloneService {
         if (!(entity as org.bukkit.craftbukkit.entity.CraftEntity).handle.saveAsPassenger(output)) {
             return null
         }
-        return output.buildResult()
+        val tag = output.buildResult()
+        val passengers = ListTag()
+        entity.passengers.forEach { passenger ->
+            capture(passenger)?.let(passengers::add)
+        }
+        if (!passengers.isEmpty()) {
+            tag.put("Passengers", passengers)
+        }
+        return tag
     }
 
     private fun spawnClone(
@@ -84,14 +119,15 @@ object PaperEntityCloneService {
         tag: CompoundTag,
         location: Location,
         entityId: UUID,
-    ) {
+    ): net.minecraft.world.entity.Entity? {
         stripUuids(tag)
         val entity = EntityType.loadEntityRecursive(tag, level, EntitySpawnReason.COMMAND) { entity ->
             entity.setUUID(entityId)
             entity.snapTo(location.x, location.y, location.z, location.yaw, location.pitch)
             entity
-        } ?: return
+        } ?: return null
         level.tryAddFreshEntityWithPassengers(entity)
+        return entity
     }
 
     private fun stripUuids(tag: CompoundTag) {
@@ -110,6 +146,55 @@ object PaperEntityCloneService {
             current = current.vehicle!!
         }
         return current
+    }
+
+    private fun planEntityTree(
+        entity: Entity,
+        operation: CloneEntitiesRequest,
+        sourceMinX: Int,
+        sourceMinY: Int,
+        sourceMinZ: Int,
+        sizeX: Double,
+        sizeZ: Double,
+        parentCloneId: UUID?,
+    ): List<CommittedEntityClone> {
+        val snapshot = capture(entity) ?: return emptyList()
+        stripUuids(snapshot)
+        val cloneId = UUID.randomUUID()
+        val target = transformLocation(entity.location, sourceMinX, sourceMinY, sourceMinZ, sizeX, sizeZ, operation)
+        return buildList {
+            add(
+                CommittedEntityClone(
+                    entityId = cloneId,
+                    parentEntityId = parentCloneId,
+                    entityData = snapshot.toString(),
+                    spawnLocation = target,
+                ),
+            )
+            entity.passengers.forEach { passenger ->
+                if (passenger !is Player && passenger.isValid) {
+                    addAll(
+                        planEntityTree(
+                            entity = passenger,
+                            operation = operation,
+                            sourceMinX = sourceMinX,
+                            sourceMinY = sourceMinY,
+                            sourceMinZ = sourceMinZ,
+                            sizeX = sizeX,
+                            sizeZ = sizeZ,
+                            parentCloneId = cloneId,
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
+    private fun refreshPassengerPositions(entity: net.minecraft.world.entity.Entity) {
+        entity.passengers.forEach { passenger ->
+            entity.positionRider(passenger)
+            refreshPassengerPositions(passenger)
+        }
     }
 
     private fun transformLocation(

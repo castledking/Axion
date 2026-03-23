@@ -7,4 +7,5 @@ data class HistoryEntry(
     val changes: List<BlockChange>,
     val entityMoves: List<EntityMoveChange> = emptyList(),
     val entityClones: List<EntityCloneChange> = emptyList(),
+    val entityDeletes: List<EntityCloneChange> = emptyList(),
 )

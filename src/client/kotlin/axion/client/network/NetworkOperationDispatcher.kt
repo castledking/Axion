@@ -4,6 +4,7 @@ import axion.common.operation.ClearRegionOperation
 import axion.common.operation.CloneRegionOperation
 import axion.common.operation.CloneEntitiesOperation
 import axion.common.operation.CompositeOperation
+import axion.common.operation.DeleteEntitiesOperation
 import axion.common.operation.EditOperation
 import axion.common.operation.ExtrudeOperation
 import axion.common.operation.MoveEntitiesOperation
@@ -17,6 +18,7 @@ import axion.protocol.ClipboardCellPayload
 import axion.protocol.ClearRegionRequest
 import axion.protocol.CloneEntitiesRequest
 import axion.protocol.CloneRegionRequest
+import axion.protocol.DeleteEntitiesRequest
 import axion.protocol.ExtrudeRequest
 import axion.protocol.IntVector3
 import axion.protocol.MoveEntitiesRequest
@@ -103,6 +105,14 @@ class NetworkOperationDispatcher(
                         axion.common.operation.EntityMoveMirrorAxis.X -> PlacementMirrorAxisPayload.X
                         axion.common.operation.EntityMoveMirrorAxis.Z -> PlacementMirrorAxisPayload.Z
                     },
+                )
+            }
+
+            is DeleteEntitiesOperation -> {
+                val source = operation.sourceRegion.normalized()
+                DeleteEntitiesRequest(
+                    sourceMin = source.minCorner().toProtocolVector(),
+                    sourceMax = source.maxCorner().toProtocolVector(),
                 )
             }
 

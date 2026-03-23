@@ -16,6 +16,7 @@ enum class AxionOperationType {
     CLEAR_REGION,
     CLONE_REGION,
     CLONE_ENTITIES,
+    DELETE_ENTITIES,
     MOVE_ENTITIES,
     STACK_REGION,
     SMEAR_REGION,
@@ -123,6 +124,13 @@ data class CloneEntitiesRequest(
     val mirrorAxis: PlacementMirrorAxisPayload,
 ) : AxionRemoteOperation {
     override val type: AxionOperationType = AxionOperationType.CLONE_ENTITIES
+}
+
+data class DeleteEntitiesRequest(
+    val sourceMin: IntVector3,
+    val sourceMax: IntVector3,
+) : AxionRemoteOperation {
+    override val type: AxionOperationType = AxionOperationType.DELETE_ENTITIES
 }
 
 data class ClipboardCellPayload(

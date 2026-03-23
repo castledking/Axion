@@ -4,6 +4,7 @@ import axion.AxionMod
 import axion.client.network.BlockEntitySnapshotService
 import axion.client.network.BlockWrite
 import axion.client.network.LocalEntityCloneService
+import axion.client.network.LocalEntityDeleteService
 import axion.client.network.LocalEntityMoveService
 import axion.client.network.WritePlan
 import axion.common.history.BlockChange
@@ -24,7 +25,7 @@ object HistoryManager {
 
     fun record(world: World, plan: WritePlan) {
         val writes = plan.writes
-        if (writes.isEmpty() && plan.entityMoves.isEmpty() && plan.entityClones.isEmpty()) {
+        if (writes.isEmpty() && plan.entityMoves.isEmpty() && plan.entityClones.isEmpty() && plan.entityDeletes.isEmpty()) {
             return
         }
 
@@ -68,7 +69,7 @@ object HistoryManager {
             )
         }
 
-        if (changes.isEmpty() && entityMoves.isEmpty() && plan.entityClones.isEmpty()) {
+        if (changes.isEmpty() && entityMoves.isEmpty() && plan.entityClones.isEmpty() && plan.entityDeletes.isEmpty()) {
             return
         }
 
@@ -82,10 +83,21 @@ object HistoryManager {
                 entityClones = plan.entityClones.map { clone ->
                     EntityCloneChange(
                         entityId = clone.entityId,
+                        parentEntityId = clone.parentEntityId,
                         entityData = clone.entityData.copy(),
                         pos = clone.pos,
                         yaw = clone.yaw,
                         pitch = clone.pitch,
+                    )
+                },
+                entityDeletes = plan.entityDeletes.map { delete ->
+                    EntityCloneChange(
+                        entityId = delete.entityId,
+                        parentEntityId = delete.parentEntityId,
+                        entityData = delete.entityData.copy(),
+                        pos = delete.pos,
+                        yaw = delete.yaw,
+                        pitch = delete.pitch,
                     )
                 },
             ),
@@ -135,6 +147,7 @@ object HistoryManager {
                 BlockWrite(change.pos, change.oldState, change.oldBlockEntityData?.copy())
             })
             applyEntityMoves(world, entry.entityMoves, reverse = true)
+            LocalEntityCloneService.apply(world, entry.entityDeletes)
             LocalEntityCloneService.remove(world, entry.entityClones)
         } catch (exception: Exception) {
             AxionMod.LOGGER.error("Failed to undo Axion history entry {}", entry.id, exception)
@@ -158,6 +171,7 @@ object HistoryManager {
             })
             applyEntityMoves(world, entry.entityMoves, reverse = false)
             LocalEntityCloneService.apply(world, entry.entityClones)
+            LocalEntityDeleteService.apply(world, entry.entityDeletes)
         } catch (exception: Exception) {
             AxionMod.LOGGER.error("Failed to redo Axion history entry {}", entry.id, exception)
             redoStack.addLast(entry)
@@ -239,7 +253,8 @@ object HistoryManager {
             entry.label.length * 2 +
             entry.changes.sumOf(::estimateChangeBytes) +
             entry.entityMoves.size * 80 +
-            entry.entityClones.sumOf(::estimateCloneBytes)
+            entry.entityClones.sumOf(::estimateCloneBytes) +
+            entry.entityDeletes.sumOf(::estimateCloneBytes)
     }
 
     private fun estimateChangeBytes(change: BlockChange): Int {

@@ -8,6 +8,7 @@ import axion.protocol.ClipboardCellPayload
 import axion.protocol.ClearRegionRequest
 import axion.protocol.CloneEntitiesRequest
 import axion.protocol.CloneRegionRequest
+import axion.protocol.DeleteEntitiesRequest
 import axion.protocol.ExtrudeRequest
 import axion.protocol.IntVector3
 import axion.protocol.MoveEntitiesRequest
@@ -130,6 +131,7 @@ class AxionOperationService(
                     is ClearRegionRequest -> validator.blockCount(operation)
                     is CloneEntitiesRequest -> validator.blockCount(operation)
                     is CloneRegionRequest -> validator.blockCount(operation)
+                    is DeleteEntitiesRequest -> validator.blockCount(operation)
                     is MoveEntitiesRequest -> validator.blockCount(operation)
                     is StackRegionRequest -> validator.blockCount(operation)
                     is SmearRegionRequest -> validator.blockCount(operation)
@@ -154,6 +156,7 @@ class AxionOperationService(
         val plannedTransactionId = if (request.recordHistory) history.nextTransactionId() else null
         var entityMoves: List<CommittedEntityMove> = emptyList()
         var entityClones: List<CommittedEntityClone> = emptyList()
+        var entityDeletes: List<CommittedEntityClone> = emptyList()
         val result = AxionCommittedDiffBuilder(world).build(
             requestId = request.requestId,
             transactionId = plannedTransactionId,
@@ -164,11 +167,13 @@ class AxionOperationService(
         ) {
             val appliedEntityMoves = mutableListOf<CommittedEntityMove>()
             val appliedEntityClones = mutableListOf<CommittedEntityClone>()
+            val appliedEntityDeletes = mutableListOf<CommittedEntityClone>()
             request.operations.forEach { operation ->
                 when (operation) {
                     is ClearRegionRequest -> applyClear(world, operation)
                     is CloneEntitiesRequest -> appliedEntityClones += PaperEntityCloneService.clone(world, operation)
                     is CloneRegionRequest -> applyClone(world, operation)
+                    is DeleteEntitiesRequest -> appliedEntityDeletes += PaperEntityDeleteService.delete(world, operation)
                     is MoveEntitiesRequest -> appliedEntityMoves += PaperEntityMoveService.move(world, operation)
                     is StackRegionRequest -> applyStack(world, operation)
                     is SmearRegionRequest -> applySmear(world, operation)
@@ -178,11 +183,12 @@ class AxionOperationService(
             }
             entityMoves = appliedEntityMoves
             entityClones = appliedEntityClones
+            entityDeletes = appliedEntityDeletes
         }
         val transactionId = result.transactionId
         val actionLabel = result.actionLabel
         if (result.accepted && transactionId != null && actionLabel != null &&
-            (result.changes.isNotEmpty() || entityMoves.isNotEmpty() || entityClones.isNotEmpty())
+            (result.changes.isNotEmpty() || entityMoves.isNotEmpty() || entityClones.isNotEmpty() || entityDeletes.isNotEmpty())
         ) {
             history.recordNormal(
                 player.uniqueId,
@@ -194,6 +200,7 @@ class AxionOperationService(
                     changes = result.changes,
                     entityMoves = entityMoves,
                     entityClones = entityClones,
+                    entityDeletes = entityDeletes,
                 ),
                 policyService.historyBudget(world),
             )
@@ -392,7 +399,7 @@ class AxionOperationService(
             hasSmear -> "Smear"
             hasExtrude -> "Extrude"
             hasPlace -> "Place"
-            hasClear && operations.size == 1 -> "Erase"
+            operations.all { it is ClearRegionRequest || it is DeleteEntitiesRequest } -> "Erase"
             else -> "Edit"
         }
     }
@@ -425,6 +432,7 @@ class AxionOperationService(
             is ClearRegionRequest -> estimateRegionCount(operation.min, operation.max)
             is CloneRegionRequest -> estimateRegionCount(operation.sourceMin, operation.sourceMax)
             is CloneEntitiesRequest -> 0
+            is DeleteEntitiesRequest -> 0
             is MoveEntitiesRequest -> 0
             is StackRegionRequest -> operation.cells.size * maxOf(operation.repeatCount, 0)
             is SmearRegionRequest -> operation.cells.size * maxOf(operation.repeatCount, 0)
@@ -446,6 +454,7 @@ class AxionOperationService(
             AxionOperationType.CLEAR_REGION,
             AxionOperationType.CLONE_REGION,
             AxionOperationType.CLONE_ENTITIES,
+            AxionOperationType.DELETE_ENTITIES,
             AxionOperationType.MOVE_ENTITIES,
             AxionOperationType.STACK_REGION,
             AxionOperationType.SMEAR_REGION,

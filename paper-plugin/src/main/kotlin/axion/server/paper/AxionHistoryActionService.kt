@@ -57,6 +57,7 @@ class AxionHistoryActionService(
             )
         }
         PaperEntityMoveService.applyMoves(world, transaction.entityMoves, reverse = true)
+        PaperEntityCloneService.respawn(world, transaction.entityDeletes)
         PaperEntityCloneService.remove(world, transaction.entityClones)
 
         return OperationBatchResult(
@@ -112,6 +113,7 @@ class AxionHistoryActionService(
         }
         PaperEntityMoveService.applyMoves(world, transaction.entityMoves, reverse = false)
         PaperEntityCloneService.respawn(world, transaction.entityClones)
+        PaperEntityDeleteService.apply(world, transaction.entityDeletes)
 
         return OperationBatchResult(
             requestId = requestId,

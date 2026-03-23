@@ -9,6 +9,8 @@ import axion.common.model.BlockRegion
 import axion.common.model.ClipboardState
 import axion.common.model.SelectionState
 import axion.common.operation.ClearRegionOperation
+import axion.common.operation.CompositeOperation
+import axion.common.operation.DeleteEntitiesOperation
 import axion.common.operation.SymmetryBlockPlacement
 import axion.common.operation.SymmetryPlacementOperation
 import net.minecraft.block.Blocks
@@ -94,28 +96,34 @@ object EraseToolController {
 
         val operation = when (val state = AxionClientState.eraseToolState) {
             is EraseToolState.RegionDefined -> state.clipboardBuffer?.let { clipboard ->
-                SymmetryPlacementOperation(
-                    clipboard.cells.map { cell ->
-                        SymmetryBlockPlacement(
-                            pos = state.region.minCorner().add(cell.offset),
-                            state = Blocks.AIR.defaultState,
-                            blockEntityData = null,
-                        )
-                    },
+                eraseOperation(
+                    state.region,
+                    SymmetryPlacementOperation(
+                        clipboard.cells.map { cell ->
+                            SymmetryBlockPlacement(
+                                pos = state.region.minCorner().add(cell.offset),
+                                state = Blocks.AIR.defaultState,
+                                blockEntityData = null,
+                            )
+                        },
+                    ),
                 )
-            } ?: ClearRegionOperation(state.region)
+            } ?: eraseOperation(state.region)
             EraseToolState.Idle,
             is EraseToolState.FirstCornerSet,
                 -> {
                 val magic = AxionClientState.clipboardState as? ClipboardState.MagicSelection ?: return false
-                SymmetryPlacementOperation(
-                    magic.clipboardBuffer.cells.map { cell ->
-                        SymmetryBlockPlacement(
-                            pos = magic.region.minCorner().add(cell.offset),
-                            state = Blocks.AIR.defaultState,
-                            blockEntityData = null,
-                        )
-                    },
+                eraseOperation(
+                    magic.region,
+                    SymmetryPlacementOperation(
+                        magic.clipboardBuffer.cells.map { cell ->
+                            SymmetryBlockPlacement(
+                                pos = magic.region.minCorner().add(cell.offset),
+                                state = Blocks.AIR.defaultState,
+                                blockEntityData = null,
+                            )
+                        },
+                    ),
                 )
             }
         }
@@ -170,5 +178,21 @@ object EraseToolController {
     private fun isEraseActive(): Boolean {
         return AxionToolSelectionController.isAxionSlotActive() &&
             AxionToolSelectionController.selectedSubtool() == AxionSubtool.ERASE
+    }
+
+    private fun eraseOperation(
+        region: BlockRegion,
+        blockOperation: axion.common.operation.EditOperation = ClearRegionOperation(region),
+    ): axion.common.operation.EditOperation {
+        if (!AxionClientState.copyEntitiesEnabled) {
+            return blockOperation
+        }
+
+        return CompositeOperation(
+            listOf(
+                blockOperation,
+                DeleteEntitiesOperation(region),
+            ),
+        )
     }
 }

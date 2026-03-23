@@ -5,6 +5,7 @@ import axion.common.operation.ClearRegionOperation
 import axion.common.operation.CloneRegionOperation
 import axion.common.operation.CloneEntitiesOperation
 import axion.common.operation.CompositeOperation
+import axion.common.operation.DeleteEntitiesOperation
 import axion.common.operation.ExtrudeOperation
 import axion.common.operation.MoveEntitiesOperation
 import axion.common.operation.OperationValidator
@@ -52,6 +53,7 @@ class PermissiveOperationValidator : OperationValidator {
                 blocksPerBatch = operation.sourceRegion.volume(),
             )
             is CloneEntitiesOperation -> OperationEstimate()
+            is DeleteEntitiesOperation -> OperationEstimate()
             is StackRegionOperation -> OperationEstimate(
                 totalWrites = operation.clipboardBuffer.cells.size.toLong() * operation.repeatCount,
                 clipboardCells = operation.clipboardBuffer.cells.size,

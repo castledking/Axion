@@ -5,6 +5,7 @@ import java.util.UUID
 
 data class CommittedEntityClone(
     val entityId: UUID,
+    val parentEntityId: UUID? = null,
     val entityData: String,
     val spawnLocation: Location,
 )

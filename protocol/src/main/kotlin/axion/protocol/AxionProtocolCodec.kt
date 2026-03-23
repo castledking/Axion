@@ -202,6 +202,11 @@ object AxionProtocolCodec {
                 output.writeUTF(operation.mirrorAxis.name)
             }
 
+            is DeleteEntitiesRequest -> {
+                writeVector(output, operation.sourceMin)
+                writeVector(output, operation.sourceMax)
+            }
+
             is MoveEntitiesRequest -> {
                 writeVector(output, operation.sourceMin)
                 writeVector(output, operation.sourceMax)
@@ -273,6 +278,11 @@ object AxionProtocolCodec {
                 destinationOrigin = readVector(input),
                 rotationQuarterTurns = input.readInt(),
                 mirrorAxis = PlacementMirrorAxisPayload.valueOf(input.readUTF()),
+            )
+
+            AxionOperationType.DELETE_ENTITIES -> DeleteEntitiesRequest(
+                sourceMin = readVector(input),
+                sourceMax = readVector(input),
             )
 
             AxionOperationType.MOVE_ENTITIES -> MoveEntitiesRequest(

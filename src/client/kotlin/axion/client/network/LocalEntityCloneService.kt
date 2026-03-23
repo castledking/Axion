@@ -9,6 +9,7 @@ import net.minecraft.entity.LoadedEntityProcessor
 import net.minecraft.entity.SpawnReason
 import net.minecraft.entity.player.PlayerEntity
 import net.minecraft.nbt.NbtCompound
+import net.minecraft.nbt.NbtList
 import net.minecraft.server.world.ServerWorld
 import net.minecraft.storage.NbtWriteView
 import net.minecraft.util.ErrorReporter
@@ -44,34 +45,33 @@ object LocalEntityCloneService {
                     entity.vehicle == null &&
                     seen.add(entity.uuid)
             }
-            .mapNotNull { entity ->
-                val snapshot = capture(entity) ?: return@mapNotNull null
-                stripUuids(snapshot)
-                val target = transformEntity(
-                    position = Vec3d(entity.x, entity.y, entity.z),
-                    direction = directionFromAngles(entity.yaw, entity.pitch),
+            .flatMap { entity ->
+                planEntityTree(
+                    entity = entity,
                     sourceMin = sourceMin,
                     sourceMax = sourceMax,
-                    destinationOrigin = operation.destinationOrigin,
-                    mirrorAxis = operation.mirrorAxis,
-                    rotationQuarterTurns = operation.rotationQuarterTurns,
-                )
-                EntityCloneChange(
-                    entityId = UUID.randomUUID(),
-                    entityData = snapshot,
-                    pos = target.position,
-                    yaw = target.yaw,
-                    pitch = target.pitch,
-                )
+                    operation = operation,
+                    parentCloneId = null,
+                ).asSequence()
             }
             .toList()
     }
 
     fun apply(world: World, clones: List<EntityCloneChange>) {
         val serverWorld = world as? ServerWorld ?: return
+        val spawned = linkedMapOf<UUID, Entity>()
         clones.forEach { clone ->
-            spawnClone(serverWorld, clone)
+            spawnClone(serverWorld, clone)?.let { spawned[clone.entityId] = it }
         }
+        clones.forEach { clone ->
+            val parentId = clone.parentEntityId ?: return@forEach
+            val child = spawned[clone.entityId] ?: return@forEach
+            val parent = spawned[parentId] ?: return@forEach
+            child.startRiding(parent, true, true)
+        }
+        spawned.values
+            .filter { it.vehicle == null }
+            .forEach(::refreshPassengerPositions)
     }
 
     fun remove(world: World, clones: List<EntityCloneChange>) {
@@ -81,23 +81,32 @@ object LocalEntityCloneService {
         }
     }
 
-    private fun spawnClone(world: ServerWorld, clone: EntityCloneChange) {
+    private fun spawnClone(world: ServerWorld, clone: EntityCloneChange): Entity? {
         val tag = clone.entityData.copy()
         stripUuids(tag)
         val entity = EntityType.loadEntityWithPassengers(tag, world, SpawnReason.COMMAND, LoadedEntityProcessor { entity ->
             entity.setUuid(clone.entityId)
             entity.refreshPositionAndAngles(clone.pos.x, clone.pos.y, clone.pos.z, clone.yaw, clone.pitch)
             entity
-        }) ?: return
+        }) ?: return null
         world.spawnNewEntityAndPassengers(entity)
+        return entity
     }
 
     private fun capture(entity: Entity): NbtCompound? {
         val output = NbtWriteView.create(ErrorReporter.EMPTY)
-        if (!entity.saveData(output)) {
+        if (!entity.saveSelfData(output)) {
             return null
         }
-        return output.nbt
+        val tag = output.nbt
+        val passengers = NbtList()
+        entity.getPassengerList().forEach { passenger ->
+            capture(passenger)?.let(passengers::add)
+        }
+        if (!passengers.isEmpty()) {
+            tag.put("Passengers", passengers)
+        }
+        return tag
     }
 
     private fun stripUuids(tag: NbtCompound) {
@@ -116,6 +125,59 @@ object LocalEntityCloneService {
             current = current.vehicle!!
         }
         return current
+    }
+
+    private fun planEntityTree(
+        entity: Entity,
+        sourceMin: BlockPos,
+        sourceMax: BlockPos,
+        operation: CloneEntitiesOperation,
+        parentCloneId: UUID?,
+    ): List<EntityCloneChange> {
+        val snapshot = capture(entity) ?: return emptyList()
+        stripUuids(snapshot)
+        val target = transformEntity(
+            position = Vec3d(entity.x, entity.y, entity.z),
+            direction = directionFromAngles(entity.yaw, entity.pitch),
+            sourceMin = sourceMin,
+            sourceMax = sourceMax,
+            destinationOrigin = operation.destinationOrigin,
+            mirrorAxis = operation.mirrorAxis,
+            rotationQuarterTurns = operation.rotationQuarterTurns,
+        )
+        val cloneId = UUID.randomUUID()
+        return buildList {
+            add(
+                EntityCloneChange(
+                    entityId = cloneId,
+                    parentEntityId = parentCloneId,
+                    entityData = snapshot,
+                    pos = target.position,
+                    yaw = target.yaw,
+                    pitch = target.pitch,
+                ),
+            )
+            entity.getPassengerList().forEach { passenger ->
+                if (passenger !is PlayerEntity && !passenger.isRemoved) {
+                    addAll(
+                        planEntityTree(
+                            entity = passenger,
+                            sourceMin = sourceMin,
+                            sourceMax = sourceMax,
+                            operation = operation,
+                            parentCloneId = cloneId,
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
+    private fun refreshPassengerPositions(entity: Entity) {
+        entity.getPassengerList().forEach { passenger ->
+            entity.updatePassengerPosition(passenger)
+            refreshPassengerPositions(passenger)
+        }
     }
 
     private fun transformEntity(

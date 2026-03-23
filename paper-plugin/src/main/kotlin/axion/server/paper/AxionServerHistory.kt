@@ -96,7 +96,8 @@ class AxionServerHistory {
             transaction.label.length * 2 +
             transaction.changes.sumOf(::estimateChangeBytes) +
             transaction.entityMoves.size * 80 +
-            transaction.entityClones.sumOf(::estimateCloneBytes)
+            transaction.entityClones.sumOf(::estimateCloneBytes) +
+            transaction.entityDeletes.sumOf(::estimateCloneBytes)
     }
 
     private fun estimateChangeBytes(change: axion.protocol.CommittedBlockChangePayload): Int {
@@ -125,4 +126,5 @@ data class ServerHistoryTransaction(
     val changes: List<CommittedBlockChangePayload>,
     val entityMoves: List<CommittedEntityMove> = emptyList(),
     val entityClones: List<CommittedEntityClone> = emptyList(),
+    val entityDeletes: List<CommittedEntityClone> = emptyList(),
 )

@@ -64,6 +64,14 @@ object LocalEntityMoveService {
             val yaw = if (reverse) move.fromYaw else move.toYaw
             val pitch = if (reverse) move.fromPitch else move.toPitch
             entity.refreshPositionAndAngles(targetPos.x, targetPos.y, targetPos.z, yaw, pitch)
+            refreshPassengerPositions(entity)
+        }
+    }
+
+    private fun refreshPassengerPositions(entity: Entity) {
+        entity.getPassengerList().forEach { passenger ->
+            entity.updatePassengerPosition(passenger)
+            refreshPassengerPositions(passenger)
         }
     }
 

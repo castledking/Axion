@@ -152,7 +152,7 @@ object StackToolController {
     }
 
     private fun confirm(preview: StackPreviewState): Boolean {
-        dispatcher.dispatch(RegionRepeatPlacementService.toOperation(preview, StackPlacementService.repeatMode()))
+        dispatcher.dispatch(StackPlacementService.toOperation(preview))
         reset()
         return true
     }

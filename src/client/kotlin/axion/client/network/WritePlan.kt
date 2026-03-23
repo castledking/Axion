@@ -7,4 +7,5 @@ data class WritePlan(
     val writes: List<BlockWrite>,
     val entityMoves: List<EntityMovePlan> = emptyList(),
     val entityClones: List<EntityCloneChange> = emptyList(),
+    val entityDeletes: List<EntityCloneChange> = emptyList(),
 )

@@ -6,6 +6,7 @@ import java.util.UUID
 
 data class EntityCloneChange(
     val entityId: UUID,
+    val parentEntityId: UUID? = null,
     val entityData: NbtCompound,
     val pos: Vec3d,
     val yaw: Float,

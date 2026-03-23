@@ -180,7 +180,11 @@ class AxionPluginMessaging(
             types.contains(axion.protocol.AxionOperationType.SMEAR_REGION) -> "Smear"
             types.contains(axion.protocol.AxionOperationType.EXTRUDE) -> "Extrude"
             types.contains(axion.protocol.AxionOperationType.PLACE_BLOCKS) -> "Place"
-            types == setOf(axion.protocol.AxionOperationType.CLEAR_REGION) -> "Erase"
+            types == setOf(axion.protocol.AxionOperationType.DELETE_ENTITIES) -> "Erase"
+            types.all {
+                it == axion.protocol.AxionOperationType.CLEAR_REGION ||
+                    it == axion.protocol.AxionOperationType.DELETE_ENTITIES
+            } -> "Erase"
             else -> "Edit"
         }
     }

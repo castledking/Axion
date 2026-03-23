@@ -6,6 +6,7 @@ import axion.common.operation.CloneEntitiesOperation
 import axion.common.operation.ClearRegionOperation
 import axion.common.operation.CloneRegionOperation
 import axion.common.operation.CompositeOperation
+import axion.common.operation.DeleteEntitiesOperation
 import axion.common.operation.EditOperation
 import axion.common.operation.ExtrudeMode
 import axion.common.operation.ExtrudeOperation
@@ -25,12 +26,14 @@ class LocalWritePlanner {
         val writes = mutableListOf<BlockWrite>()
         val entityMoves = mutableListOf<EntityMovePlan>()
         val entityClones = mutableListOf<axion.common.history.EntityCloneChange>()
-        appendWrites(world, operation, overlay, writes, entityMoves, entityClones)
+        val entityDeletes = mutableListOf<axion.common.history.EntityCloneChange>()
+        appendWrites(world, operation, overlay, writes, entityMoves, entityClones, entityDeletes)
         return WritePlan(
             label = operationLabel(operation),
             writes = writes,
             entityMoves = entityMoves,
             entityClones = entityClones,
+            entityDeletes = entityDeletes,
         )
     }
 
@@ -41,18 +44,20 @@ class LocalWritePlanner {
         writes: MutableList<BlockWrite>,
         entityMoves: MutableList<EntityMovePlan>,
         entityClones: MutableList<axion.common.history.EntityCloneChange>,
+        entityDeletes: MutableList<axion.common.history.EntityCloneChange>,
     ) {
         when (operation) {
             is CloneEntitiesOperation -> entityClones += LocalEntityCloneService.plan(world, operation)
             is CloneRegionOperation -> appendClone(world, operation, overlay, writes)
             is ClearRegionOperation -> appendClear(operation, overlay, writes)
+            is DeleteEntitiesOperation -> entityDeletes += LocalEntityDeleteService.plan(world, operation)
             is StackRegionOperation -> appendStack(operation, overlay, writes)
             is SmearRegionOperation -> appendSmear(world, operation, overlay, writes)
             is ExtrudeOperation -> appendExtrude(world, operation, overlay, writes)
             is MoveEntitiesOperation -> entityMoves += LocalEntityMoveService.plan(world, operation)
             is SymmetryPlacementOperation -> appendSymmetryPlacement(operation, overlay, writes)
             is CompositeOperation -> operation.operations.forEach { nested ->
-                appendWrites(world, nested, overlay, writes, entityMoves, entityClones)
+                appendWrites(world, nested, overlay, writes, entityMoves, entityClones, entityDeletes)
             }
         }
     }
@@ -225,6 +230,7 @@ class LocalWritePlanner {
             is CloneRegionOperation -> "Clone"
             is CloneEntitiesOperation -> "Clone"
             is ClearRegionOperation -> "Erase"
+            is DeleteEntitiesOperation -> "Erase"
             is StackRegionOperation -> "Stack"
             is SmearRegionOperation -> "Smear"
             is ExtrudeOperation -> "Extrude"

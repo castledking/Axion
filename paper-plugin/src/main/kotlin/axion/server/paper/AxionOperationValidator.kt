@@ -4,6 +4,7 @@ import axion.protocol.AxionRemoteOperation
 import axion.protocol.ClearRegionRequest
 import axion.protocol.CloneEntitiesRequest
 import axion.protocol.CloneRegionRequest
+import axion.protocol.DeleteEntitiesRequest
 import axion.protocol.ExtrudeRequest
 import axion.protocol.IntVector3
 import axion.protocol.MoveEntitiesRequest
@@ -45,6 +46,8 @@ class AxionOperationValidator(
                     )
             }
 
+            is DeleteEntitiesRequest -> validateBounds(operation.sourceMin, operation.sourceMax)
+
             is MoveEntitiesRequest -> {
                 validateBounds(operation.sourceMin, operation.sourceMax)
                     ?: validateBounds(
@@ -69,6 +72,7 @@ class AxionOperationValidator(
             is ClearRegionRequest -> blockCount(operation.min, operation.max)
             is CloneRegionRequest -> blockCount(operation.sourceMin, operation.sourceMax)
             is CloneEntitiesRequest -> 0
+            is DeleteEntitiesRequest -> 0
             is MoveEntitiesRequest -> 0
             is StackRegionRequest -> operation.cells.size * maxOf(operation.repeatCount, 0)
             is SmearRegionRequest -> operation.cells.size * maxOf(operation.repeatCount, 0)
