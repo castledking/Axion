@@ -57,10 +57,6 @@ object ClientModeController {
         }
 
         if (client.currentScreen == null) {
-            if (client.options.attackKey.isPressed && !suppressPrimaryUntilRelease) {
-                consumePrimaryAction(client)
-            }
-
             if (client.options.useKey.isPressed && !suppressSecondaryUntilRelease) {
                 consumeSecondaryAction(client)
             }
@@ -152,6 +148,8 @@ object ClientModeController {
         val world = client.world ?: return false
         val targetPos = target.hitResult.blockPos.toImmutable()
         val brokenState = world.getBlockState(targetPos)
+        suppressPrimaryUntilRelease = true
+        client.interactionManager?.cancelBlockBreaking()
 
         dispatcher.dispatch(
             ClearRegionOperation(
@@ -163,8 +161,6 @@ object ClientModeController {
         if (!brokenState.isAir) {
             playBreakEffects(client, targetPos, brokenState)
         }
-        suppressPrimaryUntilRelease = true
-        client.interactionManager?.cancelBlockBreaking()
         return true
     }
 
