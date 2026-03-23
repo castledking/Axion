@@ -194,6 +194,14 @@ object AxionProtocolCodec {
                 writeVector(output, operation.destinationOrigin)
             }
 
+            is FilteredCloneRegionRequest -> {
+                writeVector(output, operation.sourceMin)
+                writeVector(output, operation.sourceMax)
+                writeVector(output, operation.destinationOrigin)
+                output.writeBoolean(operation.copyAir)
+                output.writeBoolean(operation.keepExisting)
+            }
+
             is CloneEntitiesRequest -> {
                 writeVector(output, operation.sourceMin)
                 writeVector(output, operation.sourceMax)
@@ -270,6 +278,14 @@ object AxionProtocolCodec {
                 sourceMin = readVector(input),
                 sourceMax = readVector(input),
                 destinationOrigin = readVector(input),
+            )
+
+            AxionOperationType.FILTERED_CLONE_REGION -> FilteredCloneRegionRequest(
+                sourceMin = readVector(input),
+                sourceMax = readVector(input),
+                destinationOrigin = readVector(input),
+                copyAir = input.readBoolean(),
+                keepExisting = input.readBoolean(),
             )
 
             AxionOperationType.CLONE_ENTITIES -> CloneEntitiesRequest(

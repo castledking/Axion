@@ -7,6 +7,7 @@ import axion.common.operation.CloneRegionOperation
 import axion.common.operation.CompositeOperation
 import axion.common.operation.EditOperation
 import axion.common.operation.EntityMoveMirrorAxis
+import axion.common.operation.FilteredCloneRegionOperation
 import axion.common.operation.MoveEntitiesOperation
 import axion.common.operation.SymmetryBlockPlacement
 import axion.common.operation.SymmetryPlacementOperation
@@ -16,17 +17,25 @@ import net.minecraft.util.math.BlockPos
 object PlacementCommitService {
     fun toOperation(preview: ClonePreviewState): EditOperation {
         val copyAir = AxionClientState.copyAirEnabled
-        val cloneOperation = if (copyAir &&
+        val cloneOperation = when {
             preview.transform.isIdentity() &&
-            !regionsOverlap(preview.sourceRegion, preview.destinationRegion) &&
-            isFullCuboidCapture(preview.sourceRegion, preview.sourceClipboardBuffer)
-        ) {
-            CloneRegionOperation(
-                sourceRegion = preview.sourceRegion,
-                destinationOrigin = preview.destinationRegion.minCorner(),
-            )
-        } else {
-            buildClonePlacementOperation(preview)
+                isFullCuboidCapture(preview.sourceRegion, preview.sourceClipboardBuffer) &&
+                copyAir &&
+                !AxionClientState.keepExistingEnabled &&
+                !regionsOverlap(preview.sourceRegion, preview.destinationRegion) -> CloneRegionOperation(
+                    sourceRegion = preview.sourceRegion,
+                    destinationOrigin = preview.destinationRegion.minCorner(),
+                )
+
+            preview.transform.isIdentity() &&
+                isFullCuboidCapture(preview.sourceRegion, preview.sourceClipboardBuffer) -> FilteredCloneRegionOperation(
+                    sourceRegion = preview.sourceRegion,
+                    destinationOrigin = preview.destinationRegion.minCorner(),
+                    copyAir = copyAir,
+                    keepExisting = AxionClientState.keepExistingEnabled,
+                )
+
+            else -> buildClonePlacementOperation(preview)
         }
 
         return when (preview.mode) {

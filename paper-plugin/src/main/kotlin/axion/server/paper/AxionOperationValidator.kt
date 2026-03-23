@@ -6,6 +6,7 @@ import axion.protocol.CloneEntitiesRequest
 import axion.protocol.CloneRegionRequest
 import axion.protocol.DeleteEntitiesRequest
 import axion.protocol.ExtrudeRequest
+import axion.protocol.FilteredCloneRegionRequest
 import axion.protocol.IntVector3
 import axion.protocol.MoveEntitiesRequest
 import axion.protocol.PlaceBlocksRequest
@@ -46,6 +47,18 @@ class AxionOperationValidator(
                     )
             }
 
+            is FilteredCloneRegionRequest -> {
+                validateBounds(operation.sourceMin, operation.sourceMax)
+                    ?: validateBounds(
+                        operation.destinationOrigin,
+                        IntVector3(
+                            operation.destinationOrigin.x + abs(operation.sourceMax.x - operation.sourceMin.x),
+                            operation.destinationOrigin.y + abs(operation.sourceMax.y - operation.sourceMin.y),
+                            operation.destinationOrigin.z + abs(operation.sourceMax.z - operation.sourceMin.z),
+                        ),
+                    )
+            }
+
             is DeleteEntitiesRequest -> validateBounds(operation.sourceMin, operation.sourceMax)
 
             is MoveEntitiesRequest -> {
@@ -71,6 +84,7 @@ class AxionOperationValidator(
         return when (operation) {
             is ClearRegionRequest -> blockCount(operation.min, operation.max)
             is CloneRegionRequest -> blockCount(operation.sourceMin, operation.sourceMax)
+            is FilteredCloneRegionRequest -> blockCount(operation.sourceMin, operation.sourceMax)
             is CloneEntitiesRequest -> 0
             is DeleteEntitiesRequest -> 0
             is MoveEntitiesRequest -> 0

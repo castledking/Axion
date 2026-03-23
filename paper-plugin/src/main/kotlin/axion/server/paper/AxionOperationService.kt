@@ -10,6 +10,7 @@ import axion.protocol.CloneEntitiesRequest
 import axion.protocol.CloneRegionRequest
 import axion.protocol.DeleteEntitiesRequest
 import axion.protocol.ExtrudeRequest
+import axion.protocol.FilteredCloneRegionRequest
 import axion.protocol.IntVector3
 import axion.protocol.MoveEntitiesRequest
 import axion.protocol.OperationBatchRequest
@@ -132,6 +133,7 @@ class AxionOperationService(
                     is CloneEntitiesRequest -> validator.blockCount(operation)
                     is CloneRegionRequest -> validator.blockCount(operation)
                     is DeleteEntitiesRequest -> validator.blockCount(operation)
+                    is FilteredCloneRegionRequest -> validator.blockCount(operation)
                     is MoveEntitiesRequest -> validator.blockCount(operation)
                     is StackRegionRequest -> validator.blockCount(operation)
                     is SmearRegionRequest -> validator.blockCount(operation)
@@ -174,6 +176,7 @@ class AxionOperationService(
                     is CloneEntitiesRequest -> appliedEntityClones += PaperEntityCloneService.clone(world, operation)
                     is CloneRegionRequest -> applyClone(world, operation)
                     is DeleteEntitiesRequest -> appliedEntityDeletes += PaperEntityDeleteService.delete(world, operation)
+                    is FilteredCloneRegionRequest -> applyFilteredClone(world, operation)
                     is MoveEntitiesRequest -> appliedEntityMoves += PaperEntityMoveService.move(world, operation)
                     is StackRegionRequest -> applyStack(world, operation)
                     is SmearRegionRequest -> applySmear(world, operation)
@@ -251,6 +254,48 @@ class AxionOperationService(
 
     private fun applyStack(world: World, operation: StackRegionRequest) {
         applyRepeatedClipboard(world, operation.sourceOrigin, operation.cells, operation.step, operation.repeatCount, airOnly = false)
+    }
+
+    private fun applyFilteredClone(world: World, operation: FilteredCloneRegionRequest) {
+        val sourceMin = minVector(operation.sourceMin, operation.sourceMax)
+        val sourceMax = maxVector(operation.sourceMin, operation.sourceMax)
+        val captured = buildList {
+            forEachPos(sourceMin, sourceMax) { x, y, z ->
+                add(
+                    ServerCapturedBlock(
+                        offset = IntVector3(x - sourceMin.x, y - sourceMin.y, z - sourceMin.z),
+                        blockState = world.getBlockAt(x, y, z).blockData.getAsString(false),
+                        blockEntityData = PaperBlockEntitySnapshotService.capture(world, net.minecraft.core.BlockPos(x, y, z)),
+                    ),
+                )
+            }
+        }
+
+        captured.forEach { capturedBlock ->
+            if (!operation.copyAir && org.bukkit.Bukkit.createBlockData(capturedBlock.blockState).material.isAir) {
+                return@forEach
+            }
+
+            val destination = IntVector3(
+                operation.destinationOrigin.x + capturedBlock.offset.x,
+                operation.destinationOrigin.y + capturedBlock.offset.y,
+                operation.destinationOrigin.z + capturedBlock.offset.z,
+            )
+            if (operation.keepExisting &&
+                destination.x in sourceMin.x..sourceMax.x &&
+                destination.y in sourceMin.y..sourceMax.y &&
+                destination.z in sourceMin.z..sourceMax.z
+            ) {
+                return@forEach
+            }
+
+            PaperBlockEntitySnapshotService.apply(
+                world = world,
+                pos = net.minecraft.core.BlockPos(destination.x, destination.y, destination.z),
+                blockStateString = capturedBlock.blockState,
+                blockEntityPayload = capturedBlock.blockEntityData,
+            )
+        }
     }
 
     private fun applySmear(world: World, operation: SmearRegionRequest) {
@@ -386,6 +431,7 @@ class AxionOperationService(
 
     private fun actionLabel(operations: List<AxionRemoteOperation>): String {
         val hasClone = operations.any { it is CloneRegionRequest }
+        val hasFilteredClone = operations.any { it is FilteredCloneRegionRequest }
         val hasCloneEntities = operations.any { it is CloneEntitiesRequest }
         val hasClear = operations.any { it is ClearRegionRequest }
         val hasStack = operations.any { it is StackRegionRequest }
@@ -394,7 +440,7 @@ class AxionOperationService(
         val hasPlace = operations.any { it is PlaceBlocksRequest }
         return when {
             hasClone && hasClear -> "Move"
-            hasClone || hasCloneEntities -> "Clone"
+            hasClone || hasFilteredClone || hasCloneEntities -> "Clone"
             hasStack -> "Stack"
             hasSmear -> "Smear"
             hasExtrude -> "Extrude"
@@ -411,6 +457,12 @@ class AxionOperationService(
     private data class CapturedBlock(
         val offset: IntVector3,
         val state: BlockState,
+    )
+
+    private data class ServerCapturedBlock(
+        val offset: IntVector3,
+        val blockState: String,
+        val blockEntityData: String?,
     )
 
     private sealed interface ExtrudePlanningResult {
@@ -431,6 +483,7 @@ class AxionOperationService(
         return when (operation) {
             is ClearRegionRequest -> estimateRegionCount(operation.min, operation.max)
             is CloneRegionRequest -> estimateRegionCount(operation.sourceMin, operation.sourceMax)
+            is FilteredCloneRegionRequest -> estimateRegionCount(operation.sourceMin, operation.sourceMax)
             is CloneEntitiesRequest -> 0
             is DeleteEntitiesRequest -> 0
             is MoveEntitiesRequest -> 0
@@ -453,6 +506,7 @@ class AxionOperationService(
         val SUPPORTED_OPERATIONS: Set<AxionOperationType> = setOf(
             AxionOperationType.CLEAR_REGION,
             AxionOperationType.CLONE_REGION,
+            AxionOperationType.FILTERED_CLONE_REGION,
             AxionOperationType.CLONE_ENTITIES,
             AxionOperationType.DELETE_ENTITIES,
             AxionOperationType.MOVE_ENTITIES,

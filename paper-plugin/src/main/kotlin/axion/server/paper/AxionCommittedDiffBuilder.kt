@@ -7,6 +7,7 @@ import axion.protocol.CloneRegionRequest
 import axion.protocol.CommittedBlockChangePayload
 import axion.protocol.DeleteEntitiesRequest
 import axion.protocol.ExtrudeRequest
+import axion.protocol.FilteredCloneRegionRequest
 import axion.protocol.IntVector3
 import axion.protocol.MoveEntitiesRequest
 import axion.protocol.OperationBatchResult
@@ -76,6 +77,25 @@ class AxionCommittedDiffBuilder(
                 when (operation) {
                     is ClearRegionRequest -> collectRegion(touched, operation.min, operation.max)
                     is CloneRegionRequest -> {
+                        val sourceMin = minVector(operation.sourceMin, operation.sourceMax)
+                        val sourceMax = maxVector(operation.sourceMin, operation.sourceMax)
+                        val size = IntVector3(
+                            sourceMax.x - sourceMin.x,
+                            sourceMax.y - sourceMin.y,
+                            sourceMax.z - sourceMin.z,
+                        )
+                        collectRegion(
+                            touched,
+                            operation.destinationOrigin,
+                            IntVector3(
+                                operation.destinationOrigin.x + size.x,
+                                operation.destinationOrigin.y + size.y,
+                                operation.destinationOrigin.z + size.z,
+                            ),
+                        )
+                    }
+
+                    is FilteredCloneRegionRequest -> {
                         val sourceMin = minVector(operation.sourceMin, operation.sourceMax)
                         val sourceMax = maxVector(operation.sourceMin, operation.sourceMax)
                         val size = IntVector3(

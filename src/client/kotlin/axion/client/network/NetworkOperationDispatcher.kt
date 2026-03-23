@@ -7,6 +7,7 @@ import axion.common.operation.CompositeOperation
 import axion.common.operation.DeleteEntitiesOperation
 import axion.common.operation.EditOperation
 import axion.common.operation.ExtrudeOperation
+import axion.common.operation.FilteredCloneRegionOperation
 import axion.common.operation.MoveEntitiesOperation
 import axion.common.operation.OperationDispatcher
 import axion.common.operation.SmearRegionOperation
@@ -20,6 +21,7 @@ import axion.protocol.CloneEntitiesRequest
 import axion.protocol.CloneRegionRequest
 import axion.protocol.DeleteEntitiesRequest
 import axion.protocol.ExtrudeRequest
+import axion.protocol.FilteredCloneRegionRequest
 import axion.protocol.IntVector3
 import axion.protocol.MoveEntitiesRequest
 import axion.protocol.OperationBatchRequest
@@ -90,6 +92,17 @@ class NetworkOperationDispatcher(
                     sourceMin = source.minCorner().toProtocolVector(),
                     sourceMax = source.maxCorner().toProtocolVector(),
                     destinationOrigin = operation.destinationOrigin.toProtocolVector(),
+                )
+            }
+
+            is FilteredCloneRegionOperation -> {
+                val source = operation.sourceRegion.normalized()
+                FilteredCloneRegionRequest(
+                    sourceMin = source.minCorner().toProtocolVector(),
+                    sourceMax = source.maxCorner().toProtocolVector(),
+                    destinationOrigin = operation.destinationOrigin.toProtocolVector(),
+                    copyAir = operation.copyAir,
+                    keepExisting = operation.keepExisting,
                 )
             }
 

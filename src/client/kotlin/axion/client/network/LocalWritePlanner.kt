@@ -10,6 +10,7 @@ import axion.common.operation.DeleteEntitiesOperation
 import axion.common.operation.EditOperation
 import axion.common.operation.ExtrudeMode
 import axion.common.operation.ExtrudeOperation
+import axion.common.operation.FilteredCloneRegionOperation
 import axion.common.operation.MoveEntitiesOperation
 import axion.common.operation.SmearRegionOperation
 import axion.common.operation.StackRegionOperation
@@ -51,6 +52,7 @@ class LocalWritePlanner {
             is CloneRegionOperation -> appendClone(world, operation, overlay, writes)
             is ClearRegionOperation -> appendClear(operation, overlay, writes)
             is DeleteEntitiesOperation -> entityDeletes += LocalEntityDeleteService.plan(world, operation)
+            is FilteredCloneRegionOperation -> appendFilteredClone(world, operation, overlay, writes)
             is StackRegionOperation -> appendStack(operation, overlay, writes)
             is SmearRegionOperation -> appendSmear(world, operation, overlay, writes)
             is ExtrudeOperation -> appendExtrude(world, operation, overlay, writes)
@@ -87,6 +89,33 @@ class LocalWritePlanner {
         val region = operation.region.normalized()
         BlockPos.iterate(region.minCorner(), region.maxCorner()).forEach { pos ->
             appendWrite(pos.toImmutable(), Blocks.AIR.defaultState, null, overlay, writes)
+        }
+    }
+
+    private fun appendFilteredClone(
+        world: World,
+        operation: FilteredCloneRegionOperation,
+        overlay: MutableMap<BlockPos, BlockWrite>,
+        writes: MutableList<BlockWrite>,
+    ) {
+        val source = operation.sourceRegion.normalized()
+        captureRegionCells(world, source, overlay).forEach { cell ->
+            if (!operation.copyAir && cell.state.isAir) {
+                return@forEach
+            }
+
+            val destinationPos = operation.destinationOrigin.add(cell.offset).toImmutable()
+            if (operation.keepExisting && source.contains(destinationPos)) {
+                return@forEach
+            }
+
+            appendWrite(
+                pos = destinationPos,
+                state = cell.state,
+                blockEntityData = cell.blockEntityData,
+                overlay = overlay,
+                writes = writes,
+            )
         }
     }
 
@@ -231,6 +260,7 @@ class LocalWritePlanner {
             is CloneEntitiesOperation -> "Clone"
             is ClearRegionOperation -> "Erase"
             is DeleteEntitiesOperation -> "Erase"
+            is FilteredCloneRegionOperation -> "Clone"
             is StackRegionOperation -> "Stack"
             is SmearRegionOperation -> "Smear"
             is ExtrudeOperation -> "Extrude"

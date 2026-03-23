@@ -15,6 +15,7 @@ data class DoubleVector3(
 enum class AxionOperationType {
     CLEAR_REGION,
     CLONE_REGION,
+    FILTERED_CLONE_REGION,
     CLONE_ENTITIES,
     DELETE_ENTITIES,
     MOVE_ENTITIES,
@@ -104,6 +105,16 @@ data class CloneRegionRequest(
     val destinationOrigin: IntVector3,
 ) : AxionRemoteOperation {
     override val type: AxionOperationType = AxionOperationType.CLONE_REGION
+}
+
+data class FilteredCloneRegionRequest(
+    val sourceMin: IntVector3,
+    val sourceMax: IntVector3,
+    val destinationOrigin: IntVector3,
+    val copyAir: Boolean,
+    val keepExisting: Boolean,
+) : AxionRemoteOperation {
+    override val type: AxionOperationType = AxionOperationType.FILTERED_CLONE_REGION
 }
 
 data class MoveEntitiesRequest(

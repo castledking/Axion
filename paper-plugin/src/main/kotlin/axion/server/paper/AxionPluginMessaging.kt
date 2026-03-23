@@ -176,6 +176,7 @@ class AxionPluginMessaging(
             types.contains(axion.protocol.AxionOperationType.CLONE_REGION) &&
                 types.contains(axion.protocol.AxionOperationType.CLEAR_REGION) -> "Move"
             types.contains(axion.protocol.AxionOperationType.CLONE_REGION) -> "Clone"
+            types.contains(axion.protocol.AxionOperationType.FILTERED_CLONE_REGION) -> "Clone"
             types.contains(axion.protocol.AxionOperationType.STACK_REGION) -> "Stack"
             types.contains(axion.protocol.AxionOperationType.SMEAR_REGION) -> "Smear"
             types.contains(axion.protocol.AxionOperationType.EXTRUDE) -> "Extrude"
