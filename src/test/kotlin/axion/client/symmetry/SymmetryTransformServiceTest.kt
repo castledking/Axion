@@ -29,11 +29,11 @@ class SymmetryTransformServiceTest {
     }
 
     @Test
-    fun `mixed half-grid anchor rotates blocks without flooring drift`() {
+    fun `mixed half-grid anchor normalizes rotational center to block centers`() {
         val transformed = SymmetryTransformService.transformBlock(
-            sourceBlock = BlockPos(0, 0, 0),
-            anchor = Vec3d(0.0, 0.5, 0.5),
-            transform = SymmetryTransformSpec(rotationQuarterTurns = 1),
+            sourceBlock = BlockPos(1, 0, 0),
+            anchor = Vec3d(0.0, 0.0, 0.5),
+            transform = SymmetryTransformSpec(rotationQuarterTurns = 2),
         )
 
         assertEquals(BlockPos(-1, 0, 0), transformed)

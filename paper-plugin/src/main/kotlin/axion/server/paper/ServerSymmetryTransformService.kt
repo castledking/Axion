@@ -26,9 +26,10 @@ object ServerSymmetryTransformService {
     }
 
     fun transformBlock(source: IntVector3, anchor: DoubleVector3, transform: TransformSpec): IntVector3 {
-        val anchorX2 = (anchor.x * 2.0).roundToInt()
+        val rawAnchorX2 = (anchor.x * 2.0).roundToInt()
         val anchorY2 = (anchor.y * 2.0).roundToInt()
-        val anchorZ2 = (anchor.z * 2.0).roundToInt()
+        val rawAnchorZ2 = (anchor.z * 2.0).roundToInt()
+        val (anchorX2, anchorZ2) = effectiveHorizontalAnchor(rawAnchorX2, rawAnchorZ2, transform)
 
         val centerX2 = source.x * 2 + 1
         val centerY2 = source.y * 2 + 1
@@ -68,6 +69,23 @@ object ServerSymmetryTransformService {
             SymmetryMirrorAxisPayload.X -> Triple(-vector.first, vector.second, vector.third)
             SymmetryMirrorAxisPayload.Z -> Triple(vector.first, vector.second, -vector.third)
         }
+    }
+
+    private fun effectiveHorizontalAnchor(
+        anchorX2: Int,
+        anchorZ2: Int,
+        transform: TransformSpec,
+    ): Pair<Int, Int> {
+        if (Math.floorMod(transform.rotationQuarterTurns, 4) == 0) {
+            return anchorX2 to anchorZ2
+        }
+        if ((anchorX2 and 1) == (anchorZ2 and 1)) {
+            return anchorX2 to anchorZ2
+        }
+
+        val adjustedX2 = if ((anchorX2 and 1) == 0) anchorX2 + 1 else anchorX2
+        val adjustedZ2 = if ((anchorZ2 and 1) == 0) anchorZ2 + 1 else anchorZ2
+        return adjustedX2 to adjustedZ2
     }
 
     data class TransformSpec(
