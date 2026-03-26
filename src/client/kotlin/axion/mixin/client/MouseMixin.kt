@@ -46,6 +46,10 @@ abstract class MouseMixin {
             return
         }
 
+        if (AxionModifierKeys.isAltDown(client) && !AxionAltMenuController.isActive(client)) {
+            return
+        }
+
         val player = client.player ?: return
         when (val outcome = AxionInteractionRouter.handleScroll(
             client = client,
