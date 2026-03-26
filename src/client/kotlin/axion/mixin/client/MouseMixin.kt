@@ -1,5 +1,6 @@
 package axion.mixin.client
 
+import axion.client.compat.LitematicaCompat
 import axion.client.hotbar.AxionAltMenuController
 import axion.client.input.AxionInteractionRouter
 import axion.client.input.AxionModifierKeys
@@ -46,7 +47,7 @@ abstract class MouseMixin {
             return
         }
 
-        if (AxionModifierKeys.isAltDown(client) && !AxionAltMenuController.isActive(client)) {
+        if (AxionModifierKeys.isAltDown(client) && LitematicaCompat.isHoldingConfiguredTool(client)) {
             return
         }
 
