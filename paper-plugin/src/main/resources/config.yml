@@ -30,6 +30,8 @@ limits:
         z: 0
   worlds: {}
 protection:
+  griefprevention:
+    enabled: true
   worldguard:
     enabled: true
 audit:

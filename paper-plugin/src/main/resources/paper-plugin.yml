@@ -7,10 +7,6 @@ author: CASTLEDKING
 website: https://castled.codes
 dependencies:
   server:
-    packetevents:
-      load: BEFORE
-      required: false
-      join-classpath: true
     WorldGuard:
       load: BEFORE
       required: false
