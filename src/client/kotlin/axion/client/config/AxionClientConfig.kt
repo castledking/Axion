@@ -10,6 +10,8 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 object AxionClientConfig {
+    private const val MIN_SAVED_HOTBAR_COUNT: Int = 9
+    private const val HOTBAR_SLOT_COUNT: Int = 9
     private val gson = GsonBuilder().setPrettyPrinting().create()
     private val path: Path = FabricLoader.getInstance().configDir.resolve("axion-client.json")
 
@@ -30,6 +32,41 @@ object AxionClientConfig {
 
     fun setUseCommandModifierOnMac(enabled: Boolean) {
         data = data.copy(useCommandModifierOnMac = isMacOs() && enabled)
+        save()
+    }
+
+    fun savedHotbars(): List<SavedHotbarConfig> = data.savedHotbars
+
+    fun savedHotbar(index: Int): SavedHotbarConfig? = data.savedHotbars.getOrNull(index)
+
+    fun ensureSavedHotbarCapacity(requiredCount: Int) {
+        if (requiredCount <= data.savedHotbars.size) {
+            return
+        }
+
+        data = data.copy(
+            savedHotbars = data.savedHotbars + List(requiredCount - data.savedHotbars.size) { SavedHotbarConfig.empty() },
+        )
+        save()
+    }
+
+    fun activeSavedHotbarIndex(): Int = data.activeSavedHotbarIndex
+
+    fun setActiveSavedHotbarIndex(index: Int) {
+        ensureSavedHotbarCapacity(index + 1)
+        val normalizedIndex = index.coerceIn(0, data.savedHotbars.lastIndex)
+        data = data.copy(activeSavedHotbarIndex = normalizedIndex)
+        save()
+    }
+
+    fun updateSavedHotbar(index: Int, hotbar: SavedHotbarConfig) {
+        ensureSavedHotbarCapacity(index + 1)
+
+        data = data.copy(
+            savedHotbars = data.savedHotbars.mapIndexed { existingIndex, existing ->
+                if (existingIndex == index) sanitizeSavedHotbar(hotbar) else existing
+            },
+        )
         save()
     }
 
@@ -207,6 +244,8 @@ object AxionClientConfig {
 
                 Data(
                     useCommandModifierOnMac = fileData.useCommandModifierOnMac ?: defaults.useCommandModifierOnMac,
+                    activeSavedHotbarIndex = (fileData.activeSavedHotbarIndex ?: defaults.activeSavedHotbarIndex)
+                        .coerceIn(0, sanitizeSavedHotbars(fileData.savedHotbars ?: defaults.savedHotbars).lastIndex),
                     nextMagicTemplateIndex = maxOf(
                         fileData.nextMagicTemplateIndex ?: defaults.nextMagicTemplateIndex,
                         loadedTemplates.size + 1,
@@ -215,6 +254,7 @@ object AxionClientConfig {
                         fileData.nextMagicCustomMaskIndex ?: defaults.nextMagicCustomMaskIndex,
                         loadedCustomMasks.size + 1,
                     ),
+                    savedHotbars = sanitizeSavedHotbars(fileData.savedHotbars ?: defaults.savedHotbars),
                     magicSelectTemplates = loadedTemplates,
                     magicSelectCustomMasks = loadedCustomMasks,
                 )
@@ -254,6 +294,26 @@ object AxionClientConfig {
         )
     }
 
+    private fun sanitizeSavedHotbars(savedHotbars: List<SavedHotbarConfig>): List<SavedHotbarConfig> {
+        val sanitized = savedHotbars.map(::sanitizeSavedHotbar)
+        return if (sanitized.size >= MIN_SAVED_HOTBAR_COUNT) {
+            sanitized
+        } else {
+            sanitized + List(MIN_SAVED_HOTBAR_COUNT - sanitized.size) { SavedHotbarConfig.empty() }
+        }
+    }
+
+    private fun sanitizeSavedHotbar(savedHotbar: SavedHotbarConfig): SavedHotbarConfig {
+        val slots = savedHotbar.slots
+            .take(HOTBAR_SLOT_COUNT)
+            .map { it?.trim()?.takeIf(String::isNotEmpty) }
+        return if (slots.size >= HOTBAR_SLOT_COUNT) {
+            savedHotbar.copy(slots = slots)
+        } else {
+            savedHotbar.copy(slots = slots + List(HOTBAR_SLOT_COUNT - slots.size) { null })
+        }
+    }
+
     private fun save() {
         runCatching {
             Files.createDirectories(path.parent)
@@ -265,8 +325,10 @@ object AxionClientConfig {
 
     data class Data(
         val useCommandModifierOnMac: Boolean,
+        val activeSavedHotbarIndex: Int,
         val nextMagicTemplateIndex: Int,
         val nextMagicCustomMaskIndex: Int,
+        val savedHotbars: List<SavedHotbarConfig>,
         val magicSelectTemplates: List<MagicSelectTemplateConfig>,
         val magicSelectCustomMasks: List<MagicSelectCustomMask>,
     ) {
@@ -277,8 +339,10 @@ object AxionClientConfig {
                     ?.contains("mac") == true
                 return Data(
                     useCommandModifierOnMac = isMac,
+                    activeSavedHotbarIndex = 0,
                     nextMagicTemplateIndex = 3,
                     nextMagicCustomMaskIndex = 3,
+                    savedHotbars = List(MIN_SAVED_HOTBAR_COUNT) { SavedHotbarConfig.empty() },
                     magicSelectTemplates = listOf(
                         MagicSelectTemplateConfig(
                             id = "template_1",
@@ -320,9 +384,19 @@ object AxionClientConfig {
 
     private data class FileData(
         val useCommandModifierOnMac: Boolean? = null,
+        val activeSavedHotbarIndex: Int? = null,
         val nextMagicTemplateIndex: Int? = null,
         val nextMagicCustomMaskIndex: Int? = null,
+        val savedHotbars: List<SavedHotbarConfig>? = null,
         val magicSelectTemplates: List<MagicSelectTemplateConfig>? = null,
         val magicSelectCustomMasks: List<MagicSelectCustomMask>? = null,
     )
+}
+
+data class SavedHotbarConfig(
+    val slots: List<String?>,
+) {
+    companion object {
+        fun empty(): SavedHotbarConfig = SavedHotbarConfig(List(9) { null })
+    }
 }

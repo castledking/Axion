@@ -16,12 +16,16 @@ object AxionAltMenuController {
             AxionModifierKeys.isAltDown(client)
     }
 
+    private fun isAnyAltOverlayActive(client: MinecraftClient): Boolean {
+        return isActive(client) || SavedHotbarController.isOverlayActive(client)
+    }
+
     fun onEndTick(client: MinecraftClient) {
         if (client.currentScreen != null) {
             return
         }
 
-        val active = isActive(client)
+        val active = isAnyAltOverlayActive(client)
         if (active) {
             if (client.mouse.isCursorLocked) {
                 client.mouse.unlockCursor()
@@ -101,7 +105,38 @@ object AxionAltMenuController {
         )
     }
 
+    fun hoveringSavedHotbarPageButton(
+        client: MinecraftClient,
+        screenWidth: Int,
+        screenHeight: Int,
+    ): AxionHudLayout.SavedHotbarPageButtonBounds? {
+        if (!SavedHotbarController.isOverlayActive(client)) {
+            return null
+        }
+
+        return AxionHudLayout.savedHotbarPageButtons(screenWidth, screenHeight, SavedHotbarController.selectedPage())
+            .firstOrNull { button ->
+                button.contains(
+                    client.mouse.getScaledX(client.window),
+                    client.mouse.getScaledY(client.window),
+                )
+            }
+    }
+
     fun handleMouseButton(client: MinecraftClient, button: Int, action: Int): Boolean {
+        if (SavedHotbarController.isOverlayActive(client)) {
+            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && action == GLFW.GLFW_PRESS) {
+                hoveringSavedHotbarPageButton(
+                    client,
+                    client.window.scaledWidth,
+                    client.window.scaledHeight,
+                )?.let { buttonBounds ->
+                    SavedHotbarController.changePage(buttonBounds.direction)
+                }
+            }
+            return true
+        }
+
         if (!isActive(client)) {
             return false
         }

@@ -2,6 +2,7 @@ package axion.client.input
 
 import axion.client.config.AxionConfigScreen
 import axion.client.hotbar.AxionAltMenuController
+import axion.client.hotbar.SavedHotbarController
 import axion.client.history.UndoRedoController
 import axion.client.mode.ClientModeController
 import axion.client.network.AxionServerConnection
@@ -21,6 +22,7 @@ object AxionTickHandler {
         AxionInteractionRouter.onEndTick(client)
         val player = client.player ?: return
         AxionToolSelectionController.syncWithPlayerSlot(player.inventory.selectedSlot)
+        SavedHotbarController.onEndTick(client)
         ClientModeController.enforceCreativeMode(client)
         AxionAltMenuController.onEndTick(client)
         if (client.currentScreen == null && !AxionAltMenuController.isActive(client)) {

@@ -6,6 +6,7 @@ import axion.client.tool.AxionToolSelectionController
 import axion.common.model.AxionSubtool
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.gui.DrawContext
+import net.minecraft.item.ItemStack
 import net.minecraft.util.Formatting
 
 object AxionHotbarHud {
@@ -25,6 +26,10 @@ object AxionHotbarHud {
         }
         if (!AxionToolSelectionController.isCreativeModeAllowed()) {
             return
+        }
+
+        if (!AxionToolSelectionController.isAxionSelected() && SavedHotbarController.isOverlayActive(client)) {
+            renderSavedHotbarOverlay(context, client)
         }
 
         val sideSlot = AxionHudLayout.sideSlot(
@@ -114,6 +119,81 @@ object AxionHotbarHud {
             y + 8,
             if (selected) TEXT_SELECTED else TEXT_IDLE,
         )
+    }
+
+    private fun renderSavedHotbarOverlay(
+        context: DrawContext,
+        client: MinecraftClient,
+    ) {
+        val page = SavedHotbarController.selectedPage()
+        val displayRows = SavedHotbarController.displayHotbarsForSelectedPage(client)
+        val rowBounds = AxionHudLayout.savedHotbarRows(context.scaledWindowWidth, context.scaledWindowHeight, page)
+
+        rowBounds.zip(displayRows).forEach { (bounds, display) ->
+            val borderColor = when {
+                display.selected -> BORDER_SELECTED
+                display.active -> TEXT_IDLE
+                else -> BORDER_NEUTRAL
+            }
+
+            context.fill(bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + bounds.height, OUTER_BACKGROUND)
+            context.fill(bounds.x + 1, bounds.y + 1, bounds.x + bounds.width - 1, bounds.y + bounds.height - 1, INNER_BACKGROUND)
+            renderSavedHotbarItems(context, bounds.x + 1, bounds.y + 1, display.stacks)
+            context.drawStrokedRectangle(bounds.x, bounds.y, bounds.width, bounds.height, borderColor)
+        }
+
+        val topBounds = rowBounds.last()
+        context.drawTextWithShadow(
+            client.textRenderer,
+            "Page ${page + 1}",
+            topBounds.x + topBounds.width + 8,
+            topBounds.y + 2,
+            TEXT_SELECTED,
+        )
+        renderSavedHotbarPageButtons(context, client, page)
+    }
+
+    private fun renderSavedHotbarItems(
+        context: DrawContext,
+        startX: Int,
+        startY: Int,
+        stacks: List<ItemStack>,
+    ) {
+        stacks.take(9).forEachIndexed { index, stack ->
+            val slotX = startX + (index * 20)
+            val slotWidth = if (index == 8) 20 else 19
+            context.drawStrokedRectangle(slotX, startY, slotWidth, 19, 0xFF6A6A6A.toInt())
+            if (!stack.isEmpty) {
+                context.drawItem(stack, slotX + 2, startY + 2)
+                context.drawStackOverlay(MinecraftClient.getInstance().textRenderer, stack, slotX + 2, startY + 2)
+            }
+        }
+    }
+
+    private fun renderSavedHotbarPageButtons(
+        context: DrawContext,
+        client: MinecraftClient,
+        page: Int,
+    ) {
+        val hovered = AxionAltMenuController.hoveringSavedHotbarPageButton(
+            client,
+            context.scaledWindowWidth,
+            context.scaledWindowHeight,
+        )
+        AxionHudLayout.savedHotbarPageButtons(context.scaledWindowWidth, context.scaledWindowHeight, page).forEach { button ->
+            val isHovered = hovered?.direction == button.direction
+            val borderColor = if (isHovered) BORDER_HOVER else BORDER_NEUTRAL
+            context.fill(button.x, button.y, button.x + button.width, button.y + button.height, OUTER_BACKGROUND)
+            context.fill(button.x + 1, button.y + 1, button.x + button.width - 1, button.y + button.height - 1, INNER_BACKGROUND)
+            context.drawStrokedRectangle(button.x, button.y, button.width, button.height, borderColor)
+            context.drawCenteredTextWithShadow(
+                client.textRenderer,
+                if (button.direction > 0) "↑" else "↓",
+                button.x + (button.width / 2),
+                button.y + 2,
+                if (isHovered) TEXT_SELECTED else TEXT_IDLE,
+            )
+        }
     }
 
     private fun renderSubtoolStrip(

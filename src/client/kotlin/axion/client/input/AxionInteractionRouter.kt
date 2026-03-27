@@ -2,6 +2,7 @@ package axion.client.input
 
 import axion.client.AxionClientState
 import axion.client.config.MagicSelectMaskConfigScreen
+import axion.client.hotbar.SavedHotbarController
 import axion.client.symmetry.SymmetryController
 import axion.client.symmetry.SymmetryPlacementController
 import axion.client.tool.AxionToolSelectionController
@@ -151,6 +152,12 @@ object AxionInteractionRouter {
         altHeld: Boolean,
         ctrlHeld: Boolean,
     ): AxionToolSelectionController.ScrollOutcome {
+        if (altHeld && !AxionToolSelectionController.isAxionSlotActive()) {
+            if (SavedHotbarController.handleScroll(client, scrollAmount)) {
+                return AxionToolSelectionController.ScrollOutcome.Consumed
+            }
+        }
+
         if (ctrlHeld && AxionToolSelectionController.isAxionSlotActive()) {
             if (handleMagicSelectBrushScroll(client, scrollAmount)) {
                 return AxionToolSelectionController.ScrollOutcome.Consumed
