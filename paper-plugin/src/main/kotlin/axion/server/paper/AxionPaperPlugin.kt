@@ -17,9 +17,6 @@ class AxionPaperPlugin : JavaPlugin() {
 
     override fun onLoad() {
         noClipService = AxionNoClipService(this)
-        if (server.pluginManager.getPlugin("packetevents") != null) {
-            AxionPacketEventsNoClipBridge.register(this, noClipService)
-        }
     }
 
     override fun onEnable() {
@@ -46,11 +43,11 @@ class AxionPaperPlugin : JavaPlugin() {
     override fun onDisable() {
         if (::messaging.isInitialized) {
             messaging.logTimingSummary("shutdown")
+            server.messenger.unregisterIncomingPluginChannel(this, AxionProtocol.CHANNEL_ID, messaging)
         }
         if (::noClipService.isInitialized) {
             noClipService.stop()
         }
-        server.messenger.unregisterIncomingPluginChannel(this, AxionProtocol.CHANNEL_ID, messaging)
         server.messenger.unregisterOutgoingPluginChannel(this, AxionProtocol.CHANNEL_ID)
     }
 

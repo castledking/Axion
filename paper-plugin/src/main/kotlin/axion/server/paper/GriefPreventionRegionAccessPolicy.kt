@@ -41,6 +41,10 @@ class GriefPreventionRegionAccessPolicy private constructor(
                 null
             } catch (_: LinkageError) {
                 null
+            } catch (_: IllegalStateException) {
+                null
+            } catch (_: NullPointerException) {
+                null
             }
         }
     }
@@ -114,8 +118,12 @@ class GriefPreventionRegionAccessPolicy private constructor(
             val claimResults = IdentityHashMap<Any, String?>()
             touchedPositions.forEach { position ->
                 val location = Location(world, position.x.toDouble(), position.y.toDouble(), position.z.toDouble())
-                val claim = getClaimAt(location, player) ?: return@forEach
-                val denial = claimResults.getOrPut(claim) {
+                val claim = getClaimAt(location, player)
+                val denial = if (claim != null) {
+                    claimResults.getOrPut(claim) {
+                        allowBuildMethod.invoke(plugin, player, location, location.block.type) as String?
+                    }
+                } else {
                     allowBuildMethod.invoke(plugin, player, location, location.block.type) as String?
                 }
                 if (denial != null) {
@@ -132,17 +140,17 @@ class GriefPreventionRegionAccessPolicy private constructor(
         private fun getClaimAt(location: Location, player: Player): Any? {
             val method = getClaimAtMethod ?: return null
             return when (getClaimAtArity) {
-                4 -> method.invoke(dataStore, location, true, false, null)
-                    ?: method.invoke(dataStore, location, false, false, null)
+                4 -> method.invoke(dataStore, location, false, false, null)
+                    ?: method.invoke(dataStore, location, true, false, null)
 
                 3 -> {
                     val thirdArg = resolveThirdArgument(method.parameterTypes[2], player)
-                    method.invoke(dataStore, location, true, thirdArg)
-                        ?: method.invoke(dataStore, location, false, thirdArg)
+                    method.invoke(dataStore, location, false, thirdArg)
+                        ?: method.invoke(dataStore, location, true, thirdArg)
                 }
 
-                2 -> method.invoke(dataStore, location, true)
-                    ?: method.invoke(dataStore, location, false)
+                2 -> method.invoke(dataStore, location, false)
+                    ?: method.invoke(dataStore, location, true)
 
                 else -> null
             }
@@ -164,15 +172,25 @@ class GriefPreventionRegionAccessPolicy private constructor(
         }
 
         private fun resolveDataStore(plugin: Plugin): Any {
-            return runCatching {
-                plugin.javaClass.getField("dataStore").get(plugin)
-            }.recoverCatching {
-                val field = plugin.javaClass.getDeclaredField("dataStore")
+            findField(plugin.javaClass, "dataStore")?.let { field ->
                 field.isAccessible = true
-                field.get(plugin)
-            }.getOrElse {
-                error("GriefPrevention dataStore field not found")
+                field.get(plugin)?.let { return it }
             }
+            throw IllegalStateException("GriefPrevention dataStore field not found")
+        }
+
+        private fun findField(type: Class<*>, name: String): java.lang.reflect.Field? {
+            var current: Class<*>? = type
+            while (current != null) {
+                runCatching { current.getDeclaredField(name) }
+                    .getOrNull()
+                    ?.let { return it }
+                runCatching { current.getField(name) }
+                    .getOrNull()
+                    ?.let { return it }
+                current = current.superclass
+            }
+            return null
         }
     }
 
