@@ -19,7 +19,9 @@ class AxionNoClipService(
         }
 
         taskId = Bukkit.getScheduler().scheduleSyncRepeatingTask(plugin, Runnable {
-            Bukkit.getOnlinePlayers().forEach(::applyState)
+            armedPlayers.toList().forEach { playerId ->
+                Bukkit.getPlayer(playerId)?.let(::applyState)
+            }
         }, 1L, 1L)
     }
 
@@ -69,8 +71,10 @@ class AxionNoClipService(
     private fun setNoPhysics(player: Player, active: Boolean) {
         val handle: ServerPlayer = (player as CraftPlayer).handle
         handle.noPhysics = active
-        handle.setOnGround(false)
-        handle.fallDistance = 0.0
-        player.fallDistance = 0f
+        if (active) {
+            handle.setOnGround(false)
+            handle.fallDistance = 0.0
+            player.fallDistance = 0f
+        }
     }
 }
