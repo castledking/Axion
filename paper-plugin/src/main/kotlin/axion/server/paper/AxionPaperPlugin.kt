@@ -59,24 +59,41 @@ class AxionPaperPlugin : JavaPlugin() {
     }
 
     private fun installConfiguredProtectionAdapters() {
-        if (!config.getBoolean("protection.worldguard.enabled", true)) {
+        val adapters = mutableListOf<RegionAccessPolicy>()
+
+        if (config.getBoolean("protection.griefprevention.enabled", true)) {
+            val adapter = GriefPreventionRegionAccessPolicy.tryCreate()
+            if (adapter == null) {
+                logger.info("Axion GriefPrevention protection adapter not installed: GriefPrevention not present")
+            } else {
+                adapters += adapter
+                logger.info("Axion GriefPrevention protection adapter enabled")
+            }
+        } else {
+            logger.info("Axion GriefPrevention protection adapter disabled by config")
+        }
+
+        if (config.getBoolean("protection.worldguard.enabled", true)) {
+            val worldGuard = server.pluginManager.getPlugin("WorldGuard")
+            if (worldGuard == null || !worldGuard.isEnabled) {
+                logger.info("Axion WorldGuard protection adapter not installed: WorldGuard not present")
+            } else {
+                val adapter = WorldGuardRegionAccessPolicy.tryCreate(worldGuard)
+                if (adapter == null) {
+                    logger.warning("Axion could not initialize the WorldGuard protection adapter")
+                } else {
+                    adapters += adapter
+                    logger.info("Axion WorldGuard protection adapter enabled")
+                }
+            }
+        } else {
             logger.info("Axion WorldGuard protection adapter disabled by config")
-            return
         }
 
-        val worldGuard = server.pluginManager.getPlugin("WorldGuard")
-        if (worldGuard == null || !worldGuard.isEnabled) {
-            logger.info("Axion WorldGuard protection adapter not installed: WorldGuard not present")
-            return
+        regionAccessPolicy = when (adapters.size) {
+            0 -> AllowAllRegionAccessPolicy
+            1 -> adapters.first()
+            else -> CompositeRegionAccessPolicy(adapters)
         }
-
-        val adapter = WorldGuardRegionAccessPolicy.tryCreate(worldGuard)
-        if (adapter == null) {
-            logger.warning("Axion could not initialize the WorldGuard protection adapter")
-            return
-        }
-
-        installRegionAccessPolicy(adapter)
-        logger.info("Axion WorldGuard protection adapter enabled")
     }
 }

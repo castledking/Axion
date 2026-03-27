@@ -19,6 +19,7 @@ import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry
 import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.client.MinecraftClient
 import net.minecraft.text.Text
+import net.minecraft.util.Formatting
 
 object AxionServerConnection {
     sealed interface State {
@@ -193,7 +194,14 @@ object AxionServerConnection {
                 }
                 val requestKind = AxionRequestTracker.complete(message.requestId)
                 if (!message.accepted) {
-                    notifyPlayerOnce("Axion server rejected edit [${message.code.name}]: ${message.message}")
+                    if (message.source == axion.protocol.AxionResultSource.GRIEF_PREVENTION) {
+                        MinecraftClient.getInstance().player?.sendMessage(
+                            Text.literal("Couldn't apply edit, try again.").formatted(Formatting.RED),
+                            true,
+                        )
+                    } else {
+                        notifyPlayerOnce("Axion server rejected edit [${message.code.name}]: ${message.message}")
+                    }
                 } else {
                     clearStatusMessage("Axion server rejected edit [${message.code.name}]: ${message.message}")
                     val entry = RemoteHistoryAdapter.toHistoryEntry(message)

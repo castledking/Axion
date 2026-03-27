@@ -49,6 +49,7 @@ enum class AxionResultSource {
     POLICY,
     PERMISSION,
     CONFIG_CUBOID,
+    GRIEF_PREVENTION,
     WORLDGUARD,
     HISTORY,
     TRANSPORT,
