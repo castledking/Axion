@@ -70,6 +70,18 @@ object SavedHotbarController {
         pendingSelectionIndex = (nextPage * PAGE_SIZE) + currentRow
     }
 
+    fun selectHotbar(index: Int) {
+        if (index < 0) {
+            return
+        }
+
+        if (index >= AxionClientConfig.savedHotbars().size) {
+            val requiredPages = (index / PAGE_SIZE) + 1
+            AxionClientConfig.ensureSavedHotbarCapacity(requiredPages * PAGE_SIZE)
+        }
+        pendingSelectionIndex = index
+    }
+
     fun handleScroll(client: MinecraftClient, scrollAmount: Double): Boolean {
         if (!supportsSavedHotbars(client)) {
             return false

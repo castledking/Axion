@@ -123,6 +123,24 @@ object AxionAltMenuController {
             }
     }
 
+    fun hoveringSavedHotbarRow(
+        client: MinecraftClient,
+        screenWidth: Int,
+        screenHeight: Int,
+    ): AxionHudLayout.SavedHotbarRowBounds? {
+        if (!SavedHotbarController.isOverlayActive(client)) {
+            return null
+        }
+
+        return AxionHudLayout.savedHotbarRows(screenWidth, screenHeight, SavedHotbarController.selectedPage())
+            .firstOrNull { row ->
+                client.mouse.getScaledX(client.window) >= row.x &&
+                    client.mouse.getScaledX(client.window) < row.x + row.width &&
+                    client.mouse.getScaledY(client.window) >= row.y &&
+                    client.mouse.getScaledY(client.window) < row.y + row.height
+            }
+    }
+
     fun handleMouseButton(client: MinecraftClient, button: Int, action: Int): Boolean {
         if (SavedHotbarController.isOverlayActive(client)) {
             if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && action == GLFW.GLFW_PRESS) {
@@ -132,6 +150,14 @@ object AxionAltMenuController {
                     client.window.scaledHeight,
                 )?.let { buttonBounds ->
                     SavedHotbarController.changePage(buttonBounds.direction)
+                    return true
+                }
+                hoveringSavedHotbarRow(
+                    client,
+                    client.window.scaledWidth,
+                    client.window.scaledHeight,
+                )?.let { rowBounds ->
+                    SavedHotbarController.selectHotbar(rowBounds.index)
                 }
             }
             return true
