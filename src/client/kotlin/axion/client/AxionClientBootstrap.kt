@@ -14,10 +14,10 @@ import axion.client.render.TargetHighlightRenderer
 import axion.client.render.PlacementPreviewRenderer
 import axion.client.render.SmearPreviewRenderer
 import axion.client.render.StackPreviewRenderer
+import axion.client.render.WorldRenderCompat
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents
 import net.minecraft.util.Identifier
 
 object AxionClientBootstrap {
@@ -31,13 +31,13 @@ object AxionClientBootstrap {
         HudElementRegistry.attachElementAfter(VanillaHudElements.HOTBAR, hudId, AxionHotbarHud::render)
         HudElementRegistry.attachElementAfter(VanillaHudElements.HOTBAR, hintHudId, AxionToolHintHud::render)
         ClientTickEvents.END_CLIENT_TICK.register(AxionTickHandler::onEndTick)
-        WorldRenderEvents.BEFORE_DEBUG_RENDER.register(TargetHighlightRenderer::render)
-        WorldRenderEvents.END_MAIN.register(SelectionBoxRenderer::render)
-        WorldRenderEvents.BEFORE_DEBUG_RENDER.register(PlacementPreviewRenderer::render)
-        WorldRenderEvents.BEFORE_DEBUG_RENDER.register(StackPreviewRenderer::render)
-        WorldRenderEvents.BEFORE_DEBUG_RENDER.register(SmearPreviewRenderer::render)
-        WorldRenderEvents.BEFORE_DEBUG_RENDER.register(ExtrudePreviewRenderer::render)
-        WorldRenderEvents.BEFORE_DEBUG_RENDER.register(SymmetryGizmoRenderer::render)
-        WorldRenderEvents.BEFORE_DEBUG_RENDER.register(SymmetryPreviewRenderer::render)
+        WorldRenderCompat.registerBeforeDebugRender(TargetHighlightRenderer::render)
+        WorldRenderCompat.registerEndMain(SelectionBoxRenderer::render)
+        WorldRenderCompat.registerBeforeDebugRender(PlacementPreviewRenderer::render)
+        WorldRenderCompat.registerBeforeDebugRender(StackPreviewRenderer::render)
+        WorldRenderCompat.registerBeforeDebugRender(SmearPreviewRenderer::render)
+        WorldRenderCompat.registerBeforeDebugRender(ExtrudePreviewRenderer::render)
+        WorldRenderCompat.registerBeforeDebugRender(SymmetryGizmoRenderer::render)
+        WorldRenderCompat.registerBeforeDebugRender(SymmetryPreviewRenderer::render)
     }
 }

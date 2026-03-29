@@ -2,10 +2,7 @@ package axion.client.render
 
 import axion.client.selection.SelectionBounds
 import axion.client.tool.ExtrudeToolController
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext
 import net.minecraft.client.MinecraftClient
-import net.minecraft.client.render.RenderLayers
-import net.minecraft.client.render.VertexRendering
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Box
 import net.minecraft.util.shape.VoxelShapes
@@ -16,13 +13,13 @@ object ExtrudePreviewRenderer {
     private const val LINE_WIDTH: Float = 1.5f
     private const val MAX_BLOCK_OUTLINES: Int = 192
 
-    fun render(context: WorldRenderContext) {
+    fun render(context: AxionWorldRenderContext) {
         val preview = ExtrudeToolController.currentPreview() ?: return
         val client = MinecraftClient.getInstance()
         val camera = client.gameRenderer.camera ?: return
         val cameraPos = camera.cameraPos
         val consumers = context.consumers()
-        val consumer = consumers.getBuffer(RenderLayers.lines())
+        val consumer = consumers.getBuffer(RenderLayerCompat.lines())
         val matrixStack = context.matrices()
         val sourcePositions = preview.footprint
         val destinationPositions = preview.extrudePositions
@@ -63,7 +60,7 @@ object ExtrudePreviewRenderer {
 
         if (positions.size <= MAX_BLOCK_OUTLINES) {
             positions.forEach { pos ->
-                VertexRendering.drawOutline(
+                VertexRenderingCompat.drawOutline(
                     matrixStack,
                     consumer,
                     VoxelShapes.cuboid(SelectionBounds.outlineBox(SelectionBounds.blockBox(pos))),
@@ -77,7 +74,7 @@ object ExtrudePreviewRenderer {
             return
         }
 
-        VertexRendering.drawOutline(
+        VertexRenderingCompat.drawOutline(
             matrixStack,
             consumer,
             VoxelShapes.cuboid(SelectionBounds.outlineBox(boundsBox(positions))),

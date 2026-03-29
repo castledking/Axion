@@ -175,6 +175,7 @@ object BuildPlacementService {
                     )
                 } else {
                     createAdjacentPlacementAt(
+                        world = world,
                         player = player,
                         hand = hand,
                         stack = stack,
@@ -213,6 +214,7 @@ object BuildPlacementService {
     }
 
     private fun createAdjacentPlacementAt(
+        world: net.minecraft.client.world.ClientWorld,
         player: net.minecraft.client.network.ClientPlayerEntity,
         hand: Hand,
         stack: net.minecraft.item.ItemStack,
@@ -237,7 +239,7 @@ object BuildPlacementService {
             return null
         }
         val placementState = blockItem.block.getPlacementState(placementContext) ?: return null
-        if (!placementState.canPlaceAt(player.entityWorld, pos)) {
+        if (!placementState.canPlaceAt(world, pos)) {
             return null
         }
         return SymmetryBlockPlacement(pos.toImmutable(), placementState)

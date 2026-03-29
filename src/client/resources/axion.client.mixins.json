@@ -6,7 +6,8 @@
     "ClientPlayerEntityMixin",
     "EntityMixin",
     "MinecraftClientMixin",
-    "MouseMixin"
+    "MouseMixin",
+    "WorldRendererFallbackMixin"
   ],
   "injectors": {
     "defaultRequire": 1

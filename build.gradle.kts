@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.gradle.api.tasks.bundling.AbstractArchiveTask
 import org.gradle.language.jvm.tasks.ProcessResources
 
 plugins {
@@ -9,6 +10,9 @@ plugins {
 version = property("mod_version") as String
 group = property("maven_group") as String
 val modVersion = version.toString()
+val minecraftVersion = property("minecraft_version") as String
+val minecraftPatch = minecraftVersion.substringAfter("1.21.", "0").substringBefore('-').toIntOrNull() ?: 0
+val needsLegacyMouseInputStub = minecraftVersion.startsWith("1.21.") && minecraftPatch < 11
 
 base {
     archivesName.set(property("archives_base_name") as String)
@@ -29,6 +33,12 @@ loom {
             sourceSet(sourceSets["main"])
             sourceSet(sourceSets["client"])
         }
+    }
+}
+
+if (needsLegacyMouseInputStub) {
+    sourceSets.named("client") {
+        java.srcDir("src/client-legacy-stubs/java")
     }
 }
 
@@ -85,5 +95,15 @@ tasks.test {
 
 tasks.jar {
     dependsOn(":protocol:compileKotlin")
+    archiveFileName.set("Axion-v${modVersion}-mc${minecraftVersion}-dev.jar")
     from(layout.projectDirectory.dir("protocol/build/classes/kotlin/main"))
+    exclude("net/minecraft/client/input/MouseInput.class")
+}
+
+tasks.named<AbstractArchiveTask>("remapJar") {
+    archiveFileName.set("Axion-v${modVersion}-mc${minecraftVersion}.jar")
+}
+
+tasks.named<AbstractArchiveTask>("sourcesJar") {
+    archiveFileName.set("Axion-v${modVersion}-mc${minecraftVersion}-sources.jar")
 }

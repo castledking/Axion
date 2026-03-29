@@ -57,7 +57,11 @@ object ModeTargeting {
             }
         } ?: return null
         val squaredDistance = origin.squaredDistanceTo(hitResult.pos)
-        val beyondVanillaReach = squaredDistance > (vanillaReach * vanillaReach) + 1.0e-6
+        val beyondVanillaReach = if (vanillaCrosshair != null) {
+            false
+        } else {
+            squaredDistance > (vanillaReach * vanillaReach) + 1.0e-6
+        }
         if (beyondVanillaReach && !AxionClientState.globalModeState.infiniteReachEnabled) {
             return null
         }

@@ -5,42 +5,47 @@ import axion.client.network.LocalWritePlanner
 import axion.client.selection.SelectionBounds
 import axion.client.tool.RegionRepeatPlacementService
 import axion.client.tool.RepeatRegionPreview
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext
 import net.minecraft.client.MinecraftClient
 import net.minecraft.util.math.BlockPos
 
 object RepeatPreviewRenderer {
     private const val MAX_REGION_OUTLINES: Int = 96
     private const val MAX_COLLISION_PULSE_BLOCKS: Int = 2048
+    private const val DESTINATION_GHOST_COLOR: Int = 0xFFFFFFFF.toInt()
+    private const val DEFAULT_GHOST_ALPHA: Int = 70
+    private const val SPARSE_GHOST_ALPHA: Int = 180
+    private const val GHOST_SCALE: Float = 0.985f
     private const val SOURCE_SELECTION_COLOR: Int = 0xFFFFFFFF.toInt()
     private val writePlanner = LocalWritePlanner()
 
     fun render(
-        context: WorldRenderContext,
+        context: AxionWorldRenderContext,
         preview: RepeatRegionPreview,
         mode: RegionRepeatPlacementService.Mode,
         destinationColor: Int,
         lineWidth: Float,
     ) {
-        val renderedSparseSource = ClipboardSelectionRenderer.renderPulse(
-            context = context,
-            origin = preview.sourceRegion.minCorner(),
-            region = preview.sourceRegion,
-            clipboard = preview.clipboardBuffer,
-            outlineColor = SOURCE_SELECTION_COLOR,
-            lineWidth = lineWidth,
-            minAlpha = 0,
-            maxAlpha = 166,
-        )
-        if (!renderedSparseSource) {
-            PulsingCuboidRenderer.renderShell(
+        if (mode != RegionRepeatPlacementService.Mode.STACK && mode != RegionRepeatPlacementService.Mode.SMEAR) {
+            val renderedSparseSource = ClipboardSelectionRenderer.renderPulse(
                 context = context,
-                box = SelectionBounds.regionBox(preview.sourceRegion),
+                origin = preview.sourceRegion.minCorner(),
+                region = preview.sourceRegion,
+                clipboard = preview.clipboardBuffer,
                 outlineColor = SOURCE_SELECTION_COLOR,
                 lineWidth = lineWidth,
                 minAlpha = 0,
                 maxAlpha = 166,
             )
+            if (!renderedSparseSource) {
+                PulsingCuboidRenderer.renderShell(
+                    context = context,
+                    box = SelectionBounds.regionBox(preview.sourceRegion),
+                    outlineColor = SOURCE_SELECTION_COLOR,
+                    lineWidth = lineWidth,
+                    minAlpha = 0,
+                    maxAlpha = 166,
+                )
+            }
         }
 
         if (mode == RegionRepeatPlacementService.Mode.SMEAR) {
@@ -54,57 +59,83 @@ object RepeatPreviewRenderer {
             return
         }
 
-        val destinationRegions = RepeatPreviewLayout.destinationRegions(
+        val selectionClipboard = ClipboardSelectionRenderer.sparseClipboard(preview.clipboardBuffer)
+        val destinationGhostClipboard = ClipboardSelectionRenderer.surfaceClipboard(preview.clipboardBuffer)
+        val sparseDestination = ClipboardSelectionRenderer.isSparse(preview.sourceRegion, selectionClipboard)
+        RepeatPreviewLayout.aggregateRegion(
             sourceRegion = preview.sourceRegion,
             step = preview.step,
-            repeatCount = preview.repeatCount,
-            maxRegions = MAX_REGION_OUTLINES,
-        )
-        destinationRegions.forEach { region ->
-            PulsingCuboidRenderer.render(
-                context = context,
-                box = SelectionBounds.outlineBox(SelectionBounds.regionBox(region)),
-                outlineColor = destinationColor,
-                lineWidth = lineWidth,
-            )
-        }
-        if (preview.repeatCount > destinationRegions.size) {
-            RepeatPreviewLayout.aggregateRegion(
-                sourceRegion = preview.sourceRegion,
-                step = preview.step,
-                startIndex = destinationRegions.size + 1,
-                endIndex = preview.repeatCount,
-            )?.let { hiddenRegion ->
-                PulsingCuboidRenderer.render(
+            startIndex = 0,
+            endIndex = preview.repeatCount,
+        )?.let { aggregateRegion ->
+            val aggregateBox = SelectionBounds.regionBox(aggregateRegion)
+
+            val nonAirCells = preview.clipboardBuffer.nonAirCells()
+            if (nonAirCells.isNotEmpty()) {
+                val maxGhostOrigins = maxOf(1, GhostBlockPreviewRenderer.maxOriginsFor(nonAirCells.size))
+                val ghostOrigins = RepeatPreviewLayout.destinationRegions(
+                    sourceRegion = preview.sourceRegion,
+                    step = preview.step,
+                    repeatCount = preview.repeatCount,
+                    maxRegions = MAX_REGION_OUTLINES,
+                )
+                    .asSequence()
+                    .take(maxGhostOrigins)
+                    .map { it.minCorner() }
+                    .toList()
+                if (sparseDestination) {
+                    ClipboardSelectionRenderer.renderSelection(
+                        context = context,
+                        origins = ghostOrigins,
+                        clipboard = selectionClipboard,
+                        outlineColor = destinationColor,
+                        lineWidth = lineWidth,
+                    )
+                } else {
+                    PulsingCuboidRenderer.renderOutlineBox(
+                        context = context,
+                        box = aggregateBox,
+                        outlineColor = destinationColor,
+                        lineWidth = lineWidth,
+                    )
+                }
+                GhostBlockPreviewRenderer.render(
                     context = context,
-                    box = SelectionBounds.outlineBox(SelectionBounds.regionBox(hiddenRegion)),
+                    clipboard = if (sparseDestination) destinationGhostClipboard else preview.clipboardBuffer,
+                    origins = ghostOrigins,
+                    color = DESTINATION_GHOST_COLOR,
+                    alpha = if (sparseDestination) SPARSE_GHOST_ALPHA else DEFAULT_GHOST_ALPHA,
+                    textured = true,
+                    scale = GHOST_SCALE,
+                )
+            } else if (!sparseDestination) {
+                PulsingCuboidRenderer.renderOutlineBox(
+                    context = context,
+                    box = aggregateBox,
+                    outlineColor = destinationColor,
+                    lineWidth = lineWidth,
+                )
+            } else {
+                val sparseOrigins = RepeatPreviewLayout.destinationRegions(
+                    sourceRegion = preview.sourceRegion,
+                    step = preview.step,
+                    repeatCount = preview.repeatCount,
+                    maxRegions = MAX_REGION_OUTLINES,
+                ).map { it.minCorner() }
+                ClipboardSelectionRenderer.renderSelection(
+                    context = context,
+                    origins = sparseOrigins,
+                    clipboard = selectionClipboard,
                     outlineColor = destinationColor,
                     lineWidth = lineWidth,
                 )
             }
         }
-
-        val nonAirCells = preview.clipboardBuffer.nonAirCells()
-        if (nonAirCells.isEmpty()) {
-            return
-        }
-        val maxGhostOrigins = maxOf(1, GhostBlockPreviewRenderer.maxOriginsFor(nonAirCells.size))
-        val ghostOrigins = destinationRegions
-            .asSequence()
-            .take(maxGhostOrigins)
-            .map { it.minCorner() }
-            .toList()
-        GhostBlockPreviewRenderer.render(
-            context = context,
-            clipboard = preview.clipboardBuffer,
-            origins = ghostOrigins,
-            textured = true,
-        )
         renderArrow(context, preview)
     }
 
     private fun renderCollisionAware(
-        context: WorldRenderContext,
+        context: AxionWorldRenderContext,
         preview: RepeatRegionPreview,
         mode: RegionRepeatPlacementService.Mode,
         destinationColor: Int,
@@ -117,26 +148,44 @@ object RepeatPreviewRenderer {
         }
         val renderedWrites = finalWrites.values.filterNot { it.state.isAir }
         if (renderedWrites.isNotEmpty()) {
+            val selectionClipboard = ClipboardSelectionRenderer.sparseClipboard(preview.clipboardBuffer)
+            val sparseDestination = ClipboardSelectionRenderer.isSparse(preview.sourceRegion, selectionClipboard)
+            if (!sparseDestination) {
+                RepeatPreviewLayout.aggregateRegion(
+                    sourceRegion = preview.sourceRegion,
+                    step = preview.step,
+                    startIndex = 0,
+                    endIndex = preview.repeatCount,
+                )?.let { aggregateRegion ->
+                    PulsingCuboidRenderer.renderOutlineBox(
+                        context = context,
+                        box = SelectionBounds.regionBox(aggregateRegion),
+                        outlineColor = destinationColor,
+                        lineWidth = lineWidth,
+                    )
+                }
+            }
             ClipboardSelectionRenderer.renderPulsePositions(
                 context = context,
                 positions = renderedWrites.asSequence().map { it.pos }.take(MAX_COLLISION_PULSE_BLOCKS).toList(),
                 outlineColor = destinationColor,
                 lineWidth = lineWidth,
-                minAlpha = 0,
-                maxAlpha = 110,
+                minAlpha = 16,
+                maxAlpha = 34,
             )
             GhostBlockPreviewRenderer.renderWrites(
                 context = context,
                 writes = renderedWrites,
                 color = destinationColor,
                 textured = true,
+                scale = GHOST_SCALE,
             )
         }
         renderArrow(context, preview)
     }
 
     private fun renderArrow(
-        context: WorldRenderContext,
+        context: AxionWorldRenderContext,
         preview: RepeatRegionPreview,
     ) {
         val arrowRegion = RepeatPreviewLayout.aggregateRegion(

@@ -20,9 +20,23 @@ abstract class MouseMixin {
     @Shadow
     private lateinit var client: MinecraftClient
 
-    @Inject(method = ["onMouseButton"], at = [At("HEAD")], cancellable = true)
-    private fun axionHandleMouseButton(window: Long, mouseInput: MouseInput, action: Int, ci: CallbackInfo) {
-        if (AxionAltMenuController.handleMouseButton(client, mouseInput.button(), action)) {
+    @Inject(method = ["onMouseButton(JIII)V"], at = [At("HEAD")], cancellable = true, require = 0)
+    private fun axionHandleMouseButtonLegacy(window: Long, button: Int, action: Int, mods: Int, ci: CallbackInfo) {
+        axionHandleMouseButton(button, action, ci)
+    }
+
+    @Inject(
+        method = ["onMouseButton(JLnet/minecraft/client/input/MouseInput;I)V"],
+        at = [At("HEAD")],
+        cancellable = true,
+        require = 0,
+    )
+    private fun axionHandleMouseButtonModern(window: Long, mouseInput: MouseInput, action: Int, ci: CallbackInfo) {
+        axionHandleMouseButton(mouseInput.button(), action, ci)
+    }
+
+    private fun axionHandleMouseButton(button: Int, action: Int, ci: CallbackInfo) {
+        if (AxionAltMenuController.handleMouseButton(client, button, action)) {
             ci.cancel()
             return
         }
@@ -31,7 +45,7 @@ abstract class MouseMixin {
             return
         }
 
-        val consumed = when (mouseInput.button()) {
+        val consumed = when (button) {
             GLFW.GLFW_MOUSE_BUTTON_LEFT -> ClientModeController.consumePrimaryAction(client)
             GLFW.GLFW_MOUSE_BUTTON_RIGHT -> ClientModeController.consumeSecondaryAction(client)
             else -> false

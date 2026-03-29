@@ -1,6 +1,7 @@
 package axion.client.config
 
 import axion.client.ui.FormattedNameText
+import axion.client.ui.drawStrokedRectangleCompat
 import net.minecraft.client.gui.DrawContext
 import net.minecraft.client.gui.screen.Screen
 import net.minecraft.client.gui.widget.ButtonWidget
@@ -187,7 +188,7 @@ class MagicSelectTemplateEditScreen(
             AxionClientConfig.customMaskIcons(row.mask).forEachIndexed { index, item ->
                 context.drawItem(item.defaultStack, row.contentX + (index * 18), row.y + 2)
             }
-            context.drawStrokedRectangle(
+            context.drawStrokedRectangleCompat(
                 row.toggleX,
                 row.y,
                 row.toggleWidth,

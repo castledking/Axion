@@ -2,9 +2,7 @@ package axion.client.render
 
 import axion.client.selection.SelectionBounds
 import axion.common.model.BlockRegion
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext
 import net.minecraft.client.MinecraftClient
-import net.minecraft.client.render.RenderLayers
 import net.minecraft.client.render.VertexConsumer
 import net.minecraft.util.math.Box
 import net.minecraft.util.math.Direction
@@ -24,19 +22,19 @@ object PreviewDirectionArrowRenderer {
     private const val Y_COLOR: Int = 0xFF50D26D.toInt()
     private const val Z_COLOR: Int = 0xFF5AA8FF.toInt()
 
-    fun render(context: WorldRenderContext, region: BlockRegion) {
+    fun render(context: AxionWorldRenderContext, region: BlockRegion) {
         val axisDirection = liveLookDirection() ?: return
         render(context, region, axisDirection.vector)
     }
 
-    fun render(context: WorldRenderContext, region: BlockRegion, direction: Vec3i) {
+    fun render(context: AxionWorldRenderContext, region: BlockRegion, direction: Vec3i) {
         val axis = dominantAxis(direction) ?: return
         val client = MinecraftClient.getInstance()
         val camera = client.gameRenderer.camera ?: return
         val consumers = context.consumers()
         val entry = context.matrices().peek()
         val cameraPos = camera.cameraPos
-        val consumer = consumers.getBuffer(RenderLayers.lightning())
+        val consumer = consumers.getBuffer(RenderLayerCompat.lightning())
         val box = SelectionBounds.outlineBox(SelectionBounds.regionBox(region.normalized()))
 
         val arrow = when (axis) {

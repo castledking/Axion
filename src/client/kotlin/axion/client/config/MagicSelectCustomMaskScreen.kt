@@ -1,8 +1,8 @@
 package axion.client.config
 
 import axion.client.ui.FormattedNameText
+import axion.client.ui.drawStrokedRectangleCompat
 import net.minecraft.block.Block
-import net.minecraft.client.gui.Click
 import net.minecraft.client.gui.DrawContext
 import net.minecraft.client.gui.screen.Screen
 import net.minecraft.client.gui.widget.ButtonWidget
@@ -201,44 +201,22 @@ class MagicSelectCustomMaskScreen(
             )
         }
 
+        tileBounds().forEach { tile ->
+            addDrawableChild(
+                ButtonWidget.builder(Text.empty()) {
+                    toggleTile(tile.entry)
+                    clearAndInit()
+                }.dimensions(tile.x, tile.y, tile.size, tile.size).build().apply {
+                    setAlpha(0f)
+                },
+            )
+        }
+
         updatePagingButtons()
     }
 
     override fun close() {
         client?.setScreen(parent)
-    }
-
-    override fun mouseClicked(click: Click, doubled: Boolean): Boolean {
-        if (super.mouseClicked(click, doubled)) {
-            return true
-        }
-
-        tileBounds().firstOrNull { it.contains(click.x(), click.y()) }?.let { tile ->
-            val blockId = tile.entry.id.toString()
-            val selectedByRule = selectedRuleIds
-                .mapNotNull(MagicSelectRule::fromId)
-                .any { rule -> rule.includes(tile.entry.block.defaultState) }
-            val selectedByCustom = blockId in selectedBlockIds
-            val selectedByEffectiveState = isBlockSelected(blockId, tile.entry.block.defaultState)
-
-            if (selectedByEffectiveState) {
-                if (selectedByCustom) {
-                    selectedBlockIds.remove(blockId)
-                }
-                if (selectedByRule) {
-                    excludedBlockIds.add(blockId)
-                }
-            } else if (selectedByRule && blockId in excludedBlockIds) {
-                excludedBlockIds.remove(blockId)
-            } else {
-                excludedBlockIds.remove(blockId)
-                selectedBlockIds.add(blockId)
-            }
-            clearAndInit()
-            return true
-        }
-
-        return false
     }
 
     override fun render(context: DrawContext, mouseX: Int, mouseY: Int, deltaTicks: Float) {
@@ -294,7 +272,7 @@ class MagicSelectCustomMaskScreen(
         tileBounds().forEach { tile ->
             val selected = isBlockSelected(tile.entry.id.toString(), tile.entry.block.defaultState)
             context.fill(tile.x, tile.y, tile.x + tile.size, tile.y + tile.size, 0xAA1A1A1A.toInt())
-            context.drawStrokedRectangle(
+            context.drawStrokedRectangleCompat(
                 tile.x,
                 tile.y,
                 tile.size,
@@ -324,6 +302,29 @@ class MagicSelectCustomMaskScreen(
         }
         return allBlocks.filter { entry ->
             entry.label.contains(query) || entry.id.toString().contains(query)
+        }
+    }
+
+    private fun toggleTile(entry: BlockEntry) {
+        val blockId = entry.id.toString()
+        val selectedByRule = selectedRuleIds
+            .mapNotNull(MagicSelectRule::fromId)
+            .any { rule -> rule.includes(entry.block.defaultState) }
+        val selectedByCustom = blockId in selectedBlockIds
+        val selectedByEffectiveState = isBlockSelected(blockId, entry.block.defaultState)
+
+        if (selectedByEffectiveState) {
+            if (selectedByCustom) {
+                selectedBlockIds.remove(blockId)
+            }
+            if (selectedByRule) {
+                excludedBlockIds.add(blockId)
+            }
+        } else if (selectedByRule && blockId in excludedBlockIds) {
+            excludedBlockIds.remove(blockId)
+        } else {
+            excludedBlockIds.remove(blockId)
+            selectedBlockIds.add(blockId)
         }
     }
 

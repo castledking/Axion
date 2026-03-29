@@ -23,7 +23,6 @@ Axion is an open-source Minecraft building toolkit inspired by Axiom, built as a
 
 <p align="center">
   <img alt="Requires Paper 1.21.11" src="https://img.shields.io/badge/Requires-Paper%201.21.11-white?style=for-the-badge">
-  <img alt="Optional PacketEvents" src="https://img.shields.io/badge/Optional-PacketEvents-ef4444?style=for-the-badge">
 </p>
 
 ## What Is Axion?

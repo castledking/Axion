@@ -295,15 +295,8 @@ object PlacementToolController {
                 state.firstCorner,
                 state.secondCorner,
             )
-            is CloneToolState.PreviewingOffset -> SelectionState.RegionDefined(
-                state.preview.firstCorner,
-                state.preview.sourceRegion.oppositeCorner(state.preview.firstCorner),
-            )
-
-            is CloneToolState.AwaitingConfirm -> SelectionState.RegionDefined(
-                state.preview.firstCorner,
-                state.preview.sourceRegion.oppositeCorner(state.preview.firstCorner),
-            )
+            is CloneToolState.PreviewingOffset -> SelectionState.Idle
+            is CloneToolState.AwaitingConfirm -> SelectionState.Idle
         }
 
         AxionClientState.updateSelection(selectionState)

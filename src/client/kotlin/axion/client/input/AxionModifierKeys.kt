@@ -6,7 +6,9 @@ import org.lwjgl.glfw.GLFW
 
 object AxionModifierKeys {
     fun isAltDown(client: MinecraftClient = MinecraftClient.getInstance()): Boolean {
-        return client.isAltPressed
+        val handle = client.window.handle
+        return GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_LEFT_ALT) == GLFW.GLFW_PRESS ||
+            GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_RIGHT_ALT) == GLFW.GLFW_PRESS
     }
 
     fun isControlDown(client: MinecraftClient = MinecraftClient.getInstance()): Boolean {

@@ -5,7 +5,6 @@ import axion.common.operation.CloneEntitiesOperation
 import axion.common.operation.EntityMoveMirrorAxis
 import net.minecraft.entity.Entity
 import net.minecraft.entity.EntityType
-import net.minecraft.entity.LoadedEntityProcessor
 import net.minecraft.entity.SpawnReason
 import net.minecraft.entity.player.PlayerEntity
 import net.minecraft.nbt.NbtCompound
@@ -67,7 +66,7 @@ object LocalEntityCloneService {
             val parentId = clone.parentEntityId ?: return@forEach
             val child = spawned[clone.entityId] ?: return@forEach
             val parent = spawned[parentId] ?: return@forEach
-            child.startRiding(parent, true, true)
+            startRidingCompat(child, parent)
         }
         spawned.values
             .filter { it.vehicle == null }
@@ -84,11 +83,11 @@ object LocalEntityCloneService {
     private fun spawnClone(world: ServerWorld, clone: EntityCloneChange): Entity? {
         val tag = clone.entityData.copy()
         stripUuids(tag)
-        val entity = EntityType.loadEntityWithPassengers(tag, world, SpawnReason.COMMAND, LoadedEntityProcessor { entity ->
+        val entity = EntityType.loadEntityWithPassengers(tag, world, SpawnReason.COMMAND) { entity ->
             entity.setUuid(clone.entityId)
             entity.refreshPositionAndAngles(clone.pos.x, clone.pos.y, clone.pos.z, clone.yaw, clone.pitch)
             entity
-        }) ?: return null
+        } ?: return null
         world.spawnNewEntityAndPassengers(entity)
         return entity
     }
@@ -178,6 +177,13 @@ object LocalEntityCloneService {
             entity.updatePassengerPosition(passenger)
             refreshPassengerPositions(passenger)
         }
+    }
+
+    private fun startRidingCompat(child: Entity, parent: Entity) {
+        val startRidingMethods = child.javaClass.methods.filter { it.name == "startRiding" }
+        startRidingMethods.firstOrNull { it.parameterCount == 3 }?.invoke(child, parent, true, true)?.let { return }
+        startRidingMethods.firstOrNull { it.parameterCount == 2 }?.invoke(child, parent, true)?.let { return }
+        startRidingMethods.firstOrNull { it.parameterCount == 1 }?.invoke(child, parent)
     }
 
     private fun transformEntity(

@@ -3,6 +3,7 @@ package axion.client.hotbar
 import axion.client.AxionClientState
 import axion.client.input.AxionModifierKeys
 import axion.client.tool.AxionToolSelectionController
+import axion.client.ui.drawStrokedRectangleCompat
 import axion.common.model.AxionSubtool
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.gui.DrawContext
@@ -111,7 +112,7 @@ object AxionHotbarHud {
         val borderColor = if (selected) BORDER_SELECTED else BORDER_NEUTRAL
         context.fill(x, y, x + size, y + size, OUTER_BACKGROUND)
         context.fill(x + 2, y + 2, x + size - 2, y + size - 2, INNER_BACKGROUND)
-        context.drawStrokedRectangle(x, y, size, size, borderColor)
+        context.drawStrokedRectangleCompat(x, y, size, size, borderColor)
         context.drawCenteredTextWithShadow(
             MinecraftClient.getInstance().textRenderer,
             label,
@@ -139,7 +140,7 @@ object AxionHotbarHud {
             context.fill(bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + bounds.height, OUTER_BACKGROUND)
             context.fill(bounds.x + 1, bounds.y + 1, bounds.x + bounds.width - 1, bounds.y + bounds.height - 1, INNER_BACKGROUND)
             renderSavedHotbarItems(context, bounds.x + 1, bounds.y + 1, display.stacks)
-            context.drawStrokedRectangle(bounds.x, bounds.y, bounds.width, bounds.height, borderColor)
+            context.drawStrokedRectangleCompat(bounds.x, bounds.y, bounds.width, bounds.height, borderColor)
         }
 
         val topBounds = rowBounds.last()
@@ -162,7 +163,7 @@ object AxionHotbarHud {
         stacks.take(9).forEachIndexed { index, stack ->
             val slotX = startX + (index * 20)
             val slotWidth = if (index == 8) 20 else 19
-            context.drawStrokedRectangle(slotX, startY, slotWidth, 19, 0xFF6A6A6A.toInt())
+            context.drawStrokedRectangleCompat(slotX, startY, slotWidth, 19, 0xFF6A6A6A.toInt())
             if (!stack.isEmpty) {
                 context.drawItem(stack, slotX + 2, startY + 2)
                 context.drawStackOverlay(MinecraftClient.getInstance().textRenderer, stack, slotX + 2, startY + 2)
@@ -185,7 +186,7 @@ object AxionHotbarHud {
             val borderColor = if (isHovered) BORDER_HOVER else BORDER_NEUTRAL
             context.fill(button.x, button.y, button.x + button.width, button.y + button.height, OUTER_BACKGROUND)
             context.fill(button.x + 1, button.y + 1, button.x + button.width - 1, button.y + button.height - 1, INNER_BACKGROUND)
-            context.drawStrokedRectangle(button.x, button.y, button.width, button.height, borderColor)
+            context.drawStrokedRectangleCompat(button.x, button.y, button.width, button.height, borderColor)
             context.drawCenteredTextWithShadow(
                 client.textRenderer,
                 if (button.direction > 0) "↑" else "↓",
@@ -214,7 +215,7 @@ object AxionHotbarHud {
             val textColor = if (highlighted || hover) TEXT_SELECTED else TEXT_IDLE
 
             context.fill(entry.x, entry.y, entry.x + entry.width, entry.y + entry.height, OUTER_BACKGROUND)
-            context.drawStrokedRectangle(entry.x, entry.y, entry.width, entry.height, borderColor)
+            context.drawStrokedRectangleCompat(entry.x, entry.y, entry.width, entry.height, borderColor)
             context.drawTextWithShadow(
                 textRenderer,
                 entry.subtool.shortLabel,
@@ -249,7 +250,7 @@ object AxionHotbarHud {
         val label = if (enabled) "MMB: Magic Select" else "MMB: Extend Face"
 
         context.fill(bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + bounds.height, OUTER_BACKGROUND)
-        context.drawStrokedRectangle(bounds.x, bounds.y, bounds.width, bounds.height, borderColor)
+        context.drawStrokedRectangleCompat(bounds.x, bounds.y, bounds.width, bounds.height, borderColor)
         context.drawCenteredTextWithShadow(
             textRenderer,
             label,
@@ -276,7 +277,7 @@ object AxionHotbarHud {
         val label = if (enabled) "Keep Existing: ON" else "Keep Existing: OFF"
 
         context.fill(bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + bounds.height, OUTER_BACKGROUND)
-        context.drawStrokedRectangle(bounds.x, bounds.y, bounds.width, bounds.height, borderColor)
+        context.drawStrokedRectangleCompat(bounds.x, bounds.y, bounds.width, bounds.height, borderColor)
         context.drawCenteredTextWithShadow(
             textRenderer,
             label,
@@ -303,7 +304,7 @@ object AxionHotbarHud {
         val label = if (enabled) "Copy Entities: ON" else "Copy Entities: OFF"
 
         context.fill(bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + bounds.height, OUTER_BACKGROUND)
-        context.drawStrokedRectangle(bounds.x, bounds.y, bounds.width, bounds.height, borderColor)
+        context.drawStrokedRectangleCompat(bounds.x, bounds.y, bounds.width, bounds.height, borderColor)
         context.drawCenteredTextWithShadow(
             textRenderer,
             label,
@@ -330,7 +331,7 @@ object AxionHotbarHud {
         val label = if (enabled) "Copy Air: ON" else "Copy Air: OFF"
 
         context.fill(bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + bounds.height, OUTER_BACKGROUND)
-        context.drawStrokedRectangle(bounds.x, bounds.y, bounds.width, bounds.height, borderColor)
+        context.drawStrokedRectangleCompat(bounds.x, bounds.y, bounds.width, bounds.height, borderColor)
         context.drawCenteredTextWithShadow(
             textRenderer,
             label,

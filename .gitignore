@@ -29,3 +29,6 @@ MANIFEST.MF
 !src/main/resources/**
 !src/client/resources/**
 !paper-plugin/src/main/resources/**
+RELEASE-*.md
+PLAN-*.md
+*.log

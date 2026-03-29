@@ -64,7 +64,7 @@ object PaperEntityCloneService {
                     val parentId = clone.parentEntityId ?: return@forEach
                     val child = spawned[clone.entityId] ?: return@forEach
                     val parent = spawned[parentId] ?: return@forEach
-                    child.startRiding(parent, true, true)
+                    startRidingCompat(child, parent)
                 }
                 spawned.values
                     .filter { it.vehicle == null }
@@ -91,7 +91,7 @@ object PaperEntityCloneService {
             val parentId = clone.parentEntityId ?: return@forEach
             val child = spawned[clone.entityId] ?: return@forEach
             val parent = spawned[parentId] ?: return@forEach
-            child.startRiding(parent, true, true)
+            startRidingCompat(child, parent)
         }
         spawned.values
             .filter { it.vehicle == null }
@@ -146,6 +146,16 @@ object PaperEntityCloneService {
             current = current.vehicle!!
         }
         return current
+    }
+
+    private fun startRidingCompat(
+        child: net.minecraft.world.entity.Entity,
+        parent: net.minecraft.world.entity.Entity,
+    ) {
+        val startRidingMethods = child.javaClass.methods.filter { it.name == "startRiding" }
+        startRidingMethods.firstOrNull { it.parameterCount == 3 }?.invoke(child, parent, true, true)?.let { return }
+        startRidingMethods.firstOrNull { it.parameterCount == 2 }?.invoke(child, parent, true)?.let { return }
+        startRidingMethods.firstOrNull { it.parameterCount == 1 }?.invoke(child, parent)
     }
 
     private fun planEntityTree(

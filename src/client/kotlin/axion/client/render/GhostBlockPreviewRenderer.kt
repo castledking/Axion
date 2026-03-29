@@ -2,20 +2,16 @@ package axion.client.render
 
 import axion.client.network.BlockWrite
 import axion.common.model.ClipboardBuffer
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext
 import net.minecraft.block.ShapeContext
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.render.LightmapTextureManager
 import net.minecraft.client.render.OverlayTexture
 import net.minecraft.client.render.RenderLayer
-import net.minecraft.client.render.RenderLayers
 import net.minecraft.client.render.VertexConsumer
 import net.minecraft.client.render.VertexConsumerProvider
 import net.minecraft.client.util.math.MatrixStack
-import net.minecraft.client.render.model.BlockModelPart
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Box
-import net.minecraft.util.math.random.Random
 
 object GhostBlockPreviewRenderer {
     private const val GHOST_ALPHA: Int = 44
@@ -30,12 +26,14 @@ object GhostBlockPreviewRenderer {
     }
 
     fun render(
-        context: WorldRenderContext,
+        context: AxionWorldRenderContext,
         clipboard: ClipboardBuffer,
         origins: Collection<BlockPos>,
         color: Int = DEFAULT_GHOST_COLOR,
         alpha: Int = GHOST_ALPHA,
         textured: Boolean = false,
+        fullBlock: Boolean = false,
+        scale: Float = 1.0f,
     ) {
         if (origins.isEmpty()) {
             return
@@ -55,7 +53,7 @@ object GhostBlockPreviewRenderer {
         }
 
         if (textured) {
-            renderTextured(context, occupiedCells, boundedOrigins, alpha)
+            renderTextured(context, occupiedCells, boundedOrigins, alpha, scale, color)
             return
         }
 
@@ -63,7 +61,8 @@ object GhostBlockPreviewRenderer {
         val world = client.world ?: return
         val camera = client.gameRenderer.camera ?: return
         val consumers = context.consumers()
-        val consumer = consumers.getBuffer(RenderLayers.debugFilledBox())
+        val fillLayer = RenderLayerCompat.debugQuads()
+        val consumer = consumers.getBuffer(fillLayer)
         val cameraPos = camera.cameraPos
         val matrixStack = context.matrices()
         val shapeContext = ShapeContext.absent()
@@ -71,38 +70,19 @@ object GhostBlockPreviewRenderer {
         boundedOrigins.forEach { origin ->
             occupiedCells.forEach { cell ->
                 val blockPos = cell.absolutePos(origin)
-                val shape = cell.state.getOutlineShape(world, blockPos, shapeContext)
-                if (shape.isEmpty) {
-                    return@forEach
-                }
-
-                shape.forEachBox { minX, minY, minZ, maxX, maxY, maxZ ->
-                    PulsingCuboidRenderer.renderFilledBox(
-                        matrixStack = matrixStack,
-                        consumer = consumer,
-                        cameraPos = cameraPos,
-                        box = Box(
-                            blockPos.x + minX,
-                            blockPos.y + minY,
-                            blockPos.z + minZ,
-                            blockPos.x + maxX,
-                            blockPos.y + maxY,
-                            blockPos.z + maxZ,
-                        ),
-                        alpha = alpha,
-                        color = color,
-                    )
-                }
+                renderShapeBoxes(world, matrixStack, consumer, fillLayer, cameraPos, blockPos, cell.state, alpha, color, fullBlock, shapeContext)
             }
         }
     }
 
     fun renderWrites(
-        context: WorldRenderContext,
+        context: AxionWorldRenderContext,
         writes: Collection<BlockWrite>,
         color: Int = DEFAULT_GHOST_COLOR,
         alpha: Int = GHOST_ALPHA,
         textured: Boolean = false,
+        fullBlock: Boolean = false,
+        scale: Float = 1.0f,
     ) {
         if (writes.isEmpty()) {
             return
@@ -117,7 +97,7 @@ object GhostBlockPreviewRenderer {
         }
 
         if (textured) {
-            renderTexturedWrites(context, boundedWrites, alpha)
+            renderTexturedWrites(context, boundedWrites, alpha, scale, color)
             return
         }
 
@@ -125,43 +105,24 @@ object GhostBlockPreviewRenderer {
         val world = client.world ?: return
         val camera = client.gameRenderer.camera ?: return
         val consumers = context.consumers()
-        val consumer = consumers.getBuffer(RenderLayers.debugFilledBox())
+        val fillLayer = RenderLayerCompat.debugQuads()
+        val consumer = consumers.getBuffer(fillLayer)
         val cameraPos = camera.cameraPos
         val matrixStack = context.matrices()
         val shapeContext = ShapeContext.absent()
 
         boundedWrites.forEach { write ->
-            val blockPos = write.pos
-            val shape = write.state.getOutlineShape(world, blockPos, shapeContext)
-            if (shape.isEmpty) {
-                return@forEach
-            }
-
-            shape.forEachBox { minX, minY, minZ, maxX, maxY, maxZ ->
-                PulsingCuboidRenderer.renderFilledBox(
-                    matrixStack = matrixStack,
-                    consumer = consumer,
-                    cameraPos = cameraPos,
-                    box = Box(
-                        blockPos.x + minX,
-                        blockPos.y + minY,
-                        blockPos.z + minZ,
-                        blockPos.x + maxX,
-                        blockPos.y + maxY,
-                        blockPos.z + maxZ,
-                    ),
-                    alpha = alpha,
-                    color = color,
-                )
-            }
+            renderShapeBoxes(world, matrixStack, consumer, fillLayer, cameraPos, write.pos, write.state, alpha, color, fullBlock, shapeContext)
         }
     }
 
     private fun renderTextured(
-        context: WorldRenderContext,
+        context: AxionWorldRenderContext,
         occupiedCells: List<axion.common.model.ClipboardCell>,
         origins: List<BlockPos>,
         alpha: Int,
+        scale: Float,
+        color: Int,
     ) {
         val client = MinecraftClient.getInstance()
         val world = client.world ?: return
@@ -171,31 +132,24 @@ object GhostBlockPreviewRenderer {
         val cameraPos = camera.cameraPos
         val blockRenderManager = client.blockRenderManager
         val alphaScale = alpha / 255.0f
-        val consumer = AlphaVertexConsumer(consumers.getBuffer(RenderLayers.translucentMovingBlock()), alphaScale)
-        val random = Random.create(0L)
+        val alphaConsumers = TintedAlphaVertexConsumerProvider(consumers, alphaScale, color)
 
         origins.forEach { origin ->
             occupiedCells.forEach { cell ->
                 val blockPos = cell.absolutePos(origin)
-                val model = blockRenderManager.getModel(cell.state)
-                val parts = mutableListOf<BlockModelPart>()
-                random.setSeed(cell.state.hashCode().toLong())
-                model.addParts(random, parts)
-                if (parts.isEmpty()) {
-                    return@forEach
-                }
                 matrixStack.push()
                 matrixStack.translate(
                     blockPos.x - cameraPos.x,
                     blockPos.y - cameraPos.y,
                     blockPos.z - cameraPos.z,
                 )
-                renderTexturedParts(
-                    matrixStack = matrixStack,
-                    consumer = consumer,
-                    parts = parts,
-                    light = LightmapTextureManager.MAX_LIGHT_COORDINATE,
-                    overlay = OverlayTexture.DEFAULT_UV,
+                applyScale(matrixStack, scale)
+                blockRenderManager.renderBlockAsEntity(
+                    cell.state,
+                    matrixStack,
+                    alphaConsumers,
+                    LightmapTextureManager.MAX_LIGHT_COORDINATE,
+                    OverlayTexture.DEFAULT_UV,
                 )
                 matrixStack.pop()
             }
@@ -203,83 +157,155 @@ object GhostBlockPreviewRenderer {
     }
 
     private fun renderTexturedWrites(
-        context: WorldRenderContext,
+        context: AxionWorldRenderContext,
         writes: List<BlockWrite>,
         alpha: Int,
+        scale: Float,
+        color: Int,
     ) {
         val client = MinecraftClient.getInstance()
+        val world = client.world ?: return
         val consumers = context.consumers()
         val matrixStack = context.matrices()
         val camera = client.gameRenderer.camera ?: return
         val cameraPos = camera.cameraPos
         val blockRenderManager = client.blockRenderManager
         val alphaScale = alpha / 255.0f
-        val consumer = AlphaVertexConsumer(consumers.getBuffer(RenderLayers.translucentMovingBlock()), alphaScale)
-        val random = Random.create(0L)
+        val alphaConsumers = TintedAlphaVertexConsumerProvider(consumers, alphaScale, color)
 
         writes.forEach { write ->
-            val model = blockRenderManager.getModel(write.state)
-            val parts = mutableListOf<BlockModelPart>()
-            random.setSeed(write.state.hashCode().toLong())
-            model.addParts(random, parts)
-            if (parts.isEmpty()) {
-                return@forEach
-            }
             matrixStack.push()
             matrixStack.translate(
                 write.pos.x - cameraPos.x,
                 write.pos.y - cameraPos.y,
                 write.pos.z - cameraPos.z,
             )
-            renderTexturedParts(
-                matrixStack = matrixStack,
-                consumer = consumer,
-                parts = parts,
-                light = LightmapTextureManager.MAX_LIGHT_COORDINATE,
-                overlay = OverlayTexture.DEFAULT_UV,
+            applyScale(matrixStack, scale)
+            blockRenderManager.renderBlockAsEntity(
+                write.state,
+                matrixStack,
+                alphaConsumers,
+                LightmapTextureManager.MAX_LIGHT_COORDINATE,
+                OverlayTexture.DEFAULT_UV,
             )
             matrixStack.pop()
         }
     }
 
-    private fun renderTexturedParts(
-        matrixStack: MatrixStack,
-        consumer: VertexConsumer,
-        parts: List<BlockModelPart>,
-        light: Int,
-        overlay: Int,
-    ) {
-        val entry = matrixStack.peek()
-        parts.forEach { part ->
-            part.getQuads(null).forEach { quad ->
-                consumer.quad(entry, quad, 1.0f, 1.0f, 1.0f, 1.0f, light, overlay)
-            }
-            net.minecraft.util.math.Direction.entries.forEach { direction ->
-                part.getQuads(direction).forEach { quad ->
-                    consumer.quad(entry, quad, 1.0f, 1.0f, 1.0f, 1.0f, light, overlay)
-                }
-            }
-        }
-    }
-
-    private class AlphaVertexConsumer(
+    private class TintedAlphaVertexConsumer(
         private val delegate: VertexConsumer,
         private val alphaScale: Float,
+        tintColor: Int,
     ) : VertexConsumer by delegate {
+        private val tintRed = (tintColor shr 16) and 0xFF
+        private val tintGreen = (tintColor shr 8) and 0xFF
+        private val tintBlue = tintColor and 0xFF
+
         override fun color(red: Int, green: Int, blue: Int, alpha: Int): VertexConsumer {
-            delegate.color(red, green, blue, scaledAlpha(alpha))
+            delegate.color(
+                tinted(red, tintRed),
+                tinted(green, tintGreen),
+                tinted(blue, tintBlue),
+                scaledAlpha(alpha),
+            )
             return this
         }
 
         override fun color(color: Int): VertexConsumer {
             val alpha = scaledAlpha((color ushr 24) and 0xFF)
-            val rgb = color and 0x00FFFFFF
-            delegate.color((alpha shl 24) or rgb)
+            val red = tinted((color shr 16) and 0xFF, tintRed)
+            val green = tinted((color shr 8) and 0xFF, tintGreen)
+            val blue = tinted(color and 0xFF, tintBlue)
+            delegate.color((alpha shl 24) or (red shl 16) or (green shl 8) or blue)
             return this
         }
 
         private fun scaledAlpha(alpha: Int): Int {
             return (alpha * alphaScale).toInt().coerceIn(0, 255)
+        }
+
+        private fun tinted(channel: Int, tint: Int): Int {
+            val lifted = mix(channel, 255, 0.5f)
+            return mix(lifted, tint, 0.35f)
+        }
+
+        private fun mix(from: Int, to: Int, amount: Float): Int {
+            return (from + (to - from) * amount).toInt().coerceIn(0, 255)
+        }
+    }
+
+    private fun applyScale(matrixStack: MatrixStack, scale: Float) {
+        if (scale == 1.0f) {
+            return
+        }
+        matrixStack.translate(0.5, 0.5, 0.5)
+        matrixStack.scale(scale, scale, scale)
+        matrixStack.translate(-0.5, -0.5, -0.5)
+    }
+
+    private fun renderShapeBoxes(
+        world: net.minecraft.client.world.ClientWorld,
+        matrixStack: MatrixStack,
+        consumer: VertexConsumer,
+        layer: RenderLayer,
+        cameraPos: net.minecraft.util.math.Vec3d,
+        blockPos: BlockPos,
+        state: net.minecraft.block.BlockState,
+        alpha: Int,
+        color: Int,
+        fullBlock: Boolean,
+        shapeContext: ShapeContext,
+    ) {
+        if (fullBlock) {
+            PulsingCuboidRenderer.renderFilledBox(
+                matrixStack = matrixStack,
+                consumer = consumer,
+                layer = layer,
+                cameraPos = cameraPos,
+                box = Box(
+                    blockPos.x.toDouble(),
+                    blockPos.y.toDouble(),
+                    blockPos.z.toDouble(),
+                    blockPos.x + 1.0,
+                    blockPos.y + 1.0,
+                    blockPos.z + 1.0,
+                ),
+                alpha = alpha,
+                color = color,
+            )
+            return
+        }
+
+        val shape = state.getOutlineShape(world, blockPos, shapeContext)
+        if (shape.isEmpty) return
+
+        shape.forEachBox { minX, minY, minZ, maxX, maxY, maxZ ->
+            PulsingCuboidRenderer.renderFilledBox(
+                matrixStack = matrixStack,
+                consumer = consumer,
+                layer = layer,
+                cameraPos = cameraPos,
+                box = Box(
+                    blockPos.x + minX,
+                    blockPos.y + minY,
+                    blockPos.z + minZ,
+                    blockPos.x + maxX,
+                    blockPos.y + maxY,
+                    blockPos.z + maxZ,
+                ),
+                alpha = alpha,
+                color = color,
+            )
+        }
+    }
+
+    private class TintedAlphaVertexConsumerProvider(
+        private val delegate: VertexConsumerProvider,
+        private val alphaScale: Float,
+        private val tintColor: Int,
+    ) : VertexConsumerProvider {
+        override fun getBuffer(layer: RenderLayer): VertexConsumer {
+            return TintedAlphaVertexConsumer(delegate.getBuffer(layer), alphaScale, tintColor)
         }
     }
 }

@@ -2,17 +2,16 @@ package axion.client.render
 
 import axion.client.AxionClientState
 import axion.common.model.SymmetryState
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext
 import net.minecraft.client.MinecraftClient
-import net.minecraft.client.render.RenderLayers
 import net.minecraft.util.math.Box
+import net.minecraft.util.shape.VoxelShapes
 
 object SymmetryGizmoRenderer {
     private const val GIZMO_COLOR: Int = 0xFFF2C94C.toInt()
-    private const val GIZMO_ALPHA: Int = 138
     private const val HALF_SIZE: Double = 2.0 / 16.0
+    private const val LINE_WIDTH: Float = 1.5f
 
-    fun render(context: WorldRenderContext) {
+    fun render(context: AxionWorldRenderContext) {
         val state = AxionClientState.symmetryState
         val config = when (state) {
             SymmetryState.Inactive -> return
@@ -25,14 +24,15 @@ object SymmetryGizmoRenderer {
         val consumers = context.consumers()
         val matrixStack = context.matrices()
         val box = gizmoBox(config.anchor.position)
-
-        PulsingCuboidRenderer.renderFilledBox(
-            matrixStack = matrixStack,
-            consumer = consumers.getBuffer(RenderLayers.lightning()),
-            cameraPos = cameraPos,
-            box = box,
-            alpha = GIZMO_ALPHA,
-            color = GIZMO_COLOR,
+        VertexRenderingCompat.drawOutline(
+            matrixStack,
+            consumers.getBuffer(RenderLayerCompat.lines()),
+            VoxelShapes.cuboid(box),
+            -cameraPos.x,
+            -cameraPos.y,
+            -cameraPos.z,
+            GIZMO_COLOR,
+            LINE_WIDTH,
         )
     }
 

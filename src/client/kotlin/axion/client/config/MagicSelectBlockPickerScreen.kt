@@ -1,7 +1,7 @@
 package axion.client.config
 
+import axion.client.ui.drawStrokedRectangleCompat
 import net.minecraft.block.Block
-import net.minecraft.client.gui.Click
 import net.minecraft.client.gui.DrawContext
 import net.minecraft.client.gui.screen.Screen
 import net.minecraft.client.gui.widget.ButtonWidget
@@ -106,29 +106,21 @@ class MagicSelectBlockPickerScreen(
             },
         )
 
+        tileBounds().forEach { tile ->
+            addDrawableChild(
+                ButtonWidget.builder(Text.empty()) {
+                    toggleTile(tile.entry)
+                }.dimensions(tile.x, tile.y, tile.size, tile.size).build().apply {
+                    setAlpha(0f)
+                },
+            )
+        }
+
         updatePagingButtons()
     }
 
     override fun close() {
         client?.setScreen(parent)
-    }
-
-    override fun mouseClicked(click: Click, doubled: Boolean): Boolean {
-        if (super.mouseClicked(click, doubled)) {
-            return true
-        }
-
-        tileBounds().firstOrNull { it.contains(click.x(), click.y()) }?.let { tile ->
-            val blockId = tile.entry.id.toString()
-            if (blockId in selectedBlockIds) {
-                selectedBlockIds.remove(blockId)
-            } else {
-                selectedBlockIds.add(blockId)
-            }
-            return true
-        }
-
-        return false
     }
 
     override fun render(context: DrawContext, mouseX: Int, mouseY: Int, deltaTicks: Float) {
@@ -150,7 +142,7 @@ class MagicSelectBlockPickerScreen(
         tileBounds().forEach { tile ->
             val selected = tile.entry.id.toString() in selectedBlockIds
             context.fill(tile.x, tile.y, tile.x + tile.size, tile.y + tile.size, 0xAA1A1A1A.toInt())
-            context.drawStrokedRectangle(
+            context.drawStrokedRectangleCompat(
                 tile.x,
                 tile.y,
                 tile.size,
@@ -214,6 +206,15 @@ class MagicSelectBlockPickerScreen(
                 y = startY + (row * (TILE_SIZE + TILE_GAP)),
                 size = TILE_SIZE,
             )
+        }
+    }
+
+    private fun toggleTile(entry: BlockEntry) {
+        val blockId = entry.id.toString()
+        if (blockId in selectedBlockIds) {
+            selectedBlockIds.remove(blockId)
+        } else {
+            selectedBlockIds.add(blockId)
         }
     }
 

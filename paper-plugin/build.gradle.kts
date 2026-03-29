@@ -5,6 +5,7 @@ plugins {
 
 group = rootProject.group
 version = rootProject.version
+val minecraftVersion = rootProject.property("minecraft_version") as String
 
 base {
     archivesName.set("axion-plugin")
@@ -39,6 +40,7 @@ tasks.processResources {
 }
 
 tasks.jar {
+    archiveFileName.set("AxionPaper-v${project.version}-mc${minecraftVersion}.jar")
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     from({
         configurations.runtimeClasspath.get()

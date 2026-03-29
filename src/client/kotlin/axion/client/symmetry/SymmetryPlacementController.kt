@@ -8,6 +8,7 @@ import axion.client.symmetry.SymmetryAwareOperationDispatcher
 import axion.common.model.SymmetryConfig
 import axion.common.model.SymmetryState
 import net.minecraft.client.MinecraftClient
+import net.minecraft.sound.SoundCategory
 import net.minecraft.util.Hand
 
 object SymmetryPlacementController {
@@ -41,6 +42,7 @@ object SymmetryPlacementController {
         }
 
         dispatcher.dispatch(operation)
+        playPlacementEffects(client, operation)
         client.player?.swingHand(Hand.MAIN_HAND)
         return true
     }
@@ -49,6 +51,26 @@ object SymmetryPlacementController {
         return when (val state = AxionClientState.symmetryState) {
             SymmetryState.Inactive -> null
             is SymmetryState.Active -> state.config
+        }
+    }
+
+    private fun playPlacementEffects(
+        client: MinecraftClient,
+        operation: axion.common.operation.SymmetryPlacementOperation,
+    ) {
+        val world = client.world ?: return
+        operation.placements.forEach { placement ->
+            val soundGroup = placement.state.soundGroup
+            world.playSoundClient(
+                placement.pos.x + 0.5,
+                placement.pos.y + 0.5,
+                placement.pos.z + 0.5,
+                soundGroup.placeSound,
+                SoundCategory.BLOCKS,
+                (soundGroup.volume + 1.0f) / 2.0f,
+                soundGroup.pitch * 0.8f,
+                false,
+            )
         }
     }
 }

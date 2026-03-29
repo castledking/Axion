@@ -4,6 +4,7 @@ import axion.client.config.AxionConfigScreen
 import axion.client.config.MagicSelectCustomMaskScreen
 import axion.client.config.MagicSelectMaskConfigScreen
 import axion.client.config.MagicSelectTemplateEditScreen
+import axion.client.ui.drawStrokedRectangleCompat
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.gui.DrawContext
 import net.minecraft.client.font.TextRenderer
@@ -44,7 +45,7 @@ object AxionToolHintHud {
         val y = context.scaledWindowHeight - PANEL_BOTTOM_MARGIN - height
 
         context.fill(x, y, x + width, y + height, PANEL_BACKGROUND)
-        context.drawStrokedRectangle(x, y, width, height, PANEL_BORDER)
+        context.drawStrokedRectangleCompat(x, y, width, height, PANEL_BORDER)
 
         var cursorY = y + PADDING
         cursorY = drawHeader(context, textRenderer, panel, x, cursorY, lineHeight)
