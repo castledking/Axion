@@ -31,15 +31,20 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Build release artifacts
+        if: github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v')
+        run: ./build-axion.sh all
+
       - name: Build project
+        if: github.event_name != 'release'
         run: ./gradlew clean build :paper-plugin:jar
 
       - name: Collect release jars
         if: github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v')
         run: |
           mkdir -p release-artifacts
-          cp "$(find build/libs -maxdepth 1 -type f -name 'axion-*.jar' ! -name '*-sources.jar' | head -n1)" release-artifacts/
-          cp "$(find paper-plugin/build/libs -maxdepth 1 -type f -name 'axion-plugin-*.jar' | head -n1)" release-artifacts/
+          find build/libs -mindepth 2 -maxdepth 2 -type f -name 'Axion-v*.jar' -exec cp {} release-artifacts/ \;
+          find paper-plugin/build/libs -mindepth 2 -maxdepth 2 -type f -name 'AxionPaper-v*.jar' -exec cp {} release-artifacts/ \;
 
       - name: Upload release jars
         if: github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v')
