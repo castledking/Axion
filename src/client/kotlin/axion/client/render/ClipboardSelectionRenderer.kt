@@ -16,6 +16,8 @@ import java.util.WeakHashMap
 object ClipboardSelectionRenderer {
     private const val BASE_OVERLAY_SCALE: Float = 0.996f
     private const val PULSE_OVERLAY_SCALE: Float = 0.992f
+    private const val MAX_BASE_OVERLAY_CELLS: Int = 4096
+    private const val MAX_PULSE_OVERLAY_CELLS: Int = 2048
     private const val SELECTION_BASE_FILL_COLOR: Int = 0xFFCC5656.toInt()
     private const val SELECTION_BASE_FILL_ALPHA: Int = 1
     private const val SELECTION_PULSE_FILL_COLOR: Int = 0xFF7C98FF.toInt()
@@ -23,6 +25,8 @@ object ClipboardSelectionRenderer {
     private const val SELECTION_PULSE_MAX_ALPHA: Int = 8
     private const val STATIC_FILL_ALPHA: Int = 52
     private val geometryCache = WeakHashMap<ClipboardBuffer, CachedGeometry>()
+    private val sparseClipboardCache = WeakHashMap<ClipboardBuffer, ClipboardBuffer>()
+    private val surfaceClipboardCache = WeakHashMap<ClipboardBuffer, ClipboardBuffer>()
     private val redGlassClipboardCache = WeakHashMap<ClipboardBuffer, ClipboardBuffer>()
     private val blueGlassClipboardCache = WeakHashMap<ClipboardBuffer, ClipboardBuffer>()
     private val grayGlassClipboardCache = WeakHashMap<ClipboardBuffer, ClipboardBuffer>()
@@ -191,13 +195,18 @@ object ClipboardSelectionRenderer {
     }
 
     fun sparseClipboard(source: ClipboardBuffer): ClipboardBuffer {
-        val nonAir = source.nonAirCells()
-        return if (nonAir.size == source.cells.size) source else ClipboardBuffer(size = source.size, cells = nonAir)
+        return sparseClipboardCache.getOrPut(source) {
+            val nonAir = source.nonAirCells()
+            if (nonAir.size == source.cells.size) source else ClipboardBuffer(size = source.size, cells = nonAir)
+        }
     }
 
     fun surfaceClipboard(source: ClipboardBuffer): ClipboardBuffer {
-        val surface = surfaceCells(source)
-        return if (surface.size == source.cells.size) source else ClipboardBuffer(size = source.size, cells = surface)
+        return surfaceClipboardCache.getOrPut(source) {
+            val occupiedCells = source.nonAirCells()
+            val surface = surfaceCells(source)
+            if (surface.size == occupiedCells.size) source else ClipboardBuffer(size = source.size, cells = surface)
+        }
     }
 
     private fun renderSelectionAtOrigins(
@@ -222,7 +231,14 @@ object ClipboardSelectionRenderer {
         val client = MinecraftClient.getInstance()
         val camera = client.gameRenderer.camera ?: return false
         val cameraPos = camera.cameraPos
-        val baseOverlay = overlayClipboard(clipboard, glassStateFor(baseFillColor), surfaceOnly = true)
+        val overlayCellCount = geometry.boxes.size.toLong() * origins.size.toLong()
+        val renderBaseOverlay = overlayCellCount <= MAX_BASE_OVERLAY_CELLS.toLong()
+        val renderPulseOverlay = overlayCellCount <= MAX_PULSE_OVERLAY_CELLS.toLong()
+        val baseOverlay = if (renderBaseOverlay) {
+            overlayClipboard(clipboard, glassStateFor(baseFillColor), surfaceOnly = true)
+        } else {
+            null
+        }
         val pulseAlpha = if (pulseFillColor != null) {
             PulsingCuboidRenderer.pulsingAlpha(
                 minAlpha = pulseMinAlpha,
@@ -232,16 +248,22 @@ object ClipboardSelectionRenderer {
         } else {
             0
         }
-        val pulseOverlay = pulseFillColor?.let { overlayClipboard(clipboard, glassStateFor(it), surfaceOnly = true) }
+        val pulseOverlay = if (renderPulseOverlay) {
+            pulseFillColor?.let { overlayClipboard(clipboard, glassStateFor(it), surfaceOnly = true) }
+        } else {
+            null
+        }
 
-        GhostBlockPreviewRenderer.render(
-            context = context,
-            clipboard = baseOverlay,
-            origins = origins,
-            alpha = baseAlpha,
-            textured = true,
-            scale = BASE_OVERLAY_SCALE,
-        )
+        if (baseOverlay != null) {
+            GhostBlockPreviewRenderer.render(
+                context = context,
+                clipboard = baseOverlay,
+                origins = origins,
+                alpha = baseAlpha,
+                textured = true,
+                scale = BASE_OVERLAY_SCALE,
+            )
+        }
         if (pulseOverlay != null) {
             GhostBlockPreviewRenderer.render(
                 context = context,
@@ -276,8 +298,9 @@ object ClipboardSelectionRenderer {
     private fun geometryFor(clipboard: ClipboardBuffer): CachedGeometry {
         return geometryCache.getOrPut(clipboard) {
             var shape: VoxelShape = VoxelShapes.empty()
-            val boxes = ArrayList<Box>(clipboard.cells.size)
-            clipboard.cells.forEach { cell ->
+            val visibleCells = surfaceCells(clipboard)
+            val boxes = ArrayList<Box>(visibleCells.size)
+            visibleCells.forEach { cell ->
                 val box = SelectionBounds.blockBox(BlockPos.ORIGIN.add(cell.offset))
                 boxes += box
                 shape = VoxelShapes.union(shape, VoxelShapes.cuboid(box))
@@ -303,13 +326,14 @@ object ClipboardSelectionRenderer {
 
     private fun surfaceCells(source: ClipboardBuffer): List<ClipboardCell> {
         return surfaceCellCache.getOrPut(source) {
-            if (source.cells.size <= 1) {
-                source.cells
+            val occupiedCells = source.nonAirCells()
+            if (occupiedCells.size <= 1) {
+                occupiedCells
             } else {
-                val occupied = source.cells.asSequence()
+                val occupied = occupiedCells.asSequence()
                     .map { Triple(it.offset.x, it.offset.y, it.offset.z) }
                     .toHashSet()
-                source.cells.filter { cell ->
+                occupiedCells.filter { cell ->
                     val x = cell.offset.x
                     val y = cell.offset.y
                     val z = cell.offset.z

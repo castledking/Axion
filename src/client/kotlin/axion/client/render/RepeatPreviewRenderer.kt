@@ -59,9 +59,25 @@ object RepeatPreviewRenderer {
             return
         }
 
+        renderStandardRepeat(
+            context = context,
+            preview = preview,
+            destinationColor = destinationColor,
+            lineWidth = lineWidth,
+        )
+        renderArrow(context, preview)
+    }
+
+    private fun renderStandardRepeat(
+        context: AxionWorldRenderContext,
+        preview: RepeatRegionPreview,
+        destinationColor: Int,
+        lineWidth: Float,
+    ) {
         val selectionClipboard = ClipboardSelectionRenderer.sparseClipboard(preview.clipboardBuffer)
-        val destinationGhostClipboard = ClipboardSelectionRenderer.surfaceClipboard(preview.clipboardBuffer)
+        val destinationGhostClipboard = ClipboardSelectionRenderer.surfaceClipboard(selectionClipboard)
         val sparseDestination = ClipboardSelectionRenderer.isSparse(preview.sourceRegion, selectionClipboard)
+        val ghostClipboard = if (sparseDestination) destinationGhostClipboard else preview.clipboardBuffer
         RepeatPreviewLayout.aggregateRegion(
             sourceRegion = preview.sourceRegion,
             step = preview.step,
@@ -70,7 +86,7 @@ object RepeatPreviewRenderer {
         )?.let { aggregateRegion ->
             val aggregateBox = SelectionBounds.regionBox(aggregateRegion)
 
-            val nonAirCells = preview.clipboardBuffer.nonAirCells()
+            val nonAirCells = ghostClipboard.nonAirCells()
             if (nonAirCells.isNotEmpty()) {
                 val maxGhostOrigins = maxOf(1, GhostBlockPreviewRenderer.maxOriginsFor(nonAirCells.size))
                 val ghostOrigins = RepeatPreviewLayout.destinationRegions(
@@ -101,7 +117,7 @@ object RepeatPreviewRenderer {
                 }
                 GhostBlockPreviewRenderer.render(
                     context = context,
-                    clipboard = if (sparseDestination) destinationGhostClipboard else preview.clipboardBuffer,
+                    clipboard = ghostClipboard,
                     origins = ghostOrigins,
                     color = DESTINATION_GHOST_COLOR,
                     alpha = if (sparseDestination) SPARSE_GHOST_ALPHA else DEFAULT_GHOST_ALPHA,
@@ -131,7 +147,6 @@ object RepeatPreviewRenderer {
                 )
             }
         }
-        renderArrow(context, preview)
     }
 
     private fun renderCollisionAware(
@@ -147,6 +162,22 @@ object RepeatPreviewRenderer {
             finalWrites[write.pos.toImmutable()] = write
         }
         val renderedWrites = finalWrites.values.filterNot { it.state.isAir }
+        val expectedWriteCount = preview.committedSegments.sumOf { segment ->
+            segment.clipboardBuffer.nonAirCells().size * segment.repeatCount
+        } + (preview.clipboardBuffer.nonAirCells().size * preview.repeatCount)
+        val hasCollision = renderedWrites.size < expectedWriteCount
+
+        if (!hasCollision) {
+            renderStandardRepeat(
+                context = context,
+                preview = preview,
+                destinationColor = destinationColor,
+                lineWidth = lineWidth,
+            )
+            renderArrow(context, preview)
+            return
+        }
+
         if (renderedWrites.isNotEmpty()) {
             val selectionClipboard = ClipboardSelectionRenderer.sparseClipboard(preview.clipboardBuffer)
             val sparseDestination = ClipboardSelectionRenderer.isSparse(preview.sourceRegion, selectionClipboard)
@@ -172,13 +203,6 @@ object RepeatPreviewRenderer {
                 lineWidth = lineWidth,
                 minAlpha = 16,
                 maxAlpha = 34,
-            )
-            GhostBlockPreviewRenderer.renderWrites(
-                context = context,
-                writes = renderedWrites,
-                color = destinationColor,
-                textured = true,
-                scale = GHOST_SCALE,
             )
         }
         renderArrow(context, preview)

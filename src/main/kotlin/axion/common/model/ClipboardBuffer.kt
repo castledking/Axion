@@ -11,8 +11,13 @@ data class ClipboardBuffer(
     private val cachedNonAirCells: List<ClipboardCell> by lazy(LazyThreadSafetyMode.NONE) {
         cells.filterNot { it.state.isAir }
     }
+    private val cachedHashCode: Int by lazy(LazyThreadSafetyMode.NONE) {
+        31 * size.hashCode() + cells.hashCode()
+    }
 
     fun nonAirCells(): List<ClipboardCell> = cachedNonAirCells
+
+    override fun hashCode(): Int = cachedHashCode
 }
 
 data class ClipboardCell(

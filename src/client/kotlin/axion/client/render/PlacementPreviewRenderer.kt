@@ -28,7 +28,7 @@ object PlacementPreviewRenderer {
             PlacementToolMode.MOVE -> MOVE_DESTINATION_COLOR
         }
         val destinationSelectionClipboard = ClipboardSelectionRenderer.sparseClipboard(preview.destinationClipboardBuffer)
-        val destinationGhostClipboard = ClipboardSelectionRenderer.surfaceClipboard(preview.destinationClipboardBuffer)
+        val destinationGhostClipboard = ClipboardSelectionRenderer.surfaceClipboard(destinationSelectionClipboard)
         val sparseDestination = ClipboardSelectionRenderer.isSparse(
             preview.destinationRegion,
             destinationSelectionClipboard,
@@ -80,7 +80,7 @@ object PlacementPreviewRenderer {
         return moveSourceClipboardCache.getOrPut(source) {
             ClipboardBuffer(
                 size = source.size,
-                cells = source.cells.map { cell ->
+                cells = source.nonAirCells().map { cell ->
                     cell.copy(state = Blocks.LIGHT_GRAY_STAINED_GLASS.defaultState)
                 },
             )
