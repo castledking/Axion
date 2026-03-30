@@ -2,6 +2,7 @@ package axion.mixin.client
 
 import axion.client.render.WorldRenderCompat
 import net.minecraft.client.render.WorldRenderer
+import net.minecraft.client.render.state.WorldRenderState
 import net.minecraft.client.util.math.MatrixStack
 import org.spongepowered.asm.mixin.Mixin
 import org.spongepowered.asm.mixin.injection.At
@@ -18,7 +19,7 @@ abstract class WorldRendererFallbackMixin {
     private fun axionFallbackAfterBlockDamage(
         matrices: MatrixStack,
         immediate: net.minecraft.client.render.VertexConsumerProvider.Immediate,
-        renderState: Any,
+        renderState: WorldRenderState,
         ci: CallbackInfo,
     ) {
         if (!WorldRenderCompat.hasFallbackCallbacks()) {
@@ -36,7 +37,7 @@ abstract class WorldRendererFallbackMixin {
         immediate: net.minecraft.client.render.VertexConsumerProvider.Immediate,
         matrices: MatrixStack,
         renderHitOutline: Boolean,
-        renderState: Any,
+        renderState: WorldRenderState,
         ci: CallbackInfo,
     ) {
         if (!WorldRenderCompat.hasFallbackCallbacks()) {

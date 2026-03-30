@@ -13,6 +13,7 @@ val modVersion = version.toString()
 val minecraftVersion = property("minecraft_version") as String
 val minecraftPatch = minecraftVersion.substringAfter("1.21.", "0").substringBefore('-').toIntOrNull() ?: 0
 val needsLegacyMouseInputStub = minecraftVersion.startsWith("1.21.") && minecraftPatch < 11
+val needsLegacyWorldRenderStateStub = minecraftVersion.startsWith("1.21.") && minecraftPatch < 9
 
 base {
     archivesName.set(property("archives_base_name") as String)
@@ -39,6 +40,12 @@ loom {
 if (needsLegacyMouseInputStub) {
     sourceSets.named("client") {
         java.srcDir("src/client-legacy-stubs/java")
+    }
+}
+
+if (needsLegacyWorldRenderStateStub) {
+    sourceSets.named("client") {
+        java.srcDir("src/client-1_21_8-stubs/java")
     }
 }
 
@@ -98,6 +105,7 @@ tasks.jar {
     archiveFileName.set("Axion-v${modVersion}-mc${minecraftVersion}-dev.jar")
     from(layout.projectDirectory.dir("protocol/build/classes/kotlin/main"))
     exclude("net/minecraft/client/input/MouseInput.class")
+    exclude("net/minecraft/client/render/state/WorldRenderState.class")
 }
 
 tasks.named<AbstractArchiveTask>("remapJar") {
