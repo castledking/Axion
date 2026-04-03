@@ -32,41 +32,59 @@ object SelectionBoxRenderer {
         when (state) {
             SelectionState.Idle -> {
                 val pendingMagicSelection = AxionClientState.clipboardState as? axion.common.model.ClipboardState.MagicSelection ?: return
-                ClipboardSelectionRenderer.renderSelection(
+                BlockPreviewPipeline.renderSelection(
                     context = context,
-                    origin = pendingMagicSelection.region.minCorner(),
-                    clipboard = pendingMagicSelection.clipboardBuffer,
-                    outlineColor = REGION_COLOR,
-                    lineWidth = LINE_WIDTH,
+                    scene = BlockPreviewPipeline.SelectionScene(
+                        origins = listOf(pendingMagicSelection.region.minCorner()),
+                        selectionClipboard = pendingMagicSelection.clipboardBuffer,
+                        sparse = true,
+                        outlineColor = REGION_COLOR,
+                        lineWidth = LINE_WIDTH,
+                        baseFillColor = SELECTION_BASE_FILL_COLOR,
+                        baseAlpha = SELECTION_BASE_FILL_ALPHA,
+                        pulseFillColor = SELECTION_PULSE_FILL_COLOR,
+                        pulseMinAlpha = SELECTION_PULSE_MIN_ALPHA,
+                        pulseMaxAlpha = SELECTION_PULSE_MAX_ALPHA,
+                    ),
                 )
                 return
             }
 
             is SelectionState.FirstCornerSet -> {
-                PulsingCuboidRenderer.renderSelectionBox(
+                BlockPreviewPipeline.renderSelection(
                     context = context,
-                    box = SelectionBounds.blockBox(state.firstCorner),
-                    outlineColor = REGION_COLOR,
-                    lineWidth = LINE_WIDTH,
-                    baseFillColor = SELECTION_BASE_FILL_COLOR,
-                    baseAlpha = SELECTION_BASE_FILL_ALPHA,
-                    pulseFillColor = SELECTION_PULSE_FILL_COLOR,
-                    pulseMinAlpha = SELECTION_PULSE_MIN_ALPHA,
-                    pulseMaxAlpha = SELECTION_PULSE_MAX_ALPHA,
+                    scene = BlockPreviewPipeline.SelectionScene(
+                        origins = emptyList(),
+                        selectionClipboard = null,
+                        sparse = false,
+                        outlineColor = REGION_COLOR,
+                        lineWidth = LINE_WIDTH,
+                        aggregateBox = SelectionBounds.blockBox(state.firstCorner),
+                        baseFillColor = SELECTION_BASE_FILL_COLOR,
+                        baseAlpha = SELECTION_BASE_FILL_ALPHA,
+                        pulseFillColor = SELECTION_PULSE_FILL_COLOR,
+                        pulseMinAlpha = SELECTION_PULSE_MIN_ALPHA,
+                        pulseMaxAlpha = SELECTION_PULSE_MAX_ALPHA,
+                    ),
                 )
             }
 
             is SelectionState.RegionDefined -> {
-                PulsingCuboidRenderer.renderSelectionBox(
+                BlockPreviewPipeline.renderSelection(
                     context = context,
-                    box = SelectionBounds.regionBox(state.region()),
-                    outlineColor = REGION_COLOR,
-                    lineWidth = LINE_WIDTH,
-                    baseFillColor = SELECTION_BASE_FILL_COLOR,
-                    baseAlpha = SELECTION_BASE_FILL_ALPHA,
-                    pulseFillColor = SELECTION_PULSE_FILL_COLOR,
-                    pulseMinAlpha = SELECTION_PULSE_MIN_ALPHA,
-                    pulseMaxAlpha = SELECTION_PULSE_MAX_ALPHA,
+                    scene = BlockPreviewPipeline.SelectionScene(
+                        origins = emptyList(),
+                        selectionClipboard = null,
+                        sparse = false,
+                        outlineColor = REGION_COLOR,
+                        lineWidth = LINE_WIDTH,
+                        aggregateBox = SelectionBounds.regionBox(state.region()),
+                        baseFillColor = SELECTION_BASE_FILL_COLOR,
+                        baseAlpha = SELECTION_BASE_FILL_ALPHA,
+                        pulseFillColor = SELECTION_PULSE_FILL_COLOR,
+                        pulseMinAlpha = SELECTION_PULSE_MIN_ALPHA,
+                        pulseMaxAlpha = SELECTION_PULSE_MAX_ALPHA,
+                    ),
                 )
             }
         }

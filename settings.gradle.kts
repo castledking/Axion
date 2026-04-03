@@ -10,3 +10,4 @@ rootProject.name = "Axion"
 
 include(":protocol")
 include(":paper-plugin")
+include(":fabric-server")

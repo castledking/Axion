@@ -5,7 +5,6 @@ import axion.client.tool.PlacementToolController
 import axion.client.tool.PlacementToolMode
 import axion.common.model.ClipboardBuffer
 import net.minecraft.block.Blocks
-import java.util.WeakHashMap
 
 object PlacementPreviewRenderer {
     private const val DESTINATION_GHOST_COLOR: Int = 0xFFFFFFFF.toInt()
@@ -19,7 +18,11 @@ object PlacementPreviewRenderer {
     private const val SPARSE_DESTINATION_GHOST_ALPHA: Int = 235
     private const val MOVE_SOURCE_GHOST_SCALE: Float = 1.01f
     private const val DESTINATION_GHOST_SCALE: Float = 0.985f
-    private val moveSourceClipboardCache = WeakHashMap<ClipboardBuffer, ClipboardBuffer>()
+    private const val MAX_MOVE_DETAILED_SELECTION_CELLS: Int = 256
+    private const val MAX_MOVE_SOURCE_CELLS: Int = 384
+    private const val MAX_MOVE_DESTINATION_GHOST_CELLS: Int = 256
+    private const val MAX_CLONE_DESTINATION_GHOST_CELLS: Int = 512
+    private val moveSourceClipboardCache = java.util.WeakHashMap<ClipboardBuffer, ClipboardBuffer?>()
 
     fun render(context: AxionWorldRenderContext) {
         val preview = PlacementToolController.currentPreview() ?: return
@@ -28,62 +31,102 @@ object PlacementPreviewRenderer {
             PlacementToolMode.MOVE -> MOVE_DESTINATION_COLOR
         }
         val destinationSelectionClipboard = ClipboardSelectionRenderer.sparseClipboard(preview.destinationClipboardBuffer)
-        val destinationGhostClipboard = ClipboardSelectionRenderer.surfaceClipboard(destinationSelectionClipboard)
+        val destinationGhostClipboard = when (preview.mode) {
+            PlacementToolMode.MOVE -> ClipboardSelectionRenderer.surfaceClipboard(destinationSelectionClipboard)
+            PlacementToolMode.CLONE -> if (ClipboardSelectionRenderer.isSparse(preview.destinationRegion, destinationSelectionClipboard)) {
+                ClipboardSelectionRenderer.surfaceClipboard(destinationSelectionClipboard)
+            } else {
+                preview.destinationClipboardBuffer
+            }
+        }
         val sparseDestination = ClipboardSelectionRenderer.isSparse(
             preview.destinationRegion,
             destinationSelectionClipboard,
         )
+        val detailedMovePreview = preview.mode != PlacementToolMode.MOVE ||
+            destinationSelectionClipboard.nonAirCells().size <= MAX_MOVE_DETAILED_SELECTION_CELLS
         if (preview.mode == PlacementToolMode.MOVE) {
-            GhostBlockPreviewRenderer.render(
-                context = context,
-                clipboard = moveSourceClipboard(preview.sourceClipboardBuffer),
-                origins = listOf(preview.sourceRegion.minCorner()),
-                color = MOVE_SOURCE_COLOR,
-                alpha = MOVE_SOURCE_GHOST_ALPHA,
-                textured = true,
-                scale = MOVE_SOURCE_GHOST_SCALE,
-            )
+            val sourceClipboard = if (detailedMovePreview) moveSourceClipboard(preview.sourceClipboardBuffer) else null
+            if (sourceClipboard != null) {
+                BlockPreviewPipeline.renderOverlay(
+                    context = context,
+                    scene = BlockPreviewPipeline.OverlayScene(
+                        origins = listOf(preview.sourceRegion.minCorner()),
+                        clipboard = sourceClipboard,
+                        color = MOVE_SOURCE_COLOR,
+                        alpha = MOVE_SOURCE_GHOST_ALPHA,
+                        scale = MOVE_SOURCE_GHOST_SCALE,
+                    ),
+                )
+            }
         }
-        if (sparseDestination) {
-            ClipboardSelectionRenderer.renderSelection(
+        val renderDestinationGhost = detailedMovePreview && destinationGhostClipboard.nonAirCells().size <= when (preview.mode) {
+            PlacementToolMode.MOVE -> MAX_MOVE_DESTINATION_GHOST_CELLS
+            PlacementToolMode.CLONE -> MAX_CLONE_DESTINATION_GHOST_CELLS
+        }
+
+        if (preview.mode == PlacementToolMode.MOVE && !detailedMovePreview) {
+            BlockPreviewPipeline.renderDestination(
                 context = context,
-                origin = preview.destinationRegion.minCorner(),
-                clipboard = destinationSelectionClipboard,
-                outlineColor = destinationColor,
-                lineWidth = LINE_WIDTH,
+                scene = BlockPreviewPipeline.Scene(
+                    origins = listOf(preview.destinationRegion.minCorner()),
+                    selectionClipboard = destinationSelectionClipboard,
+                    shellClipboard = preview.destinationClipboardBuffer,
+                    fallbackGhostClipboard = destinationGhostClipboard,
+                    sparse = false,
+                    outlineColor = destinationColor,
+                    lineWidth = LINE_WIDTH,
+                    ghostColor = DESTINATION_GHOST_COLOR,
+                    ghostAlpha = when {
+                        sparseDestination -> SPARSE_DESTINATION_GHOST_ALPHA
+                        preview.mode == PlacementToolMode.MOVE -> MOVE_DESTINATION_GHOST_ALPHA
+                        else -> DEFAULT_GHOST_ALPHA
+                    },
+                    ghostScale = DESTINATION_GHOST_SCALE,
+                    aggregateBox = SelectionBounds.regionBox(preview.destinationRegion),
+                    renderGhost = false,
+                ),
             )
         } else {
-            PulsingCuboidRenderer.renderOutlineBox(
+            BlockPreviewPipeline.renderDestination(
                 context = context,
-                box = SelectionBounds.regionBox(preview.destinationRegion),
-                outlineColor = destinationColor,
-                lineWidth = LINE_WIDTH,
+                scene = BlockPreviewPipeline.Scene(
+                    origins = listOf(preview.destinationRegion.minCorner()),
+                    selectionClipboard = destinationSelectionClipboard,
+                    shellClipboard = preview.destinationClipboardBuffer,
+                    fallbackGhostClipboard = destinationGhostClipboard,
+                    sparse = sparseDestination,
+                    outlineColor = destinationColor,
+                    lineWidth = LINE_WIDTH,
+                    ghostColor = DESTINATION_GHOST_COLOR,
+                    ghostAlpha = when {
+                        sparseDestination -> SPARSE_DESTINATION_GHOST_ALPHA
+                        preview.mode == PlacementToolMode.MOVE -> MOVE_DESTINATION_GHOST_ALPHA
+                        else -> DEFAULT_GHOST_ALPHA
+                    },
+                    ghostScale = DESTINATION_GHOST_SCALE,
+                    aggregateBox = SelectionBounds.regionBox(preview.destinationRegion),
+                    renderGhost = renderDestinationGhost,
+                ),
             )
         }
-        GhostBlockPreviewRenderer.render(
-            context = context,
-            clipboard = if (sparseDestination) destinationGhostClipboard else preview.destinationClipboardBuffer,
-            origins = listOf(preview.destinationRegion.minCorner()),
-            color = DESTINATION_GHOST_COLOR,
-            alpha = when {
-                sparseDestination -> SPARSE_DESTINATION_GHOST_ALPHA
-                preview.mode == PlacementToolMode.MOVE -> MOVE_DESTINATION_GHOST_ALPHA
-                else -> DEFAULT_GHOST_ALPHA
-            },
-            textured = true,
-            scale = DESTINATION_GHOST_SCALE,
-        )
         PreviewDirectionArrowRenderer.render(context, preview.destinationRegion)
     }
 
-    private fun moveSourceClipboard(source: ClipboardBuffer): ClipboardBuffer {
+    private fun moveSourceClipboard(source: ClipboardBuffer): ClipboardBuffer? {
         return moveSourceClipboardCache.getOrPut(source) {
-            ClipboardBuffer(
-                size = source.size,
-                cells = source.nonAirCells().map { cell ->
-                    cell.copy(state = Blocks.LIGHT_GRAY_STAINED_GLASS.defaultState)
-                },
-            )
+            val visibleSource = ClipboardSelectionRenderer.surfaceClipboard(ClipboardSelectionRenderer.sparseClipboard(source))
+            val visibleCells = visibleSource.nonAirCells()
+            if (visibleCells.size > MAX_MOVE_SOURCE_CELLS) {
+                null
+            } else {
+                ClipboardBuffer(
+                    size = visibleSource.size,
+                    cells = visibleCells.map { cell ->
+                        cell.copy(state = Blocks.LIGHT_GRAY_STAINED_GLASS.defaultState)
+                    },
+                )
+            }
         }
     }
 }

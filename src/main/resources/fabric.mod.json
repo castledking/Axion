@@ -22,6 +22,9 @@
     "client": [
       "axion.AxionClientMod"
     ],
+    "server": [
+      "${fabric_server_entrypoint}"
+    ],
     "modmenu": [
       "axion.client.compat.AxionModMenuIntegration"
     ]

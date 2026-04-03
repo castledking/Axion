@@ -14,6 +14,12 @@ val minecraftVersion = property("minecraft_version") as String
 val minecraftPatch = minecraftVersion.substringAfter("1.21.", "0").substringBefore('-').toIntOrNull() ?: 0
 val needsLegacyMouseInputStub = minecraftVersion.startsWith("1.21.") && minecraftPatch < 11
 val needsLegacyWorldRenderStateStub = minecraftVersion.startsWith("1.21.") && minecraftPatch < 9
+val supportsFabricDedicatedServer = minecraftVersion == "1.21.11"
+val fabricServerEntrypoint = if (supportsFabricDedicatedServer) {
+    "axion.server.fabric.AxionFabricServerMod"
+} else {
+    "axion.server.fabric.AxionFabricServerStubMod"
+}
 
 base {
     archivesName.set(property("archives_base_name") as String)
@@ -66,9 +72,13 @@ tasks.processResources {
         delete(layout.buildDirectory.dir("resources/main"))
     }
     inputs.property("version", modVersion)
+    inputs.property("fabric_server_entrypoint", fabricServerEntrypoint)
 
     filesMatching("fabric.mod.json") {
-        expand("version" to modVersion)
+        expand(
+            "version" to modVersion,
+            "fabric_server_entrypoint" to fabricServerEntrypoint,
+        )
     }
 }
 
@@ -102,8 +112,17 @@ tasks.test {
 
 tasks.jar {
     dependsOn(":protocol:compileKotlin")
+    dependsOn("compileClientKotlin")
+    dependsOn("processClientResources")
+    if (supportsFabricDedicatedServer) {
+        dependsOn(":fabric-server:compileKotlin")
+    }
     archiveFileName.set("Axion-v${modVersion}-mc${minecraftVersion}-dev.jar")
     from(layout.projectDirectory.dir("protocol/build/classes/kotlin/main"))
+    if (supportsFabricDedicatedServer) {
+        from(layout.projectDirectory.dir("fabric-server/build/classes/kotlin/main"))
+    }
+    from(sourceSets["client"].output)
     exclude("net/minecraft/client/input/MouseInput.class")
     exclude("net/minecraft/client/render/state/WorldRenderState.class")
 }

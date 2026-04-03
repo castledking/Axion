@@ -2,11 +2,13 @@
 
 ## What is it?
 
-Axion is an open-source Fabric building tool for Minecraft, inspired by Axiom. It adds fast in-game editing tools, live previews, symmetry, Magic Select, and long-range builder utilities.
+Axion is an open-source Fabric building tool for Minecraft, inspired by Axiom. It adds fast in-game editing tools, live previews, symmetry, Magic Select, saved hotbars, and long-range builder utilities.
 
-For multiplayer-safe editing, pair it with the Axion Paper plugin:
+For multiplayer-safe editing on Paper, pair it with the Axion Paper plugin:
 
 - [Axion Plugin README](https://github.com/castledking/Axion/blob/main/PLUGIN-README.md)
+
+For Minecraft `1.21.11`, Axion also has a Fabric dedicated server path using the same main Fabric jar that players install on the client.
 
 <p align="center">
   <a href="https://modrinth.com/mod/axion-paper-plugin"><img alt="Download on Modrinth" src="https://img.shields.io/badge/Download%20on-Modrinth-1bd96a?style=for-the-badge&logo=modrinth&logoColor=white"></a>
@@ -34,10 +36,34 @@ The Fabric mod is the client-side half of Axion. It handles:
 - live region previews
 - symmetry anchors and gizmos
 - Magic Select templates and masks
+- saved hotbars / hotbar workspace flow
 - builder modes like replace mode, infinite reach, and no clip
 - local singleplayer behavior
 
-For multiplayer editing, the Paper plugin is what makes server-backed edits, history, validation, and large operations work correctly.
+For multiplayer editing:
+
+- on Paper, use the Axion Paper plugin
+- on Fabric dedicated server, use the same Axion Fabric jar in the server `mods` folder, but this server path currently only targets Minecraft `1.21.11`
+
+## Version Support
+
+Fabric client support:
+
+- `1.21.8`
+- `1.21.9`
+- `1.21.10`
+- `1.21.11`
+
+Paper plugin support:
+
+- `1.21.8`
+- `1.21.9`
+- `1.21.10`
+- `1.21.11`
+
+Fabric dedicated server support:
+
+- `1.21.11` only
 
 ## Features
 
@@ -54,31 +80,64 @@ For multiplayer editing, the Paper plugin is what makes server-backed edits, his
   - shared custom masks
   - searchable block picker
   - brush size control
-- Stronger preview feedback:
-  - ghost block previews
-  - guide arrows
-  - pulsing selection feedback
-  - clearer helper text
+- Saved hotbars / hotbar workspace:
+  - hold `Alt` to open the saved hotbar overlay
+  - scroll or click to switch saved hotbars
+  - release `Alt` to load the selected saved hotbar into your live hotbar
+  - the previously active hotbar is saved back automatically
 - Builder utilities:
   - replace mode
   - infinite reach
   - no clip
   - far pick block
+- Preview and selection feedback:
+  - pulsing cuboid feedback
+  - ghost block previews
+  - guide arrows
+  - clearer helper text
 - Mod Menu integration and in-game config screen
 
 ## Requirements
+
+For Fabric client:
+
+- Fabric Loader
+- Fabric API
+- Fabric Language Kotlin
+
+Minecraft version support:
+
+- `1.21.8` through `1.21.11` on the client
+
+For Fabric dedicated server:
 
 - Minecraft `1.21.11`
 - Fabric Loader
 - Fabric API
 - Fabric Language Kotlin
+- the same Axion Fabric jar that the client uses for `1.21.11`
 
 ## Installation
 
-1. Install Fabric Loader for Minecraft `1.21.11`.
-2. Put the Axion mod jar in your `mods` folder.
+### Fabric Client
+
+1. Install Fabric Loader for your supported Minecraft version (`1.21.8` through `1.21.11`).
+2. Put the Axion mod jar in your client `mods` folder.
 3. Install Fabric API and Fabric Language Kotlin.
 4. Launch Minecraft in creative mode.
+
+### Fabric Dedicated Server (`1.21.11` only)
+
+1. Install Fabric Loader for Minecraft `1.21.11`.
+2. Put the same Axion Fabric jar in the server `mods` folder.
+3. Install Fabric API and Fabric Language Kotlin on the server.
+4. Start the server.
+
+Important:
+
+- the `1.21.11` main Axion Fabric jar is dual-use
+- you do not need a separate Fabric server-only Axion jar
+- the same file goes in the client `mods` folder and the Fabric server `mods` folder
 
 ## Controls and Usage
 
@@ -86,8 +145,15 @@ Axion is designed around a dedicated hotbar slot workflow.
 
 - Equip the Axion slot to access the tool strip
 - Use the selected subtool directly in-world
-- Hold `Alt` while on Axion to open the hotbar tool menu
+- Hold `Alt` while on Axion to open the hotbar tool menu / saved hotbar overlay
 - Press `Right Shift` to open the Axion config screen
+
+Saved hotbars:
+
+- hold `Alt` to preview saved hotbars
+- scroll or click to choose a saved hotbar
+- release `Alt` to load it
+- your previous hotbar is saved back automatically
 
 Magic Select:
 
@@ -98,15 +164,22 @@ Magic Select:
 
 ## Multiplayer
 
-The mod works best with the companion Paper plugin.
+Axion works in three broad modes:
 
-Without the plugin, Axion still works in singleplayer and for client-side/local behavior, but multiplayer server-backed edit application, validation, and history are not available.
+- singleplayer / integrated server
+- Paper multiplayer with the Axion Paper plugin
+- Fabric dedicated server multiplayer on `1.21.11`
+
+Paper is still the more mature multiplayer backend, especially for protection/policy integrations.
+
+Fabric server support on `1.21.11` now covers real authoritative editing, but it is currently only available for that exact Minecraft version.
 
 ## Notes
 
 - Axion is built for creative-mode building workflows.
-- Keep the client mod and Paper plugin on matching compatible versions if you use both.
-- Some newer features, especially server-backed tool behavior, depend on the plugin being updated too.
+- Keep the client and server/plugin on matching compatible versions where possible.
+- Fabric dedicated server support currently only exists for `1.21.11`.
+- Paper plugin support and Fabric client support cover `1.21.8` through `1.21.11`.
 
 ## Links
 

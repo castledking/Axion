@@ -16,6 +16,7 @@ import net.minecraft.util.math.Box
 object GhostBlockPreviewRenderer {
     private const val GHOST_ALPHA: Int = 44
     private const val MAX_GHOST_BLOCKS: Int = 1536
+    private const val MAX_TEXTURED_GHOST_BLOCKS: Int = 512
     private const val DEFAULT_GHOST_COLOR: Int = 0xFFFFFFFF.toInt()
 
     fun maxOriginsFor(nonAirCellCount: Int): Int {
@@ -39,9 +40,14 @@ object GhostBlockPreviewRenderer {
             return
         }
 
-        val occupiedCells = clipboard.nonAirCells()
-        if (occupiedCells.isEmpty()) {
+        val allOccupiedCells = clipboard.nonAirCells()
+        if (allOccupiedCells.isEmpty()) {
             return
+        }
+        val occupiedCells = if (textured) {
+            downsampleCells(allOccupiedCells, MAX_TEXTURED_GHOST_BLOCKS)
+        } else {
+            allOccupiedCells
         }
         val maxOrigins = maxOriginsFor(occupiedCells.size)
         if (maxOrigins <= 0) {
@@ -88,12 +94,17 @@ object GhostBlockPreviewRenderer {
             return
         }
 
-        val boundedWrites = writes.asSequence()
+        val allBoundedWrites = writes.asSequence()
             .filterNot { it.state.isAir }
             .take(MAX_GHOST_BLOCKS)
             .toList()
-        if (boundedWrites.isEmpty()) {
+        if (allBoundedWrites.isEmpty()) {
             return
+        }
+        val boundedWrites = if (textured) {
+            downsampleWrites(allBoundedWrites, MAX_TEXTURED_GHOST_BLOCKS)
+        } else {
+            allBoundedWrites
         }
 
         if (textured) {
@@ -307,5 +318,42 @@ object GhostBlockPreviewRenderer {
         override fun getBuffer(layer: RenderLayer): VertexConsumer {
             return TintedAlphaVertexConsumer(delegate.getBuffer(layer), alphaScale, tintColor)
         }
+    }
+
+    private fun downsampleCells(
+        cells: List<axion.common.model.ClipboardCell>,
+        maxCells: Int,
+    ): List<axion.common.model.ClipboardCell> {
+        if (cells.size <= maxCells) {
+            return cells
+        }
+        return downsampleList(cells, maxCells)
+    }
+
+    private fun downsampleWrites(
+        writes: List<BlockWrite>,
+        maxWrites: Int,
+    ): List<BlockWrite> {
+        if (writes.size <= maxWrites) {
+            return writes
+        }
+        return downsampleList(writes, maxWrites)
+    }
+
+    private fun <T> downsampleList(
+        values: List<T>,
+        maxValues: Int,
+    ): List<T> {
+        if (values.size <= maxValues) {
+            return values
+        }
+
+        val result = ArrayList<T>(maxValues)
+        val lastIndex = values.lastIndex
+        for (index in 0 until maxValues) {
+            val sourceIndex = ((index.toLong() * lastIndex) / (maxValues - 1).coerceAtLeast(1)).toInt()
+            result += values[sourceIndex]
+        }
+        return result
     }
 }

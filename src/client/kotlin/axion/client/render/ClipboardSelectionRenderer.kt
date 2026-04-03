@@ -88,7 +88,7 @@ object ClipboardSelectionRenderer {
         outlineColor: Int,
         lineWidth: Float,
     ): Boolean {
-        return renderSelectionAtOrigins(
+        return renderStyledSelection(
             context = context,
             origins = origins,
             clipboard = clipboard,
@@ -99,6 +99,32 @@ object ClipboardSelectionRenderer {
             pulseFillColor = SELECTION_PULSE_FILL_COLOR,
             pulseMinAlpha = SELECTION_PULSE_MIN_ALPHA,
             pulseMaxAlpha = SELECTION_PULSE_MAX_ALPHA,
+        )
+    }
+
+    fun renderStyledSelection(
+        context: AxionWorldRenderContext,
+        origins: Collection<BlockPos>,
+        clipboard: ClipboardBuffer,
+        outlineColor: Int,
+        lineWidth: Float,
+        baseFillColor: Int,
+        baseAlpha: Int,
+        pulseFillColor: Int?,
+        pulseMinAlpha: Int,
+        pulseMaxAlpha: Int,
+    ): Boolean {
+        return renderSelectionAtOrigins(
+            context = context,
+            origins = origins,
+            clipboard = clipboard,
+            outlineColor = outlineColor,
+            lineWidth = lineWidth,
+            baseFillColor = baseFillColor,
+            baseAlpha = baseAlpha,
+            pulseFillColor = pulseFillColor,
+            pulseMinAlpha = pulseMinAlpha,
+            pulseMaxAlpha = pulseMaxAlpha,
         )
     }
 

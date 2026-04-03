@@ -10,12 +10,16 @@ object RenderLayerCompat {
     private val legacyIntermediaryNames = mapOf(
         "getLightning" to "method_23593",
         "getLines" to "method_23594",
+        "getBlockTranslucentCull" to "method_76545",
+        "getTranslucentMovingBlock" to "method_29380",
         "getDebugQuads" to "method_49042",
         "getDebugFilledBox" to "method_49047",
     )
     private val modernIntermediaryNames = mapOf(
         "lightning" to "method_76003",
         "lines" to "method_76015",
+        "blockTranslucentCull" to "method_76545",
+        "translucentMovingBlock" to "method_75977",
         "debugQuads" to "method_76023",
         "debugFilledBox" to "method_76019",
     )
@@ -27,6 +31,26 @@ object RenderLayerCompat {
     fun debugQuads(): RenderLayer = resolve("debugQuads", "getDebugQuads")
 
     fun debugFilledBox(): RenderLayer = resolve("debugFilledBox", "getDebugFilledBox")
+
+    fun translucentMovingBlock(): RenderLayer = resolve("translucentMovingBlock", "getTranslucentMovingBlock")
+
+    fun blockTranslucentCull(): RenderLayer {
+        findMappedMethod(
+            RenderLayers::class.java,
+            "net.minecraft.client.render.RenderLayers",
+            "blockTranslucentCull",
+            modernIntermediaryNames["blockTranslucentCull"],
+        )?.let { return it.invoke(null) as RenderLayer }
+
+        findMappedMethod(
+            RenderLayer::class.java,
+            "net.minecraft.client.render.RenderLayer",
+            "getBlockTranslucentCull",
+            legacyIntermediaryNames["getBlockTranslucentCull"],
+        )?.let { return it.invoke(null) as RenderLayer }
+
+        return translucentMovingBlock()
+    }
 
     private fun resolve(renderLayersMethod: String, renderLayerMethod: String): RenderLayer {
         findMappedMethod(
