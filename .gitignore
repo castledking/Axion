@@ -32,3 +32,6 @@ MANIFEST.MF
 RELEASE-*.md
 PLAN-*.md
 *.log
+bin/
+.kotlin/
+.modrinth/

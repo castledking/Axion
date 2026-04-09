@@ -6,7 +6,7 @@ import net.minecraft.client.option.KeyBinding
 import org.lwjgl.glfw.GLFW
 
 object AxionKeybindings {
-    private const val category: String = "keycategory.${AxionMod.MOD_ID}.general"
+    private const val category: String = "key.categories.${AxionMod.MOD_ID}.general"
 
     val selectAxionTool: KeyBinding = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.select_axion_tool",
@@ -40,6 +40,18 @@ object AxionKeybindings {
 
     val toggleInfiniteReach: KeyBinding = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.toggle_infinite_reach",
+        GLFW.GLFW_KEY_UNKNOWN,
+        category,
+    )
+
+    val toggleBulldozer: KeyBinding = KeyBindingCompat.create(
+        "key.${AxionMod.MOD_ID}.toggle_bulldozer",
+        GLFW.GLFW_KEY_UNKNOWN,
+        category,
+    )
+
+    val toggleFastPlace: KeyBinding = KeyBindingCompat.create(
+        "key.${AxionMod.MOD_ID}.toggle_fast_place",
         GLFW.GLFW_KEY_UNKNOWN,
         category,
     )
@@ -87,6 +99,8 @@ object AxionKeybindings {
         KeyBindingHelper.registerKeyBinding(toggleNoClip)
         KeyBindingHelper.registerKeyBinding(toggleReplaceMode)
         KeyBindingHelper.registerKeyBinding(toggleInfiniteReach)
+        KeyBindingHelper.registerKeyBinding(toggleBulldozer)
+        KeyBindingHelper.registerKeyBinding(toggleFastPlace)
         KeyBindingHelper.registerKeyBinding(toolDeleteAction)
         KeyBindingHelper.registerKeyBinding(symmetryToggleRotation)
         KeyBindingHelper.registerKeyBinding(symmetryToggleMirror)

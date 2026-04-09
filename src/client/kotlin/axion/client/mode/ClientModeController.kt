@@ -23,10 +23,13 @@ import net.minecraft.world.WorldEvents
 
 object ClientModeController {
     private const val NO_CLIP_ESCAPE_TICKS: Int = 8
+    private const val FAST_REPEAT_TICKS: Int = 4
     private val dispatcher = SymmetryAwareOperationDispatcher(recordHistory = false)
     private var suppressPrimaryUntilRelease: Boolean = false
     private var suppressSecondaryUntilRelease: Boolean = false
     private var noClipEscapeTicks: Int = 0
+    private var bulldozerRepeatCounter: Int = 0
+    private var fastPlaceRepeatCounter: Int = 0
 
     fun enforceCreativeMode(client: MinecraftClient) {
         if (canUseModes(client)) {
@@ -46,6 +49,8 @@ object ClientModeController {
 
         suppressPrimaryUntilRelease = false
         suppressSecondaryUntilRelease = false
+        bulldozerRepeatCounter = 0
+        fastPlaceRepeatCounter = 0
         if (AxionClientState.globalModeState != axion.common.model.GlobalModeState()) {
             AxionClientState.updateGlobalModes(axion.common.model.GlobalModeState())
         }
@@ -59,19 +64,42 @@ object ClientModeController {
         }
 
         if (client.currentScreen == null) {
+            val state = AxionClientState.globalModeState
+            val useFastPlace = state.fastPlaceEnabled || state.replaceModeEnabled
+
             if (client.options.useKey.isPressed && !suppressSecondaryUntilRelease) {
-                consumeSecondaryAction(client)
+                if (useFastPlace) {
+                    fastPlaceRepeatCounter++
+                    if (fastPlaceRepeatCounter >= FAST_REPEAT_TICKS) {
+                        fastPlaceRepeatCounter = 0
+                        consumeSecondaryAction(client)
+                    }
+                } else {
+                    consumeSecondaryAction(client)
+                }
+            } else {
+                fastPlaceRepeatCounter = 0
+            }
+
+            if (state.bulldozerEnabled && client.options.attackKey.isPressed && !suppressPrimaryUntilRelease) {
+                bulldozerRepeatCounter++
+                if (bulldozerRepeatCounter >= FAST_REPEAT_TICKS) {
+                    bulldozerRepeatCounter = 0
+                    consumePrimaryAction(client)
+                }
             }
         }
 
         if (!client.options.attackKey.isPressed) {
             suppressPrimaryUntilRelease = false
+            bulldozerRepeatCounter = 0
         } else if (suppressPrimaryUntilRelease) {
             client.interactionManager?.cancelBlockBreaking()
         }
 
         if (!client.options.useKey.isPressed) {
             suppressSecondaryUntilRelease = false
+            fastPlaceRepeatCounter = 0
         }
 
         applyNoClip(client)
@@ -93,6 +121,14 @@ object ClientModeController {
 
         while (AxionKeybindings.toggleInfiniteReach.wasPressed()) {
             toggleInfiniteReach(client)
+        }
+
+        while (AxionKeybindings.toggleBulldozer.wasPressed()) {
+            toggleBulldozer(client)
+        }
+
+        while (AxionKeybindings.toggleFastPlace.wasPressed()) {
+            toggleFastPlace(client)
         }
     }
 
@@ -256,6 +292,22 @@ object ClientModeController {
         )
         AxionClientState.updateGlobalModes(nextState)
         showToast(client, "Infinite Reach", nextState.infiniteReachEnabled)
+    }
+
+    private fun toggleBulldozer(client: MinecraftClient) {
+        val nextState = AxionClientState.globalModeState.copy(
+            bulldozerEnabled = !AxionClientState.globalModeState.bulldozerEnabled,
+        )
+        AxionClientState.updateGlobalModes(nextState)
+        showToast(client, "Bulldozer", nextState.bulldozerEnabled)
+    }
+
+    private fun toggleFastPlace(client: MinecraftClient) {
+        val nextState = AxionClientState.globalModeState.copy(
+            fastPlaceEnabled = !AxionClientState.globalModeState.fastPlaceEnabled,
+        )
+        AxionClientState.updateGlobalModes(nextState)
+        showToast(client, "Fast Place", nextState.fastPlaceEnabled)
     }
 
     private fun applyNoClip(client: MinecraftClient) {

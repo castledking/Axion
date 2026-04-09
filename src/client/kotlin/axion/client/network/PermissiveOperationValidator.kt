@@ -111,9 +111,9 @@ class PermissiveOperationValidator : OperationValidator {
     }
 
     private companion object {
-        const val MAX_BLOCKS_PER_BATCH: Long = 262_144
+        const val MAX_BLOCKS_PER_BATCH: Long = 1_262_144
         const val MAX_TOTAL_WRITES: Long = 2_097_152
-        const val MAX_CLIPBOARD_CELLS: Int = 262_144
+        const val MAX_CLIPBOARD_CELLS: Int = 1_262_144
         const val MAX_EXTRUDE_FOOTPRINT: Int = 32_768
         const val MAX_EXTRUDE_WRITES: Int = 32_768
     }

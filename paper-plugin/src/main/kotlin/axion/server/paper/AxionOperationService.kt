@@ -117,6 +117,7 @@ class AxionOperationService(
             null
         } else {
             buildSet<IntVector3> {
+                addAll(AxionCommittedDiffBuilder.collectTouched(request.operations))
                 request.operations.forEach { operation ->
                     if (operation is ExtrudeRequest) {
                         addAll(resolvedExtrudePlans.getValue(operation).touchedPositions)

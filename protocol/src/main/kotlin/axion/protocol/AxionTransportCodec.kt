@@ -15,7 +15,7 @@ enum class AxionCompressionMode {
 object AxionTransportCodec {
     const val COMPRESSION_THRESHOLD_BYTES: Int = 32 * 1024
     const val MAX_CHUNK_BYTES: Int = 24 * 1024
-    const val MAX_SERIALIZED_BYTES: Int = 8 * 1024 * 1024
+    const val MAX_SERIALIZED_BYTES: Int = 128 * 1024 * 1024
     const val MAX_CHUNKS: Int = 512
 
     fun encodeServerMessage(message: AxionServerMessage, transferId: Long): List<ByteArray> {

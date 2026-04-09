@@ -7,7 +7,9 @@ import axion.client.symmetry.SymmetryAwareOperationDispatcher
 import axion.common.model.BlockRegion
 import axion.common.model.ClipboardState
 import axion.common.model.SelectionState
+import axion.protocol.AxionTransportCodec
 import net.minecraft.client.MinecraftClient
+import net.minecraft.text.Text
 import net.minecraft.util.math.BlockPos
 
 object PlacementToolController {
@@ -196,7 +198,20 @@ object PlacementToolController {
     }
 
     private fun confirm(preview: ClonePreviewState): Boolean {
-        dispatcher.dispatch(PlacementCommitService.toOperation(preview))
+        val operation = PlacementCommitService.toOperation(preview)
+
+        // Validate operation size before dispatching to prevent crashes
+        val estimatedSize = estimateOperationSize(operation)
+        if (estimatedSize > AxionTransportCodec.MAX_SERIALIZED_BYTES) {
+            val player = MinecraftClient.getInstance().player
+            player?.sendMessage(
+                Text.literal("Selection too large! Please select a smaller region (max ~${AxionTransportCodec.MAX_SERIALIZED_BYTES / 1024 / 1024}MB) or increase the limit."),
+                false
+            )
+            return false
+        }
+
+        dispatcher.dispatch(operation)
         if (preview.mode == PlacementToolMode.CLONE) {
             val state = CloneToolState.AwaitingConfirm(preview)
             AxionClientState.updatePlacementToolState(state)
@@ -205,6 +220,22 @@ object PlacementToolController {
             reset()
         }
         return true
+    }
+
+    private fun estimateOperationSize(operation: axion.common.operation.EditOperation): Int {
+        // Quick estimation by counting placements (each placement is roughly 100+ bytes serialized)
+        return when (operation) {
+            is axion.common.operation.SymmetryPlacementOperation -> operation.placements.size * 150
+            is axion.common.operation.CompositeOperation -> {
+                operation.operations.sumOf { op ->
+                    when (op) {
+                        is axion.common.operation.SymmetryPlacementOperation -> op.placements.size * 150
+                        else -> 100 // estimate for other operation types
+                    }
+                }
+            }
+            else -> 1000 // conservative estimate for other operations
+        }
     }
 
     private fun expandSelectionFace(client: MinecraftClient, region: BlockRegion): Boolean {

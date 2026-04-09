@@ -1,16 +1,18 @@
 package axion.server.paper
 
-import axion.protocol.CommittedBlockChangePayload
 import axion.protocol.OperationBatchResult
 import net.minecraft.core.BlockPos
 import org.bukkit.Bukkit
 import org.bukkit.World
 import org.bukkit.entity.Player
+import org.slf4j.LoggerFactory
 
 class AxionHistoryActionService(
     private val history: AxionServerHistory,
     private val policyService: AxionPolicyService,
 ) {
+    private val logger = LoggerFactory.getLogger(AxionHistoryActionService::class.java)
+
     fun undo(player: Player, requestId: Long, transactionId: Long, timing: AxionTimingContext): OperationBatchResult {
         val transaction = history.peekUndo(player.uniqueId, transactionId)
             ?: return rejected(
@@ -37,7 +39,7 @@ class AxionHistoryActionService(
             timing = timing,
         )?.let { return rejected(requestId, it) }
 
-        if (!validateCurrentWorld(world, transaction.changes, expectNewState = true)) {
+        if (!validateCurrentWorld(world, transaction, expectNewState = true)) {
             return rejected(requestId, AxionRejection(
                     code = axion.protocol.AxionResultCode.WORLD_MISMATCH,
                     source = axion.protocol.AxionResultSource.HISTORY,
@@ -97,7 +99,7 @@ class AxionHistoryActionService(
             timing = timing,
         )?.let { return rejected(requestId, it) }
 
-        if (!validateCurrentWorld(world, transaction.changes, expectNewState = false)) {
+        if (!validateCurrentWorld(world, transaction, expectNewState = false)) {
             return rejected(requestId, AxionRejection(
                     code = axion.protocol.AxionResultCode.WORLD_MISMATCH,
                     source = axion.protocol.AxionResultSource.HISTORY,
@@ -128,20 +130,33 @@ class AxionHistoryActionService(
 
     private fun validateCurrentWorld(
         world: World,
-        changes: List<CommittedBlockChangePayload>,
+        transaction: ServerHistoryTransaction,
         expectNewState: Boolean,
     ): Boolean {
-        return changes.all { change ->
+        transaction.changes.forEach { change ->
             val expected = if (expectNewState) change.newState else change.oldState
             // Block entities and some transient block properties can legitimately drift after an
             // edit due to timers, inventories, fluid updates, power state, or server-side
             // normalization. Prefer an exact block-state match, but allow same-material matches
             // so immediate redo remains reliable after a valid undo.
-            stateMatchesExpected(
-                current = world.getBlockAt(change.pos.x, change.pos.y, change.pos.z).blockData,
-                expected = expected,
-            )
+            val current = world.getBlockAt(change.pos.x, change.pos.y, change.pos.z).blockData
+            if (!stateMatchesExpected(current = current, expected = expected)) {
+                logger.warn(
+                    "Axion {} mismatch for transaction {} [{}] in world {} at {},{},{}: current='{}' expected='{}'",
+                    if (expectNewState) "undo" else "redo",
+                    transaction.id,
+                    transaction.label,
+                    world.name,
+                    change.pos.x,
+                    change.pos.y,
+                    change.pos.z,
+                    current.getAsString(false),
+                    expected,
+                )
+                return false
+            }
         }
+        return true
     }
 
     private fun stateMatchesExpected(current: org.bukkit.block.data.BlockData, expected: String): Boolean {
