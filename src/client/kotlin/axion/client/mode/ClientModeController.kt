@@ -23,7 +23,7 @@ import net.minecraft.world.WorldEvents
 
 object ClientModeController {
     private const val NO_CLIP_ESCAPE_TICKS: Int = 8
-    private const val FAST_REPEAT_TICKS: Int = 4
+    private const val FAST_REPEAT_TICKS: Int = 1
     private val dispatcher = SymmetryAwareOperationDispatcher(recordHistory = false)
     private var suppressPrimaryUntilRelease: Boolean = false
     private var suppressSecondaryUntilRelease: Boolean = false

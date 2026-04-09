@@ -6,7 +6,7 @@ import net.minecraft.client.option.KeyBinding
 import org.lwjgl.glfw.GLFW
 
 object AxionKeybindings {
-    private const val category: String = "key.categories.${AxionMod.MOD_ID}.general"
+    private const val category: String = "keycategory.${AxionMod.MOD_ID}.general"
 
     val selectAxionTool: KeyBinding = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.select_axion_tool",
