@@ -23,13 +23,11 @@ import net.minecraft.world.WorldEvents
 
 object ClientModeController {
     private const val NO_CLIP_ESCAPE_TICKS: Int = 8
-    private const val FAST_REPEAT_TICKS: Int = 1
+    private const val FAST_REPEAT_ACTIONS_PER_TICK: Int = 5
     private val dispatcher = SymmetryAwareOperationDispatcher(recordHistory = false)
     private var suppressPrimaryUntilRelease: Boolean = false
     private var suppressSecondaryUntilRelease: Boolean = false
     private var noClipEscapeTicks: Int = 0
-    private var bulldozerRepeatCounter: Int = 0
-    private var fastPlaceRepeatCounter: Int = 0
 
     fun enforceCreativeMode(client: MinecraftClient) {
         if (canUseModes(client)) {
@@ -49,8 +47,6 @@ object ClientModeController {
 
         suppressPrimaryUntilRelease = false
         suppressSecondaryUntilRelease = false
-        bulldozerRepeatCounter = 0
-        fastPlaceRepeatCounter = 0
         if (AxionClientState.globalModeState != axion.common.model.GlobalModeState()) {
             AxionClientState.updateGlobalModes(axion.common.model.GlobalModeState())
         }
@@ -69,22 +65,16 @@ object ClientModeController {
 
             if (client.options.useKey.isPressed && !suppressSecondaryUntilRelease) {
                 if (useFastPlace) {
-                    fastPlaceRepeatCounter++
-                    if (fastPlaceRepeatCounter >= FAST_REPEAT_TICKS) {
-                        fastPlaceRepeatCounter = 0
+                    repeat(FAST_REPEAT_ACTIONS_PER_TICK) {
                         consumeSecondaryAction(client)
                     }
                 } else {
                     consumeSecondaryAction(client)
                 }
-            } else {
-                fastPlaceRepeatCounter = 0
             }
 
             if (state.bulldozerEnabled && client.options.attackKey.isPressed && !suppressPrimaryUntilRelease) {
-                bulldozerRepeatCounter++
-                if (bulldozerRepeatCounter >= FAST_REPEAT_TICKS) {
-                    bulldozerRepeatCounter = 0
+                repeat(FAST_REPEAT_ACTIONS_PER_TICK) {
                     consumePrimaryAction(client)
                 }
             }
@@ -92,14 +82,12 @@ object ClientModeController {
 
         if (!client.options.attackKey.isPressed) {
             suppressPrimaryUntilRelease = false
-            bulldozerRepeatCounter = 0
         } else if (suppressPrimaryUntilRelease) {
             client.interactionManager?.cancelBlockBreaking()
         }
 
         if (!client.options.useKey.isPressed) {
             suppressSecondaryUntilRelease = false
-            fastPlaceRepeatCounter = 0
         }
 
         applyNoClip(client)
