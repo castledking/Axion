@@ -216,6 +216,35 @@ object ClientModeController {
 
         applyNoClip(client)
         syncRemoteNoClip(client)
+
+        // Apply flying speed multiplier
+        applyFlyingSpeed(client)
+    }
+
+    private fun applyFlyingSpeed(client: MinecraftClient) {
+        val player = client.player ?: return
+        if (!player.abilities.flying) {
+            // Reset to vanilla speed when not flying
+            player.abilities.flySpeed = 0.05f
+            return
+        }
+
+        val multiplier = AxionClientState.flySpeedMultiplier
+        val state = AxionClientState.globalModeState
+
+        // Safety cap: if noclip is enabled, limit speed to prevent collision issues
+        val effectiveMultiplier = if (state.noClipEnabled) {
+            val capped = multiplier.coerceAtMost(3.0f)
+            if (capped < multiplier) {
+                AxionMod.LOGGER.info("[Axion] Flying speed capped from ${(multiplier * 100).toInt()}% to 300% due to NoClip being enabled")
+            }
+            capped
+        } else {
+            multiplier
+        }
+
+        // Apply speed: vanilla base is 0.05f
+        player.abilities.flySpeed = 0.05f * effectiveMultiplier
     }
 
     /**

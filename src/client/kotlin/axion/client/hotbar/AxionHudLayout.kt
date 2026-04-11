@@ -158,4 +158,68 @@ object AxionHudLayout {
             ),
         )
     }
+
+    data class FlyingSpeedSliderBounds(
+        val plusButton: ToggleButtonBounds,
+        val track: ToggleButtonBounds,
+        val minusButton: ToggleButtonBounds,
+    ) {
+        fun trackValueFromY(mouseY: Double): Float {
+            // Map Y position to multiplier (top = max, bottom = min)
+            val relativeY = (track.y + track.height - mouseY).coerceIn(0.0, track.height.toDouble())
+            val normalized = relativeY / track.height
+            return 1.0f + (normalized * 8.99f).toFloat()
+        }
+    }
+
+    fun flyingSpeedSliderBounds(screenWidth: Int, screenHeight: Int, page: Int): FlyingSpeedSliderBounds {
+        val pageButtons = savedHotbarPageButtons(screenWidth, screenHeight, page)
+        val buttonX = pageButtons.firstOrNull()?.x ?: ((screenWidth / 2) - HOTBAR_HALF_WIDTH + SAVED_HOTBAR_WIDTH + 12)
+        val downButton = pageButtons.firstOrNull { it.direction < 0 }
+        val buttonBottom = downButton?.let { it.y + it.height } ?: (screenHeight - 22 + 18 + 12)
+
+        // Button dimensions match page buttons
+        val btnWidth = SAVED_HOTBAR_PAGE_BUTTON_WIDTH
+        val btnHeight = SAVED_HOTBAR_PAGE_BUTTON_HEIGHT
+        val centerX = buttonX + (SAVED_HOTBAR_PAGE_BUTTON_WIDTH / 2)
+
+        // Calculate positions (top to bottom)
+        val fontHeight = MinecraftClient.getInstance().textRenderer.fontHeight  // typically 9px
+        val plusY = buttonBottom + fontHeight + 6  // label height + 4px gap above label + 2px gap
+        val trackY = plusY + btnHeight + 2  // 2px gap after + button
+
+        // Calculate available space for track, reserving room for toolbox slot
+        val sideSlot = sideSlot(MinecraftClient.getInstance(), screenWidth, screenHeight)
+        val axSlotTop = sideSlot.y
+        val sideSlotSize = sideSlot.size  // = SLOT_SIZE = 24
+        val toolboxReserve = sideSlotSize + 2 + 6  // toolbox height + gap + breathing room
+        val minusHeight = 12
+        val minusGap = 2
+
+        // Available height = space from trackY down to toolbox slot
+        val availableForTrack = axSlotTop - toolboxReserve - minusHeight - minusGap - trackY
+        val trackHeight = availableForTrack.coerceIn(24, 60)  // min 24px, max 60px
+
+        val minusY = trackY + trackHeight + minusGap
+
+        // Center the buttons and track on the same x
+        val trackWidth = 12
+        val trackX = centerX - (trackWidth / 2)
+        val btnX = centerX - (btnWidth / 2)
+
+        return FlyingSpeedSliderBounds(
+            plusButton = ToggleButtonBounds(x = btnX, y = plusY, width = btnWidth, height = btnHeight),
+            track = ToggleButtonBounds(x = trackX, y = trackY, width = trackWidth, height = trackHeight),
+            minusButton = ToggleButtonBounds(x = btnX, y = minusY, width = btnWidth, height = btnHeight),
+        )
+    }
+
+    fun toolboxSlotBounds(client: MinecraftClient, screenWidth: Int, screenHeight: Int): SlotBounds {
+        val sideSlot = sideSlot(client, screenWidth, screenHeight)
+        return SlotBounds(
+            x = sideSlot.x,
+            y = sideSlot.y - 2 - sideSlot.size,  // 20px tall (same as slot size), 2px gap above
+            size = sideSlot.size
+        )
+    }
 }

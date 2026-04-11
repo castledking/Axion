@@ -25,6 +25,11 @@ object AxionAltMenuController {
             return
         }
 
+        // Handle continuous slider dragging
+        if (isDraggingSlider) {
+            handleFlyingSpeedSliderDrag(client, client.window.scaledWidth, client.window.scaledHeight)
+        }
+
         val active = isAnyAltOverlayActive(client)
         if (active) {
             if (client.mouse.isCursorLocked) {
@@ -141,9 +146,85 @@ object AxionAltMenuController {
             }
     }
 
+    private var isDraggingSlider: Boolean = false
+
+    fun isHoveringFlyingSpeedTrack(client: MinecraftClient, screenWidth: Int, screenHeight: Int): Boolean {
+        if (!SavedHotbarController.isOverlayActive(client)) {
+            return false
+        }
+        val bounds = AxionHudLayout.flyingSpeedSliderBounds(screenWidth, screenHeight, SavedHotbarController.selectedPage())
+        return bounds.track.contains(
+            client.mouse.getScaledX(client.window),
+            client.mouse.getScaledY(client.window),
+        )
+    }
+
+    fun isHoveringFlyingSpeedPlusButton(client: MinecraftClient, screenWidth: Int, screenHeight: Int): Boolean {
+        if (!SavedHotbarController.isOverlayActive(client)) {
+            return false
+        }
+        val bounds = AxionHudLayout.flyingSpeedSliderBounds(screenWidth, screenHeight, SavedHotbarController.selectedPage())
+        return bounds.plusButton.contains(
+            client.mouse.getScaledX(client.window),
+            client.mouse.getScaledY(client.window),
+        )
+    }
+
+    fun isHoveringFlyingSpeedMinusButton(client: MinecraftClient, screenWidth: Int, screenHeight: Int): Boolean {
+        if (!SavedHotbarController.isOverlayActive(client)) {
+            return false
+        }
+        val bounds = AxionHudLayout.flyingSpeedSliderBounds(screenWidth, screenHeight, SavedHotbarController.selectedPage())
+        return bounds.minusButton.contains(
+            client.mouse.getScaledX(client.window),
+            client.mouse.getScaledY(client.window),
+        )
+    }
+
+    fun handleFlyingSpeedSliderDrag(client: MinecraftClient, screenWidth: Int, screenHeight: Int) {
+        if (!isDraggingSlider) return
+        val bounds = AxionHudLayout.flyingSpeedSliderBounds(screenWidth, screenHeight, SavedHotbarController.selectedPage())
+        val mouseY = client.mouse.getScaledY(client.window)
+        val newValue = bounds.trackValueFromY(mouseY)
+        AxionClientState.updateFlySpeedMultiplier(newValue)
+    }
+
+    fun handleFlyingSpeedSliderScroll(client: MinecraftClient, scrollDelta: Double): Boolean {
+        if (!isHoveringFlyingSpeedTrack(client, client.window.scaledWidth, client.window.scaledHeight)) {
+            return false
+        }
+        val currentValue = AxionClientState.flySpeedMultiplier
+        val newValue = if (scrollDelta > 0) {
+            (currentValue + 0.1f).coerceAtMost(9.99f)
+        } else {
+            (currentValue - 0.1f).coerceAtLeast(1.0f)
+        }
+        AxionClientState.updateFlySpeedMultiplier(newValue)
+        return true
+    }
+
     fun handleMouseButton(client: MinecraftClient, button: Int, action: Int): Boolean {
         if (SavedHotbarController.isOverlayActive(client)) {
             if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && action == GLFW.GLFW_PRESS) {
+                // Check for + button click
+                if (isHoveringFlyingSpeedPlusButton(client, client.window.scaledWidth, client.window.scaledHeight)) {
+                    val newValue = (AxionClientState.flySpeedMultiplier + 0.5f).coerceAtMost(9.99f)
+                    AxionClientState.updateFlySpeedMultiplier(newValue)
+                    return true
+                }
+                // Check for - button click
+                if (isHoveringFlyingSpeedMinusButton(client, client.window.scaledWidth, client.window.scaledHeight)) {
+                    val newValue = (AxionClientState.flySpeedMultiplier - 0.5f).coerceAtLeast(1.0f)
+                    AxionClientState.updateFlySpeedMultiplier(newValue)
+                    return true
+                }
+                // Check for slider drag start
+                if (isHoveringFlyingSpeedTrack(client, client.window.scaledWidth, client.window.scaledHeight)) {
+                    isDraggingSlider = true
+                    // Immediately update value based on click position
+                    handleFlyingSpeedSliderDrag(client, client.window.scaledWidth, client.window.scaledHeight)
+                    return true
+                }
                 hoveringSavedHotbarPageButton(
                     client,
                     client.window.scaledWidth,
@@ -159,6 +240,13 @@ object AxionAltMenuController {
                 )?.let { rowBounds ->
                     SavedHotbarController.selectHotbar(rowBounds.index)
                 }
+            }
+            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && action == GLFW.GLFW_RELEASE) {
+                isDraggingSlider = false
+            }
+            // Handle slider drag during mouse move (via onEndTick or similar)
+            if (isDraggingSlider) {
+                handleFlyingSpeedSliderDrag(client, client.window.scaledWidth, client.window.scaledHeight)
             }
             return true
         }

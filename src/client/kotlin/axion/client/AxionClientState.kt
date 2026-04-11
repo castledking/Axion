@@ -56,6 +56,9 @@ object AxionClientState {
     var copyAirEnabled: Boolean = false
         private set
 
+    var flySpeedMultiplier: Float = 1.0f
+        private set
+
     fun updateToolSelection(state: ToolSelectionState) {
         toolSelectionState = state
     }
@@ -118,5 +121,9 @@ object AxionClientState {
 
     fun updateCopyAir(enabled: Boolean) {
         copyAirEnabled = enabled
+    }
+
+    fun updateFlySpeedMultiplier(multiplier: Float) {
+        flySpeedMultiplier = multiplier.coerceIn(1.0f, 9.99f)
     }
 }

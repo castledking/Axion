@@ -152,6 +152,130 @@ object AxionHotbarHud {
             TEXT_SELECTED,
         )
         renderSavedHotbarPageButtons(context, client, page)
+        renderFlyingSpeedSlider(context, client, page)
+    }
+
+    private fun renderFlyingSpeedSlider(
+        context: DrawContext,
+        client: MinecraftClient,
+        page: Int,
+    ) {
+        // Only render when player can fly
+        if (client.player?.abilities?.allowFlying != true) {
+            return
+        }
+
+        val bounds = AxionHudLayout.flyingSpeedSliderBounds(context.scaledWindowWidth, context.scaledWindowHeight, page)
+        val multiplier = AxionClientState.flySpeedMultiplier
+
+        // Check hover states for each element
+        val plusHovered = AxionAltMenuController.isHoveringFlyingSpeedPlusButton(client, context.scaledWindowWidth, context.scaledWindowHeight)
+        val trackHovered = AxionAltMenuController.isHoveringFlyingSpeedTrack(client, context.scaledWindowWidth, context.scaledWindowHeight)
+        val minusHovered = AxionAltMenuController.isHoveringFlyingSpeedMinusButton(client, context.scaledWindowWidth, context.scaledWindowHeight)
+
+        // Render + button
+        val plus = bounds.plusButton
+        val plusBorderColor = if (plusHovered) BORDER_HOVER else BORDER_NEUTRAL
+        val plusTextColor = if (plusHovered) TEXT_SELECTED else TEXT_IDLE
+        context.fill(plus.x, plus.y, plus.x + plus.width, plus.y + plus.height, OUTER_BACKGROUND)
+        context.fill(plus.x + 1, plus.y + 1, plus.x + plus.width - 1, plus.y + plus.height - 1, INNER_BACKGROUND)
+        context.drawStrokedRectangleCompat(plus.x, plus.y, plus.width, plus.height, plusBorderColor)
+        context.drawCenteredTextWithShadow(client.textRenderer, "+", plus.x + plus.width / 2, plus.y + 2, plusTextColor)
+
+        // Percentage label above + button
+        val percentageText = "${(multiplier * 100).toInt()}%"
+        val labelY = plus.y - client.textRenderer.fontHeight - 2
+        context.drawCenteredTextWithShadow(
+            client.textRenderer,
+            percentageText,
+            plus.x + plus.width / 2,
+            labelY,
+            TEXT_IDLE,
+        )
+
+        // Render track
+        val track = bounds.track
+        val trackBorderColor = if (trackHovered) BORDER_HOVER else BORDER_NEUTRAL
+        context.fill(track.x, track.y, track.x + track.width, track.y + track.height, OUTER_BACKGROUND)
+        context.fill(track.x + 1, track.y + 1, track.x + track.width - 1, track.y + track.height - 1, INNER_BACKGROUND)
+
+        // Calculate filled portion (bottom to top, 1.0f to 9.99f)
+        val normalizedValue = (multiplier - 1.0f) / 8.99f
+        val fillHeight = (track.height * normalizedValue).toInt()
+        val fillY = track.y + track.height - fillHeight
+
+        // Gradient colors (blue → lime)
+        val gradientStops = listOf(
+            0.0f to 0xFF1A5CFF.toInt(),   // Deep blue (bottom)
+            0.33f to 0xFF00C8FF.toInt(),   // Cyan
+            0.55f to 0xFF00E8A0.toInt(),   // Teal-green
+            0.75f to 0xFF4DFF4D.toInt(),   // Green
+            1.0f to 0xFF99FF00.toInt(),    // Lime (top)
+        )
+
+        // Draw gradient fill in horizontal slices
+        val sliceHeight = 10
+        val numSlices = (fillHeight + sliceHeight - 1) / sliceHeight
+
+        for (i in 0 until numSlices) {
+            val sliceY = fillY + (i * sliceHeight)
+            val sliceBottom = (sliceY + sliceHeight).coerceAtMost(track.y + track.height - 1)
+            val sliceTop = sliceY.coerceAtLeast(track.y + 1)
+
+            if (sliceTop >= sliceBottom) continue
+
+            // Calculate normalized position for this slice (0 = bottom, 1 = top of fill)
+            val sliceCenter = (sliceTop + sliceBottom) / 2f
+            val sliceNormalized = if (fillHeight > 0) (sliceCenter - (track.y + track.height - fillHeight)) / fillHeight else 0f
+
+            // Interpolate color
+            val color = interpolateGradientColor(gradientStops, sliceNormalized.coerceIn(0f, 1f))
+            context.fill(track.x + 1, sliceTop, track.x + track.width - 1, sliceBottom, color)
+        }
+
+        // Track border
+        context.drawStrokedRectangleCompat(track.x, track.y, track.width, track.height, trackBorderColor)
+
+        // Render - button
+        val minus = bounds.minusButton
+        val minusBorderColor = if (minusHovered) BORDER_HOVER else BORDER_NEUTRAL
+        val minusTextColor = if (minusHovered) TEXT_SELECTED else TEXT_IDLE
+        context.fill(minus.x, minus.y, minus.x + minus.width, minus.y + minus.height, OUTER_BACKGROUND)
+        context.fill(minus.x + 1, minus.y + 1, minus.x + minus.width - 1, minus.y + minus.height - 1, INNER_BACKGROUND)
+        context.drawStrokedRectangleCompat(minus.x, minus.y, minus.width, minus.height, minusBorderColor)
+        context.drawCenteredTextWithShadow(client.textRenderer, "-", minus.x + minus.width / 2, minus.y + 2, minusTextColor)
+    }
+
+    private fun interpolateGradientColor(stops: List<Pair<Float, Int>>, t: Float): Int {
+        // Find the two stops to interpolate between
+        for (i in 0 until stops.size - 1) {
+            val (t1, c1) = stops[i]
+            val (t2, c2) = stops[i + 1]
+            if (t >= t1 && t <= t2) {
+                val localT = (t - t1) / (t2 - t1)
+                return interpolateColor(c1, c2, localT)
+            }
+        }
+        return stops.last().second
+    }
+
+    private fun interpolateColor(c1: Int, c2: Int, t: Float): Int {
+        val a1 = (c1 shr 24) and 0xFF
+        val r1 = (c1 shr 16) and 0xFF
+        val g1 = (c1 shr 8) and 0xFF
+        val b1 = c1 and 0xFF
+
+        val a2 = (c2 shr 24) and 0xFF
+        val r2 = (c2 shr 16) and 0xFF
+        val g2 = (c2 shr 8) and 0xFF
+        val b2 = c2 and 0xFF
+
+        val a = (a1 + (a2 - a1) * t).toInt()
+        val r = (r1 + (r2 - r1) * t).toInt()
+        val g = (g1 + (g2 - g1) * t).toInt()
+        val b = (b1 + (b2 - b1) * t).toInt()
+
+        return (a shl 24) or (r shl 16) or (g shl 8) or b
     }
 
     private fun renderSavedHotbarItems(
