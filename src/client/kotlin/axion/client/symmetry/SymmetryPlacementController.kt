@@ -30,12 +30,17 @@ object SymmetryPlacementController {
         if (AxionToolSelectionController.isAxionSlotActive()) {
             return false
         }
+        // Don't consume when fast place or replace mode is enabled - let multi-sample path handle it
+        val state = AxionClientState.globalModeState
+        if (state.fastPlaceEnabled || state.replaceModeEnabled) {
+            return false
+        }
         val target = ModeTargeting.currentBlockTarget(client) ?: return false
         val operation = BuildPlacementService.createPlacementOperation(
             client = client,
             target = target,
             symmetryConfig = config,
-            replaceMode = AxionClientState.globalModeState.replaceModeEnabled,
+            replaceMode = state.replaceModeEnabled,
         )
         if (operation == null || operation.placements.size <= 1) {
             return false

@@ -1,5 +1,6 @@
 package axion.mixin.client
 
+import axion.AxionMod
 import axion.client.compat.LitematicaCompat
 import axion.client.hotbar.AxionAltMenuController
 import axion.client.input.AxionInteractionRouter
@@ -42,6 +43,36 @@ abstract class MouseMixin {
         }
 
         if (client.currentScreen != null || action != GLFW.GLFW_PRESS) {
+            return
+        }
+
+        // For infinite reach without fast place, let vanilla handle the event
+        // so that doItemUse is called and continuous placement works
+        if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT &&
+            ClientModeController.shouldLetVanillaHandleSecondaryAction(client)) {
+            return
+        }
+
+        // For fast place mode, let vanilla handle so doItemUse is called
+        // which triggers our mixin and enables manual key tracking
+        if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT &&
+            ClientModeController.isFastPlaceEnabled(client)) {
+            AxionMod.LOGGER.info("[Axion] MouseMixin letting vanilla handle right-click for fast place")
+            return
+        }
+
+        // For infinite reach without bulldozer, let vanilla handle the event
+        // so that doAttack is called and continuous breaking works
+        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT &&
+            ClientModeController.shouldLetVanillaHandlePrimaryAction(client)) {
+            AxionMod.LOGGER.info("[Axion] MouseMixin letting vanilla handle left-click for infinite reach")
+            return
+        }
+
+        // For bulldozer + infinite reach, also let vanilla handle for continuous multi-block breaking
+        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT &&
+            ClientModeController.shouldLetVanillaHandleBulldozerInfiniteReach(client)) {
+            AxionMod.LOGGER.info("[Axion] MouseMixin letting vanilla handle left-click for bulldozer + infinite reach")
             return
         }
 

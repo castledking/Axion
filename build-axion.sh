@@ -63,7 +63,7 @@ build_version() {
 
   echo
   echo "==> Building Axion v${MOD_VERSION} for Minecraft ${version}"
-  local gradle_tasks=(remapJar :paper-plugin:jar)
+  local gradle_tasks=(clean remapJar :paper-plugin:jar)
 
   ./gradlew "${gradle_tasks[@]}" \
     -Pmod_version="${MOD_VERSION}" \

@@ -1,5 +1,6 @@
 package axion.mixin.client
 
+import axion.AxionMod
 import axion.client.input.AxionInteractionRouter
 import axion.client.mode.ClientModeController
 import axion.client.symmetry.SymmetryBreakController
@@ -17,7 +18,28 @@ abstract class MinecraftClientMixin {
 
     @Inject(method = ["doAttack"], at = [At("HEAD")], cancellable = true)
     private fun axionHandlePrimaryAction(ci: CallbackInfoReturnable<Boolean>) {
+        AxionMod.LOGGER.info("[Axion] doAttack called")
+
+        // Manually track attack key press since cancelling prevents vanilla key binding updates
+        ClientModeController.setAttackKeyManuallyPressed()
+
         SymmetryBreakController.handlePrimaryAction(self())
+
+        // Handle bulldozer + infinite reach multi-block breaking
+        if (ClientModeController.handleBulldozerInfiniteReachBreaking(self())) {
+            AxionMod.LOGGER.info("[Axion] doAttack handled by bulldozer + infinite reach")
+            ci.setReturnValue(false)
+            ci.cancel()
+            return
+        }
+
+        // Handle infinite reach block breaking at vanilla speed
+        if (ClientModeController.handleInfiniteReachBreaking(self())) {
+            AxionMod.LOGGER.info("[Axion] doAttack handled by infinite reach")
+            ci.setReturnValue(false)
+            ci.cancel()
+            return
+        }
 
         if (AxionInteractionRouter.shouldSuppressPrimary(self())) {
             ci.setReturnValue(false)
@@ -45,22 +67,46 @@ abstract class MinecraftClientMixin {
 
     @Inject(method = ["doItemUse"], at = [At("HEAD")], cancellable = true)
     private fun axionHandleSecondaryAction(ci: CallbackInfo) {
+        AxionMod.LOGGER.info("[Axion] doItemUse called")
+
+        // Manually track use key press since cancelling prevents vanilla key binding updates
+        ClientModeController.setUseKeyManuallyPressed()
+
+        // Handle fast place + infinite reach multi-block placement
+        if (ClientModeController.handleFastPlaceInfiniteReachPlacement(self())) {
+            AxionMod.LOGGER.info("[Axion] doItemUse handled by fast place + infinite reach")
+            ci.cancel()
+            return
+        }
+
+        // Handle infinite reach + vanilla-speed placement in the mixin
+        // This bypasses vanilla's item use cooldown
+        if (ClientModeController.handleInfiniteReachPlacement(self())) {
+            AxionMod.LOGGER.info("[Axion] doItemUse handled by infinite reach")
+            ci.cancel()
+            return
+        }
+
         if (AxionInteractionRouter.shouldSuppressSecondary(self())) {
+            AxionMod.LOGGER.info("[Axion] doItemUse suppressed by AxionInteractionRouter")
             ci.cancel()
             return
         }
 
         if (AxionInteractionRouter.consumeSecondaryAction(self())) {
+            AxionMod.LOGGER.info("[Axion] doItemUse consumed by AxionInteractionRouter")
             ci.cancel()
             return
         }
 
         if (ClientModeController.shouldSuppressSecondary(self())) {
+            AxionMod.LOGGER.info("[Axion] doItemUse suppressed by ClientModeController")
             ci.cancel()
             return
         }
 
         if (ClientModeController.consumeSecondaryAction(self())) {
+            AxionMod.LOGGER.info("[Axion] doItemUse consumed by ClientModeController")
             ci.cancel()
         }
     }

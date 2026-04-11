@@ -4,7 +4,9 @@
   "compatibilityLevel": "JAVA_21",
   "client": [
     "ClientPlayerEntityMixin",
+    "ClientPlayerInteractionManagerAccessor",
     "EntityMixin",
+    "MinecraftClientAccessor",
     "MinecraftClientMixin",
     "MouseMixin",
     "WorldRendererFallbackMixin"

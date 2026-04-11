@@ -3,14 +3,17 @@ package axion.client.mode
 import axion.common.model.SymmetryConfig
 import axion.common.operation.SymmetryBlockPlacement
 import axion.common.operation.SymmetryPlacementOperation
+import net.minecraft.block.ShapeContext
 import net.minecraft.client.MinecraftClient
 import net.minecraft.item.BlockItem
 import net.minecraft.item.ItemPlacementContext
+import net.minecraft.util.function.BooleanBiFunction
 import net.minecraft.util.Hand
 import net.minecraft.util.hit.BlockHitResult
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Direction
 import net.minecraft.util.math.Vec3d
+import net.minecraft.util.shape.VoxelShapes
 
 object BuildPlacementService {
     fun createPlacementOperation(
@@ -207,6 +210,9 @@ object BuildPlacementService {
         if (!placementState.canPlaceAt(world, placementPos)) {
             return null
         }
+        if (wouldCollideWithPlayer(world, player, placementPos, placementState)) {
+            return null
+        }
         return PlacementResult(
             placement = SymmetryBlockPlacement(placementPos, placementState),
             canReplaceExisting = rawContext.canReplaceExisting(),
@@ -240,6 +246,9 @@ object BuildPlacementService {
         }
         val placementState = blockItem.block.getPlacementState(placementContext) ?: return null
         if (!placementState.canPlaceAt(world, pos)) {
+            return null
+        }
+        if (wouldCollideWithPlayer(world, player, pos, placementState)) {
             return null
         }
         return SymmetryBlockPlacement(pos.toImmutable(), placementState)
@@ -291,6 +300,9 @@ object BuildPlacementService {
         if (!placementState.canPlaceAt(world, pos)) {
             return null
         }
+        if (wouldCollideWithPlayer(world, player, pos, placementState)) {
+            return null
+        }
 
         return SymmetryBlockPlacement(
             pos = pos.toImmutable(),
@@ -328,4 +340,27 @@ object BuildPlacementService {
         val placement: SymmetryBlockPlacement,
         val canReplaceExisting: Boolean,
     )
+
+    private fun wouldCollideWithPlayer(
+        world: net.minecraft.client.world.ClientWorld,
+        player: net.minecraft.client.network.ClientPlayerEntity,
+        pos: BlockPos,
+        state: net.minecraft.block.BlockState,
+    ): Boolean {
+        if (player.isSpectator || player.noClip) {
+            return false
+        }
+
+        val collisionShape = state.getCollisionShape(world, pos, ShapeContext.of(player))
+        if (collisionShape.isEmpty) {
+            return false
+        }
+
+        val playerShape = VoxelShapes.cuboid(player.boundingBox.contract(1.0E-4))
+        return VoxelShapes.matchesAnywhere(
+            collisionShape.offset(pos.x.toDouble(), pos.y.toDouble(), pos.z.toDouble()),
+            playerShape,
+            BooleanBiFunction.AND,
+        )
+    }
 }
