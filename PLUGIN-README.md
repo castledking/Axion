@@ -6,7 +6,7 @@ The Axion Paper plugin is the multiplayer companion for the Axion Fabric mod on 
 
 For the client-side toolset, install the Fabric mod:
 
-- [Axion Mod README](https://github.com/castledking/Axion/blob/main/MOD-README.md)
+<a href="https://modrinth.com/mod/axion"><img alt="Download on Modrinth" src="https://img.shields.io/badge/Download%20on-Modrinth-1bd96a?style=for-the-badge&logo=modrinth&logoColor=white"></a> <p>[Axion Mod README](https://github.com/castledking/Axion/blob/main/MOD-README.md)
 
 If you are running a Fabric dedicated server instead of Paper:
 
@@ -15,7 +15,6 @@ If you are running a Fabric dedicated server instead of Paper:
 - it uses the same main Axion Fabric mod jar in the server `mods` folder
 
 <p align="center">
-  <a href="https://modrinth.com/mod/axion"><img alt="Download on Modrinth" src="https://img.shields.io/badge/Download%20on-Modrinth-1bd96a?style=for-the-badge&logo=modrinth&logoColor=white"></a>
   <a href="https://github.com/castledking/Axion"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github"></a>
   <a href="https://github.com/castledking/Axion/issues"><img alt="GitHub Issues" src="https://img.shields.io/badge/GitHub-Issues-181717?style=for-the-badge&logo=github"></a>
   <a href="https://github.com/castledking/Axion/wiki"><img alt="Wiki" src="https://img.shields.io/badge/GitHub-Wiki-181717?style=for-the-badge&logo=github"></a>
@@ -24,7 +23,6 @@ If you are running a Fabric dedicated server instead of Paper:
 <p align="center">
   <a href="https://discord.com/invite/pCKdCX6nYr"><img alt="Discord" src="https://img.shields.io/badge/Discord-Community-5865F2?style=for-the-badge&logo=discord&logoColor=white"></a>
   <a href="https://github.com/castledking/Axion/blob/main/README.md"><img alt="Main README" src="https://img.shields.io/badge/View-Main%20README-3b82f6?style=for-the-badge"></a>
-  <a href="https://castled.codes"><img alt="CASTLED CODEX" src="https://castled.codes/assets/logo-banner.png" width="140" height="35"></a>
 </p>
 
 <p align="center">
@@ -120,6 +118,7 @@ Players still use the Fabric mod client-side, including:
 - saved hotbars / hotbar workspace
 - symmetry
 - no clip / infinite reach / replace mode UI
+- fly speed adjustment via Alt menu
 
 Saved hotbars:
 

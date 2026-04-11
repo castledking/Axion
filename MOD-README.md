@@ -6,24 +6,16 @@ Axion is an open-source Fabric building tool for Minecraft, inspired by Axiom. I
 
 For multiplayer-safe editing on Paper, pair it with the Axion Paper plugin:
 
-- [Axion Plugin README](https://github.com/castledking/Axion/blob/main/PLUGIN-README.md)
+<a href="https://modrinth.com/mod/axion-paper-plugin"><img alt="Download on Modrinth" src="https://img.shields.io/badge/Download%20on-Modrinth-1bd96a?style=for-the-badge&logo=modrinth&logoColor=white"></a> <p>[Axion Plugin README](https://github.com/castledking/Axion/blob/main/PLUGIN-README.md)
 
 For Minecraft `1.21.11`, Axion also has a Fabric dedicated server path using the same main Fabric jar that players install on the client.
 
 <p align="center">
-  <a href="https://modrinth.com/mod/axion-paper-plugin"><img alt="Download on Modrinth" src="https://img.shields.io/badge/Download%20on-Modrinth-1bd96a?style=for-the-badge&logo=modrinth&logoColor=white"></a>
   <a href="https://github.com/castledking/Axion"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github"></a>
   <a href="https://github.com/castledking/Axion/issues"><img alt="GitHub Issues" src="https://img.shields.io/badge/GitHub-Issues-181717?style=for-the-badge&logo=github"></a>
   <a href="https://github.com/castledking/Axion/wiki"><img alt="Wiki" src="https://img.shields.io/badge/GitHub-Wiki-181717?style=for-the-badge&logo=github"></a>
-</p>
-
-<p align="center">
   <a href="https://discord.com/invite/pCKdCX6nYr"><img alt="Discord" src="https://img.shields.io/badge/Discord-Community-5865F2?style=for-the-badge&logo=discord&logoColor=white"></a>
   <a href="https://github.com/castledking/Axion/blob/main/README.md"><img alt="Main README" src="https://img.shields.io/badge/View-Main%20README-3b82f6?style=for-the-badge"></a>
-  <a href="https://castled.codes"><img alt="CASTLED CODEX" src="https://castled.codes/assets/logo-banner.png" width="140" height="35"></a>
-</p>
-
-<p align="center">
   <a href="https://modrinth.com/mod/fabric-api"><img alt="Requires Fabric API" src="https://img.shields.io/badge/Requires-Fabric%20API-c9b07a?style=for-the-badge"></a>
   <a href="https://modrinth.com/mod/fabric-language-kotlin"><img alt="Requires Fabric Language Kotlin" src="https://img.shields.io/badge/Requires-Fabric%20Language%20Kotlin-7f52ff?style=for-the-badge&logo=kotlin&logoColor=white"></a>
 </p>
@@ -85,11 +77,15 @@ Fabric dedicated server support:
   - scroll or click to switch saved hotbars
   - release `Alt` to load the selected saved hotbar into your live hotbar
   - the previously active hotbar is saved back automatically
+- Fly speed adjustment via Alt menu
+  - slider from 100% to 999%
 - Builder utilities:
   - replace mode
   - infinite reach
   - no clip
   - far pick block
+  - bulldozer
+  - fast place
 - Preview and selection feedback:
   - pulsing cuboid feedback
   - ghost block previews

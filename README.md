@@ -56,10 +56,12 @@ The Paper plugin handles authoritative multiplayer edit application, validation,
   - replace mode
   - infinite reach
   - no clip
+  - bulldozer
+  - fast place
 - **Config and UI**
   - Mod Menu support
   - in-game config screen
-  - Alt hotbar menu toggles for edit behavior
+  - Alt hotbar menu for adjusting fly speed andhotbar saving/loading
 - **Multiplayer Support**
   - server-backed edits through the companion Paper plugin
   - undo/redo and validation on the server side
@@ -68,6 +70,8 @@ The Paper plugin handles authoritative multiplayer edit application, validation,
 
 ## Current Highlights
 
+- **Flying Speed Slider** — Adjust creative flight speed from 100% to 999% via Alt menu
+- **Improved Infinite Reach** — Replace mode, bulldozer, and fast place now work seamlessly at any distance
 - Magic Select Templates for custom masked selection behavior
 - Better move/clone/stack/smear preview flow and scrolling visualization
 - Multi-directional stack and smear previews
