@@ -44,7 +44,9 @@ object AxionTickHandler {
                 AxionInteractionRouter.handleDeleteAction(client)
             }
 
-            while (AxionKeybindings.symmetryToggleRotation.wasPressed()) {
+            // Use KeyBindingHandler for keys that might conflict with vanilla (e.g., R for sprint)
+            // This ensures proper behavior on 1.21.7 and earlier where wasPressed() consumes the key
+            if (KeyBindingHandler.wasPressed(AxionKeybindings.symmetryToggleRotation)) {
                 if (AxionModifierKeys.isControlDown(client)) {
                     if (!PlacementToolController.handleRotateAction()) {
                         SymmetryController.toggleRotational()
@@ -52,7 +54,7 @@ object AxionTickHandler {
                 }
             }
 
-            while (AxionKeybindings.symmetryToggleMirror.wasPressed()) {
+            if (KeyBindingHandler.wasPressed(AxionKeybindings.symmetryToggleMirror)) {
                 if (AxionModifierKeys.isControlDown(client)) {
                     if (!PlacementToolController.handleMirrorAction(client)) {
                         SymmetryController.toggleMirror(client)

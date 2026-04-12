@@ -11,10 +11,24 @@ version = property("mod_version") as String
 group = property("maven_group") as String
 val modVersion = version.toString()
 val minecraftVersion = property("minecraft_version") as String
-val minecraftPatch = minecraftVersion.substringAfter("1.21.", "0").substringBefore('-').toIntOrNull() ?: 0
+val is120Series = minecraftVersion.startsWith("1.20.")
+val minecraftPatch = when {
+    minecraftVersion.startsWith("1.21.") -> minecraftVersion.substringAfter("1.21.", "0").substringBefore('-').toIntOrNull() ?: 0
+    else -> 0
+}
+val is1210To1214 = minecraftVersion.startsWith("1.21.") && minecraftPatch in 0..4
+val is1215To1217 = minecraftVersion.startsWith("1.21.") && minecraftPatch in 5..7
 val needsLegacyMouseInputStub = minecraftVersion.startsWith("1.21.") && minecraftPatch < 11
 val needsLegacyWorldRenderStateStub = minecraftVersion.startsWith("1.21.") && minecraftPatch < 9
 val supportsFabricDedicatedServer = minecraftVersion == "1.21.11"
+
+// Define Minecraft version range for fabric.mod.json
+val minecraftVersionRange = when {
+    is120Series -> ">=1.20 <1.21"
+    is1210To1214 -> ">=1.21 <=1.21.4"
+    is1215To1217 -> ">=1.21.5 <=1.21.7"
+    else -> ">=1.21.8"
+}
 val fabricServerEntrypoint = if (supportsFabricDedicatedServer) {
     "axion.server.fabric.AxionFabricServerMod"
 } else {
@@ -55,6 +69,32 @@ if (needsLegacyWorldRenderStateStub) {
     }
 }
 
+// Configure version-specific compat source sets
+// Each Minecraft version has its own compat directory with VersionCompatImpl/Init
+when {
+    is120Series -> {
+        sourceSets.named("client") {
+            kotlin.srcDir("src/compat-1_20_6/kotlin")
+        }
+    }
+    is1210To1214 -> {
+        sourceSets.named("client") {
+            kotlin.srcDir("src/compat-1_21_4/kotlin")
+        }
+    }
+    is1215To1217 -> {
+        sourceSets.named("client") {
+            kotlin.srcDir("src/compat-1_21_7/kotlin")
+        }
+    }
+    else -> {
+        // 1.21.8+: Use 1.21.11 compat files
+        sourceSets.named("client") {
+            kotlin.srcDir("src/compat-1_21_11/kotlin")
+        }
+    }
+}
+
 dependencies {
     implementation(project(":protocol"))
     minecraft("com.mojang:minecraft:${property("minecraft_version")}")
@@ -73,11 +113,13 @@ tasks.processResources {
     }
     inputs.property("version", modVersion)
     inputs.property("fabric_server_entrypoint", fabricServerEntrypoint)
+    inputs.property("minecraft_version_range", minecraftVersionRange)
 
     filesMatching("fabric.mod.json") {
         expand(
             "version" to modVersion,
             "fabric_server_entrypoint" to fabricServerEntrypoint,
+            "minecraft_version_range" to minecraftVersionRange,
         )
     }
 }
@@ -133,4 +175,5 @@ tasks.named<AbstractArchiveTask>("remapJar") {
 
 tasks.named<AbstractArchiveTask>("sourcesJar") {
     archiveFileName.set("Axion-v${modVersion}-mc${minecraftVersion}-sources.jar")
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }

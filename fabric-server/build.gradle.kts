@@ -12,9 +12,23 @@ version = rootProject.version
 
 val minecraftVersion = rootProject.property("minecraft_version") as String
 val modVersion = project.version.toString()
+val isSupportedVersion = minecraftVersion == "1.21.11"
 
 base {
     archivesName.set("axion-fabric-server")
+}
+
+// Disable all tasks for unsupported versions
+if (!isSupportedVersion) {
+    tasks.withType<AbstractArchiveTask>().configureEach {
+        enabled = false
+    }
+    tasks.withType<JavaCompile>().configureEach {
+        enabled = false
+    }
+    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+        enabled = false
+    }
 }
 
 repositories {

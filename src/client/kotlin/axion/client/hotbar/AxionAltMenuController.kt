@@ -1,6 +1,7 @@
 package axion.client.hotbar
 
 import axion.client.AxionClientState
+import axion.client.compat.VersionCompatImpl
 import axion.client.input.AxionModifierKeys
 import axion.client.tool.AxionToolSelectionController
 import axion.common.model.AxionSubtool
@@ -53,8 +54,8 @@ object AxionAltMenuController {
         val sideSlot = AxionHudLayout.sideSlot(client, screenWidth, screenHeight)
         return AxionHudLayout.subtoolAt(
             sideSlot = sideSlot,
-            mouseX = client.mouse.getScaledX(client.window),
-            mouseY = client.mouse.getScaledY(client.window),
+            mouseX = VersionCompatImpl.getScaledMouseX(client),
+            mouseY = VersionCompatImpl.getScaledMouseY(client),
         )
     }
 
@@ -66,8 +67,8 @@ object AxionAltMenuController {
         val sideSlot = AxionHudLayout.sideSlot(client, screenWidth, screenHeight)
         val bounds = AxionHudLayout.middleClickToggleBounds(sideSlot)
         return bounds.contains(
-            client.mouse.getScaledX(client.window),
-            client.mouse.getScaledY(client.window),
+            VersionCompatImpl.getScaledMouseX(client),
+            VersionCompatImpl.getScaledMouseY(client),
         )
     }
 
@@ -79,8 +80,8 @@ object AxionAltMenuController {
         val sideSlot = AxionHudLayout.sideSlot(client, screenWidth, screenHeight)
         val bounds = AxionHudLayout.keepExistingToggleBounds(sideSlot)
         return bounds.contains(
-            client.mouse.getScaledX(client.window),
-            client.mouse.getScaledY(client.window),
+            VersionCompatImpl.getScaledMouseX(client),
+            VersionCompatImpl.getScaledMouseY(client),
         )
     }
 
@@ -92,8 +93,8 @@ object AxionAltMenuController {
         val sideSlot = AxionHudLayout.sideSlot(client, screenWidth, screenHeight)
         val bounds = AxionHudLayout.copyEntitiesToggleBounds(sideSlot)
         return bounds.contains(
-            client.mouse.getScaledX(client.window),
-            client.mouse.getScaledY(client.window),
+            VersionCompatImpl.getScaledMouseX(client),
+            VersionCompatImpl.getScaledMouseY(client),
         )
     }
 
@@ -105,8 +106,8 @@ object AxionAltMenuController {
         val sideSlot = AxionHudLayout.sideSlot(client, screenWidth, screenHeight)
         val bounds = AxionHudLayout.copyAirToggleBounds(sideSlot)
         return bounds.contains(
-            client.mouse.getScaledX(client.window),
-            client.mouse.getScaledY(client.window),
+            VersionCompatImpl.getScaledMouseX(client),
+            VersionCompatImpl.getScaledMouseY(client),
         )
     }
 
@@ -122,8 +123,8 @@ object AxionAltMenuController {
         return AxionHudLayout.savedHotbarPageButtons(screenWidth, screenHeight, SavedHotbarController.selectedPage())
             .firstOrNull { button ->
                 button.contains(
-                    client.mouse.getScaledX(client.window),
-                    client.mouse.getScaledY(client.window),
+                    VersionCompatImpl.getScaledMouseX(client),
+                    VersionCompatImpl.getScaledMouseY(client),
                 )
             }
     }
@@ -139,10 +140,10 @@ object AxionAltMenuController {
 
         return AxionHudLayout.savedHotbarRows(screenWidth, screenHeight, SavedHotbarController.selectedPage())
             .firstOrNull { row ->
-                client.mouse.getScaledX(client.window) >= row.x &&
-                    client.mouse.getScaledX(client.window) < row.x + row.width &&
-                    client.mouse.getScaledY(client.window) >= row.y &&
-                    client.mouse.getScaledY(client.window) < row.y + row.height
+                VersionCompatImpl.getScaledMouseX(client) >= row.x &&
+                    VersionCompatImpl.getScaledMouseX(client) < row.x + row.width &&
+                    VersionCompatImpl.getScaledMouseY(client) >= row.y &&
+                    VersionCompatImpl.getScaledMouseY(client) < row.y + row.height
             }
     }
 
@@ -154,8 +155,8 @@ object AxionAltMenuController {
         }
         val bounds = AxionHudLayout.flyingSpeedSliderBounds(screenWidth, screenHeight, SavedHotbarController.selectedPage())
         return bounds.track.contains(
-            client.mouse.getScaledX(client.window),
-            client.mouse.getScaledY(client.window),
+            VersionCompatImpl.getScaledMouseX(client),
+            VersionCompatImpl.getScaledMouseY(client),
         )
     }
 
@@ -165,8 +166,8 @@ object AxionAltMenuController {
         }
         val bounds = AxionHudLayout.flyingSpeedSliderBounds(screenWidth, screenHeight, SavedHotbarController.selectedPage())
         return bounds.plusButton.contains(
-            client.mouse.getScaledX(client.window),
-            client.mouse.getScaledY(client.window),
+            VersionCompatImpl.getScaledMouseX(client),
+            VersionCompatImpl.getScaledMouseY(client),
         )
     }
 
@@ -176,15 +177,15 @@ object AxionAltMenuController {
         }
         val bounds = AxionHudLayout.flyingSpeedSliderBounds(screenWidth, screenHeight, SavedHotbarController.selectedPage())
         return bounds.minusButton.contains(
-            client.mouse.getScaledX(client.window),
-            client.mouse.getScaledY(client.window),
+            VersionCompatImpl.getScaledMouseX(client),
+            VersionCompatImpl.getScaledMouseY(client),
         )
     }
 
     fun handleFlyingSpeedSliderDrag(client: MinecraftClient, screenWidth: Int, screenHeight: Int) {
         if (!isDraggingSlider) return
         val bounds = AxionHudLayout.flyingSpeedSliderBounds(screenWidth, screenHeight, SavedHotbarController.selectedPage())
-        val mouseY = client.mouse.getScaledY(client.window)
+        val mouseY = VersionCompatImpl.getScaledMouseY(client)
         val newValue = bounds.trackValueFromY(mouseY)
         AxionClientState.updateFlySpeedMultiplier(newValue)
     }

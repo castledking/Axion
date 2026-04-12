@@ -6,9 +6,23 @@ plugins {
 group = rootProject.group
 version = rootProject.version
 val minecraftVersion = rootProject.property("minecraft_version") as String
+val isSupportedVersion = minecraftVersion == "1.21.11" || minecraftVersion == "1.21.7"
 
 base {
     archivesName.set("axion-plugin")
+}
+
+// Disable all tasks for unsupported versions
+if (!isSupportedVersion) {
+    tasks.withType<AbstractArchiveTask>().configureEach {
+        enabled = false
+    }
+    tasks.withType<JavaCompile>().configureEach {
+        enabled = false
+    }
+    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+        enabled = false
+    }
 }
 
 repositories {

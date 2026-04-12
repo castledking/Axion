@@ -1,5 +1,6 @@
 package axion.client.mode
 import axion.client.AxionClientState
+import axion.client.compat.VersionCompatImpl
 import axion.client.input.AxionKeybindings
 import axion.client.network.AxionServerConnection
 import axion.client.selection.AxionTargeting
@@ -947,7 +948,8 @@ object ClientModeController {
         val world = client.world ?: return
         operation.placements.forEach { placement ->
             val soundGroup = placement.state.soundGroup
-            world.playSoundClient(
+            VersionCompatImpl.playSoundClient(
+                world,
                 placement.pos.x + 0.5,
                 placement.pos.y + 0.5,
                 placement.pos.z + 0.5,
@@ -955,7 +957,6 @@ object ClientModeController {
                 SoundCategory.BLOCKS,
                 (soundGroup.volume + 1.0f) / 2.0f,
                 soundGroup.pitch * 0.8f,
-                false,
             )
         }
     }
@@ -984,7 +985,7 @@ object ClientModeController {
                 return true
             }
 
-            val inventorySlot = findInventorySlot(inventory, pickedItem, PlayerInventory.getHotbarSize() until inventory.mainStacks.size)
+            val inventorySlot = findInventorySlot(inventory, pickedItem, PlayerInventory.getHotbarSize() until VersionCompatImpl.getMainInventoryStacks(inventory).size)
             if (inventorySlot >= 0) {
                 client.interactionManager?.clickSlot(
                     player.currentScreenHandler.syncId,

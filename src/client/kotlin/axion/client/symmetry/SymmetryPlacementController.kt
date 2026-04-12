@@ -1,6 +1,7 @@
 package axion.client.symmetry
 
 import axion.client.AxionClientState
+import axion.client.compat.VersionCompatImpl
 import axion.client.mode.BuildPlacementService
 import axion.client.mode.ModeTargeting
 import axion.client.tool.AxionToolSelectionController
@@ -66,7 +67,8 @@ object SymmetryPlacementController {
         val world = client.world ?: return
         operation.placements.forEach { placement ->
             val soundGroup = placement.state.soundGroup
-            world.playSoundClient(
+            VersionCompatImpl.playSoundClient(
+                world,
                 placement.pos.x + 0.5,
                 placement.pos.y + 0.5,
                 placement.pos.z + 0.5,
@@ -74,7 +76,6 @@ object SymmetryPlacementController {
                 SoundCategory.BLOCKS,
                 (soundGroup.volume + 1.0f) / 2.0f,
                 soundGroup.pitch * 0.8f,
-                false,
             )
         }
     }
