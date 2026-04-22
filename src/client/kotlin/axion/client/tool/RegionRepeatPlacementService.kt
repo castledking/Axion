@@ -183,7 +183,37 @@ object RegionRepeatPlacementService {
         }
     }
 
+    private data class FoldCacheKey(
+        val clipboardHash: Int,
+        val sourceRegion: BlockRegion,
+        val step: Vec3i,
+        val repeatCount: Int,
+        val mode: Mode,
+    )
+
+    private val foldCache = LinkedHashMap<FoldCacheKey, FoldedRepeatPreview>(8, 0.75f, true)
+
     private fun foldPreview(
+        preview: RepeatRegionPreview,
+        mode: Mode,
+    ): FoldedRepeatPreview {
+        val key = FoldCacheKey(
+            clipboardHash = preview.clipboardBuffer.hashCode(),
+            sourceRegion = preview.sourceRegion,
+            step = preview.step,
+            repeatCount = preview.repeatCount,
+            mode = mode,
+        )
+        foldCache[key]?.let { return it }
+        val result = foldPreviewUncached(preview, mode)
+        if (foldCache.size >= 8) {
+            foldCache.entries.iterator().let { it.next(); it.remove() }
+        }
+        foldCache[key] = result
+        return result
+    }
+
+    private fun foldPreviewUncached(
         preview: RepeatRegionPreview,
         mode: Mode,
     ): FoldedRepeatPreview {

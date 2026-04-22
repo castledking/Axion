@@ -18,10 +18,10 @@ object PlacementPreviewRenderer {
     private const val SPARSE_DESTINATION_GHOST_ALPHA: Int = 235
     private const val MOVE_SOURCE_GHOST_SCALE: Float = 1.01f
     private const val DESTINATION_GHOST_SCALE: Float = 0.985f
-    private const val MAX_MOVE_DETAILED_SELECTION_CELLS: Int = 256
-    private const val MAX_MOVE_SOURCE_CELLS: Int = 384
-    private const val MAX_MOVE_DESTINATION_GHOST_CELLS: Int = 256
-    private const val MAX_CLONE_DESTINATION_GHOST_CELLS: Int = 512
+    private const val MAX_MOVE_DETAILED_SELECTION_CELLS: Int = 4096
+    private const val MAX_MOVE_SOURCE_CELLS: Int = 4096
+    private const val MAX_MOVE_DESTINATION_GHOST_CELLS: Int = 8192
+    private const val MAX_CLONE_DESTINATION_GHOST_CELLS: Int = 8192
     private val moveSourceClipboardCache = java.util.WeakHashMap<ClipboardBuffer, ClipboardBuffer?>()
 
     fun render(context: AxionWorldRenderContext) {

@@ -1,5 +1,6 @@
 package axion.client.hotbar
 
+import axion.client.compat.LitematicaCompat
 import axion.client.config.AxionClientConfig
 import axion.client.config.SavedHotbarConfig
 import axion.client.input.AxionModifierKeys
@@ -37,7 +38,9 @@ object SavedHotbarController {
     }
 
     fun isOverlayActive(client: MinecraftClient): Boolean {
-        return supportsSavedHotbars(client) && AxionModifierKeys.isAltDown(client)
+        return supportsSavedHotbars(client) &&
+            AxionModifierKeys.isAltDown(client) &&
+            !LitematicaCompat.isHoldingConfiguredTool(client)
     }
 
     fun displayHotbarsForSelectedPage(client: MinecraftClient): List<DisplayHotbar> {

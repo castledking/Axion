@@ -92,8 +92,10 @@ abstract class MouseMixin {
             return
         }
 
-        if (AxionModifierKeys.isAltDown(client) && LitematicaCompat.isHoldingConfiguredTool(client)) {
-            return
+        if (LitematicaCompat.isHoldingConfiguredTool(client)) {
+            if (AxionModifierKeys.isAltDown(client) || AxionModifierKeys.isControlDown(client)) {
+                return
+            }
         }
 
         val player = client.player ?: return

@@ -83,6 +83,10 @@ data class NoClipStateRequest(
     val armed: Boolean,
 ) : AxionClientMessage
 
+data class FlightSpeedRequest(
+    val multiplier: Float,
+) : AxionClientMessage
+
 sealed interface AxionRemoteOperation {
     val type: AxionOperationType
 }

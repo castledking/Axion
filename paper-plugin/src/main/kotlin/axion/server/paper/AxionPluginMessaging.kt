@@ -5,6 +5,7 @@ import axion.protocol.AxionProtocol
 import axion.protocol.AxionProtocolCodec
 import axion.protocol.AxionTransportCodec
 import axion.protocol.ClientHello
+import axion.protocol.FlightSpeedRequest
 import axion.protocol.NoClipStateRequest
 import axion.protocol.OperationBatchRequest
 import axion.protocol.OperationBatchResult
@@ -18,6 +19,7 @@ class AxionPluginMessaging(
     private val plugin: AxionPaperPlugin,
     private val policyService: AxionPolicyService,
     private val noClipService: AxionNoClipService,
+    private val flightSpeedService: AxionFlightSpeedService,
 ) : PluginMessageListener {
     private val auditEnabled = plugin.config.getBoolean("audit.enabled", true)
     private val timingStats = AxionTimingStatsTracker(
@@ -43,6 +45,7 @@ class AxionPluginMessaging(
         when (decoded) {
             is ClientHello -> handleHello(player, decoded)
             is NoClipStateRequest -> handleNoClipState(player, decoded)
+            is FlightSpeedRequest -> handleFlightSpeed(player, decoded)
             is OperationBatchRequest -> handleOperationBatch(player, decoded)
             is UndoRequest -> handleUndo(player, decoded)
             is RedoRequest -> handleRedo(player, decoded)
@@ -85,6 +88,10 @@ class AxionPluginMessaging(
 
     private fun handleNoClipState(player: Player, request: NoClipStateRequest) {
         noClipService.setArmed(player, request.armed)
+    }
+
+    private fun handleFlightSpeed(player: Player, request: FlightSpeedRequest) {
+        flightSpeedService.blessPlayer(player, request.multiplier)
     }
 
     private fun handleUndo(player: Player, request: UndoRequest) {

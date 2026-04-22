@@ -69,6 +69,7 @@ if (needsLegacyWorldRenderStateStub) {
     }
 }
 
+
 // Configure version-specific compat source sets
 // Each Minecraft version has its own compat directory with VersionCompatImpl/Init
 when {

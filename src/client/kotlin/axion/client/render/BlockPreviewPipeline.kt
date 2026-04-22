@@ -4,6 +4,9 @@ import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Box
 
 object BlockPreviewPipeline {
+    private val LOGGER = org.slf4j.LoggerFactory.getLogger("AxionPreviewPipeline")
+    private var diagCounter = 0
+    private const val SPARSE_OUTLINE_BUDGET: Int = 512
     enum class SelectionStyle {
         SELECTION,
         PULSE,
@@ -157,12 +160,18 @@ object BlockPreviewPipeline {
         scene: Scene,
     ): Boolean {
         if (scene.origins.isEmpty()) {
+            if (diagCounter++ % 120 == 0) {
+                LOGGER.warn("[Axion] renderDestination: SKIP origins empty, sparse={}", scene.sparse)
+            }
             renderOutline(context, scene)
             return false
         }
 
         val nonAirCells = scene.shellClipboard.nonAirCells()
         if (nonAirCells.isEmpty()) {
+            if (diagCounter++ % 120 == 0) {
+                LOGGER.warn("[Axion] renderDestination: SKIP nonAirCells empty")
+            }
             renderOutline(context, scene)
             return false
         }
@@ -170,7 +179,14 @@ object BlockPreviewPipeline {
         renderOutline(context, scene)
 
         if (!scene.renderGhost) {
+            if (diagCounter++ % 120 == 0) {
+                LOGGER.warn("[Axion] renderDestination: renderGhost=false, origins={}, nonAirCells={}", scene.origins.size, nonAirCells.size)
+            }
             return true
+        }
+
+        if (diagCounter++ % 120 == 0) {
+            LOGGER.warn("[Axion] renderDestination: RENDERING ghost, origins={}, nonAirCells={}", scene.origins.size, nonAirCells.size)
         }
 
         val renderedShell = PreviewShellBlockRenderer.render(
@@ -181,6 +197,9 @@ object BlockPreviewPipeline {
             alpha = scene.ghostAlpha,
         )
         if (!renderedShell) {
+            if (diagCounter++ % 120 == 0) {
+                LOGGER.warn("[Axion] renderDestination: shell failed, falling back to GhostBlockPreviewRenderer")
+            }
             GhostBlockPreviewRenderer.render(
                 context = context,
                 clipboard = scene.fallbackGhostClipboard,
@@ -199,7 +218,9 @@ object BlockPreviewPipeline {
         scene: Scene,
     ) {
         if (scene.sparse) {
-            if (!PreviewRegionOutlineRenderer.render(
+            val totalCells = scene.selectionClipboard.nonAirCells().size.toLong() * scene.origins.size.toLong()
+            val withinBudget = totalCells <= SPARSE_OUTLINE_BUDGET
+            if (withinBudget && !PreviewRegionOutlineRenderer.render(
                     context = context,
                     clipboard = scene.selectionClipboard,
                     origins = scene.origins,
@@ -214,6 +235,16 @@ object BlockPreviewPipeline {
                     outlineColor = scene.outlineColor,
                     lineWidth = scene.lineWidth,
                 )
+            }
+            if (!withinBudget) {
+                scene.aggregateBox?.let { box ->
+                    PulsingCuboidRenderer.renderOutlineBox(
+                        context = context,
+                        box = box,
+                        outlineColor = scene.outlineColor,
+                        lineWidth = scene.lineWidth,
+                    )
+                }
             }
         } else {
             scene.aggregateBox?.let { box ->

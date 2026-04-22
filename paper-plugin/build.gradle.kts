@@ -6,7 +6,7 @@ plugins {
 group = rootProject.group
 version = rootProject.version
 val minecraftVersion = rootProject.property("minecraft_version") as String
-val isSupportedVersion = minecraftVersion == "1.21.11" || minecraftVersion == "1.21.7"
+val isSupportedVersion = minecraftVersion in setOf("1.21.7", "1.21.8", "1.21.9", "1.21.10", "1.21.11")
 
 base {
     archivesName.set("axion-plugin")

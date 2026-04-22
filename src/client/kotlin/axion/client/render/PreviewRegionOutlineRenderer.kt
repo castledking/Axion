@@ -6,7 +6,7 @@ import net.minecraft.client.MinecraftClient
 import net.minecraft.util.math.BlockPos
 
 object PreviewRegionOutlineRenderer {
-    private const val MAX_REGION_QUADS: Int = 4096
+    const val MAX_REGION_QUADS: Int = 16384
 
     fun render(
         context: AxionWorldRenderContext,

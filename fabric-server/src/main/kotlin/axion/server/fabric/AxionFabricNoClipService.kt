@@ -30,6 +30,10 @@ class AxionFabricNoClipService {
         setNoPhysics(player, false)
     }
 
+    fun isEnabled(player: ServerPlayerEntity): Boolean {
+        return armedPlayers.contains(player.uuid)
+    }
+
     fun stop(server: MinecraftServer) {
         armedPlayers.toList().forEach { uuid ->
             server.playerManager.getPlayer(uuid)?.let { setNoPhysics(it, false) }

@@ -155,6 +155,9 @@ object ClipboardSelectionRenderer {
         return true
     }
 
+    // Limit for CPU-intensive outline rendering - beyond this we use fast path
+    private const val MAX_OUTLINE_POSITIONS: Int = 256
+
     fun renderPulsePositions(
         context: AxionWorldRenderContext,
         positions: Collection<BlockPos>,
@@ -167,11 +170,6 @@ object ClipboardSelectionRenderer {
             return false
         }
 
-        var shape: VoxelShape = VoxelShapes.empty()
-        positions.forEach { pos ->
-            shape = VoxelShapes.union(shape, VoxelShapes.cuboid(SelectionBounds.blockBox(pos)))
-        }
-
         val client = MinecraftClient.getInstance()
         val camera = client.gameRenderer.camera ?: return false
         val cameraPos = camera.cameraPos
@@ -179,6 +177,9 @@ object ClipboardSelectionRenderer {
         val matrixStack = context.matrices()
         val fillLayer = RenderLayerCompat.debugQuads()
         val fillConsumer = consumers.getBuffer(fillLayer)
+
+        // Fast path: render simple boxes without expensive VoxelShape union for large selections
+        val useFastPath = positions.size > MAX_OUTLINE_POSITIONS
 
         positions.forEach { pos ->
             val box = SelectionBounds.blockBox(pos)
@@ -202,16 +203,39 @@ object ClipboardSelectionRenderer {
             )
         }
 
-        VertexRenderingCompat.drawOutline(
-            matrixStack,
-            consumers.getBuffer(RenderLayerCompat.lines()),
-            shape,
-            -cameraPos.x,
-            -cameraPos.y,
-            -cameraPos.z,
-            outlineColor,
-            lineWidth,
-        )
+        // Only build expensive VoxelShape for outline if under the limit
+        if (!useFastPath) {
+            var shape: VoxelShape = VoxelShapes.empty()
+            positions.forEach { pos ->
+                shape = VoxelShapes.union(shape, VoxelShapes.cuboid(SelectionBounds.blockBox(pos)))
+            }
+
+            VertexRenderingCompat.drawOutline(
+                matrixStack,
+                consumers.getBuffer(RenderLayerCompat.lines()),
+                shape,
+                -cameraPos.x,
+                -cameraPos.y,
+                -cameraPos.z,
+                outlineColor,
+                lineWidth,
+            )
+        } else {
+            // Fast path: draw individual block outlines without VoxelShape union
+            val lineConsumer = consumers.getBuffer(RenderLayerCompat.lines())
+            positions.forEach { pos ->
+                VertexRenderingCompat.drawOutline(
+                    matrixStack,
+                    lineConsumer,
+                    VoxelShapes.cuboid(SelectionBounds.blockBox(pos)),
+                    -cameraPos.x,
+                    -cameraPos.y,
+                    -cameraPos.z,
+                    outlineColor,
+                    lineWidth,
+                )
+            }
+        }
         return true
     }
 

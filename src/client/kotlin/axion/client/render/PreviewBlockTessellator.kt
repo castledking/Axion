@@ -4,10 +4,11 @@ import net.minecraft.block.BlockRenderType
 import net.minecraft.block.BlockState
 import net.minecraft.block.entity.BlockEntity
 import net.minecraft.client.MinecraftClient
-import net.minecraft.client.render.VertexConsumer
+import net.minecraft.client.render.model.BlockModelPart
 import net.minecraft.client.util.math.MatrixStack
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Direction
+import net.minecraft.util.math.random.Random
 import net.minecraft.world.BlockRenderView
 import net.minecraft.world.biome.ColorResolver
 import net.minecraft.world.chunk.light.LightingProvider
@@ -37,9 +38,19 @@ object PreviewBlockTessellator {
         )
 
         var rendered = false
+        val random = Random.create()
+        val parts = ArrayList<BlockModelPart>(16)
         region.surfaceBlocks.forEach { block ->
             val state = block.state
             if (state.isAir || state.renderType != BlockRenderType.MODEL) {
+                return@forEach
+            }
+
+            val model = blockRenderManager.getModel(state)
+            parts.clear()
+            random.setSeed(state.getRenderingSeed(block.pos))
+            model.addParts(random, parts)
+            if (parts.isEmpty()) {
                 return@forEach
             }
 
@@ -56,7 +67,7 @@ object PreviewBlockTessellator {
                 matrices,
                 consumer,
                 true,
-                emptyList(),
+                parts,
             )
             matrices.pop()
             rendered = true
@@ -88,47 +99,5 @@ object PreviewBlockTessellator {
         override fun getLightingProvider(): LightingProvider = world.lightingProvider
 
         override fun getColor(pos: BlockPos, colorResolver: ColorResolver): Int = world.getColor(pos, colorResolver)
-    }
-
-    private class TintedAlphaVertexConsumer(
-        private val delegate: VertexConsumer,
-        private val alphaScale: Float,
-        tintColor: Int,
-    ) : VertexConsumer by delegate {
-        private val tintRed = (tintColor shr 16) and 0xFF
-        private val tintGreen = (tintColor shr 8) and 0xFF
-        private val tintBlue = tintColor and 0xFF
-
-        override fun color(red: Int, green: Int, blue: Int, alpha: Int): VertexConsumer {
-            delegate.color(
-                tinted(red, tintRed),
-                tinted(green, tintGreen),
-                tinted(blue, tintBlue),
-                scaledAlpha(alpha),
-            )
-            return this
-        }
-
-        override fun color(color: Int): VertexConsumer {
-            val alpha = scaledAlpha((color ushr 24) and 0xFF)
-            val red = tinted((color shr 16) and 0xFF, tintRed)
-            val green = tinted((color shr 8) and 0xFF, tintGreen)
-            val blue = tinted(color and 0xFF, tintBlue)
-            delegate.color((alpha shl 24) or (red shl 16) or (green shl 8) or blue)
-            return this
-        }
-
-        private fun scaledAlpha(alpha: Int): Int {
-            return (alpha * alphaScale).toInt().coerceIn(0, 255)
-        }
-
-        private fun tinted(channel: Int, tint: Int): Int {
-            val lifted = mix(channel, 255, 0.35f)
-            return mix(lifted, tint, 0.25f)
-        }
-
-        private fun mix(from: Int, to: Int, amount: Float): Int {
-            return (from + (to - from) * amount).toInt().coerceIn(0, 255)
-        }
     }
 }

@@ -8,6 +8,8 @@ class AxionPaperPlugin : JavaPlugin() {
         private set
     lateinit var noClipService: AxionNoClipService
         private set
+    lateinit var flightSpeedService: AxionFlightSpeedService
+        private set
 
     @Volatile
     var regionAccessPolicy: RegionAccessPolicy = AllowAllRegionAccessPolicy
@@ -17,6 +19,7 @@ class AxionPaperPlugin : JavaPlugin() {
 
     override fun onLoad() {
         noClipService = AxionNoClipService(this)
+        flightSpeedService = AxionFlightSpeedService(this)
     }
 
     override fun onEnable() {
@@ -25,8 +28,11 @@ class AxionPaperPlugin : JavaPlugin() {
         if (!::noClipService.isInitialized) {
             noClipService = AxionNoClipService(this)
         }
+        if (!::flightSpeedService.isInitialized) {
+            flightSpeedService = AxionFlightSpeedService(this)
+        }
         installConfiguredProtectionAdapters()
-        messaging = AxionPluginMessaging(this, policyService, noClipService)
+        messaging = AxionPluginMessaging(this, policyService, noClipService, flightSpeedService)
         registerCommand(
             "axion",
             "Axion Paper admin utilities.",
@@ -34,9 +40,11 @@ class AxionPaperPlugin : JavaPlugin() {
             AxionAdminCommand(messaging),
         )
         server.pluginManager.registerEvents(AxionNoClipListener(noClipService), this)
+        server.pluginManager.registerEvents(flightSpeedService, this)
         server.messenger.registerIncomingPluginChannel(this, AxionProtocol.CHANNEL_ID, messaging)
         server.messenger.registerOutgoingPluginChannel(this, AxionProtocol.CHANNEL_ID)
         noClipService.start()
+        flightSpeedService.start()
         logger.info("Axion Paper plugin enabled")
     }
 
@@ -47,6 +55,9 @@ class AxionPaperPlugin : JavaPlugin() {
         }
         if (::noClipService.isInitialized) {
             noClipService.stop()
+        }
+        if (::flightSpeedService.isInitialized) {
+            flightSpeedService.stop()
         }
         server.messenger.unregisterOutgoingPluginChannel(this, AxionProtocol.CHANNEL_ID)
     }

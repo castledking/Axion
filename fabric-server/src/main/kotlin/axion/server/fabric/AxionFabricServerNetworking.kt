@@ -8,6 +8,7 @@ import axion.protocol.AxionResultSource
 import axion.protocol.AxionServerMessage
 import axion.protocol.AxionTransportCodec
 import axion.protocol.ClientHello
+import axion.protocol.FlightSpeedRequest
 import axion.protocol.NoClipStateRequest
 import axion.protocol.OperationBatchRequest
 import axion.protocol.OperationBatchResult
@@ -40,6 +41,7 @@ class AxionFabricServerNetworking(
                 when (decoded) {
                     is ClientHello -> handleHello(context.player(), decoded)
                     is NoClipStateRequest -> noClipService.setArmed(context.player(), decoded.armed)
+                    is FlightSpeedRequest -> handleFlightSpeed(context.player(), decoded)
                     is OperationBatchRequest -> handleOperationBatch(context.player(), decoded)
                     is UndoRequest -> handleUndo(context.server(), context.player(), decoded)
                     is RedoRequest -> handleRedo(context.server(), context.player(), decoded)
@@ -87,6 +89,27 @@ class AxionFabricServerNetworking(
 
     private fun handleRedo(server: MinecraftServer, player: ServerPlayerEntity, request: RedoRequest) {
         sendMessage(player, historyActionService.redo(server, player, request.requestId, request.transactionId))
+    }
+
+    private fun handleFlightSpeed(player: ServerPlayerEntity, request: FlightSpeedRequest) {
+        // For Fabric server, we just apply the flight speed directly to the player
+        // The noPhysics flag helps prevent rubberbanding at high speeds (>500%)
+        val vanillaFlySpeed = 0.05f
+        val targetSpeed = vanillaFlySpeed * request.multiplier
+
+        if (player.abilities.flySpeed != targetSpeed) {
+            player.abilities.flySpeed = targetSpeed
+
+            // For high speeds, enable noPhysics to prevent rubberbanding
+            if (request.multiplier >= 5.0f) {
+                player.noClip = true
+            } else {
+                // Only disable noClip if NoClip service hasn't enabled it
+                if (!noClipService.isEnabled(player)) {
+                    player.noClip = false
+                }
+            }
+        }
     }
 
     private fun sendRejected(

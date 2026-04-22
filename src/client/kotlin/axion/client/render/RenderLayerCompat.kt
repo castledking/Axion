@@ -7,6 +7,21 @@ import java.lang.reflect.Modifier
 
 object RenderLayerCompat {
     private const val NO_ARG_RENDER_LAYER_DESC = "()Lnet/minecraft/client/render/RenderLayer;"
+
+    private val renderSetupField: java.lang.reflect.Field? by lazy {
+        RenderLayer::class.java.declaredFields.firstOrNull {
+            it.type.name == "net.minecraft.client.render.RenderSetup"
+        }?.also { it.isAccessible = true }
+    }
+
+    /**
+     * Access the RenderSetup for a RenderLayer via reflection.
+     * Needed to resolve texture bindings for custom RenderPass drawing.
+     * Returns Any? to remain compatible across MC versions where RenderSetup may not exist.
+     */
+    fun getRenderSetup(layer: RenderLayer): Any? {
+        return renderSetupField?.get(layer)
+    }
     private val legacyIntermediaryNames = mapOf(
         "getLightning" to "method_23593",
         "getLines" to "method_23594",

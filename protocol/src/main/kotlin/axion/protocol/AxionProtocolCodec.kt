@@ -41,6 +41,11 @@ object AxionProtocolCodec {
                     data.writeByte(5)
                     data.writeBoolean(message.armed)
                 }
+
+                is FlightSpeedRequest -> {
+                    data.writeByte(6)
+                    data.writeFloat(message.multiplier)
+                }
             }
         }
         return output.toByteArray()
@@ -84,6 +89,10 @@ object AxionProtocolCodec {
 
                 5 -> NoClipStateRequest(
                     armed = data.readBoolean(),
+                )
+
+                6 -> FlightSpeedRequest(
+                    multiplier = data.readFloat(),
                 )
 
                 else -> null

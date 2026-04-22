@@ -80,6 +80,8 @@ object AxionServerConnection {
             nextTransferId = 1L
             AxionRequestTracker.clear()
             AxionServerMessageAssembler.clear()
+            axion.client.render.AxionPreviewBufferCache.invalidate()
+            axion.client.render.AxionPreviewTemplateCache.invalidate()
             client.execute { }
         })
     }

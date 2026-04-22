@@ -1,6 +1,7 @@
 package axion.client.hotbar
 
 import axion.client.AxionClientState
+import axion.client.compat.LitematicaCompat
 import axion.client.compat.VersionCompatImpl
 import axion.client.input.AxionModifierKeys
 import axion.client.tool.AxionToolSelectionController
@@ -14,7 +15,8 @@ object AxionAltMenuController {
     fun isActive(client: MinecraftClient): Boolean {
         return client.currentScreen == null &&
             AxionToolSelectionController.isAxionSelected() &&
-            AxionModifierKeys.isAltDown(client)
+            AxionModifierKeys.isAltDown(client) &&
+            !LitematicaCompat.isHoldingConfiguredTool(client)
     }
 
     private fun isAnyAltOverlayActive(client: MinecraftClient): Boolean {

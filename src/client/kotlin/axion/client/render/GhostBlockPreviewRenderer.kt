@@ -15,8 +15,8 @@ import net.minecraft.util.math.Box
 
 object GhostBlockPreviewRenderer {
     private const val GHOST_ALPHA: Int = 44
-    private const val MAX_GHOST_BLOCKS: Int = 1536
-    private const val MAX_TEXTURED_GHOST_BLOCKS: Int = 512
+    private const val MAX_GHOST_BLOCKS: Int = 65536
+    private const val MAX_TEXTURED_GHOST_BLOCKS: Int = 32768
     private const val DEFAULT_GHOST_COLOR: Int = 0xFFFFFFFF.toInt()
 
     fun maxOriginsFor(nonAirCellCount: Int): Int {
@@ -59,7 +59,7 @@ object GhostBlockPreviewRenderer {
         }
 
         if (textured) {
-            renderTextured(context, occupiedCells, boundedOrigins, alpha, scale, color)
+            renderTextured(context, clipboard, boundedOrigins, alpha, scale, color)
             return
         }
 
@@ -129,22 +129,58 @@ object GhostBlockPreviewRenderer {
 
     private fun renderTextured(
         context: AxionWorldRenderContext,
-        occupiedCells: List<axion.common.model.ClipboardCell>,
+        clipboard: ClipboardBuffer,
         origins: List<BlockPos>,
         alpha: Int,
         scale: Float,
         color: Int,
     ) {
+        // Phase 3 (template GPU buffer) is disabled — RenderLayer.draw() creates its own
+        // render pass which doesn't composite correctly during the Fabric world render callback.
+        // Phase 1 below uses context.consumers() which renders through MC's normal pipeline.
+
+        // Phase 1: per-frame tessellation from mesh cache
         val client = MinecraftClient.getInstance()
         val world = client.world ?: return
-        val consumers = context.consumers()
         val matrixStack = context.matrices()
         val camera = client.gameRenderer.camera ?: return
         val cameraPos = camera.cameraPos
-        val blockRenderManager = client.blockRenderManager
         val alphaScale = alpha / 255.0f
-        val alphaConsumers = TintedAlphaVertexConsumerProvider(consumers, alphaScale, color)
 
+        val cachedMesh = AxionPreviewMeshCache.getOrBuild(
+            clipboard = clipboard,
+            origins = origins,
+            color = color,
+            alpha = alpha,
+            scale = scale,
+            maxBlocks = MAX_TEXTURED_GHOST_BLOCKS,
+        )
+
+        if (cachedMesh != null && cachedMesh.blocks.isNotEmpty()) {
+            val previewView = AxionBlockTessellator.TemplateBlockRenderView(world, cachedMesh.statesByPosition)
+            val consumer = TintedAlphaVertexConsumer(
+                context.consumers().getBuffer(RenderLayerCompat.blockTranslucentCull()),
+                alphaScale,
+                color,
+            )
+            AxionBlockTessellator.tessellateBatch(
+                blocks = cachedMesh.blocks,
+                world = previewView,
+                matrixStack = matrixStack,
+                consumer = consumer,
+                cameraX = cameraPos.x,
+                cameraY = cameraPos.y,
+                cameraZ = cameraPos.z,
+                checkSides = true,
+            )
+            return
+        }
+
+        // Final fallback: entity rendering
+        val occupiedCells = clipboard.nonAirCells()
+        val consumers = context.consumers()
+        val blockRenderManager = client.blockRenderManager
+        val alphaConsumers = TintedAlphaVertexConsumerProvider(consumers, alphaScale, color)
         origins.forEach { origin ->
             occupiedCells.forEach { cell ->
                 val blockPos = cell.absolutePos(origin)
@@ -174,16 +210,45 @@ object GhostBlockPreviewRenderer {
         scale: Float,
         color: Int,
     ) {
+        // Phase 2/3 (GPU buffer paths) are disabled — RenderLayer.draw() creates its own
+        // render pass which doesn't composite correctly during the Fabric world render callback.
+        // Phase 1 below uses context.consumers() which renders through MC's normal pipeline.
+        val blockInfos = writes.map { PreviewBlockInfo(it.pos, it.state) }
+
+        // Phase 1: per-frame tessellation from mesh cache
         val client = MinecraftClient.getInstance()
         val world = client.world ?: return
-        val consumers = context.consumers()
         val matrixStack = context.matrices()
         val camera = client.gameRenderer.camera ?: return
         val cameraPos = camera.cameraPos
-        val blockRenderManager = client.blockRenderManager
         val alphaScale = alpha / 255.0f
-        val alphaConsumers = TintedAlphaVertexConsumerProvider(consumers, alphaScale, color)
 
+        val cachedMesh = AxionPreviewMeshCache.getOrBuildForWrites(blockInfos, color, alpha)
+
+        if (cachedMesh.blocks.isNotEmpty()) {
+            val previewView = AxionBlockTessellator.TemplateBlockRenderView(world, cachedMesh.statesByPosition)
+            val consumer = TintedAlphaVertexConsumer(
+                context.consumers().getBuffer(RenderLayerCompat.blockTranslucentCull()),
+                alphaScale,
+                color,
+            )
+            AxionBlockTessellator.tessellateBatch(
+                blocks = cachedMesh.blocks,
+                world = previewView,
+                matrixStack = matrixStack,
+                consumer = consumer,
+                cameraX = cameraPos.x,
+                cameraY = cameraPos.y,
+                cameraZ = cameraPos.z,
+                checkSides = true,
+            )
+            return
+        }
+
+        // Fallback to entity rendering
+        val consumers = context.consumers()
+        val blockRenderManager = client.blockRenderManager
+        val alphaConsumers = TintedAlphaVertexConsumerProvider(consumers, alphaScale, color)
         writes.forEach { write ->
             matrixStack.push()
             matrixStack.translate(
@@ -200,48 +265,6 @@ object GhostBlockPreviewRenderer {
                 OverlayTexture.DEFAULT_UV,
             )
             matrixStack.pop()
-        }
-    }
-
-    private class TintedAlphaVertexConsumer(
-        private val delegate: VertexConsumer,
-        private val alphaScale: Float,
-        tintColor: Int,
-    ) : VertexConsumer by delegate {
-        private val tintRed = (tintColor shr 16) and 0xFF
-        private val tintGreen = (tintColor shr 8) and 0xFF
-        private val tintBlue = tintColor and 0xFF
-
-        override fun color(red: Int, green: Int, blue: Int, alpha: Int): VertexConsumer {
-            delegate.color(
-                tinted(red, tintRed),
-                tinted(green, tintGreen),
-                tinted(blue, tintBlue),
-                scaledAlpha(alpha),
-            )
-            return this
-        }
-
-        override fun color(color: Int): VertexConsumer {
-            val alpha = scaledAlpha((color ushr 24) and 0xFF)
-            val red = tinted((color shr 16) and 0xFF, tintRed)
-            val green = tinted((color shr 8) and 0xFF, tintGreen)
-            val blue = tinted(color and 0xFF, tintBlue)
-            delegate.color((alpha shl 24) or (red shl 16) or (green shl 8) or blue)
-            return this
-        }
-
-        private fun scaledAlpha(alpha: Int): Int {
-            return (alpha * alphaScale).toInt().coerceIn(0, 255)
-        }
-
-        private fun tinted(channel: Int, tint: Int): Int {
-            val lifted = mix(channel, 255, 0.5f)
-            return mix(lifted, tint, 0.35f)
-        }
-
-        private fun mix(from: Int, to: Int, amount: Float): Int {
-            return (from + (to - from) * amount).toInt().coerceIn(0, 255)
         }
     }
 

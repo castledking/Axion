@@ -55,6 +55,10 @@ object ClientModeController {
     // Vanilla places blocks every 4 ticks (5 blocks/second)
     private const val VANILLA_PLACEMENT_COOLDOWN_TICKS: Int = 4
 
+    // Sound cooldown to prevent spam during fast place mode
+    private var lastPlacementSoundTick: Long = 0
+    private const val PLACEMENT_SOUND_COOLDOWN_TICKS: Int = 4
+
     private var lastBreakTick: Long = 0
     // Vanilla breaking speed (4 tick cooldown)
     private const val VANILLA_BREAK_COOLDOWN_TICKS: Int = 4
@@ -63,10 +67,9 @@ object ClientModeController {
     private var useKeyManuallyPressed: Boolean = false
     private var attackKeyManuallyPressed: Boolean = false
 
-    private var lastBulldozerInfiniteReachTick: Long = 0
-    private var bulldozerBrokeThisTick: Boolean = false
-    // Fast bulldozer + infinite reach speed (1 tick cooldown for multi-block)
-    private const val BULLDOZER_INFINITE_REACH_COOLDOWN_TICKS: Int = 1
+    // Unified bulldozer cooldown - same speed for IR and non-IR
+    private var lastBulldozerTick: Long = 0
+    private const val BULLDOZER_COOLDOWN_TICKS: Int = 2  // Slightly faster than vanilla (4 ticks)
 
     fun enforceCreativeMode(client: MinecraftClient) {
         if (canUseModes(client)) {
@@ -152,37 +155,17 @@ object ClientModeController {
                 }
             }
 
-            // Handle bulldozer mode
+            // Handle bulldozer mode - unified 2-tick cooldown for both IR and non-IR
             val isAxionSlotActive = AxionToolSelectionController.isAxionSlotActive()
-            AxionMod.LOGGER.info("[Axion] Bulldozer condition check: bulldozer=${state.bulldozerEnabled}, attackPressed=$attackPressed, isAxionSlotActive=$isAxionSlotActive, brokeThisTick=$bulldozerBrokeThisTick")
             if (state.bulldozerEnabled && attackPressed && !isAxionSlotActive) {
-                AxionMod.LOGGER.info("[Axion] Bulldozer conditions met, checking infinite reach...")
-                if (state.infiniteReachEnabled) {
-                    // For bulldozer + infinite reach: execute every tick (0 cooldown) but only once per tick
-                    val currentTick = client.world?.time ?: 0
-                    val tickDiff = currentTick - lastBulldozerInfiniteReachTick
-                    AxionMod.LOGGER.info("[Axion] Bulldozer+IR tick check: currentTick=$currentTick, lastTick=$lastBulldozerInfiniteReachTick, diff=$tickDiff")
-
-                    // Reset flag if we're on a new tick
-                    if (tickDiff > 0) {
-                        bulldozerBrokeThisTick = false
-                    }
-
-                    // Only break if we haven't already broken this tick
-                    if (!bulldozerBrokeThisTick) {
-                        AxionMod.LOGGER.info("[Axion] Bulldozer+IR executing performMultiSampleBulldozer")
-                        bypassBlockBreakingCooldown(client)
-                        performMultiSampleBulldozer(client)
-                        lastBulldozerInfiniteReachTick = currentTick
-                        bulldozerBrokeThisTick = true
-                    } else {
-                        AxionMod.LOGGER.info("[Axion] Bulldozer+IR already broke this tick, skipping")
-                    }
-                } else {
-                    // Regular bulldozer without infinite reach
-                    AxionMod.LOGGER.info("[Axion] Regular bulldozer executing")
+                val currentTick = client.world?.time ?: 0
+                if (currentTick - lastBulldozerTick >= BULLDOZER_COOLDOWN_TICKS) {
                     bypassBlockBreakingCooldown(client)
-                    performMultiSampleBulldozer(client)
+                    performSingleBulldozerBreak(client, state.infiniteReachEnabled)
+                    lastBulldozerTick = currentTick
+                    // Suppress vanilla attack to prevent double-breaking
+                    suppressPrimaryUntilRelease = true
+                    client.interactionManager?.cancelBlockBreaking()
                 }
             }
 
@@ -222,6 +205,8 @@ object ClientModeController {
         applyFlyingSpeed(client)
     }
 
+    private var lastSyncedSpeedMultiplier: Float = 1.0f
+
     private fun applyFlyingSpeed(client: MinecraftClient) {
         val player = client.player ?: return
         if (!player.abilities.flying) {
@@ -231,6 +216,14 @@ object ClientModeController {
         }
 
         val multiplier = AxionClientState.flySpeedMultiplier
+
+        // At 100% (default), don't apply any speed changes - let other plugins control it
+        if (multiplier == 1.0f) {
+            // Sync with server to clear any blessing
+            syncFlightSpeedWithServer(client, multiplier)
+            return
+        }
+
         val state = AxionClientState.globalModeState
 
         // Safety cap: if noclip is enabled, limit speed to prevent collision issues
@@ -246,6 +239,29 @@ object ClientModeController {
 
         // Apply speed: vanilla base is 0.05f
         player.abilities.flySpeed = 0.05f * effectiveMultiplier
+
+        // Sync with server to enable blessing for high speeds
+        syncFlightSpeedWithServer(client, effectiveMultiplier)
+    }
+
+    private fun syncFlightSpeedWithServer(client: MinecraftClient, multiplier: Float) {
+        // Only sync when connected to a server with Axion plugin
+        if (client.server != null) {
+            return // Single player - no need to sync
+        }
+
+        // Only sync when multiplier changes
+        if (multiplier == lastSyncedSpeedMultiplier) {
+            return
+        }
+        lastSyncedSpeedMultiplier = multiplier
+
+        // Send to server if available
+        if (AxionServerConnection.isRemoteAuthoritativeAvailable()) {
+            AxionServerConnection.sendClientMessage(
+                axion.protocol.FlightSpeedRequest(multiplier)
+            )
+        }
     }
 
     /**
@@ -434,27 +450,16 @@ object ClientModeController {
             return false
         }
 
-        // Execute every tick (0 cooldown) but only once per tick
+        // Unified cooldown with regular bulldozer - 2 tick speed
         val currentTick = client.world?.time ?: 0
-        val tickDiff = currentTick - lastBulldozerInfiniteReachTick
-
-        // Reset flag if we're on a new tick
-        if (tickDiff > 0) {
-            bulldozerBrokeThisTick = false
-        }
-
-        // If already broke this tick, let vanilla handle it
-        if (bulldozerBrokeThisTick) {
-            AxionMod.LOGGER.info("[Axion] handleBulldozerInfiniteReachBreaking already broke this tick, letting vanilla handle")
+        if (currentTick - lastBulldozerTick < BULLDOZER_COOLDOWN_TICKS) {
             return false
         }
 
-        AxionMod.LOGGER.info("[Axion] handleBulldozerInfiniteReachBreaking executing multi-sample break")
-        // Use multi-sample breaking like regular bulldozer
+        AxionMod.LOGGER.info("[Axion] handleBulldozerInfiniteReachBreaking executing single block break")
         bypassBlockBreakingCooldown(client)
-        performMultiSampleBulldozer(client)
-        lastBulldozerInfiniteReachTick = currentTick
-        bulldozerBrokeThisTick = true
+        performSingleBulldozerBreak(client, infiniteReach = true)
+        lastBulldozerTick = currentTick
 
         return true
     }
@@ -475,6 +480,19 @@ object ClientModeController {
 
         if (AxionToolSelectionController.isAxionSlotActive()) {
             return false
+        }
+
+        // Allow usable items (potions, shields, food, etc.) to work normally
+        val player = client.player
+        val heldStack = player?.mainHandStack
+        val item = heldStack?.item
+        if (item != null && player != null) {
+            // Check if item has a use action (food, potions, shields, etc.)
+            // Items with maxUseTime > 0 are usable (food, potions, shields, bows, etc.)
+            if (item.getMaxUseTime(heldStack, player) > 0) {
+                // Let vanilla handle items with right-click actions (potions, shields, etc.)
+                return false
+            }
         }
 
         // Enforce vanilla placement speed (4 tick cooldown)
@@ -946,19 +964,27 @@ object ClientModeController {
         operation: axion.common.operation.SymmetryPlacementOperation,
     ) {
         val world = client.world ?: return
-        operation.placements.forEach { placement ->
-            val soundGroup = placement.state.soundGroup
-            VersionCompatImpl.playSoundClient(
-                world,
-                placement.pos.x + 0.5,
-                placement.pos.y + 0.5,
-                placement.pos.z + 0.5,
-                soundGroup.placeSound,
-                SoundCategory.BLOCKS,
-                (soundGroup.volume + 1.0f) / 2.0f,
-                soundGroup.pitch * 0.8f,
-            )
+        val currentTick = client.world?.time ?: 0
+
+        // Throttle placement sounds to prevent spam during fast place mode
+        if (currentTick - lastPlacementSoundTick < PLACEMENT_SOUND_COOLDOWN_TICKS) {
+            return
         }
+        lastPlacementSoundTick = currentTick
+
+        // Play sound only for the first placement (represents the batch)
+        val placement = operation.placements.firstOrNull() ?: return
+        val soundGroup = placement.state.soundGroup
+        VersionCompatImpl.playSoundClient(
+            world,
+            placement.pos.x + 0.5,
+            placement.pos.y + 0.5,
+            placement.pos.z + 0.5,
+            soundGroup.placeSound,
+            SoundCategory.BLOCKS,
+            (soundGroup.volume + 1.0f) / 2.0f,
+            soundGroup.pitch * 0.8f,
+        )
     }
 
     private fun tryPickFarBlock(
@@ -1382,130 +1408,60 @@ object ClientModeController {
         AxionMod.LOGGER.info("[Axion] Exceeded iteration limit")
     }
 
-    private fun performSingleBulldozer(client: MinecraftClient) {
+    private fun performSingleBulldozerBreak(
+        client: MinecraftClient,
+        infiniteReach: Boolean,
+    ) {
         val player = client.player ?: return
         val world = client.world ?: return
         val cameraEntity = client.cameraEntity ?: player
-        val state = AxionClientState.globalModeState
         val origin = cameraEntity.getCameraPosVec(1.0f)
         val direction = cameraEntity.getRotationVec(1.0f)
-        val maxDistance = if (state.infiniteReachEnabled) AxionTargeting.DEFAULT_REACH else player.blockInteractionRange
-        val target = origin.add(direction.multiply(maxDistance))
+        val vanillaReach = player.blockInteractionRange
+        val maxDistance = if (infiniteReach) AxionTargeting.DEFAULT_REACH else vanillaReach
+
+        // Raycast to find target block
         val hit = world.raycast(
             RaycastContext(
                 origin,
-                target,
+                origin.add(direction.multiply(maxDistance)),
                 RaycastContext.ShapeType.OUTLINE,
                 RaycastContext.FluidHandling.NONE,
                 cameraEntity,
             ),
         )
+
         if (hit.type != HitResult.Type.BLOCK) {
             return
         }
+
         val blockHit = hit as BlockHitResult
-        val targetPos = blockHit.blockPos.toImmutable()
+        val targetPos = blockHit.blockPos
         val brokenState = world.getBlockState(targetPos)
-        if (brokenState.isAir) {
+
+        if (brokenState.isAir || brokenState.block is net.minecraft.block.FluidBlock) {
             return
         }
-        bypassBlockBreakingCooldown(client)
-        dispatcher.dispatch(
-            ClearRegionOperation(
-                BlockRegion(targetPos, targetPos),
-            ),
-        )
-        SymmetryBreakController.dispatchDerivedBreaks(client, targetPos)
+
+        val distSq = origin.squaredDistanceTo(Vec3d.ofCenter(targetPos))
+        val beyondVanillaReach = distSq > (vanillaReach * vanillaReach)
+
+        if (!beyondVanillaReach) {
+            // Within vanilla range - use vanilla attackBlock for proper client prediction
+            // This prevents ghost blocks by letting the client handle the break prediction
+            client.interactionManager?.attackBlock(targetPos, blockHit.side)
+        } else {
+            // Beyond vanilla range - use dispatch for infinite reach breaking
+            dispatcher.dispatch(
+                ClearRegionOperation(
+                    BlockRegion(targetPos, targetPos),
+                ),
+            )
+            SymmetryBreakController.dispatchDerivedBreaks(client, targetPos)
+            playBreakEffects(client, targetPos, brokenState)
+        }
+
         player.swingHand(Hand.MAIN_HAND)
-        playBreakEffects(client, targetPos, brokenState)
-    }
-
-    private fun performMultiSampleBulldozer(client: MinecraftClient) {
-        val player = client.player ?: return
-        val world = client.world ?: return
-        val cameraEntity = client.cameraEntity ?: player
-        val state = AxionClientState.globalModeState
-        val origin = cameraEntity.getCameraPosVec(1.0f)
-        val direction = cameraEntity.getRotationVec(1.0f)
-        val maxDistance = if (state.infiniteReachEnabled) AxionTargeting.DEFAULT_REACH else player.blockInteractionRange
-        val vanillaReachSq = player.blockInteractionRange * player.blockInteractionRange
-
-        val seenPositions = linkedSetOf<net.minecraft.util.math.BlockPos>()
-        val withinRangeOperations = mutableListOf<Pair<net.minecraft.util.math.BlockPos, net.minecraft.util.math.Direction>>()
-        val beyondRangeOperations = mutableListOf<axion.common.operation.EditOperation>()
-        val beyondRangeEffects = mutableListOf<Pair<net.minecraft.util.math.BlockPos, net.minecraft.block.BlockState>>()
-
-        // Ray marching to find blocks along the line for fast continuous breaking
-        AxionMod.LOGGER.info("[Axion] performMultiSampleBulldozer starting, maxDistance=$maxDistance")
-
-        val stepSize = 0.3
-        var currentPos = origin
-        var steps = 0
-        var blocksFound = 0
-        val maxBlocks = 25
-        val maxSteps = (maxDistance / stepSize).toInt()
-
-        while (steps < maxSteps && blocksFound < maxBlocks) {
-            currentPos = currentPos.add(direction.multiply(stepSize))
-            steps++
-
-            val blockPos = BlockPos.ofFloored(currentPos)
-
-            // Skip if we've already seen this position
-            if (!seenPositions.add(blockPos)) {
-                continue
-            }
-
-            val brokenState = world.getBlockState(blockPos)
-            if (brokenState.isAir) {
-                continue
-            }
-
-            // Skip water and lava blocks
-            if (brokenState.block is net.minecraft.block.FluidBlock) {
-                continue
-            }
-
-            blocksFound++
-            val distSq = origin.squaredDistanceTo(currentPos)
-            val beyondVanillaReach = distSq > vanillaReachSq
-
-            AxionMod.LOGGER.info("[Axion] Bulldozer ray march hit block at $blockPos, distance=$distSq, beyondVanilla=$beyondVanillaReach")
-
-            if (!beyondVanillaReach) {
-                // Within vanilla range - use attackBlock for client prediction
-                val side = Direction.getFacing(direction.x, direction.y, direction.z)
-                withinRangeOperations += blockPos to side
-            } else {
-                // Beyond vanilla range - use dispatch-based breaking
-                beyondRangeOperations +=
-                    ClearRegionOperation(
-                        BlockRegion(blockPos, blockPos),
-                    )
-                beyondRangeEffects += blockPos to brokenState
-            }
-        }
-
-        // Execute within-range breaks with attackBlock (for client prediction)
-        withinRangeOperations.forEach { (targetPos, side) ->
-            bypassBlockBreakingCooldown(client)
-            client.interactionManager?.attackBlock(targetPos, side)
-        }
-
-        // Execute beyond-range breaks with dispatch
-        if (beyondRangeOperations.isNotEmpty()) {
-            dispatchBatch(beyondRangeOperations)
-            beyondRangeEffects.forEach { (targetPos, brokenState) ->
-                SymmetryBreakController.dispatchDerivedBreaks(client, targetPos)
-                playBreakEffects(client, targetPos, brokenState)
-            }
-        }
-
-        AxionMod.LOGGER.info("[Axion] performMultiSampleBulldozer finished: found ${withinRangeOperations.size + beyondRangeOperations.size} blocks, withinRange=${withinRangeOperations.size}, beyondRange=${beyondRangeOperations.size}")
-
-        if (withinRangeOperations.isNotEmpty() || beyondRangeOperations.isNotEmpty()) {
-            client.player?.swingHand(Hand.MAIN_HAND)
-        }
     }
 
     private fun dispatchBatch(operations: List<axion.common.operation.EditOperation>) {

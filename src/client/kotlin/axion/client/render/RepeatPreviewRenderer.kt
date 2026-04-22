@@ -100,6 +100,7 @@ object RepeatPreviewRenderer {
                 repeatCount = segment.repeatCount,
                 destinationColor = destinationColor,
                 lineWidth = lineWidth,
+                forceAggregateOutline = true,
             )
         }
     }
@@ -129,6 +130,7 @@ object RepeatPreviewRenderer {
         repeatCount: Int,
         destinationColor: Int,
         lineWidth: Float,
+        forceAggregateOutline: Boolean = false,
     ) {
         val selectionClipboard = ClipboardSelectionRenderer.sparseClipboard(clipboardBuffer)
         val destinationGhostClipboard = ClipboardSelectionRenderer.surfaceClipboard(selectionClipboard)
@@ -141,25 +143,34 @@ object RepeatPreviewRenderer {
             endIndex = repeatCount,
         )?.let { aggregateRegion ->
             val aggregateBox = SelectionBounds.regionBox(aggregateRegion)
-            val destinationRegions = RepeatPreviewLayout.destinationRegions(
-                sourceRegion = sourceRegion,
-                step = step,
-                repeatCount = repeatCount,
-                maxRegions = MAX_REGION_OUTLINES,
-            )
+            val destinationRegions = if (!forceAggregateOutline) {
+                RepeatPreviewLayout.destinationRegions(
+                    sourceRegion = sourceRegion,
+                    step = step,
+                    repeatCount = repeatCount,
+                    maxRegions = MAX_REGION_OUTLINES,
+                )
+            } else {
+                emptyList()
+            }
 
             val nonAirCells = ghostClipboard.nonAirCells()
             if (nonAirCells.isNotEmpty()) {
                 val maxGhostOrigins = maxOf(1, GhostBlockPreviewRenderer.maxOriginsFor(nonAirCells.size))
                 val canRenderAllGhostOrigins = repeatCount <= maxGhostOrigins
-                val ghostOrigins = if (canRenderAllGhostOrigins) {
+                val ghostOrigins = if (forceAggregateOutline) {
+                    RepeatPreviewLayout.destinationRegions(
+                        sourceRegion = sourceRegion,
+                        step = step,
+                        repeatCount = repeatCount,
+                        maxRegions = maxGhostOrigins,
+                    ).map { it.minCorner() }
+                } else {
                     destinationRegions
                         .asSequence()
                         .take(maxGhostOrigins)
                         .map { it.minCorner() }
                         .toList()
-                } else {
-                    emptyList()
                 }
                 BlockPreviewPipeline.renderDestination(
                     context = context,
@@ -168,14 +179,14 @@ object RepeatPreviewRenderer {
                         selectionClipboard = selectionClipboard,
                         shellClipboard = clipboardBuffer,
                         fallbackGhostClipboard = ghostClipboard,
-                        sparse = sparseDestination,
+                        sparse = if (!canRenderAllGhostOrigins) false else sparseDestination,
                         outlineColor = destinationColor,
                         lineWidth = lineWidth,
                         ghostColor = DESTINATION_GHOST_COLOR,
                         ghostAlpha = if (sparseDestination) SPARSE_GHOST_ALPHA else DEFAULT_GHOST_ALPHA,
                         ghostScale = GHOST_SCALE,
                         aggregateBox = aggregateBox,
-                        renderGhost = canRenderAllGhostOrigins,
+                        renderGhost = true,
                     ),
                 )
             } else if (!sparseDestination) {
@@ -197,7 +208,7 @@ object RepeatPreviewRenderer {
                     ),
                 )
             } else {
-                val sparseOrigins = destinationRegions.map { it.minCorner() }
+                val sparseOrigins = if (forceAggregateOutline) emptyList() else destinationRegions.map { it.minCorner() }
                 BlockPreviewPipeline.renderDestination(
                     context = context,
                     scene = BlockPreviewPipeline.Scene(
@@ -205,7 +216,7 @@ object RepeatPreviewRenderer {
                         selectionClipboard = selectionClipboard,
                         shellClipboard = clipboardBuffer,
                         fallbackGhostClipboard = ghostClipboard,
-                        sparse = true,
+                        sparse = !forceAggregateOutline,
                         outlineColor = destinationColor,
                         lineWidth = lineWidth,
                         ghostColor = DESTINATION_GHOST_COLOR,

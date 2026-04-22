@@ -8,7 +8,7 @@ import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Box
 import net.minecraft.util.math.Direction
 import net.minecraft.util.math.Vec3i
-import java.util.WeakHashMap
+import java.util.LinkedHashMap
 import kotlin.math.abs
 
 object PreviewMeshTessellator {
@@ -44,7 +44,9 @@ object PreviewMeshTessellator {
         val plane: Int,
     )
 
-    private val shellTemplateCache = WeakHashMap<ClipboardBuffer, ShellTemplate>()
+    private val shellTemplateCache = object : LinkedHashMap<ClipboardBuffer, ShellTemplate>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<ClipboardBuffer, ShellTemplate>?) = size > 16
+    }
 
     fun buildShellMesh(
         clipboard: ClipboardBuffer,

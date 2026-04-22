@@ -2,16 +2,21 @@ package axion.client.network
 
 import axion.common.operation.ClearRegionOperation
 import axion.common.operation.CloneRegionOperation
-import axion.common.operation.CloneEntitiesOperation
+import axion.client.history.HistoryManager
+import axion.client.history.RemoteHistoryAdapter
 import axion.common.operation.CompositeOperation
-import axion.common.operation.DeleteEntitiesOperation
 import axion.common.operation.EditOperation
+import net.minecraft.client.MinecraftClient
+import net.minecraft.text.Text
+import net.minecraft.util.Formatting
 import axion.common.operation.ExtrudeOperation
 import axion.common.operation.FilteredCloneRegionOperation
 import axion.common.operation.MoveEntitiesOperation
 import axion.common.operation.OperationDispatcher
 import axion.common.operation.SmearRegionOperation
 import axion.common.operation.StackRegionOperation
+import axion.common.operation.CloneEntitiesOperation
+import axion.common.operation.DeleteEntitiesOperation
 import axion.common.operation.SymmetryPlacementOperation
 import axion.protocol.AxionExtrudeMode
 import axion.protocol.AxionRemoteOperation
@@ -45,14 +50,21 @@ class NetworkOperationDispatcher(
 
         val requiredCapabilities = remoteOperations.mapTo(linkedSetOf()) { it.type }
         if (!AxionServerConnection.supportsAll(requiredCapabilities)) {
-            AxionServerConnection.notifyPlayerOnce(
-                when (AxionServerConnection.state()) {
-                    is AxionServerConnection.State.AwaitingHello -> "Axion server handshake still pending."
-                    is AxionServerConnection.State.Available -> "Installed Axion server plugin does not support this operation."
-                    is AxionServerConnection.State.Unsupported -> "Axion client/server protocol mismatch."
-                    AxionServerConnection.State.Disconnected -> AxionServerConnection.PLUGIN_REQUIRED_MESSAGE
-                },
-            )
+            val state = AxionServerConnection.state()
+            val message = when (state) {
+                is AxionServerConnection.State.AwaitingHello -> "Axion server handshake still pending."
+                is AxionServerConnection.State.Available -> "Installed Axion server plugin does not support this operation."
+                is AxionServerConnection.State.Unsupported -> "Axion client/server protocol mismatch."
+                AxionServerConnection.State.Disconnected -> AxionServerConnection.PLUGIN_REQUIRED_MESSAGE
+            }
+            AxionServerConnection.notifyPlayerOnce(message)
+            // Show action bar alert for Disconnected state (no plugin installed)
+            if (state == AxionServerConnection.State.Disconnected) {
+                MinecraftClient.getInstance().player?.sendMessage(
+                    Text.literal("⚠ Axion server plugin required for multiplayer editing").formatted(Formatting.RED),
+                    true, // Action bar (overlay)
+                )
+            }
             return
         }
 
