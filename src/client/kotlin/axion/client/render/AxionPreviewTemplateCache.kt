@@ -230,12 +230,7 @@ object AxionPreviewTemplateCache {
             cameraZ = 0.0,
             checkSides = true,
         )
-        LOGGER.warn("[Axion] tessellateTemplate: blocks={}, rendered={}", blocks.size, rendered)
-
         val result = bufferBuilder.endNullable()
-        if (result == null) {
-            LOGGER.warn("[Axion] tessellateTemplate: endNullable returned null (no vertices produced)")
-        }
         return result
     }
 

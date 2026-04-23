@@ -4,8 +4,6 @@ import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Box
 
 object BlockPreviewPipeline {
-    private val LOGGER = org.slf4j.LoggerFactory.getLogger("AxionPreviewPipeline")
-    private var diagCounter = 0
     private const val SPARSE_OUTLINE_BUDGET: Int = 512
     enum class SelectionStyle {
         SELECTION,
@@ -160,18 +158,12 @@ object BlockPreviewPipeline {
         scene: Scene,
     ): Boolean {
         if (scene.origins.isEmpty()) {
-            if (diagCounter++ % 120 == 0) {
-                LOGGER.warn("[Axion] renderDestination: SKIP origins empty, sparse={}", scene.sparse)
-            }
             renderOutline(context, scene)
             return false
         }
 
         val nonAirCells = scene.shellClipboard.nonAirCells()
         if (nonAirCells.isEmpty()) {
-            if (diagCounter++ % 120 == 0) {
-                LOGGER.warn("[Axion] renderDestination: SKIP nonAirCells empty")
-            }
             renderOutline(context, scene)
             return false
         }
@@ -179,14 +171,7 @@ object BlockPreviewPipeline {
         renderOutline(context, scene)
 
         if (!scene.renderGhost) {
-            if (diagCounter++ % 120 == 0) {
-                LOGGER.warn("[Axion] renderDestination: renderGhost=false, origins={}, nonAirCells={}", scene.origins.size, nonAirCells.size)
-            }
             return true
-        }
-
-        if (diagCounter++ % 120 == 0) {
-            LOGGER.warn("[Axion] renderDestination: RENDERING ghost, origins={}, nonAirCells={}", scene.origins.size, nonAirCells.size)
         }
 
         val renderedShell = PreviewShellBlockRenderer.render(
@@ -197,9 +182,6 @@ object BlockPreviewPipeline {
             alpha = scene.ghostAlpha,
         )
         if (!renderedShell) {
-            if (diagCounter++ % 120 == 0) {
-                LOGGER.warn("[Axion] renderDestination: shell failed, falling back to GhostBlockPreviewRenderer")
-            }
             GhostBlockPreviewRenderer.render(
                 context = context,
                 clipboard = scene.fallbackGhostClipboard,

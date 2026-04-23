@@ -22,4 +22,6 @@ data class RepeatRegionPreview(
     val scrollSign: Int,
     val repeatCount: Int,
     val committedSegments: List<RepeatPreviewSegment> = emptyList(),
+    val transform: PlacementTransform = PlacementTransform(),
+    val sourceClipboardBuffer: ClipboardBuffer = clipboardBuffer,
 )

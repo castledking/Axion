@@ -9,6 +9,8 @@ import axion.common.model.BlockRegion
 import axion.common.model.ClipboardState
 import axion.common.model.SelectionState
 import net.minecraft.client.MinecraftClient
+import axion.client.tool.ClipboardTransformService
+import axion.client.tool.PlacementMirrorAxis
 
 object StackToolController {
     private val dispatcher = SymmetryAwareOperationDispatcher()
@@ -142,6 +144,50 @@ object StackToolController {
         AxionClientState.updateStackToolState(nextState)
         syncSelectionState(nextState)
         return true
+    }
+
+    fun handleRotateAction(): Boolean {
+        val state = AxionClientState.stackToolState
+        if (state !is StackToolState.PreviewingStack) return false
+        val preview = state.preview
+        val newTransform = preview.transform.rotateClockwise()
+        val transformed = ClipboardTransformService.transform(preview.sourceClipboardBuffer, newTransform)
+        val nextState = StackToolState.PreviewingStack(
+            preview.copy(
+                clipboardBuffer = transformed,
+                transform = newTransform,
+            ),
+        )
+        AxionClientState.updateStackToolState(nextState)
+        syncSelectionState(nextState)
+        return true
+    }
+
+    fun handleMirrorAction(client: MinecraftClient): Boolean {
+        val state = AxionClientState.stackToolState
+        if (state !is StackToolState.PreviewingStack) return false
+        val preview = state.preview
+        val axis = dominantMirrorAxis(client)
+        val newTransform = preview.transform.toggleMirror(axis)
+        val transformed = ClipboardTransformService.transform(preview.sourceClipboardBuffer, newTransform)
+        val nextState = StackToolState.PreviewingStack(
+            preview.copy(
+                clipboardBuffer = transformed,
+                transform = newTransform,
+            ),
+        )
+        AxionClientState.updateStackToolState(nextState)
+        syncSelectionState(nextState)
+        return true
+    }
+
+    private fun dominantMirrorAxis(client: MinecraftClient): PlacementMirrorAxis {
+        val look = client.player?.rotationVecClient ?: return PlacementMirrorAxis.X
+        return if (kotlin.math.abs(look.x) >= kotlin.math.abs(look.z)) {
+            PlacementMirrorAxis.X
+        } else {
+            PlacementMirrorAxis.Z
+        }
     }
 
     fun reset() {

@@ -44,19 +44,21 @@ object AxionTickHandler {
                 AxionInteractionRouter.handleDeleteAction(client)
             }
 
-            // Use KeyBindingHandler for keys that might conflict with vanilla (e.g., R for sprint)
-            // This ensures proper behavior on 1.21.7 and earlier where wasPressed() consumes the key
-            if (KeyBindingHandler.wasPressed(AxionKeybindings.symmetryToggleRotation)) {
-                if (AxionModifierKeys.isControlDown(client)) {
-                    if (!PlacementToolController.handleRotateAction()) {
+            // Use wasCtrlComboPressed for modifier combos (Ctrl+R, Ctrl+F) because MC 1.21.8+
+            // suppresses KeyBinding.isPressed when modifier keys are held, and wasPressed()
+            // can be consumed by conflicting vanilla bindings. wasCtrlComboPressed reads both
+            // keys directly from GLFW and edge-detects the combo, bypassing both issues.
+            if (KeyBindingHandler.wasCtrlComboPressed(AxionKeybindings.symmetryToggleRotation)) {
+                if (!PlacementToolController.handleRotateAction()) {
+                    if (!StackToolController.handleRotateAction()) {
                         SymmetryController.toggleRotational()
                     }
                 }
             }
 
-            if (KeyBindingHandler.wasPressed(AxionKeybindings.symmetryToggleMirror)) {
-                if (AxionModifierKeys.isControlDown(client)) {
-                    if (!PlacementToolController.handleMirrorAction(client)) {
+            if (KeyBindingHandler.wasCtrlComboPressed(AxionKeybindings.symmetryToggleMirror)) {
+                if (!PlacementToolController.handleMirrorAction(client)) {
+                    if (!StackToolController.handleMirrorAction(client)) {
                         SymmetryController.toggleMirror(client)
                     }
                 }

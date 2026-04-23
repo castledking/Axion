@@ -9,11 +9,15 @@ import java.lang.reflect.Method
 object KeyBindingCompat {
     private val primitiveInt = Int::class.javaPrimitiveType!!
 
+    /** Cache category instances by key so all keybindings sharing a category key
+     *  reference the same object — MC groups keybindings by category identity. */
+    private val categoryCache = mutableMapOf<String, Any>()
+
     fun create(translationKey: String, code: Int, categoryKey: String): KeyBinding {
         val categoryClass = resolveCategoryClass()
 
         if (categoryClass != null) {
-            val category = createCategory(categoryClass, categoryKey)
+            val category = categoryCache.getOrPut(categoryKey) { createCategory(categoryClass, categoryKey) }
             findConstructor(
                 String::class.java,
                 primitiveInt,
@@ -42,7 +46,7 @@ object KeyBindingCompat {
             return constructor.newInstance(translationKey, keySym, code, categoryKey) as KeyBinding
         }
         if (categoryClass != null) {
-            val category = createCategory(categoryClass, categoryKey)
+            val category = categoryCache.getOrPut(categoryKey) { createCategory(categoryClass, categoryKey) }
             findConstructor(
                 String::class.java,
                 inputUtilType,
