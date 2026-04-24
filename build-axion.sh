@@ -7,6 +7,7 @@ cd "$ROOT_DIR"
 MOD_VERSION="${MOD_VERSION:-$(awk -F= '/^mod_version=/{print $2}' gradle.properties)}"
 
 SUPPORTED_VERSIONS=(
+  "1.21.7"
   "1.21.8"
   "1.21.9"
   "1.21.10"
@@ -15,6 +16,7 @@ SUPPORTED_VERSIONS=(
 
 resolve_yarn_mappings() {
   case "$1" in
+    "1.21.7") echo "1.21.7+build.1" ;;
     "1.21.8") echo "1.21.8+build.1" ;;
     "1.21.9") echo "1.21.9+build.1" ;;
     "1.21.10") echo "1.21.10+build.3" ;;
@@ -25,6 +27,7 @@ resolve_yarn_mappings() {
 
 resolve_fabric_version() {
   case "$1" in
+    "1.21.7") echo "0.129.0+1.21.7" ;;
     "1.21.8") echo "0.131.0+1.21.8" ;;
     "1.21.9") echo "0.134.1+1.21.9" ;;
     "1.21.10") echo "0.138.4+1.21.10" ;;
@@ -35,6 +38,7 @@ resolve_fabric_version() {
 
 resolve_paper_version() {
   case "$1" in
+    "1.21.7") echo "1.21.7-R0.1-SNAPSHOT" ;;
     "1.21.8") echo "1.21.8-R0.1-SNAPSHOT" ;;
     "1.21.9") echo "1.21.9-R0.1-SNAPSHOT" ;;
     "1.21.10") echo "1.21.10-R0.1-SNAPSHOT" ;;
@@ -83,11 +87,12 @@ build_version() {
 
 print_menu() {
   echo "Select a build target:"
-  echo "  1) Minecraft 1.21.8"
-  echo "  2) Minecraft 1.21.9"
-  echo "  3) Minecraft 1.21.10"
-  echo "  4) Minecraft 1.21.11"
-  echo "  5) All supported versions"
+  echo "  1) Minecraft 1.21.7"
+  echo "  2) Minecraft 1.21.8"
+  echo "  3) Minecraft 1.21.9"
+  echo "  4) Minecraft 1.21.10"
+  echo "  5) Minecraft 1.21.11"
+  echo "  6) All supported versions"
   echo "  q) Cancel"
 }
 
@@ -99,19 +104,22 @@ else
 fi
 
 case "$choice" in
-  1|"1.21.8")
+  1|"1.21.7")
+    build_version "1.21.7"
+    ;;
+  2|"1.21.8")
     build_version "1.21.8"
     ;;
-  2|"1.21.9")
+  3|"1.21.9")
     build_version "1.21.9"
     ;;
-  3|"1.21.10")
+  4|"1.21.10")
     build_version "1.21.10"
     ;;
-  4|"1.21.11")
+  5|"1.21.11")
     build_version "1.21.11"
     ;;
-  5|all|ALL)
+  6|all|ALL)
     for version in "${SUPPORTED_VERSIONS[@]}"; do
       build_version "$version"
     done
