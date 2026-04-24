@@ -95,7 +95,6 @@ object ClientModeController {
     }
 
     fun onEndTick(client: MinecraftClient) {
-        AxionMod.LOGGER.info("[Axion] onEndTick called, canUseModes=${canUseModes(client)}, currentScreen=${client.currentScreen}, infiniteReach=${AxionClientState.globalModeState.infiniteReachEnabled}")
         if (!canUseModes(client)) {
             applyNoClip(client)
             syncRemoteNoClip(client)
@@ -111,7 +110,6 @@ object ClientModeController {
             // Reset manual tracking - it will be set again by mixin if key is still held
             useKeyManuallyPressed = false
             attackKeyManuallyPressed = false
-            AxionMod.LOGGER.info("[Axion] usePressed=$usePressed, attackPressed=$attackPressed, infiniteReach=${state.infiniteReachEnabled}, useFastPlace=$useFastPlace, bulldozer=${state.bulldozerEnabled}")
 
             if (usePressed) {
                 // Reset seen targets every tick to allow continuous placement
@@ -122,33 +120,25 @@ object ClientModeController {
                     // Enforce vanilla placement speed (4 tick cooldown)
                     val currentTick = client.world?.time ?: 0
                     if (currentTick - lastPlacementTick >= VANILLA_PLACEMENT_COOLDOWN_TICKS) {
-                        AxionMod.LOGGER.info("[Axion] Calling performSingleBlockPlacement")
                         performSingleBlockPlacement(client)
                         lastPlacementTick = currentTick
-                    } else {
-                        AxionMod.LOGGER.info("[Axion] Skipping placement - cooldown active")
                     }
                 } else if (useFastPlace && !AxionToolSelectionController.isAxionSlotActive()) {
                     // Multi-sample fast place for fast place mode or infinite reach + fast place
                     // Execute every tick (0 cooldown) but only once per tick
                     val currentTick = client.world?.time ?: 0
                     val tickDiff = currentTick - lastPlacementTick
-                    AxionMod.LOGGER.info("[Axion] onEndTick fast place check: currentTick=$currentTick, lastPlacementTick=$lastPlacementTick, tickDiff=$tickDiff, fastPlaceExecutedThisTick=$fastPlaceExecutedThisTick")
 
                     // Reset flag if we're on a new tick
                     if (tickDiff > 0) {
                         fastPlaceExecutedThisTick = false
-                        AxionMod.LOGGER.info("[Axion] Reset fastPlaceExecutedThisTick for new tick")
                     }
 
                     // Only place if we haven't already placed this tick
                     if (!fastPlaceExecutedThisTick) {
-                        AxionMod.LOGGER.info("[Axion] onEndTick fast place executing performMultiSampleFastPlace")
                         performMultiSampleFastPlace(client)
                         lastPlacementTick = currentTick
                         fastPlaceExecutedThisTick = true
-                    } else {
-                        AxionMod.LOGGER.info("[Axion] onEndTick fast place already executed this tick, skipping")
                     }
                 } else if (!suppressSecondaryUntilRelease) {
                     consumeSecondaryAction(client)
@@ -437,16 +427,13 @@ object ClientModeController {
      */
     fun handleBulldozerInfiniteReachBreaking(client: MinecraftClient): Boolean {
         val state = AxionClientState.globalModeState
-        AxionMod.LOGGER.info("[Axion] handleBulldozerInfiniteReachBreaking called, infiniteReach=${state.infiniteReachEnabled}, bulldozer=${state.bulldozerEnabled}")
 
         // Only handle if both infinite reach AND bulldozer are enabled
         if (!state.infiniteReachEnabled || !state.bulldozerEnabled) {
-            AxionMod.LOGGER.info("[Axion] handleBulldozerInfiniteReachBreaking returning false - modes not enabled")
             return false
         }
 
         if (AxionToolSelectionController.isAxionSlotActive()) {
-            AxionMod.LOGGER.info("[Axion] handleBulldozerInfiniteReachBreaking returning false - axion slot active")
             return false
         }
 
@@ -456,7 +443,6 @@ object ClientModeController {
             return false
         }
 
-        AxionMod.LOGGER.info("[Axion] handleBulldozerInfiniteReachBreaking executing single block break")
         bypassBlockBreakingCooldown(client)
         performSingleBulldozerBreak(client, infiniteReach = true)
         lastBulldozerTick = currentTick
@@ -498,13 +484,9 @@ object ClientModeController {
         // Enforce vanilla placement speed (4 tick cooldown)
         val currentTick = client.world?.time ?: 0
         val tickDiff = currentTick - lastPlacementTick
-        AxionMod.LOGGER.info("[Axion] handleInfiniteReachPlacement cooldown check: currentTick=$currentTick, lastPlacementTick=$lastPlacementTick, diff=$tickDiff, cooldown=$VANILLA_PLACEMENT_COOLDOWN_TICKS")
         if (tickDiff < VANILLA_PLACEMENT_COOLDOWN_TICKS) {
-            AxionMod.LOGGER.info("[Axion] handleInfiniteReachPlacement cooldown active, skipping placement")
             return true // Still "handle" it to cancel vanilla, but don't place
         }
-
-        AxionMod.LOGGER.info("[Axion] handleInfiniteReachPlacement executing placement")
 
         // Bypass item use cooldown
         bypassItemUseCooldown(client)
@@ -537,21 +519,16 @@ object ClientModeController {
         // Execute every tick (0 cooldown) but only once per tick
         val currentTick = client.world?.time ?: 0
         val tickDiff = currentTick - lastPlacementTick
-        AxionMod.LOGGER.info("[Axion] handleFastPlaceInfiniteReachPlacement check: currentTick=$currentTick, lastPlacementTick=$lastPlacementTick, tickDiff=$tickDiff, fastPlaceExecutedThisTick=$fastPlaceExecutedThisTick")
 
         // Reset flag if we're on a new tick
         if (tickDiff > 0) {
             fastPlaceExecutedThisTick = false
-            AxionMod.LOGGER.info("[Axion] handleFastPlaceInfiniteReachPlacement reset flag for new tick")
         }
 
         // If already placed this tick, let vanilla handle it
         if (fastPlaceExecutedThisTick) {
-            AxionMod.LOGGER.info("[Axion] handleFastPlaceInfiniteReachPlacement already placed this tick, letting vanilla handle")
             return false
         }
-
-        AxionMod.LOGGER.info("[Axion] handleFastPlaceInfiniteReachPlacement executing multi-sample place")
 
         // Use multi-sample fast place like regular fast place
         bypassItemUseCooldown(client)
@@ -1345,7 +1322,6 @@ object ClientModeController {
         val maxDistance = if (state.infiniteReachEnabled) AxionTargeting.DEFAULT_REACH else vanillaReach
 
         bypassItemUseCooldown(client)
-        AxionMod.LOGGER.info("[Axion] performSingleBlockPlacement called")
 
         // Iterative raycasting to find the first valid placement surface
         var rayOrigin = origin
@@ -1364,17 +1340,14 @@ object ClientModeController {
             )
 
             if (hit.type != HitResult.Type.BLOCK) {
-                AxionMod.LOGGER.info("[Axion] No block hit, returning")
                 return
             }
 
             val blockHit = hit as BlockHitResult
             val hitPos = blockHit.blockPos
-            AxionMod.LOGGER.info("[Axion] Raycast hit block at $hitPos, side: ${blockHit.side}")
 
             // Check if we've already tried this position
             if (!seenPositions.add(hitPos)) {
-                AxionMod.LOGGER.info("[Axion] Already tried $hitPos, skipping")
                 rayOrigin = hit.pos.add(direction.multiply(0.1))
                 continue
             }
@@ -1395,17 +1368,14 @@ object ClientModeController {
             )
 
             if (operation != null) {
-                AxionMod.LOGGER.info("[Axion] Created operation, dispatching")
                 dispatcher.dispatch(operation)
                 player.swingHand(Hand.MAIN_HAND)
                 playPlacementEffects(client, operation)
                 return
             }
 
-            AxionMod.LOGGER.info("[Axion] Operation null for $hitPos, moving forward")
             rayOrigin = hit.pos.add(direction.multiply(0.1))
         }
-        AxionMod.LOGGER.info("[Axion] Exceeded iteration limit")
     }
 
     private fun performSingleBulldozerBreak(

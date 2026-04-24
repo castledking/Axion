@@ -31,6 +31,7 @@ MANIFEST.MF
 !paper-plugin/src/main/resources/**
 RELEASE-*.md
 PLAN-*.md
+MULTI_VERSION_SUPPORT.md
 *.log
 bin/
 .kotlin/

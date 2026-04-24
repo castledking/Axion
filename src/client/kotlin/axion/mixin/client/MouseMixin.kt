@@ -1,6 +1,5 @@
 package axion.mixin.client
 
-import axion.AxionMod
 import axion.client.compat.LitematicaCompat
 import axion.client.hotbar.AxionAltMenuController
 import axion.client.input.AxionInteractionRouter
@@ -57,7 +56,6 @@ abstract class MouseMixin {
         // which triggers our mixin and enables manual key tracking
         if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT &&
             ClientModeController.isFastPlaceEnabled(client)) {
-            AxionMod.LOGGER.info("[Axion] MouseMixin letting vanilla handle right-click for fast place")
             return
         }
 
@@ -65,14 +63,12 @@ abstract class MouseMixin {
         // so that doAttack is called and continuous breaking works
         if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT &&
             ClientModeController.shouldLetVanillaHandlePrimaryAction(client)) {
-            AxionMod.LOGGER.info("[Axion] MouseMixin letting vanilla handle left-click for infinite reach")
             return
         }
 
         // For bulldozer + infinite reach, also let vanilla handle for continuous multi-block breaking
         if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT &&
             ClientModeController.shouldLetVanillaHandleBulldozerInfiniteReach(client)) {
-            AxionMod.LOGGER.info("[Axion] MouseMixin letting vanilla handle left-click for bulldozer + infinite reach")
             return
         }
 
