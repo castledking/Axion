@@ -121,6 +121,7 @@ class NetworkOperationDispatcher(
             is CloneEntitiesOperation -> {
                 val source = operation.sourceRegion.normalized()
                 CloneEntitiesRequest(
+                    entityUuids = operation.entityUuids,
                     sourceMin = source.minCorner().toProtocolVector(),
                     sourceMax = source.maxCorner().toProtocolVector(),
                     destinationOrigin = operation.destinationOrigin.toProtocolVector(),
@@ -128,6 +129,7 @@ class NetworkOperationDispatcher(
                     mirrorAxis = when (operation.mirrorAxis) {
                         axion.common.operation.EntityMoveMirrorAxis.NONE -> PlacementMirrorAxisPayload.NONE
                         axion.common.operation.EntityMoveMirrorAxis.X -> PlacementMirrorAxisPayload.X
+                        axion.common.operation.EntityMoveMirrorAxis.Y -> PlacementMirrorAxisPayload.Y
                         axion.common.operation.EntityMoveMirrorAxis.Z -> PlacementMirrorAxisPayload.Z
                     },
                 )
@@ -151,6 +153,7 @@ class NetworkOperationDispatcher(
                     mirrorAxis = when (operation.mirrorAxis) {
                         axion.common.operation.EntityMoveMirrorAxis.NONE -> PlacementMirrorAxisPayload.NONE
                         axion.common.operation.EntityMoveMirrorAxis.X -> PlacementMirrorAxisPayload.X
+                        axion.common.operation.EntityMoveMirrorAxis.Y -> PlacementMirrorAxisPayload.Y
                         axion.common.operation.EntityMoveMirrorAxis.Z -> PlacementMirrorAxisPayload.Z
                     },
                 )

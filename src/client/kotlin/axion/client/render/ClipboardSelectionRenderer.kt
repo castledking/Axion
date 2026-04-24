@@ -32,9 +32,14 @@ object ClipboardSelectionRenderer {
     private val grayGlassClipboardCache = WeakHashMap<ClipboardBuffer, ClipboardBuffer>()
     private val surfaceCellCache = WeakHashMap<ClipboardBuffer, List<ClipboardCell>>()
 
+    // MAX_VOXEL_UNION_CELLS: beyond this threshold we skip VoxelShapes.union (O(n^2))
+    // and fall back to a simple aggregate bounding box for the outline.
+    private const val MAX_VOXEL_UNION_CELLS: Int = 256
+
     private data class CachedGeometry(
-        val shape: VoxelShape,
+        val shape: VoxelShape?,
         val boxes: List<Box>,
+        val boundingBox: Box?,
     )
 
     fun renderStaticSelection(
@@ -325,21 +330,44 @@ object ClipboardSelectionRenderer {
             )
         }
 
-        origins.forEach { origin ->
-            val translatedShape = VoxelShapes.empty().let {
-                // outline remains merged, but translated per origin
-                geometry.shape.offset(origin.x.toDouble(), origin.y.toDouble(), origin.z.toDouble())
+        val mergedShape = geometry.shape
+        if (mergedShape != null) {
+            // Small selection: use merged VoxelShape for smooth outline
+            origins.forEach { origin ->
+                val translatedShape = mergedShape.offset(
+                    origin.x.toDouble(),
+                    origin.y.toDouble(),
+                    origin.z.toDouble(),
+                )
+                VertexRenderingCompat.drawOutline(
+                    matrixStack,
+                    consumers.getBuffer(RenderLayerCompat.lines()),
+                    translatedShape,
+                    -cameraPos.x,
+                    -cameraPos.y,
+                    -cameraPos.z,
+                    outlineColor,
+                    lineWidth,
+                )
             }
-            VertexRenderingCompat.drawOutline(
-                matrixStack,
-                consumers.getBuffer(RenderLayerCompat.lines()),
-                translatedShape,
-                -cameraPos.x,
-                -cameraPos.y,
-                -cameraPos.z,
-                outlineColor,
-                lineWidth,
-            )
+        } else {
+            // Large selection: render aggregate bounding box outline per origin
+            val bbox = geometry.boundingBox
+            if (bbox != null) {
+                origins.forEach { origin ->
+                    val translatedBox = bbox.offset(
+                        origin.x.toDouble(),
+                        origin.y.toDouble(),
+                        origin.z.toDouble(),
+                    )
+                    PulsingCuboidRenderer.renderOutlineBox(
+                        context = context,
+                        box = translatedBox,
+                        outlineColor = outlineColor,
+                        lineWidth = lineWidth,
+                    )
+                }
+            }
         }
 
         return true
@@ -347,15 +375,37 @@ object ClipboardSelectionRenderer {
 
     private fun geometryFor(clipboard: ClipboardBuffer): CachedGeometry {
         return geometryCache.getOrPut(clipboard) {
-            var shape: VoxelShape = VoxelShapes.empty()
             val visibleCells = surfaceCells(clipboard)
             val boxes = ArrayList<Box>(visibleCells.size)
             visibleCells.forEach { cell ->
-                val box = SelectionBounds.blockBox(BlockPos.ORIGIN.add(cell.offset))
-                boxes += box
-                shape = VoxelShapes.union(shape, VoxelShapes.cuboid(box))
+                boxes += SelectionBounds.blockBox(BlockPos.ORIGIN.add(cell.offset))
             }
-            CachedGeometry(shape = shape, boxes = boxes)
+            if (visibleCells.size <= MAX_VOXEL_UNION_CELLS) {
+                // Small selection: build merged VoxelShape for smooth outline
+                var shape: VoxelShape = VoxelShapes.empty()
+                boxes.forEach { box ->
+                    shape = VoxelShapes.union(shape, VoxelShapes.cuboid(box))
+                }
+                CachedGeometry(shape = shape, boxes = boxes, boundingBox = null)
+            } else {
+                // Large selection: skip expensive O(n^2) VoxelShapes.union,
+                // compute aggregate bounding box for fast outline fallback
+                var minX = Double.MAX_VALUE
+                var minY = Double.MAX_VALUE
+                var minZ = Double.MAX_VALUE
+                var maxX = Double.MIN_VALUE
+                var maxY = Double.MIN_VALUE
+                var maxZ = Double.MIN_VALUE
+                boxes.forEach { box ->
+                    if (box.minX < minX) minX = box.minX
+                    if (box.minY < minY) minY = box.minY
+                    if (box.minZ < minZ) minZ = box.minZ
+                    if (box.maxX > maxX) maxX = box.maxX
+                    if (box.maxY > maxY) maxY = box.maxY
+                    if (box.maxZ > maxZ) maxZ = box.maxZ
+                }
+                CachedGeometry(shape = null, boxes = boxes, boundingBox = Box(minX, minY, minZ, maxX, maxY, maxZ))
+            }
         }
     }
 

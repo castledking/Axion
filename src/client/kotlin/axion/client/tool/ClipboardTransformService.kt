@@ -35,6 +35,7 @@ object ClipboardTransformService {
         val mirroredOffset = when (transform.mirrorAxis) {
             PlacementMirrorAxis.NONE -> offset
             PlacementMirrorAxis.X -> Vec3i(size.x - 1 - offset.x, offset.y, offset.z)
+            PlacementMirrorAxis.Y -> Vec3i(offset.x, size.y - 1 - offset.y, offset.z)
             PlacementMirrorAxis.Z -> Vec3i(offset.x, offset.y, size.z - 1 - offset.z)
         }
 
@@ -53,6 +54,7 @@ object ClipboardTransformService {
         val mirroredState = when (transform.mirrorAxis) {
             PlacementMirrorAxis.NONE -> state
             PlacementMirrorAxis.X -> state.mirror(BlockMirror.FRONT_BACK)
+            PlacementMirrorAxis.Y -> state.mirror(BlockMirror.FRONT_BACK).rotate(BlockRotation.CLOCKWISE_180)
             PlacementMirrorAxis.Z -> state.mirror(BlockMirror.LEFT_RIGHT)
         }
 

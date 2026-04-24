@@ -3,7 +3,6 @@ package axion.client.render
 import axion.client.network.BlockWrite
 import axion.client.network.LocalWritePlanner
 import axion.client.selection.SelectionBounds
-import axion.client.tool.RepeatPreviewSegment
 import axion.client.tool.RegionRepeatPlacementService
 import axion.client.tool.RepeatRegionPreview
 import axion.common.model.BlockRegion
@@ -70,39 +69,38 @@ object RepeatPreviewRenderer {
             }
         }
 
-        renderCommittedSegments(
-            context = context,
-            committedSegments = preview.committedSegments,
-            destinationColor = destinationColor,
-            lineWidth = lineWidth,
+        // Compute a single global aggregate outline across all committed segments + active segment
+        val globalAggregate = RepeatPreviewLayout.globalAggregateRegion(
+            segments = preview.committedSegments,
+            activeSourceRegion = preview.sourceRegion,
+            activeStep = preview.step,
+            activeRepeatCount = preview.repeatCount,
         )
+        val globalAggregateBox = globalAggregate?.let { SelectionBounds.regionBox(it) }
+
+        // Render the single global outline
+        if (globalAggregateBox != null) {
+            PulsingCuboidRenderer.renderOutlineBox(
+                context = context,
+                box = globalAggregateBox,
+                outlineColor = destinationColor,
+                lineWidth = lineWidth,
+            )
+        }
+
+        // Active preview's folded clipboard already contains all committed segment
+        // blocks merged into one buffer, so we only render the active segment.
+        // Rendering committed segments separately would cause internal face bleed
+        // because each render pass has its own face-culling context.
         renderStandardRepeat(
             context = context,
             preview = preview,
             destinationColor = destinationColor,
             lineWidth = lineWidth,
+            renderOutline = false,
+            includeSourceOrigin = preview.committedSegments.isNotEmpty(),
         )
         renderArrow(context, preview)
-    }
-
-    private fun renderCommittedSegments(
-        context: AxionWorldRenderContext,
-        committedSegments: List<RepeatPreviewSegment>,
-        destinationColor: Int,
-        lineWidth: Float,
-    ) {
-        committedSegments.forEach { segment ->
-            renderRepeatSegment(
-                context = context,
-                sourceRegion = segment.sourceRegion,
-                clipboardBuffer = segment.clipboardBuffer,
-                step = segment.step,
-                repeatCount = segment.repeatCount,
-                destinationColor = destinationColor,
-                lineWidth = lineWidth,
-                forceAggregateOutline = true,
-            )
-        }
     }
 
     private fun renderStandardRepeat(
@@ -110,6 +108,8 @@ object RepeatPreviewRenderer {
         preview: RepeatRegionPreview,
         destinationColor: Int,
         lineWidth: Float,
+        renderOutline: Boolean = true,
+        includeSourceOrigin: Boolean = false,
     ) {
         renderRepeatSegment(
             context = context,
@@ -119,6 +119,8 @@ object RepeatPreviewRenderer {
             repeatCount = preview.repeatCount,
             destinationColor = destinationColor,
             lineWidth = lineWidth,
+            renderOutline = renderOutline,
+            includeSourceOrigin = includeSourceOrigin,
         )
     }
 
@@ -131,6 +133,8 @@ object RepeatPreviewRenderer {
         destinationColor: Int,
         lineWidth: Float,
         forceAggregateOutline: Boolean = false,
+        renderOutline: Boolean = true,
+        includeSourceOrigin: Boolean = false,
     ) {
         val selectionClipboard = ClipboardSelectionRenderer.sparseClipboard(clipboardBuffer)
         val destinationGhostClipboard = ClipboardSelectionRenderer.surfaceClipboard(selectionClipboard)
@@ -142,7 +146,7 @@ object RepeatPreviewRenderer {
             startIndex = 0,
             endIndex = repeatCount,
         )?.let { aggregateRegion ->
-            val aggregateBox = SelectionBounds.regionBox(aggregateRegion)
+            val aggregateBox = if (renderOutline) SelectionBounds.regionBox(aggregateRegion) else null
             val destinationRegions = if (!forceAggregateOutline) {
                 RepeatPreviewLayout.destinationRegions(
                     sourceRegion = sourceRegion,
@@ -158,7 +162,7 @@ object RepeatPreviewRenderer {
             if (nonAirCells.isNotEmpty()) {
                 val maxGhostOrigins = maxOf(1, GhostBlockPreviewRenderer.maxOriginsFor(nonAirCells.size))
                 val canRenderAllGhostOrigins = repeatCount <= maxGhostOrigins
-                val ghostOrigins = if (forceAggregateOutline) {
+                val baseGhostOrigins = if (forceAggregateOutline) {
                     RepeatPreviewLayout.destinationRegions(
                         sourceRegion = sourceRegion,
                         step = step,
@@ -171,6 +175,11 @@ object RepeatPreviewRenderer {
                         .take(maxGhostOrigins)
                         .map { it.minCorner() }
                         .toList()
+                }
+                val ghostOrigins = if (includeSourceOrigin) {
+                    listOf(sourceRegion.normalized().minCorner()) + baseGhostOrigins
+                } else {
+                    baseGhostOrigins
                 }
                 BlockPreviewPipeline.renderDestination(
                     context = context,

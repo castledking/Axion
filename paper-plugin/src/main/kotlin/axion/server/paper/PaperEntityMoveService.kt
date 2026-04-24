@@ -17,6 +17,7 @@ object PaperEntityMoveService {
         val sourceMin = minVector(operation.sourceMin, operation.sourceMax)
         val sourceMax = maxVector(operation.sourceMin, operation.sourceMax)
         val sizeX = sourceMax.x - sourceMin.x + 1.0
+        val sizeY = sourceMax.y - sourceMin.y + 1.0
         val sizeZ = sourceMax.z - sourceMin.z + 1.0
         val queryBox = BoundingBox(
             sourceMin.x.toDouble(),
@@ -37,7 +38,7 @@ object PaperEntityMoveService {
                     seen.add(entity.uniqueId)
             }
             .map { entity ->
-                val target = transformLocation(entity.location, sourceMin.x, sourceMin.y, sourceMin.z, sizeX, sizeZ, operation)
+                val target = transformLocation(entity.location, sourceMin.x, sourceMin.y, sourceMin.z, sizeX, sizeY, sizeZ, operation)
                 val from = entity.location.clone()
                 entity.teleport(target)
                 CommittedEntityMove(
@@ -73,6 +74,7 @@ object PaperEntityMoveService {
         sourceMinY: Int,
         sourceMinZ: Int,
         sizeX: Double,
+        sizeY: Double,
         sizeZ: Double,
         operation: MoveEntitiesRequest,
     ): Location {
@@ -84,6 +86,7 @@ object PaperEntityMoveService {
         val mirrored = when (operation.mirrorAxis) {
             PlacementMirrorAxisPayload.NONE -> relative
             PlacementMirrorAxisPayload.X -> Vector(sizeX - relative.x, relative.y, relative.z)
+            PlacementMirrorAxisPayload.Y -> Vector(relative.x, sizeY - relative.y, relative.z)
             PlacementMirrorAxisPayload.Z -> Vector(relative.x, relative.y, sizeZ - relative.z)
         }
         val rotatedPosition = rotatePosition(mirrored, sizeX, sizeZ, operation.rotationQuarterTurns)
@@ -113,6 +116,7 @@ object PaperEntityMoveService {
         return when (axis) {
             PlacementMirrorAxisPayload.NONE -> direction.clone()
             PlacementMirrorAxisPayload.X -> Vector(-direction.x, direction.y, direction.z)
+            PlacementMirrorAxisPayload.Y -> Vector(direction.x, -direction.y, direction.z)
             PlacementMirrorAxisPayload.Z -> Vector(direction.x, direction.y, -direction.z)
         }
     }

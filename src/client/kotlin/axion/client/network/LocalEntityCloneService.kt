@@ -26,17 +26,10 @@ object LocalEntityCloneService {
         val source = operation.sourceRegion.normalized()
         val sourceMin = source.minCorner()
         val sourceMax = source.maxCorner()
-        val queryBox = Box(
-            sourceMin.x.toDouble(),
-            sourceMin.y.toDouble(),
-            sourceMin.z.toDouble(),
-            sourceMax.x + 1.0,
-            sourceMax.y + 1.25,
-            sourceMax.z + 1.0,
-        )
         val seen = linkedSetOf<UUID>()
-        return serverWorld.getOtherEntities(null, queryBox)
+        return operation.entityUuids
             .asSequence()
+            .mapNotNull { serverWorld.getEntity(it) }
             .map(::rootEntity)
             .filter { entity ->
                 entity !is PlayerEntity &&
@@ -198,9 +191,11 @@ object LocalEntityCloneService {
         val sizeX = sourceMax.x - sourceMin.x + 1.0
         val sizeZ = sourceMax.z - sourceMin.z + 1.0
         val relative = position.subtract(sourceMin.x.toDouble(), sourceMin.y.toDouble(), sourceMin.z.toDouble())
+        val sizeY = sourceMax.y - sourceMin.y + 1.0
         val mirrored = when (mirrorAxis) {
             EntityMoveMirrorAxis.NONE -> relative
             EntityMoveMirrorAxis.X -> Vec3d(sizeX - relative.x, relative.y, relative.z)
+            EntityMoveMirrorAxis.Y -> Vec3d(relative.x, sizeY - relative.y, relative.z)
             EntityMoveMirrorAxis.Z -> Vec3d(relative.x, relative.y, sizeZ - relative.z)
         }
         val rotatedPosition = rotatePosition(mirrored, sizeX, sizeZ, rotationQuarterTurns)
@@ -225,6 +220,7 @@ object LocalEntityCloneService {
         return when (axis) {
             EntityMoveMirrorAxis.NONE -> direction
             EntityMoveMirrorAxis.X -> Vec3d(-direction.x, direction.y, direction.z)
+            EntityMoveMirrorAxis.Y -> Vec3d(direction.x, -direction.y, direction.z)
             EntityMoveMirrorAxis.Z -> Vec3d(direction.x, direction.y, -direction.z)
         }
     }

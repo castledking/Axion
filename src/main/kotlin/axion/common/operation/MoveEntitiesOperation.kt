@@ -6,6 +6,7 @@ import net.minecraft.util.math.BlockPos
 enum class EntityMoveMirrorAxis {
     NONE,
     X,
+    Y,
     Z,
 }
 

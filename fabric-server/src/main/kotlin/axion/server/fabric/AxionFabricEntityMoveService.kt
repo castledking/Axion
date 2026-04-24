@@ -104,11 +104,13 @@ object AxionFabricEntityMoveService {
         operation: MoveEntitiesRequest,
     ): EntityTarget {
         val sizeX = sourceMax.x - sourceMin.x + 1.0
+        val sizeY = sourceMax.y - sourceMin.y + 1.0
         val sizeZ = sourceMax.z - sourceMin.z + 1.0
         val relative = position.subtract(sourceMin.x.toDouble(), sourceMin.y.toDouble(), sourceMin.z.toDouble())
         val mirrored = when (operation.mirrorAxis) {
             PlacementMirrorAxisPayload.NONE -> relative
             PlacementMirrorAxisPayload.X -> Vec3d(sizeX - relative.x, relative.y, relative.z)
+            PlacementMirrorAxisPayload.Y -> Vec3d(relative.x, sizeY - relative.y, relative.z)
             PlacementMirrorAxisPayload.Z -> Vec3d(relative.x, relative.y, sizeZ - relative.z)
         }
         val rotatedPosition = rotatePosition(mirrored, sizeX, sizeZ, operation.rotationQuarterTurns)
@@ -137,6 +139,7 @@ object AxionFabricEntityMoveService {
         return when (axis) {
             PlacementMirrorAxisPayload.NONE -> direction
             PlacementMirrorAxisPayload.X -> Vec3d(-direction.x, direction.y, direction.z)
+            PlacementMirrorAxisPayload.Y -> Vec3d(direction.x, -direction.y, direction.z)
             PlacementMirrorAxisPayload.Z -> Vec3d(direction.x, direction.y, -direction.z)
         }
     }

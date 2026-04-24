@@ -338,6 +338,7 @@ object AxionToolHintProvider {
         return when (axis) {
             PlacementMirrorAxis.NONE -> "Off"
             PlacementMirrorAxis.X -> "X"
+            PlacementMirrorAxis.Y -> "Y"
             PlacementMirrorAxis.Z -> "Z"
         }
     }

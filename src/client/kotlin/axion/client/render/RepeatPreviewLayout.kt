@@ -1,10 +1,38 @@
 package axion.client.render
 
+import axion.client.tool.RepeatPreviewSegment
 import axion.common.model.BlockRegion
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Vec3i
 
 object RepeatPreviewLayout {
+
+    fun globalAggregateRegion(
+        segments: List<RepeatPreviewSegment>,
+        activeSourceRegion: BlockRegion,
+        activeStep: Vec3i,
+        activeRepeatCount: Int,
+    ): BlockRegion? {
+        val regions = mutableListOf<BlockRegion>()
+        segments.forEach { seg ->
+            // Always calculate from sourceRegion, step, and repeatCount
+            // This ensures the aggregate region is based on where blocks are actually placed
+            aggregateRegion(seg.sourceRegion, seg.step, 0, seg.repeatCount)?.let { regions += it }
+        }
+        aggregateRegion(activeSourceRegion, activeStep, 0, activeRepeatCount)?.let { regions += it }
+        if (regions.isEmpty()) return null
+        val min = BlockPos(
+            regions.minOf { it.minCorner().x },
+            regions.minOf { it.minCorner().y },
+            regions.minOf { it.minCorner().z },
+        )
+        val max = BlockPos(
+            regions.maxOf { it.maxCorner().x },
+            regions.maxOf { it.maxCorner().y },
+            regions.maxOf { it.maxCorner().z },
+        )
+        return BlockRegion(min, max)
+    }
     fun destinationRegions(
         sourceRegion: BlockRegion,
         step: Vec3i,

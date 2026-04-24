@@ -212,6 +212,8 @@ object AxionProtocolCodec {
             }
 
             is CloneEntitiesRequest -> {
+                output.writeInt(operation.entityUuids.size)
+                operation.entityUuids.forEach { writeUuid(output, it) }
                 writeVector(output, operation.sourceMin)
                 writeVector(output, operation.sourceMax)
                 writeVector(output, operation.destinationOrigin)
@@ -298,6 +300,7 @@ object AxionProtocolCodec {
             )
 
             AxionOperationType.CLONE_ENTITIES -> CloneEntitiesRequest(
+                entityUuids = List(input.readInt()) { readUuid(input) },
                 sourceMin = readVector(input),
                 sourceMax = readVector(input),
                 destinationOrigin = readVector(input),
@@ -475,5 +478,16 @@ object AxionProtocolCodec {
         } else {
             null
         }
+    }
+
+    private fun writeUuid(output: DataOutputStream, uuid: java.util.UUID) {
+        output.writeLong(uuid.mostSignificantBits)
+        output.writeLong(uuid.leastSignificantBits)
+    }
+
+    private fun readUuid(input: DataInputStream): java.util.UUID {
+        val mostSig = input.readLong()
+        val leastSig = input.readLong()
+        return java.util.UUID(mostSig, leastSig)
     }
 }

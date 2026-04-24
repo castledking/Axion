@@ -15,6 +15,7 @@ object ClonePlacementService {
         clipboardBuffer: ClipboardBuffer,
         offset: Vec3i,
         transform: PlacementTransform = PlacementTransform(),
+        entityUuids: List<java.util.UUID> = emptyList(),
     ): ClonePreviewState {
         val normalized = sourceRegion.normalized()
         val anchor = normalized.minCorner()
@@ -32,6 +33,7 @@ object ClonePlacementService {
                 anchor.add(offset).add(destinationClipboardBuffer.size).add(-1, -1, -1),
             ).normalized(),
             transform = transform,
+            entityUuids = entityUuids,
         )
     }
 
@@ -54,6 +56,7 @@ object ClonePlacementService {
             clipboardBuffer = preview.sourceClipboardBuffer,
             offset = preview.offset.add(delta),
             transform = preview.transform,
+            entityUuids = preview.entityUuids,
         )
     }
 
@@ -73,7 +76,23 @@ object ClonePlacementService {
             offset = Vec3i.ZERO,
         )
 
-        return nudgePreview(client, initial, scrollAmount)
+        val nudged = nudgePreview(client, initial, scrollAmount)
+        // Capture entity UUIDs from the source region on first scroll
+        val world = client.world ?: return nudged
+        val sourceMin = sourceRegion.minCorner()
+        val sourceMax = sourceRegion.maxCorner()
+        val queryBox = net.minecraft.util.math.Box(
+            sourceMin.x.toDouble(),
+            sourceMin.y.toDouble(),
+            sourceMin.z.toDouble(),
+            sourceMax.x + 1.0,
+            sourceMax.y + 1.25,
+            sourceMax.z + 1.0,
+        )
+        val entityUuids = world.getEntitiesByClass(net.minecraft.entity.Entity::class.java, queryBox) { true }
+            .mapNotNull { it.uuid }
+            .toList()
+        return nudged.copy(entityUuids = entityUuids)
     }
 
     fun reanchorPreview(preview: ClonePreviewState, destinationOrigin: BlockPos): ClonePreviewState {
@@ -91,6 +110,7 @@ object ClonePlacementService {
             clipboardBuffer = preview.sourceClipboardBuffer,
             offset = offset,
             transform = preview.transform,
+            entityUuids = preview.entityUuids,
         )
     }
 
@@ -102,6 +122,7 @@ object ClonePlacementService {
             clipboardBuffer = preview.sourceClipboardBuffer,
             offset = preview.offset,
             transform = preview.transform.rotateClockwise(),
+            entityUuids = preview.entityUuids,
         )
     }
 
@@ -114,6 +135,7 @@ object ClonePlacementService {
             clipboardBuffer = preview.sourceClipboardBuffer,
             offset = preview.offset,
             transform = preview.transform.toggleMirror(axis),
+            entityUuids = preview.entityUuids,
         )
     }
 
@@ -124,10 +146,13 @@ object ClonePlacementService {
 
     private fun dominantMirrorAxis(client: MinecraftClient): PlacementMirrorAxis {
         val look = client.player?.rotationVecClient ?: return PlacementMirrorAxis.X
-        return if (kotlin.math.abs(look.x) >= kotlin.math.abs(look.z)) {
-            PlacementMirrorAxis.X
-        } else {
-            PlacementMirrorAxis.Z
+        val ax = kotlin.math.abs(look.x)
+        val ay = kotlin.math.abs(look.y)
+        val az = kotlin.math.abs(look.z)
+        return when {
+            ay >= ax && ay >= az -> PlacementMirrorAxis.Y
+            ax >= az -> PlacementMirrorAxis.X
+            else -> PlacementMirrorAxis.Z
         }
     }
 }

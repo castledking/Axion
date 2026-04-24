@@ -95,6 +95,9 @@ object RegionRepeatPlacementService {
         val currentSignedCount = preview.repeatCount * preview.scrollSign
         val nextSignedCount = currentSignedCount + scrollDirection
         if (nextSignedCount == 0) {
+            if (preview.committedSegments.isNotEmpty()) {
+                return unfoldLastSegment(preview)
+            }
             return null
         }
 
@@ -114,6 +117,23 @@ object RegionRepeatPlacementService {
             scrollSign = nextScrollSign,
             repeatCount = abs(nextSignedCount),
             committedSegments = preview.committedSegments,
+        )
+    }
+
+    private fun unfoldLastSegment(
+        preview: RepeatRegionPreview,
+    ): RepeatRegionPreview {
+        val lastSegment = preview.committedSegments.last()
+        val remainingSegments = preview.committedSegments.dropLast(1)
+        return createPreview(
+            firstCorner = preview.firstCorner,
+            sourceRegion = lastSegment.sourceRegion,
+            clipboardBuffer = lastSegment.clipboardBuffer,
+            lookDirection = lastSegment.lookDirection,
+            step = lastSegment.step,
+            scrollSign = lastSegment.scrollSign,
+            repeatCount = lastSegment.repeatCount,
+            committedSegments = remainingSegments,
         )
     }
 
@@ -240,6 +260,24 @@ object RegionRepeatPlacementService {
         val region = boundingRegion(absoluteCells.keys)
         val min = region.minCorner()
         val max = region.maxCorner()
+
+        // Safety check: if region is too large, skip folding and return original
+        val regionSize = region.size()
+        if (regionSize.x > 1000 || regionSize.y > 1000 || regionSize.z > 1000) {
+            return FoldedRepeatPreview(
+                region = preview.sourceRegion,
+                clipboardBuffer = preview.clipboardBuffer,
+                segment = RepeatPreviewSegment(
+                    sourceRegion = preview.sourceRegion,
+                    clipboardBuffer = preview.clipboardBuffer,
+                    step = preview.step,
+                    repeatCount = preview.repeatCount,
+                    lookDirection = preview.lookDirection,
+                    scrollSign = preview.scrollSign,
+                ),
+            )
+        }
+
         val foldedCells = buildList {
             for (pos in BlockPos.iterate(min, max)) {
                 val absolutePos = pos.toImmutable()
@@ -266,6 +304,8 @@ object RegionRepeatPlacementService {
                 clipboardBuffer = preview.clipboardBuffer,
                 step = preview.step,
                 repeatCount = preview.repeatCount,
+                lookDirection = preview.lookDirection,
+                scrollSign = preview.scrollSign,
             ),
         )
     }
@@ -281,6 +321,9 @@ object RegionRepeatPlacementService {
     }
 
     private fun boundingRegion(positions: Collection<BlockPos>): BlockRegion {
+        if (positions.isEmpty()) {
+            return BlockRegion(BlockPos.ORIGIN, BlockPos.ORIGIN)
+        }
         val iterator = positions.iterator()
         val first = iterator.next()
         var minX = first.x

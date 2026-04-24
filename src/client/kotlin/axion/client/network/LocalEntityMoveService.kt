@@ -93,9 +93,11 @@ object LocalEntityMoveService {
         val sizeX = sourceMax.x - sourceMin.x + 1.0
         val sizeZ = sourceMax.z - sourceMin.z + 1.0
         val relative = position.subtract(sourceMin.x.toDouble(), sourceMin.y.toDouble(), sourceMin.z.toDouble())
+        val sizeY = sourceMax.y - sourceMin.y + 1.0
         val mirrored = when (operation.mirrorAxis) {
             EntityMoveMirrorAxis.NONE -> relative
             EntityMoveMirrorAxis.X -> Vec3d(sizeX - relative.x, relative.y, relative.z)
+            EntityMoveMirrorAxis.Y -> Vec3d(relative.x, sizeY - relative.y, relative.z)
             EntityMoveMirrorAxis.Z -> Vec3d(relative.x, relative.y, sizeZ - relative.z)
         }
         val rotatedPosition = rotatePosition(mirrored, sizeX, sizeZ, operation.rotationQuarterTurns)
@@ -125,6 +127,7 @@ object LocalEntityMoveService {
         return when (axis) {
             EntityMoveMirrorAxis.NONE -> direction
             EntityMoveMirrorAxis.X -> Vec3d(-direction.x, direction.y, direction.z)
+            EntityMoveMirrorAxis.Y -> Vec3d(direction.x, -direction.y, direction.z)
             EntityMoveMirrorAxis.Z -> Vec3d(direction.x, direction.y, -direction.z)
         }
     }

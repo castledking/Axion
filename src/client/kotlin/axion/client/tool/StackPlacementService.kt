@@ -70,6 +70,7 @@ object StackPlacementService {
         val sourceOrigin = sourceRegion.minCorner()
         return (1..repeatCount).map { index ->
             CloneEntitiesOperation(
+                entityUuids = emptyList(),
                 sourceRegion = sourceRegion,
                 destinationOrigin = sourceOrigin.add(step.multiply(index)).toImmutable(),
             )

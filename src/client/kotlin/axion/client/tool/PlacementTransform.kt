@@ -3,6 +3,7 @@ package axion.client.tool
 enum class PlacementMirrorAxis {
     NONE,
     X,
+    Y,
     Z,
 }
 

@@ -94,6 +94,7 @@ sealed interface AxionRemoteOperation {
 enum class PlacementMirrorAxisPayload {
     NONE,
     X,
+    Y,
     Z,
 }
 
@@ -133,6 +134,7 @@ data class MoveEntitiesRequest(
 }
 
 data class CloneEntitiesRequest(
+    val entityUuids: List<java.util.UUID>,
     val sourceMin: IntVector3,
     val sourceMax: IntVector3,
     val destinationOrigin: IntVector3,

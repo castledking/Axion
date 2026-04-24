@@ -857,15 +857,20 @@ object ClientModeController {
         if (!active) {
             noClipEscapeTicks = 0
         } else if (!player.abilities.flying && isInsideSolidBlock(player)) {
+            // Player is suffocating inside blocks — force flight and prime escape assist
             noClipEscapeTicks = NO_CLIP_ESCAPE_TICKS
+            player.abilities.flying = true
         }
-        val escapeAssist = active && !player.abilities.flying && noClipEscapeTicks > 0
+        val escapeAssist = active && noClipEscapeTicks > 0
         if (escapeAssist) {
             noClipEscapeTicks -= 1
         }
-        player.noClip = player.isSpectator || active
+        // NoClip only takes effect when flying (or during escape assist).
+        // When the player stops flying, collisions resume normally — no rubberbanding.
+        val shouldNoClip = active && (player.abilities.flying || escapeAssist)
+        player.noClip = player.isSpectator || shouldNoClip
         player.setNoGravity(player.isSpectator || player.abilities.flying || escapeAssist)
-        if (active) {
+        if (shouldNoClip) {
             player.setOnGround(false)
             player.horizontalCollision = false
             player.verticalCollision = false
@@ -874,9 +879,10 @@ object ClientModeController {
             ?.playerManager
             ?.getPlayer(player.uuid)
             ?.let { serverPlayer ->
-                serverPlayer.noClip = serverPlayer.isSpectator || active
+                val serverShouldNoClip = active && (serverPlayer.abilities.flying || escapeAssist)
+                serverPlayer.noClip = serverPlayer.isSpectator || serverShouldNoClip
                 serverPlayer.setNoGravity(serverPlayer.isSpectator || serverPlayer.abilities.flying || escapeAssist)
-                if (active) {
+                if (serverShouldNoClip) {
                     serverPlayer.setOnGround(false)
                     serverPlayer.horizontalCollision = false
                     serverPlayer.verticalCollision = false
@@ -906,7 +912,8 @@ object ClientModeController {
         if (!AxionClientState.globalModeState.noClipEnabled || playerEntity.uuid != clientPlayer.uuid) {
             return false
         }
-        return true
+        // NoClip only active when flying or during escape assist
+        return playerEntity.abilities.flying || noClipEscapeTicks > 0
     }
 
     private fun isInsideSolidBlock(player: PlayerEntity): Boolean {

@@ -24,19 +24,13 @@ object PaperEntityCloneService {
         val sourceMin = minVector(operation.sourceMin, operation.sourceMax)
         val sourceMax = maxVector(operation.sourceMin, operation.sourceMax)
         val sizeX = sourceMax.x - sourceMin.x + 1.0
+        val sizeY = sourceMax.y - sourceMin.y + 1.0
         val sizeZ = sourceMax.z - sourceMin.z + 1.0
-        val queryBox = BoundingBox(
-            sourceMin.x.toDouble(),
-            sourceMin.y.toDouble(),
-            sourceMin.z.toDouble(),
-            sourceMax.x + 1.0,
-            sourceMax.y + 1.25,
-            sourceMax.z + 1.0,
-        )
         val level = (world as CraftWorld).handle
         val seen = linkedSetOf<UUID>()
-        return world.getNearbyEntities(queryBox)
+        return operation.entityUuids
             .asSequence()
+            .mapNotNull { uuid -> world.entities.firstOrNull { it.uniqueId == uuid } }
             .map(::rootEntity)
             .filter { entity ->
                 entity !is Player &&
@@ -52,6 +46,7 @@ object PaperEntityCloneService {
                     sourceMinY = sourceMin.y,
                     sourceMinZ = sourceMin.z,
                     sizeX = sizeX,
+                    sizeY = sizeY,
                     sizeZ = sizeZ,
                     parentCloneId = null,
                 )
@@ -165,13 +160,14 @@ object PaperEntityCloneService {
         sourceMinY: Int,
         sourceMinZ: Int,
         sizeX: Double,
+        sizeY: Double,
         sizeZ: Double,
         parentCloneId: UUID?,
     ): List<CommittedEntityClone> {
         val snapshot = capture(entity) ?: return emptyList()
         stripUuids(snapshot)
         val cloneId = UUID.randomUUID()
-        val target = transformLocation(entity.location, sourceMinX, sourceMinY, sourceMinZ, sizeX, sizeZ, operation)
+        val target = transformLocation(entity.location, sourceMinX, sourceMinY, sourceMinZ, sizeX, sizeY, sizeZ, operation)
         return buildList {
             add(
                 CommittedEntityClone(
@@ -191,6 +187,7 @@ object PaperEntityCloneService {
                             sourceMinY = sourceMinY,
                             sourceMinZ = sourceMinZ,
                             sizeX = sizeX,
+                            sizeY = sizeY,
                             sizeZ = sizeZ,
                             parentCloneId = cloneId,
                         ),
@@ -213,6 +210,7 @@ object PaperEntityCloneService {
         sourceMinY: Int,
         sourceMinZ: Int,
         sizeX: Double,
+        sizeY: Double,
         sizeZ: Double,
         operation: CloneEntitiesRequest,
     ): Location {
@@ -224,6 +222,7 @@ object PaperEntityCloneService {
         val mirrored = when (operation.mirrorAxis) {
             PlacementMirrorAxisPayload.NONE -> relative
             PlacementMirrorAxisPayload.X -> Vector(sizeX - relative.x, relative.y, relative.z)
+            PlacementMirrorAxisPayload.Y -> Vector(relative.x, sizeY - relative.y, relative.z)
             PlacementMirrorAxisPayload.Z -> Vector(relative.x, relative.y, sizeZ - relative.z)
         }
         val rotatedPosition = rotatePosition(mirrored, sizeX, sizeZ, operation.rotationQuarterTurns)
@@ -251,6 +250,7 @@ object PaperEntityCloneService {
         return when (axis) {
             PlacementMirrorAxisPayload.NONE -> direction.clone()
             PlacementMirrorAxisPayload.X -> Vector(-direction.x, direction.y, direction.z)
+            PlacementMirrorAxisPayload.Y -> Vector(direction.x, -direction.y, direction.z)
             PlacementMirrorAxisPayload.Z -> Vector(direction.x, direction.y, -direction.z)
         }
     }

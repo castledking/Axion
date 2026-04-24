@@ -19,6 +19,7 @@ object PreviewShellBlockRenderer {
         origins: Collection<BlockPos>,
         color: Int,
         alpha: Int,
+        scale: Float = 1.0f,
     ): Boolean {
         if (origins.isEmpty()) {
             return false
@@ -36,7 +37,7 @@ object PreviewShellBlockRenderer {
             origins = origins,
             color = color,
             alpha = alpha,
-            scale = 1.0f,
+            scale = scale,
             maxBlocks = MAX_RENDERED_BLOCKS,
         )
 
@@ -51,6 +52,9 @@ object PreviewShellBlockRenderer {
             color,
         )
 
+        // Apply scale to avoid z-fighting with world blocks at the same position
+        applyScale(matrixStack, scale)
+
         val rendered = AxionBlockTessellator.tessellateBatch(
             blocks = cachedMesh.blocks,
             world = previewView,
@@ -62,6 +66,21 @@ object PreviewShellBlockRenderer {
             checkSides = true,
         )
 
+        // Restore matrix stack
+        if (scale != 1.0f) {
+            matrixStack.pop()
+        }
+
         return rendered > 0
+    }
+
+    private fun applyScale(matrixStack: net.minecraft.client.util.math.MatrixStack, scale: Float) {
+        if (scale == 1.0f) {
+            return
+        }
+        matrixStack.push()
+        matrixStack.translate(0.5, 0.5, 0.5)
+        matrixStack.scale(scale, scale, scale)
+        matrixStack.translate(-0.5, -0.5, -0.5)
     }
 }

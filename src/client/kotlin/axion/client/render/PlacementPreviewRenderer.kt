@@ -16,7 +16,7 @@ object PlacementPreviewRenderer {
     private const val MOVE_SOURCE_GHOST_ALPHA: Int = 220
     private const val MOVE_DESTINATION_GHOST_ALPHA: Int = 210
     private const val SPARSE_DESTINATION_GHOST_ALPHA: Int = 235
-    private const val MOVE_SOURCE_GHOST_SCALE: Float = 1.01f
+    private const val MOVE_SOURCE_GHOST_SCALE: Float = 1.015f
     private const val DESTINATION_GHOST_SCALE: Float = 0.985f
     private const val MAX_MOVE_DETAILED_SELECTION_CELLS: Int = 4096
     private const val MAX_MOVE_SOURCE_CELLS: Int = 4096

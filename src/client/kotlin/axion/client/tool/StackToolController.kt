@@ -183,10 +183,13 @@ object StackToolController {
 
     private fun dominantMirrorAxis(client: MinecraftClient): PlacementMirrorAxis {
         val look = client.player?.rotationVecClient ?: return PlacementMirrorAxis.X
-        return if (kotlin.math.abs(look.x) >= kotlin.math.abs(look.z)) {
-            PlacementMirrorAxis.X
-        } else {
-            PlacementMirrorAxis.Z
+        val ax = kotlin.math.abs(look.x)
+        val ay = kotlin.math.abs(look.y)
+        val az = kotlin.math.abs(look.z)
+        return when {
+            ay >= ax && ay >= az -> PlacementMirrorAxis.Y
+            ax >= az -> PlacementMirrorAxis.X
+            else -> PlacementMirrorAxis.Z
         }
     }
 

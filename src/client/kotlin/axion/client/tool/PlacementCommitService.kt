@@ -40,18 +40,20 @@ object PlacementCommitService {
 
         return when (preview.mode) {
             PlacementToolMode.CLONE -> {
-                if (!AxionClientState.copyEntitiesEnabled) {
+                if (!AxionClientState.copyEntitiesEnabled || preview.entityUuids.isEmpty()) {
                     cloneOperation
                 } else {
                     compositeWithOptionalEntityClone(
                         operations = listOf(cloneOperation),
                         entityCloneOperation = CloneEntitiesOperation(
+                            entityUuids = preview.entityUuids,
                             sourceRegion = preview.sourceRegion,
                             destinationOrigin = preview.destinationRegion.minCorner(),
                             rotationQuarterTurns = preview.transform.normalizedRotationQuarterTurns,
                             mirrorAxis = when (preview.transform.mirrorAxis) {
                                 PlacementMirrorAxis.NONE -> EntityMoveMirrorAxis.NONE
                                 PlacementMirrorAxis.X -> EntityMoveMirrorAxis.X
+                                PlacementMirrorAxis.Y -> EntityMoveMirrorAxis.Y
                                 PlacementMirrorAxis.Z -> EntityMoveMirrorAxis.Z
                             },
                         ),
@@ -96,6 +98,7 @@ object PlacementCommitService {
                 mirrorAxis = when (preview.transform.mirrorAxis) {
                     PlacementMirrorAxis.NONE -> EntityMoveMirrorAxis.NONE
                     PlacementMirrorAxis.X -> EntityMoveMirrorAxis.X
+                    PlacementMirrorAxis.Y -> EntityMoveMirrorAxis.Y
                     PlacementMirrorAxis.Z -> EntityMoveMirrorAxis.Z
                 },
             )

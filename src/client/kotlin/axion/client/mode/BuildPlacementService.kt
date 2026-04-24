@@ -228,30 +228,35 @@ object BuildPlacementService {
         pos: BlockPos,
         side: Direction,
     ): SymmetryBlockPlacement? {
-        val supportPos = pos.offset(side.opposite)
-        val hitPos = Vec3d.ofCenter(supportPos).add(
-            side.offsetX * 0.5,
-            side.offsetY * 0.5,
-            side.offsetZ * 0.5,
-        )
-        val rawContext = ItemPlacementContext(
-            player,
-            hand,
-            stack,
-            BlockHitResult(hitPos, side, supportPos, false),
-        )
-        val placementContext = blockItem.getPlacementContext(rawContext) ?: return null
-        if (placementContext.blockPos != pos || !placementContext.canPlace()) {
-            return null
+        // Try the ideal support direction first (transformed side), then fall back
+        // to any adjacent solid block. When the support pos is air/replaceable,
+        // Minecraft's ItemPlacementContext tries to place there instead of at pos.
+        val facesToTry = buildList {
+            add(side)
+            Direction.entries.forEach { d -> if (d != side) add(d) }
         }
-        val placementState = blockItem.block.getPlacementState(placementContext) ?: return null
-        if (!placementState.canPlaceAt(world, pos)) {
-            return null
+        for (face in facesToTry) {
+            val supportPos = pos.offset(face.opposite)
+            if (world.getBlockState(supportPos).isAir) continue
+            val hitPos = Vec3d.ofCenter(supportPos).add(
+                face.offsetX * 0.5,
+                face.offsetY * 0.5,
+                face.offsetZ * 0.5,
+            )
+            val rawContext = ItemPlacementContext(
+                player,
+                hand,
+                stack,
+                BlockHitResult(hitPos, face, supportPos, false),
+            )
+            val placementContext = blockItem.getPlacementContext(rawContext) ?: continue
+            if (placementContext.blockPos != pos || !placementContext.canPlace()) continue
+            val placementState = blockItem.block.getPlacementState(placementContext) ?: continue
+            if (!placementState.canPlaceAt(world, pos)) continue
+            if (wouldCollideWithPlayer(world, player, pos, placementState)) return null
+            return SymmetryBlockPlacement(pos.toImmutable(), placementState)
         }
-        if (wouldCollideWithPlayer(world, player, pos, placementState)) {
-            return null
-        }
-        return SymmetryBlockPlacement(pos.toImmutable(), placementState)
+        return null
     }
 
     private fun createReplacePlacement(

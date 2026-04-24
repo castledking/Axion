@@ -180,6 +180,7 @@ object BlockPreviewPipeline {
             origins = scene.origins,
             color = scene.ghostColor,
             alpha = scene.ghostAlpha,
+            scale = scene.ghostScale,
         )
         if (!renderedShell) {
             GhostBlockPreviewRenderer.render(

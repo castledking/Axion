@@ -11,6 +11,8 @@ data class RepeatPreviewSegment(
     val clipboardBuffer: ClipboardBuffer,
     val step: Vec3i,
     val repeatCount: Int,
+    val lookDirection: Direction,
+    val scrollSign: Int,
 )
 
 data class RepeatRegionPreview(
