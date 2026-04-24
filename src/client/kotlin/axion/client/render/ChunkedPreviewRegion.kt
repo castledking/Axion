@@ -75,10 +75,7 @@ data class ChunkedPreviewRegion(
                 chunkQuads.getOrPut(chunkKey) { ArrayList() } += quad
             }
 
-            val MAX_CHUNK_VOXEL_CELLS = 64
             val chunkShapes = LinkedHashMap<Long, VoxelShape>()
-            val chunkCellCounts = LinkedHashMap<Long, Int>()
-            val chunkBounds = LinkedHashMap<Long, DoubleArray>() // [minX, minY, minZ, maxX, maxY, maxZ]
             val statesByPosition = LinkedHashMap<Long, BlockState>()
             val surfaceBlocks = ArrayList<PreviewBlock>()
             val surfaceClipboard = ClipboardSelectionRenderer.surfaceClipboard(clipboard)
@@ -90,38 +87,16 @@ data class ChunkedPreviewRegion(
                 surfaceClipboard.nonAirCells().forEach { cell ->
                     val pos = origin.add(cell.offset)
                     val chunkKey = BlockPos.asLong(pos.x shr 4, 0, pos.z shr 4)
-                    val count = (chunkCellCounts[chunkKey] ?: 0) + 1
-                    chunkCellCounts[chunkKey] = count
-                    val box = SelectionBounds.blockBox(pos)
-                    if (count <= MAX_CHUNK_VOXEL_CELLS) {
-                        val current = chunkShapes[chunkKey] ?: VoxelShapes.empty()
-                        chunkShapes[chunkKey] = VoxelShapes.union(current, VoxelShapes.cuboid(box))
-                    } else {
-                        // Beyond threshold: accumulate bounding box instead
-                        val bounds = chunkBounds.getOrPut(chunkKey) {
-                            doubleArrayOf(
-                                Double.MAX_VALUE, Double.MAX_VALUE, Double.MAX_VALUE,
-                                Double.MIN_VALUE, Double.MIN_VALUE, Double.MIN_VALUE,
-                            )
-                        }
-                        if (box.minX < bounds[0]) bounds[0] = box.minX
-                        if (box.minY < bounds[1]) bounds[1] = box.minY
-                        if (box.minZ < bounds[2]) bounds[2] = box.minZ
-                        if (box.maxX > bounds[3]) bounds[3] = box.maxX
-                        if (box.maxY > bounds[4]) bounds[4] = box.maxY
-                        if (box.maxZ > bounds[5]) bounds[5] = box.maxZ
-                    }
+                    val current = chunkShapes[chunkKey] ?: VoxelShapes.empty()
+                    chunkShapes[chunkKey] = VoxelShapes.union(
+                        current,
+                        VoxelShapes.cuboid(SelectionBounds.blockBox(pos)),
+                    )
                     surfaceBlocks += PreviewBlock(
                         pos = pos,
                         state = cell.state,
                     )
                 }
-            }
-            // For chunks that exceeded the threshold, replace their VoxelShape with a bounding box
-            chunkBounds.forEach { (chunkKey, bounds) ->
-                val existingShape = chunkShapes[chunkKey] ?: VoxelShapes.empty()
-                val boundingBox = VoxelShapes.cuboid(bounds[0], bounds[1], bounds[2], bounds[3], bounds[4], bounds[5])
-                chunkShapes[chunkKey] = VoxelShapes.union(existingShape, boundingBox)
             }
 
             val chunks = LinkedHashMap<Long, ChunkData>()

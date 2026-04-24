@@ -393,9 +393,9 @@ object ClipboardSelectionRenderer {
                 var minX = Double.MAX_VALUE
                 var minY = Double.MAX_VALUE
                 var minZ = Double.MAX_VALUE
-                var maxX = Double.MIN_VALUE
-                var maxY = Double.MIN_VALUE
-                var maxZ = Double.MIN_VALUE
+                var maxX = -Double.MAX_VALUE
+                var maxY = -Double.MAX_VALUE
+                var maxZ = -Double.MAX_VALUE
                 boxes.forEach { box ->
                     if (box.minX < minX) minX = box.minX
                     if (box.minY < minY) minY = box.minY
