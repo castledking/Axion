@@ -74,6 +74,12 @@ object AxionKeybindings {
         category,
     )
 
+    val symmetryToggleConstruct: KeyBinding = KeyBindingCompat.create(
+        "key.${AxionMod.MOD_ID}.symmetry_toggle_construct",
+        GLFW.GLFW_KEY_C,
+        category,
+    )
+
     val undoAction: KeyBinding = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.undo_action",
         GLFW.GLFW_KEY_Z,
@@ -104,6 +110,7 @@ object AxionKeybindings {
         KeyBindingHelper.registerKeyBinding(toolDeleteAction)
         KeyBindingHelper.registerKeyBinding(symmetryToggleRotation)
         KeyBindingHelper.registerKeyBinding(symmetryToggleMirror)
+        KeyBindingHelper.registerKeyBinding(symmetryToggleConstruct)
         KeyBindingHelper.registerKeyBinding(undoAction)
         KeyBindingHelper.registerKeyBinding(redoAction)
         KeyBindingHelper.registerKeyBinding(openConfigScreen)

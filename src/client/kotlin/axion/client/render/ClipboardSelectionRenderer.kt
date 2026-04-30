@@ -33,14 +33,24 @@ object ClipboardSelectionRenderer {
     private val surfaceCellCache = WeakHashMap<ClipboardBuffer, List<ClipboardCell>>()
 
     // MAX_VOXEL_UNION_CELLS: beyond this threshold we skip VoxelShapes.union (O(n^2))
-    // and fall back to a simple aggregate bounding box for the outline.
+    // and fall back to per-component bounding boxes for the outline.
     private const val MAX_VOXEL_UNION_CELLS: Int = 256
+
+    // 6-face adjacency offsets for connected component BFS
+    private val NEIGHBOR_DX = intArrayOf(-1, 1, 0, 0, 0, 0)
+    private val NEIGHBOR_DY = intArrayOf(0, 0, -1, 1, 0, 0)
+    private val NEIGHBOR_DZ = intArrayOf(0, 0, 0, 0, -1, 1)
 
     private data class CachedGeometry(
         val shape: VoxelShape?,
         val boxes: List<Box>,
-        val boundingBox: Box?,
+        val componentOutlines: List<ComponentOutline>,
     )
+
+    private sealed class ComponentOutline {
+        data class Merged(val shape: VoxelShape) : ComponentOutline()
+        data class BoundingBoxOnly(val box: Box) : ComponentOutline()
+    }
 
     fun renderStaticSelection(
         context: AxionWorldRenderContext,
@@ -351,21 +361,39 @@ object ClipboardSelectionRenderer {
                 )
             }
         } else {
-            // Large selection: render aggregate bounding box outline per origin
-            val bbox = geometry.boundingBox
-            if (bbox != null) {
+            // Large selection: render per-component outlines
+            val outlines = geometry.componentOutlines
+            if (outlines.isNotEmpty()) {
                 origins.forEach { origin ->
-                    val translatedBox = bbox.offset(
-                        origin.x.toDouble(),
-                        origin.y.toDouble(),
-                        origin.z.toDouble(),
-                    )
-                    PulsingCuboidRenderer.renderOutlineBox(
-                        context = context,
-                        box = translatedBox,
-                        outlineColor = outlineColor,
-                        lineWidth = lineWidth,
-                    )
+                    val ox = origin.x.toDouble()
+                    val oy = origin.y.toDouble()
+                    val oz = origin.z.toDouble()
+                    outlines.forEach { outline ->
+                        when (outline) {
+                            is ComponentOutline.Merged -> {
+                                val translatedShape = outline.shape.offset(ox, oy, oz)
+                                VertexRenderingCompat.drawOutline(
+                                    matrixStack,
+                                    consumers.getBuffer(RenderLayerCompat.lines()),
+                                    translatedShape,
+                                    -cameraPos.x,
+                                    -cameraPos.y,
+                                    -cameraPos.z,
+                                    outlineColor,
+                                    lineWidth,
+                                )
+                            }
+
+                            is ComponentOutline.BoundingBoxOnly -> {
+                                PulsingCuboidRenderer.renderOutlineBox(
+                                    context = context,
+                                    box = outline.box.offset(ox, oy, oz),
+                                    outlineColor = outlineColor,
+                                    lineWidth = lineWidth,
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -386,10 +414,98 @@ object ClipboardSelectionRenderer {
                 boxes.forEach { box ->
                     shape = VoxelShapes.union(shape, VoxelShapes.cuboid(box))
                 }
-                CachedGeometry(shape = shape, boxes = boxes, boundingBox = null)
+                CachedGeometry(shape = shape, boxes = boxes, componentOutlines = emptyList())
             } else {
-                // Large selection: skip expensive O(n^2) VoxelShapes.union,
-                // compute aggregate bounding box for fast outline fallback
+                // Large selection: compute connected components, then build
+                // per-component VoxelShape outlines (small bits) or bounding boxes (large blobs)
+                CachedGeometry(shape = null, boxes = boxes, componentOutlines = computeComponentOutlines(clipboard))
+            }
+        }
+    }
+
+    /**
+     * Finds connected components among non-air cells using BFS with 6-face adjacency,
+     * then builds a merged VoxelShape outline per small component (≤ threshold) or a
+     * bounding box for large components. Inspired by Axiom's ChunkedBooleanRegion which
+     * uses per-chunk hidden-face elimination for O(n) outline rendering.
+     *
+     * The connected component detection is O(n). Per-component VoxelShapes.union is
+     * bounded by the threshold, so each small component's merge cost is capped.
+     */
+    private fun computeComponentOutlines(clipboard: ClipboardBuffer): List<ComponentOutline> {
+        val nonAirCells = clipboard.nonAirCells()
+        if (nonAirCells.isEmpty()) return emptyList()
+
+        // Step 1: Build occupied set and assign component IDs via BFS
+        val occupied = HashSet<Long>(nonAirCells.size)
+        nonAirCells.forEach { cell ->
+            occupied.add(BlockPos.asLong(cell.offset.x, cell.offset.y, cell.offset.z))
+        }
+
+        val componentOf = HashMap<Long, Int>(nonAirCells.size)
+        var componentCount = 0
+        val queueX = IntArray(nonAirCells.size)
+        val queueY = IntArray(nonAirCells.size)
+        val queueZ = IntArray(nonAirCells.size)
+
+        nonAirCells.forEach { cell ->
+            val startKey = BlockPos.asLong(cell.offset.x, cell.offset.y, cell.offset.z)
+            if (startKey in componentOf) return@forEach
+
+            val compId = componentCount++
+            var head = 0
+            var tail = 0
+            queueX[tail] = cell.offset.x
+            queueY[tail] = cell.offset.y
+            queueZ[tail] = cell.offset.z
+            tail++
+            componentOf[startKey] = compId
+
+            while (head < tail) {
+                val cx = queueX[head]
+                val cy = queueY[head]
+                val cz = queueZ[head]
+                head++
+
+                for (i in 0..5) {
+                    val nx = cx + NEIGHBOR_DX[i]
+                    val ny = cy + NEIGHBOR_DY[i]
+                    val nz = cz + NEIGHBOR_DZ[i]
+                    val nkey = BlockPos.asLong(nx, ny, nz)
+                    if (nkey in occupied && nkey !in componentOf) {
+                        componentOf[nkey] = compId
+                        queueX[tail] = nx
+                        queueY[tail] = ny
+                        queueZ[tail] = nz
+                        tail++
+                    }
+                }
+            }
+        }
+
+        if (componentCount == 0) return emptyList()
+
+        // Step 2: Group surface cells by component
+        val componentBoxes = Array(componentCount) { ArrayList<Box>() }
+        surfaceCells(clipboard).forEach { cell ->
+            val key = BlockPos.asLong(cell.offset.x, cell.offset.y, cell.offset.z)
+            val comp = componentOf[key] ?: return@forEach
+            componentBoxes[comp].add(SelectionBounds.blockBox(BlockPos.ORIGIN.add(cell.offset)))
+        }
+
+        // Step 3: Build outline per component — merged VoxelShape for small, bounding box for large
+        return componentBoxes.mapNotNull { boxes ->
+            if (boxes.isEmpty()) return@mapNotNull null
+
+            if (boxes.size <= MAX_VOXEL_UNION_CELLS) {
+                // Small component: build merged VoxelShape for exact block-level outline
+                var shape: VoxelShape = VoxelShapes.empty()
+                boxes.forEach { box ->
+                    shape = VoxelShapes.union(shape, VoxelShapes.cuboid(box))
+                }
+                ComponentOutline.Merged(shape)
+            } else {
+                // Large component: use bounding box to avoid O(n^2)
                 var minX = Double.MAX_VALUE
                 var minY = Double.MAX_VALUE
                 var minZ = Double.MAX_VALUE
@@ -404,7 +520,7 @@ object ClipboardSelectionRenderer {
                     if (box.maxY > maxY) maxY = box.maxY
                     if (box.maxZ > maxZ) maxZ = box.maxZ
                 }
-                CachedGeometry(shape = null, boxes = boxes, boundingBox = Box(minX, minY, minZ, maxX, maxY, maxZ))
+                ComponentOutline.BoundingBoxOnly(Box(minX, minY, minZ, maxX, maxY, maxZ))
             }
         }
     }

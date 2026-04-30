@@ -25,10 +25,23 @@ class SymmetryAwareOperationDispatcher(
             return
         }
 
+        // Construct mode: expand operations across all symmetry transforms
+        val config = ActiveSymmetryConfig.current()
+        val expandedOperation = if (config?.constructEnabled == true && ActiveSymmetryConfig.hasDerivedTransforms(config)) {
+            val expanded = SymmetryOperationExpander.expand(operation, config)
+            when (expanded.size) {
+                0 -> return
+                1 -> expanded.first()
+                else -> axion.common.operation.CompositeOperation(expanded)
+            }
+        } else {
+            operation
+        }
+
         val client = MinecraftClient.getInstance()
         val server = client.server
         if (server == null) {
-            networkDispatcher.dispatch(operation)
+            networkDispatcher.dispatch(expandedOperation)
             return
         }
 
@@ -36,11 +49,11 @@ class SymmetryAwareOperationDispatcher(
         server.execute {
             val targetWorld = server.getWorld(worldKey)
             if (targetWorld == null) {
-                AxionMod.LOGGER.warn("Dropping operation {} because no local world is available", operation.kind)
+                AxionMod.LOGGER.warn("Dropping operation {} because no local world is available", expandedOperation.kind)
                 return@execute
             }
 
-            val plan = planner.plan(targetWorld, operation)
+            val plan = planner.plan(targetWorld, expandedOperation)
             if (plan.writes.isEmpty() && plan.entityMoves.isEmpty() && plan.entityClones.isEmpty() && plan.entityDeletes.isEmpty()) {
                 return@execute
             }

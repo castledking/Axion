@@ -165,7 +165,26 @@ class AxionHistoryActionService(
         }
 
         val expectedData = runCatching { Bukkit.createBlockData(expected) }.getOrNull() ?: return false
-        return current.material == expectedData.material
+        if (current.material == expectedData.material) {
+            return true
+        }
+        // Allow native Minecraft block decay drift (e.g. grass_block -> dirt when light is blocked,
+        // farmland -> dirt when not hydrated, dirt_path -> dirt when jumped on, snow melt). The
+        // undo will rewrite to the original oldState anyway, so accepting these drifts is safe.
+        return isNativeDecayDrift(expectedMaterial = expectedData.material, currentMaterial = current.material)
+    }
+
+    private fun isNativeDecayDrift(
+        expectedMaterial: org.bukkit.Material,
+        currentMaterial: org.bukkit.Material,
+    ): Boolean {
+        val expectedName = expectedMaterial.name
+        val currentName = currentMaterial.name
+        return when (expectedName) {
+            "GRASS_BLOCK", "MYCELIUM", "PODZOL", "FARMLAND", "DIRT_PATH" -> currentName == "DIRT"
+            "SNOW" -> currentName == "AIR"
+            else -> false
+        }
     }
 
     private fun applyState(world: World, pos: axion.protocol.IntVector3, state: String, blockEntityPayload: String?) {

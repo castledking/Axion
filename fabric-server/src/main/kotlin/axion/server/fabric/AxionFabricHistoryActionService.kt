@@ -99,7 +99,30 @@ class AxionFabricHistoryActionService(
         }
 
         val parsed = parseBlockState(world, expectedState) ?: return false
-        return current.block == parsed.blockState().block
+        if (current.block == parsed.blockState().block) {
+            return true
+        }
+        // Allow native Minecraft block decay drift (e.g. grass_block -> dirt when light is blocked,
+        // farmland -> dirt when not hydrated, dirt_path -> dirt when jumped on, snow melt). The
+        // undo will rewrite to the original oldState anyway, so accepting these drifts is safe.
+        return isNativeDecayDrift(expectedBlock = parsed.blockState().block, currentBlock = current.block)
+    }
+
+    private fun isNativeDecayDrift(
+        expectedBlock: net.minecraft.block.Block,
+        currentBlock: net.minecraft.block.Block,
+    ): Boolean {
+        val expectedId = net.minecraft.registry.Registries.BLOCK.getId(expectedBlock).toString()
+        val currentId = net.minecraft.registry.Registries.BLOCK.getId(currentBlock).toString()
+        return when (expectedId) {
+            "minecraft:grass_block",
+            "minecraft:mycelium",
+            "minecraft:podzol",
+            "minecraft:farmland",
+            "minecraft:dirt_path" -> currentId == "minecraft:dirt"
+            "minecraft:snow" -> currentId == "minecraft:air"
+            else -> false
+        }
     }
 
     private fun applyState(

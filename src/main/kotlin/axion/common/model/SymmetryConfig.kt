@@ -10,4 +10,5 @@ data class SymmetryConfig(
     val rotationalEnabled: Boolean = false,
     val mirrorEnabled: Boolean = false,
     val mirrorAxis: SymmetryMirrorAxis = SymmetryMirrorAxis.X,
+    val constructEnabled: Boolean = false,
 )

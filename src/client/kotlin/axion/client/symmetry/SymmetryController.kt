@@ -92,6 +92,18 @@ object SymmetryController {
         return true
     }
 
+    fun toggleConstruct(): Boolean {
+        if (!canToggleFromHotkey()) {
+            return false
+        }
+
+        val config = currentConfig() ?: return false
+        val enabled = !config.constructEnabled
+        AxionClientState.updateSymmetry(SymmetryState.Active(config.copy(constructEnabled = enabled)))
+        showToggleFeedback("Construct", enabled)
+        return true
+    }
+
     fun toggleMirror(client: MinecraftClient): Boolean {
         if (!canToggleFromHotkey()) {
             return false

@@ -1427,6 +1427,7 @@ object ClientModeController {
             // Within vanilla range - use vanilla attackBlock for proper client prediction
             // This prevents ghost blocks by letting the client handle the break prediction
             client.interactionManager?.attackBlock(targetPos, blockHit.side)
+            SymmetryBreakController.dispatchDerivedBreaks(client, targetPos)
         } else {
             // Beyond vanilla range - use dispatch for infinite reach breaking
             dispatcher.dispatch(

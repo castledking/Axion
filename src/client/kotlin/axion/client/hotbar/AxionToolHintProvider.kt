@@ -306,7 +306,8 @@ object AxionToolHintProvider {
                 ToolHintEntry("LMB / RMB", "Place or move anchor"),
                 ToolHintEntry("Ctrl + Scroll", "Nudge anchor"),
                 ToolHintEntry("Main Mod + R", "Toggle rotation"),
-                ToolHintEntry("Main Mod + F", "Toggle mirror Y"),
+                ToolHintEntry("Main Mod + F", "Toggle mirror"),
+                ToolHintEntry("Main Mod + C", "Toggle construct"),
                 ToolHintEntry("Del", "Clear symmetry"),
             ),
             statusLines = when (state) {
@@ -314,6 +315,7 @@ object AxionToolHintProvider {
                 is SymmetryState.Active -> buildList {
                     add(Text.of("Rot: ${if (state.config.rotationalEnabled) "On" else "Off"}"))
                     add(Text.of("Mirror: ${formatSymmetryMirror(state.config)}"))
+                    add(Text.of("Construct: ${if (state.config.constructEnabled) "On" else "Off"}"))
                     targetSummary()?.let { add(Text.of(it)) }
                 }
             },
@@ -388,6 +390,9 @@ object AxionToolHintProvider {
         }
         if (config.mirrorEnabled) {
             parts += "Mirror ${config.mirrorAxis.name}"
+        }
+        if (config.constructEnabled) {
+            parts += "Construct"
         }
         return if (parts.isEmpty()) null else "Sym: ${parts.joinToString("+")}"
     }

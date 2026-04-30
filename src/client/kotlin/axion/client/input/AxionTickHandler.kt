@@ -64,6 +64,10 @@ object AxionTickHandler {
                 }
             }
 
+            if (KeyBindingHandler.wasCtrlComboPressed(AxionKeybindings.symmetryToggleConstruct)) {
+                SymmetryController.toggleConstruct()
+            }
+
             while (AxionKeybindings.undoAction.wasPressed()) {
                 if (AxionModifierKeys.isControlDown(client)) {
                     if (AxionModifierKeys.isShiftDown(client)) {
