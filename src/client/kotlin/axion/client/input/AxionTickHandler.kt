@@ -14,10 +14,19 @@ import axion.client.tool.ExtrudeToolController
 import axion.client.tool.PlacementToolController
 import axion.client.tool.SmearToolController
 import axion.client.tool.StackToolController
+import axion.client.render.gpu.ChunkedPreviewLifecycle
 import net.minecraft.client.MinecraftClient
+import net.minecraft.client.world.ClientWorld
 
 object AxionTickHandler {
+    // Tracks the world identity to detect dimension changes / world unloads.
+    // When the world reference flips (including to null), every chunked
+    // preview session is closed so GPU/CPU caches don't leak into the next
+    // world with stale absolute-coord chunks.
+    private var lastObservedWorld: ClientWorld? = null
+
     fun onEndTick(client: MinecraftClient) {
+        observeWorldLifecycle(client.world)
         AxionServerConnection.onEndTick()
         AxionInteractionRouter.onEndTick(client)
         val player = client.player ?: return
@@ -97,5 +106,17 @@ object AxionTickHandler {
         StackToolController.onEndTick(client)
         SmearToolController.onEndTick(client)
         ExtrudeToolController.onEndTick(client)
+    }
+
+    private fun observeWorldLifecycle(currentWorld: ClientWorld?) {
+        if (currentWorld === lastObservedWorld) return
+        // World changed (joined a server, switched dimension, returned to title).
+        // Free any cached preview chunks — their absolute coordinates are no
+        // longer meaningful, and keeping them risks rendering ghost geometry
+        // against the wrong world.
+        if (lastObservedWorld != null) {
+            ChunkedPreviewLifecycle.closeAll()
+        }
+        lastObservedWorld = currentWorld
     }
 }

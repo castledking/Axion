@@ -160,7 +160,17 @@ class AxionHistoryActionService(
     }
 
     private fun stateMatchesExpected(current: org.bukkit.block.data.BlockData, expected: String): Boolean {
-        if (current.getAsString(false) == expected) {
+        val currentString = current.getAsString(false)
+        if (currentString == expected) {
+            return true
+        }
+
+        // Property-stripped comparison: ignore transient connection/physics
+        // properties (fence north/south/east/west, stair shape, redstone
+        // power, etc.) before deciding the states differ.
+        val strippedCurrent = axion.protocol.BlockDriftPolicy.stripTransientProperties(currentString)
+        val strippedExpected = axion.protocol.BlockDriftPolicy.stripTransientProperties(expected)
+        if (strippedCurrent == strippedExpected) {
             return true
         }
 
@@ -168,23 +178,14 @@ class AxionHistoryActionService(
         if (current.material == expectedData.material) {
             return true
         }
-        // Allow native Minecraft block decay drift (e.g. grass_block -> dirt when light is blocked,
-        // farmland -> dirt when not hydrated, dirt_path -> dirt when jumped on, snow melt). The
-        // undo will rewrite to the original oldState anyway, so accepting these drifts is safe.
-        return isNativeDecayDrift(expectedMaterial = expectedData.material, currentMaterial = current.material)
-    }
 
-    private fun isNativeDecayDrift(
-        expectedMaterial: org.bukkit.Material,
-        currentMaterial: org.bukkit.Material,
-    ): Boolean {
-        val expectedName = expectedMaterial.name
-        val currentName = currentMaterial.name
-        return when (expectedName) {
-            "GRASS_BLOCK", "MYCELIUM", "PODZOL", "FARMLAND", "DIRT_PATH" -> currentName == "DIRT"
-            "SNOW" -> currentName == "AIR"
-            else -> false
-        }
+        // Allow native Minecraft block decay drift (e.g. grass_block -> dirt
+        // when light is blocked, snow melt, leaves disconnected from wood,
+        // ice melt, torch-support removed). The undo will rewrite to the
+        // original oldState anyway, so accepting these drifts is safe.
+        val expectedId = expectedData.material.key.toString()
+        val currentId = current.material.key.toString()
+        return axion.protocol.BlockDriftPolicy.acceptsDecay(expectedId, currentId)
     }
 
     private fun applyState(world: World, pos: axion.protocol.IntVector3, state: String, blockEntityPayload: String?) {

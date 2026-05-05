@@ -48,23 +48,8 @@ If you want Axion edits to work properly on a Paper server, you need this plugin
 
 ## Version Support
 
-Fabric client support:
-
-- `1.21.8`
-- `1.21.9`
-- `1.21.10`
-- `1.21.11`
-
-Paper plugin support:
-
-- `1.21.8`
-- `1.21.9`
-- `1.21.10`
-- `1.21.11`
-
-Fabric dedicated server support:
-
-- `1.21.11` only
+Axion currently supports `1.21.5` through `1.21.11` for the fabric client and paper server. 
+Dedicated fabric server is currently only supported for `1.21.11`.
 
 ## Features
 
@@ -79,7 +64,7 @@ Fabric dedicated server support:
 
 For Paper:
 
-- Paper server for a supported Minecraft version (`1.21.8` through `1.21.11`)
+- Paper server for a supported Minecraft version (`1.21.5` through `1.21.11`)
 - matching Axion Fabric client for players using the toolset
 
 For Fabric dedicated server instead of Paper:
@@ -145,7 +130,7 @@ When `audit.enabled` is `false`, routine audit logging and timing summaries stay
 ## Notes
 
 - The Fabric mod and Paper plugin should stay on matching compatible builds.
-- Paper plugin support covers `1.21.8` through `1.21.11`.
+- Paper plugin support covers `1.21.5` through `1.21.11`.
 - Fabric dedicated server support is separate from the Paper plugin path and currently only targets `1.21.11`.
 - The Fabric dedicated server path uses the main Axion Fabric jar, not the Paper plugin jar.
 - Axion is designed for creative-mode building workflows.

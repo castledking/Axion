@@ -1,6 +1,7 @@
 package axion.client.render
 
 import axion.client.network.BlockWrite
+import axion.client.render.gpu.ChunkedPreviewLifecycle
 import axion.common.model.ClipboardBuffer
 import net.minecraft.block.ShapeContext
 import net.minecraft.client.MinecraftClient
@@ -19,6 +20,12 @@ object GhostBlockPreviewRenderer {
     private const val MAX_TEXTURED_GHOST_BLOCKS: Int = 32768
     private const val DEFAULT_GHOST_COLOR: Int = 0xFFFFFFFF.toInt()
 
+    // Threshold above which we route textured ghost rendering through the
+    // chunked preview session (Phase A+B GPU-style pipeline). Below this,
+    // the existing per-frame tessellation path is fine and avoids the
+    // session's diff-overhead for tiny clipboards.
+    private const val CHUNKED_PATH_CELL_THRESHOLD: Int = 1024
+
     fun maxOriginsFor(nonAirCellCount: Int): Int {
         if (nonAirCellCount <= 0) {
             return 0
@@ -35,6 +42,7 @@ object GhostBlockPreviewRenderer {
         textured: Boolean = false,
         fullBlock: Boolean = false,
         scale: Float = 1.0f,
+        sessionTag: String = "default",
     ) {
         if (origins.isEmpty()) {
             return
@@ -44,6 +52,29 @@ object GhostBlockPreviewRenderer {
         if (allOccupiedCells.isEmpty()) {
             return
         }
+
+        // Phase A+B: for large textured previews, route through the chunked
+        // preview session. It maintains a persistent per-section surface-cell
+        // cache with dirty tracking, so frame cost is O(visibleSurfaceCells)
+        // instead of O(allCells * originCount). No more downsampling caps.
+        //
+        // The session ID MUST be stable across clipboard rebuilds — otherwise
+        // each accumulated magic-select click creates a fresh session and
+        // leaks the previous session's GPU buffers, which is what was
+        // producing exponentially worse freezes on multi-blob selections.
+        // Tools that need their own slot pass a [sessionTag]; the default
+        // shares one slot for "the active textured ghost preview".
+        if (textured) {
+            val totalCells = allOccupiedCells.size.toLong() * origins.size.toLong()
+            if (totalCells > CHUNKED_PATH_CELL_THRESHOLD) {
+                val sessionId = "ghost:" + sessionTag
+                val session = ChunkedPreviewLifecycle.acquire(sessionId)
+                session.setFromClipboard(clipboard, origins)
+                session.render(context, color, alpha)
+                return
+            }
+        }
+
         val occupiedCells = if (textured) {
             downsampleCells(allOccupiedCells, MAX_TEXTURED_GHOST_BLOCKS)
         } else {

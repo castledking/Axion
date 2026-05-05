@@ -34,7 +34,13 @@ object ClipboardSelectionRenderer {
 
     // MAX_VOXEL_UNION_CELLS: beyond this threshold we skip VoxelShapes.union (O(n^2))
     // and fall back to per-component bounding boxes for the outline.
-    private const val MAX_VOXEL_UNION_CELLS: Int = 256
+    //
+    // Bumped from 256 → 2048: a brush-10 magic-select sphere produces ~1.3k
+    // surface cells per cluster, and at 256 each cluster prematurely flattened
+    // to a rectangle. 2048 covers brush sizes up to ~13 with VoxelShapes.union
+    // finishing in well under a second on cache miss; the result is then
+    // WeakHashMap-cached so subsequent frames are free.
+    private const val MAX_VOXEL_UNION_CELLS: Int = 2048
 
     // 6-face adjacency offsets for connected component BFS
     private val NEIGHBOR_DX = intArrayOf(-1, 1, 0, 0, 0, 0)
@@ -327,6 +333,7 @@ object ClipboardSelectionRenderer {
                 alpha = baseAlpha,
                 textured = true,
                 scale = BASE_OVERLAY_SCALE,
+                sessionTag = "selection-base",
             )
         }
         if (pulseOverlay != null) {
@@ -337,6 +344,7 @@ object ClipboardSelectionRenderer {
                 alpha = pulseAlpha,
                 textured = true,
                 scale = PULSE_OVERLAY_SCALE,
+                sessionTag = "selection-pulse",
             )
         }
 

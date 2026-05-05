@@ -11,23 +11,35 @@ version = property("mod_version") as String
 group = property("maven_group") as String
 val modVersion = version.toString()
 val minecraftVersion = property("minecraft_version") as String
-val is120Series = minecraftVersion.startsWith("1.20.")
 val minecraftPatch = when {
     minecraftVersion.startsWith("1.21.") -> minecraftVersion.substringAfter("1.21.", "0").substringBefore('-').toIntOrNull() ?: 0
     else -> 0
 }
-val is1210To1214 = minecraftVersion.startsWith("1.21.") && minecraftPatch in 0..4
-val is1215To1217 = minecraftVersion.startsWith("1.21.") && minecraftPatch in 5..7
-val needsLegacyMouseInputStub = minecraftVersion.startsWith("1.21.") && minecraftPatch < 11
-val needsLegacyWorldRenderStateStub = minecraftVersion.startsWith("1.21.") && minecraftPatch < 9
+
+// Two release ranges, mirroring Axiom's multi-version-jar approach:
+//   - rangeLegacy:  1.21.6 .. 1.21.8  (compat-1_21_7, no MouseInput / WorldRenderState classes,
+//                                      both stubs required at compile time)
+//   - rangeModern:  1.21.9 .. 1.21.11 (compat-1_21_11, MouseInput + WorldRenderState exist,
+//                                      no stubs required)
+//
+// 1.21.5 is intentionally excluded — the GpuBuffer rewrite, HudElementRegistry, and
+// entity NbtWriteView APIs landed in 1.21.6, and our preview pipeline uses all three.
+// Targeting 1.21.5 would require substantial reflective fallbacks; not worth it.
+//
+// Cross-version mixin compatibility within each range is handled by `require = 0`
+// dual-signature injections in MouseMixin and WorldRendererFallbackMixin.
+val rangeLegacy = minecraftVersion.startsWith("1.21.") && minecraftPatch in 6..8
+val rangeModern = minecraftVersion.startsWith("1.21.") && minecraftPatch >= 9
+
+val needsLegacyMouseInputStub = rangeLegacy
+val needsLegacyWorldRenderStateStub = rangeLegacy
 val supportsFabricDedicatedServer = minecraftVersion == "1.21.11"
 
 // Define Minecraft version range for fabric.mod.json
 val minecraftVersionRange = when {
-    is120Series -> ">=1.20 <1.21"
-    is1210To1214 -> ">=1.21 <=1.21.4"
-    is1215To1217 -> ">=1.21.5 <=1.21.7"
-    else -> ">=1.21.8"
+    rangeLegacy -> ">=1.21.6 <=1.21.8"
+    rangeModern -> ">=1.21.9 <=1.21.11"
+    else -> ">=1.21.6"
 }
 val fabricServerEntrypoint = if (supportsFabricDedicatedServer) {
     "axion.server.fabric.AxionFabricServerMod"
@@ -70,29 +82,14 @@ if (needsLegacyWorldRenderStateStub) {
 }
 
 
-// Configure version-specific compat source sets
-// Each Minecraft version has its own compat directory with VersionCompatImpl/Init
-when {
-    is120Series -> {
-        sourceSets.named("client") {
-            kotlin.srcDir("src/compat-1_20_6/kotlin")
-        }
-    }
-    is1210To1214 -> {
-        sourceSets.named("client") {
-            kotlin.srcDir("src/compat-1_21_4/kotlin")
-        }
-    }
-    is1215To1217 -> {
-        sourceSets.named("client") {
-            kotlin.srcDir("src/compat-1_21_7/kotlin")
-        }
-    }
-    else -> {
-        // 1.21.8+: Use 1.21.11 compat files
-        sourceSets.named("client") {
-            kotlin.srcDir("src/compat-1_21_11/kotlin")
-        }
+// Two compat source sets corresponding to the two release ranges
+sourceSets.named("client") {
+    if (rangeLegacy) {
+        // 1.21.5 .. 1.21.8: Codec-based NBT serialization, no MouseInput / WorldRenderState
+        kotlin.srcDir("src/compat-1_21_7/kotlin")
+    } else {
+        // 1.21.9+: registry-manager-based serialization, has MouseInput / WorldRenderState
+        kotlin.srcDir("src/compat-1_21_11/kotlin")
     }
 }
 
@@ -153,6 +150,13 @@ tasks.test {
     useJUnitPlatform()
 }
 
+// Range-style filename matching Axiom's release pattern, e.g. "mc1.21.9-1.21.11"
+val rangeFileTag = when {
+    rangeLegacy -> "mc1.21.6-1.21.8"
+    rangeModern -> "mc1.21.9-1.21.11"
+    else -> "mc${minecraftVersion}"
+}
+
 tasks.jar {
     dependsOn(":protocol:compileKotlin")
     dependsOn("compileClientKotlin")
@@ -160,7 +164,7 @@ tasks.jar {
     if (supportsFabricDedicatedServer) {
         dependsOn(":fabric-server:compileKotlin")
     }
-    archiveFileName.set("Axion-v${modVersion}-mc${minecraftVersion}-dev.jar")
+    archiveFileName.set("Axion-v${modVersion}-${rangeFileTag}-dev.jar")
     from(layout.projectDirectory.dir("protocol/build/classes/kotlin/main"))
     if (supportsFabricDedicatedServer) {
         from(layout.projectDirectory.dir("fabric-server/build/classes/kotlin/main"))
@@ -171,10 +175,10 @@ tasks.jar {
 }
 
 tasks.named<AbstractArchiveTask>("remapJar") {
-    archiveFileName.set("Axion-v${modVersion}-mc${minecraftVersion}.jar")
+    archiveFileName.set("Axion-v${modVersion}-${rangeFileTag}.jar")
 }
 
 tasks.named<AbstractArchiveTask>("sourcesJar") {
-    archiveFileName.set("Axion-v${modVersion}-mc${minecraftVersion}-sources.jar")
+    archiveFileName.set("Axion-v${modVersion}-${rangeFileTag}-sources.jar")
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }

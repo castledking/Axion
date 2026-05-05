@@ -39,23 +39,7 @@ For multiplayer editing:
 
 ## Version Support
 
-Fabric client support:
-
-- `1.21.8`
-- `1.21.9`
-- `1.21.10`
-- `1.21.11`
-
-Paper plugin support:
-
-- `1.21.8`
-- `1.21.9`
-- `1.21.10`
-- `1.21.11`
-
-Fabric dedicated server support:
-
-- `1.21.11` only
+Axion currently supports `1.21.5` through `1.21.11` for both the Fabric client and the Paper plugin. Fabric dedicated server support is currently only available for `1.21.11`.
 
 ## Features
 
@@ -103,7 +87,7 @@ For Fabric client:
 
 Minecraft version support:
 
-- `1.21.8` through `1.21.11` on the client
+- `1.21.5` through `1.21.11` on the client
 
 For Fabric dedicated server:
 
@@ -117,7 +101,7 @@ For Fabric dedicated server:
 
 ### Fabric Client
 
-1. Install Fabric Loader for your supported Minecraft version (`1.21.8` through `1.21.11`).
+1. Install Fabric Loader for your supported Minecraft version (`1.21.5` through `1.21.11`).
 2. Put the Axion mod jar in your client `mods` folder.
 3. Install Fabric API and Fabric Language Kotlin.
 4. Launch Minecraft in creative mode.

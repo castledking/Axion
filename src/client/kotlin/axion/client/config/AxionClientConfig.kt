@@ -28,10 +28,23 @@ object AxionClientConfig {
             ?.contains("mac") == true
     }
 
+    fun isLinux(): Boolean {
+        val osName = System.getProperty("os.name")?.lowercase() ?: return false
+        // Treat any Unix-like non-Mac system as "Linux" for the modifier toggle.
+        return osName.contains("linux") || osName.contains("nix") || osName.contains("nux")
+    }
+
     fun useCommandModifierOnMac(): Boolean = isMacOs() && data.useCommandModifierOnMac
 
     fun setUseCommandModifierOnMac(enabled: Boolean) {
         data = data.copy(useCommandModifierOnMac = isMacOs() && enabled)
+        save()
+    }
+
+    fun useSuperModifierOnLinux(): Boolean = isLinux() && data.useSuperModifierOnLinux
+
+    fun setUseSuperModifierOnLinux(enabled: Boolean) {
+        data = data.copy(useSuperModifierOnLinux = isLinux() && enabled)
         save()
     }
 
@@ -244,6 +257,7 @@ object AxionClientConfig {
 
                 Data(
                     useCommandModifierOnMac = fileData.useCommandModifierOnMac ?: defaults.useCommandModifierOnMac,
+                    useSuperModifierOnLinux = fileData.useSuperModifierOnLinux ?: defaults.useSuperModifierOnLinux,
                     activeSavedHotbarIndex = (fileData.activeSavedHotbarIndex ?: defaults.activeSavedHotbarIndex)
                         .coerceIn(0, sanitizeSavedHotbars(fileData.savedHotbars ?: defaults.savedHotbars).lastIndex),
                     nextMagicTemplateIndex = maxOf(
@@ -325,6 +339,7 @@ object AxionClientConfig {
 
     data class Data(
         val useCommandModifierOnMac: Boolean,
+        val useSuperModifierOnLinux: Boolean,
         val activeSavedHotbarIndex: Int,
         val nextMagicTemplateIndex: Int,
         val nextMagicCustomMaskIndex: Int,
@@ -339,6 +354,9 @@ object AxionClientConfig {
                     ?.contains("mac") == true
                 return Data(
                     useCommandModifierOnMac = isMac,
+                    // Linux users default to Alt (matches every other platform); they can
+                    // opt into Super via the config screen if their Alt key has issues.
+                    useSuperModifierOnLinux = false,
                     activeSavedHotbarIndex = 0,
                     nextMagicTemplateIndex = 3,
                     nextMagicCustomMaskIndex = 3,
@@ -384,6 +402,7 @@ object AxionClientConfig {
 
     private data class FileData(
         val useCommandModifierOnMac: Boolean? = null,
+        val useSuperModifierOnLinux: Boolean? = null,
         val activeSavedHotbarIndex: Int? = null,
         val nextMagicTemplateIndex: Int? = null,
         val nextMagicCustomMaskIndex: Int? = null,

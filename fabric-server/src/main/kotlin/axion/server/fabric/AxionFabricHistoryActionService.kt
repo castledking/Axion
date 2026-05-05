@@ -94,7 +94,17 @@ class AxionFabricHistoryActionService(
         current: net.minecraft.block.BlockState,
         expectedState: String,
     ): Boolean {
-        if (BlockArgumentParser.stringifyBlockState(current) == expectedState) {
+        val currentString = BlockArgumentParser.stringifyBlockState(current)
+        if (currentString == expectedState) {
+            return true
+        }
+
+        // Property-stripped comparison: ignore transient connection/physics
+        // properties (fence north/south/east/west, stair shape, redstone
+        // power, etc.) before deciding the states differ.
+        val strippedCurrent = axion.protocol.BlockDriftPolicy.stripTransientProperties(currentString)
+        val strippedExpected = axion.protocol.BlockDriftPolicy.stripTransientProperties(expectedState)
+        if (strippedCurrent == strippedExpected) {
             return true
         }
 
@@ -102,27 +112,14 @@ class AxionFabricHistoryActionService(
         if (current.block == parsed.blockState().block) {
             return true
         }
-        // Allow native Minecraft block decay drift (e.g. grass_block -> dirt when light is blocked,
-        // farmland -> dirt when not hydrated, dirt_path -> dirt when jumped on, snow melt). The
-        // undo will rewrite to the original oldState anyway, so accepting these drifts is safe.
-        return isNativeDecayDrift(expectedBlock = parsed.blockState().block, currentBlock = current.block)
-    }
 
-    private fun isNativeDecayDrift(
-        expectedBlock: net.minecraft.block.Block,
-        currentBlock: net.minecraft.block.Block,
-    ): Boolean {
-        val expectedId = net.minecraft.registry.Registries.BLOCK.getId(expectedBlock).toString()
-        val currentId = net.minecraft.registry.Registries.BLOCK.getId(currentBlock).toString()
-        return when (expectedId) {
-            "minecraft:grass_block",
-            "minecraft:mycelium",
-            "minecraft:podzol",
-            "minecraft:farmland",
-            "minecraft:dirt_path" -> currentId == "minecraft:dirt"
-            "minecraft:snow" -> currentId == "minecraft:air"
-            else -> false
-        }
+        // Allow native Minecraft block decay drift (e.g. grass_block -> dirt
+        // when light is blocked, snow melt, leaves disconnected from wood,
+        // ice melt, torch-support removed). The undo will rewrite to the
+        // original oldState anyway, so accepting these drifts is safe.
+        val expectedId = net.minecraft.registry.Registries.BLOCK.getId(parsed.blockState().block).toString()
+        val currentId = net.minecraft.registry.Registries.BLOCK.getId(current.block).toString()
+        return axion.protocol.BlockDriftPolicy.acceptsDecay(expectedId, currentId)
     }
 
     private fun applyState(

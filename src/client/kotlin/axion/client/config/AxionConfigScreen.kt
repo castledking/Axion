@@ -12,7 +12,9 @@ class AxionConfigScreen(
         val centerX = width / 2
         val centerY = height / 2
         val macOnly = AxionClientConfig.isMacOs()
+        val linuxOnly = AxionClientConfig.isLinux()
 
+        // Main Mod toggle (macOS-only): Cmd <-> Ctrl
         addDrawableChild(
             ButtonWidget.builder(
                 commandToggleLabel(),
@@ -21,8 +23,22 @@ class AxionConfigScreen(
                     AxionClientConfig.setUseCommandModifierOnMac(!AxionClientConfig.useCommandModifierOnMac())
                     clearAndInit()
                 }
-            }.dimensions(centerX - 110, centerY - 10, 220, 20).build().apply {
+            }.dimensions(centerX - 110, centerY - 40, 220, 20).build().apply {
                 active = macOnly
+            },
+        )
+
+        // Tool Mod toggle (Linux-only): Alt <-> Super
+        addDrawableChild(
+            ButtonWidget.builder(
+                toolModifierToggleLabel(),
+            ) {
+                if (linuxOnly) {
+                    AxionClientConfig.setUseSuperModifierOnLinux(!AxionClientConfig.useSuperModifierOnLinux())
+                    clearAndInit()
+                }
+            }.dimensions(centerX - 110, centerY - 10, 220, 20).build().apply {
+                active = linuxOnly
             },
         )
 
@@ -55,7 +71,7 @@ class AxionConfigScreen(
             textRenderer,
             Text.translatable("axion.config.main_modifier.description"),
             width / 2,
-            (height / 2) - 34,
+            (height / 2) - 64,
             0xBFBFBF,
         )
 
@@ -64,7 +80,17 @@ class AxionConfigScreen(
                 textRenderer,
                 Text.translatable("axion.config.main_modifier.mac_only"),
                 width / 2,
-                (height / 2) + 16,
+                (height / 2) - 52,
+                0x8A8A8A,
+            )
+        }
+
+        if (!AxionClientConfig.isLinux()) {
+            context.drawCenteredTextWithShadow(
+                textRenderer,
+                Text.translatable("axion.config.tool_modifier.linux_only"),
+                width / 2,
+                (height / 2) - 22,
                 0x8A8A8A,
             )
         }
@@ -95,5 +121,17 @@ class AxionConfigScreen(
                 Text.translatable("axion.config.main_modifier.ctrl"),
             )
         }
+    }
+
+    private fun toolModifierToggleLabel(): Text {
+        val activeModifierKey = if (AxionClientConfig.useSuperModifierOnLinux()) {
+            "axion.config.tool_modifier.super"
+        } else {
+            "axion.config.tool_modifier.alt"
+        }
+        return Text.translatable(
+            "axion.config.tool_modifier.button",
+            Text.translatable(activeModifierKey),
+        )
     }
 }

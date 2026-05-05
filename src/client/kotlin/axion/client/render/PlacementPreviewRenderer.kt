@@ -18,10 +18,20 @@ object PlacementPreviewRenderer {
     private const val SPARSE_DESTINATION_GHOST_ALPHA: Int = 235
     private const val MOVE_SOURCE_GHOST_SCALE: Float = 1.015f
     private const val DESTINATION_GHOST_SCALE: Float = 0.985f
-    private const val MAX_MOVE_DETAILED_SELECTION_CELLS: Int = 4096
-    private const val MAX_MOVE_SOURCE_CELLS: Int = 4096
-    private const val MAX_MOVE_DESTINATION_GHOST_CELLS: Int = 8192
-    private const val MAX_CLONE_DESTINATION_GHOST_CELLS: Int = 8192
+    // These caps used to gate the detailed/textured Move + Clone ghost paths
+    // because per-frame CPU tessellation collapsed for large selections. After
+    // Phase A+B (chunked persistent surface-cell cache + dirty tracking),
+    // [GhostBlockPreviewRenderer] routes any preview > 1024 cells through
+    // [ChunkedPreviewLifecycle], which scales to hundreds of thousands of
+    // cells. Raising these so the chunked path actually gets to handle them.
+    //
+    // Phase B.5 (persistent GpuBuffer per chunk) will further drop per-frame
+    // cost to a handful of draw calls, after which these caps can probably go
+    // away entirely.
+    private const val MAX_MOVE_DETAILED_SELECTION_CELLS: Int = 200000
+    private const val MAX_MOVE_SOURCE_CELLS: Int = 200000
+    private const val MAX_MOVE_DESTINATION_GHOST_CELLS: Int = 200000
+    private const val MAX_CLONE_DESTINATION_GHOST_CELLS: Int = 200000
     private val moveSourceClipboardCache = java.util.WeakHashMap<ClipboardBuffer, ClipboardBuffer?>()
 
     fun render(context: AxionWorldRenderContext) {
@@ -56,6 +66,7 @@ object PlacementPreviewRenderer {
                         color = MOVE_SOURCE_COLOR,
                         alpha = MOVE_SOURCE_GHOST_ALPHA,
                         scale = MOVE_SOURCE_GHOST_SCALE,
+                        sessionTag = "move-source",
                     ),
                 )
             }
@@ -73,6 +84,7 @@ object PlacementPreviewRenderer {
                     selectionClipboard = destinationSelectionClipboard,
                     shellClipboard = preview.destinationClipboardBuffer,
                     fallbackGhostClipboard = destinationGhostClipboard,
+                    sessionTag = "placement-destination",
                     sparse = false,
                     outlineColor = destinationColor,
                     lineWidth = LINE_WIDTH,
@@ -95,6 +107,7 @@ object PlacementPreviewRenderer {
                     selectionClipboard = destinationSelectionClipboard,
                     shellClipboard = preview.destinationClipboardBuffer,
                     fallbackGhostClipboard = destinationGhostClipboard,
+                    sessionTag = "placement-destination",
                     sparse = sparseDestination,
                     outlineColor = destinationColor,
                     lineWidth = LINE_WIDTH,

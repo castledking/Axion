@@ -52,13 +52,21 @@ class AxionPreviewBuffer : AutoCloseable {
         val device = RenderSystem.getDevice()
         val commandEncoder = device.createCommandEncoder()
 
-        // Upload vertex buffer
+        // Upload vertex buffer.
+        //
+        // Buffers MUST be created with USAGE_COPY_DST so that subsequent
+        // re-uploads via `commandEncoder.writeToBuffer(slice, data)` are
+        // valid copy destinations. Without this flag, MC throws
+        //   "Buffer needs USAGE_COPY_DST to be a destination for a copy"
+        // the moment we re-use a buffer (i.e. dirty-section refresh on
+        // frame 2+). The flag has no overhead when the buffer is fresh —
+        // it just marks the underlying GL buffer as a valid copy target.
         val existingVb = vertexBuffer
         if (existingVb == null || existingVb.isClosed || existingVb.size() < vertexData.remaining().toLong()) {
             vertexBuffer?.close()
             vertexBuffer = device.createBuffer(
                 LABEL_VERTEX,
-                GpuBuffer.USAGE_VERTEX or GpuBuffer.USAGE_MAP_WRITE,
+                GpuBuffer.USAGE_VERTEX or GpuBuffer.USAGE_MAP_WRITE or GpuBuffer.USAGE_COPY_DST,
                 vertexData,
             )
         } else if (!existingVb.isClosed) {
@@ -72,7 +80,7 @@ class AxionPreviewBuffer : AutoCloseable {
                 indexBuffer?.close()
                 indexBuffer = device.createBuffer(
                     LABEL_INDEX,
-                    GpuBuffer.USAGE_INDEX or GpuBuffer.USAGE_MAP_WRITE,
+                    GpuBuffer.USAGE_INDEX or GpuBuffer.USAGE_MAP_WRITE or GpuBuffer.USAGE_COPY_DST,
                     indexData,
                 )
             } else if (!existingIb.isClosed) {

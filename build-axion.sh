@@ -6,20 +6,29 @@ cd "$ROOT_DIR"
 
 MOD_VERSION="${MOD_VERSION:-$(awk -F= '/^mod_version=/{print $2}' gradle.properties)}"
 
-SUPPORTED_VERSIONS=(
-  "1.21.7"
-  "1.21.8"
-  "1.21.9"
-  "1.21.10"
-  "1.21.11"
+# Two-range release strategy (mirroring Axiom's multi-version-jar approach):
+#   range "legacy"  → covers 1.21.6 .. 1.21.8, compiled against 1.21.7
+#   range "modern"  → covers 1.21.9 .. 1.21.11, compiled against 1.21.11
+# (1.21.5 is excluded — major API changes in GpuBuffer/HudElementRegistry/NbtWriteView.)
+#
+# Within each range, cross-version mixin compatibility is handled by `require = 0`
+# dual-signature injections.
+SUPPORTED_RANGES=(
+  "legacy"
+  "modern"
 )
+
+resolve_compile_version() {
+  case "$1" in
+    "legacy") echo "1.21.7" ;;
+    "modern") echo "1.21.11" ;;
+    *) return 1 ;;
+  esac
+}
 
 resolve_yarn_mappings() {
   case "$1" in
     "1.21.7") echo "1.21.7+build.1" ;;
-    "1.21.8") echo "1.21.8+build.1" ;;
-    "1.21.9") echo "1.21.9+build.1" ;;
-    "1.21.10") echo "1.21.10+build.3" ;;
     "1.21.11") echo "1.21.11+build.4" ;;
     *) return 1 ;;
   esac
@@ -28,9 +37,6 @@ resolve_yarn_mappings() {
 resolve_fabric_version() {
   case "$1" in
     "1.21.7") echo "0.129.0+1.21.7" ;;
-    "1.21.8") echo "0.131.0+1.21.8" ;;
-    "1.21.9") echo "0.134.1+1.21.9" ;;
-    "1.21.10") echo "0.138.4+1.21.10" ;;
     "1.21.11") echo "0.141.3+1.21.11" ;;
     *) return 1 ;;
   esac
@@ -39,60 +45,73 @@ resolve_fabric_version() {
 resolve_paper_version() {
   case "$1" in
     "1.21.7") echo "1.21.7-R0.1-SNAPSHOT" ;;
-    "1.21.8") echo "1.21.8-R0.1-SNAPSHOT" ;;
-    "1.21.9") echo "1.21.9-R0.1-SNAPSHOT" ;;
-    "1.21.10") echo "1.21.10-R0.1-SNAPSHOT" ;;
     "1.21.11") echo "1.21.11-R0.1-SNAPSHOT" ;;
     *) return 1 ;;
   esac
 }
 
-build_version() {
-  local version="$1"
+resolve_range_tag() {
+  case "$1" in
+    "legacy") echo "mc1.21.6-1.21.8" ;;
+    "modern") echo "mc1.21.9-1.21.11" ;;
+    *) return 1 ;;
+  esac
+}
+
+build_range() {
+  local range="$1"
+  local compile_version
   local yarn_mappings
   local fabric_version
   local paper_version
+  local range_tag
   local mod_jar
   local paper_jar
   local mod_output_dir
   local paper_output_dir
 
-  yarn_mappings="$(resolve_yarn_mappings "$version")"
-  fabric_version="$(resolve_fabric_version "$version")"
-  paper_version="$(resolve_paper_version "$version")"
-  mod_jar="Axion-v${MOD_VERSION}-mc${version}.jar"
-  paper_jar="AxionPaper-v${MOD_VERSION}-mc${version}.jar"
-  mod_output_dir="build/libs/${version}"
-  paper_output_dir="paper-plugin/build/libs/${version}"
+  compile_version="$(resolve_compile_version "$range")"
+  yarn_mappings="$(resolve_yarn_mappings "$compile_version")"
+  fabric_version="$(resolve_fabric_version "$compile_version")"
+  paper_version="$(resolve_paper_version "$compile_version")"
+  range_tag="$(resolve_range_tag "$range")"
+  mod_jar="Axion-v${MOD_VERSION}-${range_tag}.jar"
+  paper_jar="AxionPaper-v${MOD_VERSION}-${range_tag}.jar"
+  mod_output_dir="build/libs/${range_tag}"
+  paper_output_dir="paper-plugin/build/libs/${range_tag}"
 
   echo
-  echo "==> Building Axion v${MOD_VERSION} for Minecraft ${version}"
+  echo "==> Building Axion v${MOD_VERSION} for range ${range_tag} (compiled against MC ${compile_version})"
   local gradle_tasks=(remapJar :paper-plugin:jar)
 
   ./gradlew "${gradle_tasks[@]}" \
     -Pmod_version="${MOD_VERSION}" \
-    -Pminecraft_version="${version}" \
+    -Pminecraft_version="${compile_version}" \
     -Pyarn_mappings="${yarn_mappings}" \
     -Pfabric_version="${fabric_version}" \
     -Ppaper_version="${paper_version}"
 
   mkdir -p "${mod_output_dir}" "${paper_output_dir}"
   mv -f "build/libs/${mod_jar}" "${mod_output_dir}/${mod_jar}"
-  mv -f "paper-plugin/build/libs/${paper_jar}" "${paper_output_dir}/${paper_jar}"
+  # Paper plugin emits a single-version filename; rename to range-style for output
+  local actual_paper_jar
+  actual_paper_jar="$(ls -1 paper-plugin/build/libs/AxionPaper-*.jar 2>/dev/null | head -1)"
+  if [[ -n "${actual_paper_jar}" ]]; then
+    mv -f "${actual_paper_jar}" "${paper_output_dir}/${paper_jar}"
+  fi
 
   echo "Built:"
   echo "  ${mod_output_dir}/${mod_jar}"
-  echo "  ${paper_output_dir}/${paper_jar}"
+  if [[ -n "${actual_paper_jar}" ]]; then
+    echo "  ${paper_output_dir}/${paper_jar}"
+  fi
 }
 
 print_menu() {
   echo "Select a build target:"
-  echo "  1) Minecraft 1.21.7"
-  echo "  2) Minecraft 1.21.8"
-  echo "  3) Minecraft 1.21.9"
-  echo "  4) Minecraft 1.21.10"
-  echo "  5) Minecraft 1.21.11"
-  echo "  6) All supported versions"
+  echo "  1) Legacy range (Minecraft 1.21.6 - 1.21.8)"
+  echo "  2) Modern range (Minecraft 1.21.9 - 1.21.11)"
+  echo "  3) Both ranges"
   echo "  q) Cancel"
 }
 
@@ -104,24 +123,15 @@ else
 fi
 
 case "$choice" in
-  1|"1.21.7")
-    build_version "1.21.7"
+  1|legacy|LEGACY)
+    build_range "legacy"
     ;;
-  2|"1.21.8")
-    build_version "1.21.8"
+  2|modern|MODERN)
+    build_range "modern"
     ;;
-  3|"1.21.9")
-    build_version "1.21.9"
-    ;;
-  4|"1.21.10")
-    build_version "1.21.10"
-    ;;
-  5|"1.21.11")
-    build_version "1.21.11"
-    ;;
-  6|all|ALL)
-    for version in "${SUPPORTED_VERSIONS[@]}"; do
-      build_version "$version"
+  3|all|ALL|both|BOTH)
+    for range in "${SUPPORTED_RANGES[@]}"; do
+      build_range "$range"
     done
     ;;
   q|Q|quit|QUIT)

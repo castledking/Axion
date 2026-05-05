@@ -4,7 +4,24 @@ import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Box
 
 object BlockPreviewPipeline {
-    private const val SPARSE_OUTLINE_BUDGET: Int = 512
+    // Outline budget for the per-component path. Below this we draw individual
+    // component outlines via ClipboardSelectionRenderer (Axiom-style); above it
+    // we fall back to a single aggregate bounding box.
+    //
+    // Sized for typical accumulated magic-select selections: a brush-10 sphere
+    // is ~1.3k surface cells, so a 4-click multi-pick fits comfortably inside
+    // 8k. Components individually larger than MAX_VOXEL_UNION_CELLS in
+    // ClipboardSelectionRenderer still fall back per-component, so the
+    // aggregate budget can stay generous without making single huge selections
+    // pay an O(n^2) VoxelShapes.union cost.
+    private const val SPARSE_OUTLINE_BUDGET: Int = 8192
+
+    // Route destination previews (clone etc.) through the GPU chunked
+    // session path once the surface*origin count exceeds this threshold.
+    // Smaller previews stay on PreviewShellBlockRenderer which has
+    // correct inner-face culling via TemplateBlockRenderView and is fast
+    // enough for small meshes.
+    private const val LARGE_PREVIEW_CELL_THRESHOLD: Long = 1024L
     enum class SelectionStyle {
         SELECTION,
         PULSE,
@@ -17,6 +34,9 @@ object BlockPreviewPipeline {
         val alpha: Int,
         val scale: Float,
         val textured: Boolean = true,
+        // Stable session slot for chunked GPU caching. Distinct slots prevent
+        // sessions from leaking GPU buffers when the clipboard rebuilds.
+        val sessionTag: String = "overlay",
     )
 
     data class SelectionScene(
@@ -40,6 +60,8 @@ object BlockPreviewPipeline {
         val selectionClipboard: axion.common.model.ClipboardBuffer,
         val shellClipboard: axion.common.model.ClipboardBuffer,
         val fallbackGhostClipboard: axion.common.model.ClipboardBuffer,
+        // Stable session slot for chunked GPU caching (see OverlayScene comment).
+        val sessionTag: String = "destination",
         val sparse: Boolean,
         val outlineColor: Int,
         val lineWidth: Float,
@@ -66,6 +88,7 @@ object BlockPreviewPipeline {
             alpha = scene.alpha,
             textured = scene.textured,
             scale = scene.scale,
+            sessionTag = scene.sessionTag,
         )
         return true
     }
@@ -174,6 +197,28 @@ object BlockPreviewPipeline {
             return true
         }
 
+        // For large previews (e.g. cloning a whole church), skip the
+        // per-frame CPU tessellation path (PreviewShellBlockRenderer) and
+        // route straight through the GPU chunked session. That path uploads
+        // each 16³ section once to a persistent GpuBuffer and redraws from
+        // it every frame — O(visibleSections) instead of O(surfaceCells).
+        //
+        // Threshold mirrors GhostBlockPreviewRenderer.CHUNKED_PATH_CELL_THRESHOLD.
+        val totalCells = nonAirCells.size.toLong() * scene.origins.size.toLong()
+        if (totalCells > LARGE_PREVIEW_CELL_THRESHOLD) {
+            GhostBlockPreviewRenderer.render(
+                context = context,
+                clipboard = scene.fallbackGhostClipboard,
+                origins = scene.origins,
+                color = scene.ghostColor,
+                alpha = scene.ghostAlpha,
+                textured = true,
+                scale = scene.ghostScale,
+                sessionTag = scene.sessionTag,
+            )
+            return true
+        }
+
         val renderedShell = PreviewShellBlockRenderer.render(
             context = context,
             clipboard = scene.shellClipboard,
@@ -191,6 +236,7 @@ object BlockPreviewPipeline {
                 alpha = scene.ghostAlpha,
                 textured = true,
                 scale = scene.ghostScale,
+                sessionTag = scene.sessionTag,
             )
         }
         return true
@@ -200,44 +246,28 @@ object BlockPreviewPipeline {
         context: AxionWorldRenderContext,
         scene: Scene,
     ) {
-        if (scene.sparse) {
-            val totalCells = scene.selectionClipboard.nonAirCells().size.toLong() * scene.origins.size.toLong()
-            val withinBudget = totalCells <= SPARSE_OUTLINE_BUDGET
-            if (withinBudget && !PreviewRegionOutlineRenderer.render(
-                    context = context,
-                    clipboard = scene.selectionClipboard,
-                    origins = scene.origins,
-                    outlineColor = scene.outlineColor,
-                    lineWidth = scene.lineWidth,
-                )
-            ) {
-                ClipboardSelectionRenderer.renderSelection(
-                    context = context,
-                    origins = scene.origins,
-                    clipboard = scene.selectionClipboard,
-                    outlineColor = scene.outlineColor,
-                    lineWidth = scene.lineWidth,
-                )
-            }
-            if (!withinBudget) {
-                scene.aggregateBox?.let { box ->
-                    PulsingCuboidRenderer.renderOutlineBox(
-                        context = context,
-                        box = box,
-                        outlineColor = scene.outlineColor,
-                        lineWidth = scene.lineWidth,
-                    )
-                }
-            }
-        } else {
-            scene.aggregateBox?.let { box ->
-                PulsingCuboidRenderer.renderOutlineBox(
-                    context = context,
-                    box = box,
-                    outlineColor = scene.outlineColor,
-                    lineWidth = scene.lineWidth,
-                )
-            }
+        // The placement-destination "global outline" should always be a single
+        // axis-aligned bounding box around the entire destination region —
+        // never per-block voxel outlines. A per-block outline:
+        //   * z-fights with the actual blocks underneath when the destination
+        //     overlaps existing geometry,
+        //   * traces around air gaps (sparse selections), making the outline
+        //     wrap around the shape instead of behaving like a single
+        //     selection box,
+        //   * desyncs visually from the block preview when the chunked
+        //     fast-path translates the preview but the per-block outline is
+        //     rebuilt from the new origin every frame.
+        //
+        // SuppressWarnings: the legacy [SPARSE_OUTLINE_BUDGET] /
+        // [PreviewRegionOutlineRenderer] / sparse-clipboard parameters are
+        // intentionally ignored here.
+        scene.aggregateBox?.let { box ->
+            PulsingCuboidRenderer.renderOutlineBox(
+                context = context,
+                box = box,
+                outlineColor = scene.outlineColor,
+                lineWidth = scene.lineWidth,
+            )
         }
     }
 }
