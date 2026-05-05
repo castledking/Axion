@@ -1,0 +1,40 @@
+limits:
+  default:
+    enabled: true
+    max-blocks-per-batch: 1262144
+    max-clipboard-cells: 1262144
+    max-repeat-count: 64
+    max-total-writes: 2097152
+    max-extrude-footprint-size: 32768
+    max-extrude-writes: 32768
+    large-edit-multiplier: 4
+    history:
+      max-entries: 100
+      max-bytes: 67108864
+    tools:
+      erase: true
+      clone: true
+      move: true
+      stack: true
+      smear: true
+      extrude: true
+    edit-region:
+      enabled: false
+      min:
+        x: 0
+        y: -64
+        z: 0
+      max:
+        x: 0
+        y: 320
+        z: 0
+  worlds: {}
+protection:
+  griefprevention:
+    enabled: true
+  worldguard:
+    enabled: true
+audit:
+  enabled: true
+  slow-threshold-ms: 200
+  summary-every: 50

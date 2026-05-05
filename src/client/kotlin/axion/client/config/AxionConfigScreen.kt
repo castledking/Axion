@@ -90,7 +90,7 @@ class AxionConfigScreen(
                 textRenderer,
                 Text.translatable("axion.config.tool_modifier.linux_only"),
                 width / 2,
-                (height / 2) - 22,
+                (height / 2) - 34,
                 0x8A8A8A,
             )
         }
@@ -99,7 +99,7 @@ class AxionConfigScreen(
             textRenderer,
             Text.translatable("axion.config.magic_select.templates.summary"),
             width / 2,
-            (height / 2) + 2,
+            (height / 2) - 8,
             0xBFBFBF,
         )
     }

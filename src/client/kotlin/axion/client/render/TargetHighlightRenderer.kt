@@ -1,4 +1,5 @@
 package axion.client.render
+import axion.client.compat.CameraAccess
 
 import axion.client.AxionClientState
 import axion.client.selection.AxionTarget
@@ -17,7 +18,7 @@ object TargetHighlightRenderer {
         val blockPos = currentTargetForRender() ?: return
         val client = MinecraftClient.getInstance()
         val camera = client.gameRenderer.camera ?: return
-        val cameraPos = camera.cameraPos
+        val cameraPos = CameraAccess.getPos(camera)
         val consumers = context.consumers()
         val consumer = consumers.getBuffer(RenderLayerCompat.lines())
         val matrixStack = context.matrices()

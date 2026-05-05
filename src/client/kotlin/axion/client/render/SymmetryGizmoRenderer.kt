@@ -1,4 +1,5 @@
 package axion.client.render
+import axion.client.compat.CameraAccess
 
 import axion.client.AxionClientState
 import axion.common.model.SymmetryState
@@ -20,7 +21,7 @@ object SymmetryGizmoRenderer {
 
         val client = MinecraftClient.getInstance()
         val camera = client.gameRenderer.camera ?: return
-        val cameraPos = camera.cameraPos
+        val cameraPos = CameraAccess.getPos(camera)
         val consumers = context.consumers()
         val matrixStack = context.matrices()
         val box = gizmoBox(config.anchor.position)

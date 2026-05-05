@@ -4,10 +4,8 @@ import axion.protocol.CloneEntitiesRequest
 import axion.protocol.PlacementMirrorAxisPayload
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.ListTag
-import net.minecraft.util.ProblemReporter
 import net.minecraft.world.entity.EntityType
 import net.minecraft.world.entity.EntitySpawnReason
-import net.minecraft.world.level.storage.TagValueOutput
 import org.bukkit.Location
 import org.bukkit.World
 import org.bukkit.craftbukkit.CraftWorld
@@ -94,11 +92,11 @@ object PaperEntityCloneService {
     }
 
     private fun capture(entity: Entity): CompoundTag? {
-        val output = TagValueOutput.createWithoutContext(ProblemReporter.DISCARDING)
-        if (!(entity as org.bukkit.craftbukkit.entity.CraftEntity).handle.saveAsPassenger(output)) {
+        val tag = CompoundTag()
+        val handle = (entity as org.bukkit.craftbukkit.entity.CraftEntity).handle
+        if (!saveEntityAsPassenger(handle, tag)) {
             return null
         }
-        val tag = output.buildResult()
         val passengers = ListTag()
         entity.passengers.forEach { passenger ->
             capture(passenger)?.let(passengers::add)
@@ -107,6 +105,30 @@ object PaperEntityCloneService {
             tag.put("Passengers", passengers)
         }
         return tag
+    }
+
+    private fun saveEntityAsPassenger(entity: net.minecraft.world.entity.Entity, tag: CompoundTag): Boolean {
+        val compoundMethod = entity.javaClass.methods.firstOrNull { method ->
+            method.name == "saveAsPassenger" &&
+                method.parameterTypes.size == 1 &&
+                method.parameterTypes[0] == CompoundTag::class.java
+        }
+        if (compoundMethod != null) {
+            return compoundMethod.invoke(entity, tag) as Boolean
+        }
+
+        val outputClass = Class.forName("net.minecraft.world.level.storage.TagValueOutput")
+        val reporter = Class.forName("net.minecraft.util.ProblemReporter").getField("DISCARDING").get(null)
+        val output = outputClass.getMethods().first { method ->
+            method.name == "createWithoutContext" && method.parameterTypes.size == 1
+        }.invoke(null, reporter)
+        val saved = entity.javaClass.methods.first { method ->
+            method.name == "saveAsPassenger" && method.parameterTypes.size == 1
+        }.invoke(entity, output) as Boolean
+        if (saved) {
+            tag.merge(output.javaClass.getMethod("buildResult").invoke(output) as CompoundTag)
+        }
+        return saved
     }
 
     private fun spawnClone(

@@ -1,4 +1,5 @@
 package axion.client.render
+import axion.client.compat.CameraAccess
 
 import axion.client.selection.SelectionBounds
 import axion.common.model.ClipboardBuffer
@@ -21,7 +22,7 @@ object PreviewRegionOutlineRenderer {
 
         val client = MinecraftClient.getInstance()
         val camera = client.gameRenderer.camera ?: return false
-        val cameraPos = camera.cameraPos
+        val cameraPos = CameraAccess.getPos(camera)
         val region = ChunkedPreviewRegion.getOrBuild(
             clipboard = clipboard,
             origins = origins,

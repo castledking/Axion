@@ -1,13 +1,12 @@
 package axion.client.network
 
+import axion.client.compat.VersionCompatImpl
 import axion.common.history.EntityCloneChange
 import axion.common.operation.DeleteEntitiesOperation
 import net.minecraft.entity.Entity
 import net.minecraft.entity.player.PlayerEntity
 import net.minecraft.nbt.NbtCompound
 import net.minecraft.server.world.ServerWorld
-import net.minecraft.storage.NbtWriteView
-import net.minecraft.util.ErrorReporter
 import net.minecraft.util.math.Box
 import net.minecraft.world.World
 
@@ -73,11 +72,7 @@ object LocalEntityDeleteService {
     }
 
     private fun capture(entity: Entity): NbtCompound? {
-        val output = NbtWriteView.create(ErrorReporter.EMPTY)
-        if (!entity.saveSelfData(output)) {
-            return null
-        }
-        return output.nbt
+        return VersionCompatImpl.captureEntityData(entity)
     }
 
     private fun rootEntity(entity: Entity): Entity {

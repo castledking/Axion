@@ -1,4 +1,5 @@
 package axion.client.render
+import axion.client.compat.CameraAccess
 
 import axion.client.selection.SelectionBounds
 import axion.common.model.BlockRegion
@@ -193,7 +194,7 @@ object ClipboardSelectionRenderer {
 
         val client = MinecraftClient.getInstance()
         val camera = client.gameRenderer.camera ?: return false
-        val cameraPos = camera.cameraPos
+        val cameraPos = CameraAccess.getPos(camera)
         val consumers = context.consumers()
         val matrixStack = context.matrices()
         val fillLayer = RenderLayerCompat.debugQuads()
@@ -301,7 +302,7 @@ object ClipboardSelectionRenderer {
         val consumers = context.consumers()
         val client = MinecraftClient.getInstance()
         val camera = client.gameRenderer.camera ?: return false
-        val cameraPos = camera.cameraPos
+        val cameraPos = CameraAccess.getPos(camera)
         val overlayCellCount = geometry.boxes.size.toLong() * origins.size.toLong()
         val renderBaseOverlay = overlayCellCount <= MAX_BASE_OVERLAY_CELLS.toLong()
         val renderPulseOverlay = overlayCellCount <= MAX_PULSE_OVERLAY_CELLS.toLong()

@@ -1,5 +1,6 @@
 package axion.client.input
 
+import axion.client.compat.VersionCompatImpl
 import axion.client.config.AxionConfigScreen
 import axion.client.hotbar.AxionAltMenuController
 import axion.client.hotbar.SavedHotbarController
@@ -14,7 +15,6 @@ import axion.client.tool.ExtrudeToolController
 import axion.client.tool.PlacementToolController
 import axion.client.tool.SmearToolController
 import axion.client.tool.StackToolController
-import axion.client.render.gpu.ChunkedPreviewLifecycle
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.world.ClientWorld
 
@@ -115,7 +115,7 @@ object AxionTickHandler {
         // longer meaningful, and keeping them risks rendering ghost geometry
         // against the wrong world.
         if (lastObservedWorld != null) {
-            ChunkedPreviewLifecycle.closeAll()
+            VersionCompatImpl.closeChunkedPreviews()
         }
         lastObservedWorld = currentWorld
     }

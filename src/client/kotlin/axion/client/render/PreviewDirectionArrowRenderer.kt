@@ -1,4 +1,5 @@
 package axion.client.render
+import axion.client.compat.CameraAccess
 
 import axion.client.selection.SelectionBounds
 import axion.common.model.BlockRegion
@@ -33,7 +34,7 @@ object PreviewDirectionArrowRenderer {
         val camera = client.gameRenderer.camera ?: return
         val consumers = context.consumers()
         val entry = context.matrices().peek()
-        val cameraPos = camera.cameraPos
+        val cameraPos = CameraAccess.getPos(camera)
         val consumer = consumers.getBuffer(RenderLayerCompat.lightning())
         val box = SelectionBounds.outlineBox(SelectionBounds.regionBox(region.normalized()))
 

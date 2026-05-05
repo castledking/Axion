@@ -22,6 +22,7 @@
   "axion.config.main_modifier.button": "Main Mod: %s",
   "axion.config.main_modifier.ctrl": "Ctrl",
   "axion.config.main_modifier.cmd": "CMD",
+  "axion.config.tool_modifier.description": "Choose which modifier opens Axion tool overlays.",
   "axion.config.tool_modifier.button": "Tool Mod: %s",
   "axion.config.tool_modifier.alt": "Alt",
   "axion.config.tool_modifier.super": "Super",

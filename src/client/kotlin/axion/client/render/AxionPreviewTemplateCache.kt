@@ -1,4 +1,5 @@
 package axion.client.render
+import axion.client.compat.CameraAccess
 
 import axion.common.model.ClipboardBuffer
 import axion.common.model.ClipboardCell
@@ -109,7 +110,7 @@ object AxionPreviewTemplateCache {
 
         val client = MinecraftClient.getInstance()
         val camera = client.gameRenderer.camera ?: return
-        val cameraPos = camera.cameraPos
+        val cameraPos = CameraAccess.getPos(camera)
         val modelViewStack = RenderSystem.getModelViewStack()
         val scale = entry.scale
 

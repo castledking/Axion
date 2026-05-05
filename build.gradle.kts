@@ -22,24 +22,22 @@ val minecraftPatch = when {
 //   - rangeModern:  1.21.9 .. 1.21.11 (compat-1_21_11, MouseInput + WorldRenderState exist,
 //                                      no stubs required)
 //
-// 1.21.5 is intentionally excluded — the GpuBuffer rewrite, HudElementRegistry, and
-// entity NbtWriteView APIs landed in 1.21.6, and our preview pipeline uses all three.
-// Targeting 1.21.5 would require substantial reflective fallbacks; not worth it.
-//
 // Cross-version mixin compatibility within each range is handled by `require = 0`
 // dual-signature injections in MouseMixin and WorldRendererFallbackMixin.
+val rangeMc1215 = minecraftVersion == "1.21.5"
 val rangeLegacy = minecraftVersion.startsWith("1.21.") && minecraftPatch in 6..8
 val rangeModern = minecraftVersion.startsWith("1.21.") && minecraftPatch >= 9
 
-val needsLegacyMouseInputStub = rangeLegacy
-val needsLegacyWorldRenderStateStub = rangeLegacy
+val needsLegacyMouseInputStub = rangeMc1215 || rangeLegacy
+val needsLegacyWorldRenderStateStub = rangeMc1215 || rangeLegacy
 val supportsFabricDedicatedServer = minecraftVersion == "1.21.11"
 
 // Define Minecraft version range for fabric.mod.json
 val minecraftVersionRange = when {
+    rangeMc1215 -> "1.21.5"
     rangeLegacy -> ">=1.21.6 <=1.21.8"
     rangeModern -> ">=1.21.9 <=1.21.11"
-    else -> ">=1.21.6"
+    else -> ">=1.21.5"
 }
 val fabricServerEntrypoint = if (supportsFabricDedicatedServer) {
     "axion.server.fabric.AxionFabricServerMod"
@@ -84,7 +82,11 @@ if (needsLegacyWorldRenderStateStub) {
 
 // Two compat source sets corresponding to the two release ranges
 sourceSets.named("client") {
-    if (rangeLegacy) {
+    if (rangeMc1215) {
+        kotlin.srcDir("src/compat-1_21_5/kotlin")
+        kotlin.exclude("axion/client/render/gpu/**")
+        kotlin.exclude("axion/client/render/AxionPreviewBuffer.kt")
+    } else if (rangeLegacy) {
         // 1.21.5 .. 1.21.8: Codec-based NBT serialization, no MouseInput / WorldRenderState
         kotlin.srcDir("src/compat-1_21_7/kotlin")
     } else {
@@ -152,6 +154,7 @@ tasks.test {
 
 // Range-style filename matching Axiom's release pattern, e.g. "mc1.21.9-1.21.11"
 val rangeFileTag = when {
+    rangeMc1215 -> "mc1.21.5"
     rangeLegacy -> "mc1.21.6-1.21.8"
     rangeModern -> "mc1.21.9-1.21.11"
     else -> "mc${minecraftVersion}"

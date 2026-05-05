@@ -1,4 +1,5 @@
 package axion.client.render
+import axion.client.compat.CameraAccess
 
 import axion.common.model.ClipboardBuffer
 import net.minecraft.client.MinecraftClient
@@ -28,7 +29,7 @@ object PreviewShellBlockRenderer {
         val client = MinecraftClient.getInstance()
         val world = client.world ?: return false
         val camera = client.gameRenderer.camera ?: return false
-        val cameraPos = camera.cameraPos
+        val cameraPos = CameraAccess.getPos(camera)
         val matrixStack = context.matrices()
         val alphaScale = alpha / 255.0f
 

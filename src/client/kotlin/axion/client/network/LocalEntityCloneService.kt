@@ -1,5 +1,6 @@
 package axion.client.network
 
+import axion.client.compat.VersionCompatImpl
 import axion.common.history.EntityCloneChange
 import axion.common.operation.CloneEntitiesOperation
 import axion.common.operation.EntityMoveMirrorAxis
@@ -10,8 +11,6 @@ import net.minecraft.entity.player.PlayerEntity
 import net.minecraft.nbt.NbtCompound
 import net.minecraft.nbt.NbtList
 import net.minecraft.server.world.ServerWorld
-import net.minecraft.storage.NbtWriteView
-import net.minecraft.util.ErrorReporter
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Box
 import net.minecraft.util.math.Vec3d
@@ -86,11 +85,7 @@ object LocalEntityCloneService {
     }
 
     private fun capture(entity: Entity): NbtCompound? {
-        val output = NbtWriteView.create(ErrorReporter.EMPTY)
-        if (!entity.saveSelfData(output)) {
-            return null
-        }
-        val tag = output.nbt
+        val tag = VersionCompatImpl.captureEntityData(entity) ?: return null
         val passengers = NbtList()
         entity.getPassengerList().forEach { passenger ->
             capture(passenger)?.let(passengers::add)

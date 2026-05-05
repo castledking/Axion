@@ -1,12 +1,22 @@
 package axion.client.compat
 
 import axion.common.compat.VersionCompat
+import axion.client.render.AxionWorldRenderContext
+import axion.client.render.gpu.ChunkedPreviewLifecycle
+import axion.common.model.ClipboardBuffer
+import com.mojang.blaze3d.buffers.GpuBufferSlice
+import com.mojang.blaze3d.systems.RenderPass
+import com.mojang.blaze3d.textures.GpuTextureView
 import com.mojang.serialization.DynamicOps
+import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback
 import net.minecraft.block.Block
 import net.minecraft.block.BlockState
 import net.minecraft.client.MinecraftClient
+import net.minecraft.client.gui.DrawContext
+import net.minecraft.client.render.RenderTickCounter
 import net.minecraft.client.world.ClientWorld
 import net.minecraft.command.argument.BlockArgumentParser
+import net.minecraft.entity.Entity
 import net.minecraft.item.Item
 import net.minecraft.item.ItemStack
 import net.minecraft.nbt.NbtCompound
@@ -18,7 +28,14 @@ import net.minecraft.registry.RegistryKeys
 import net.minecraft.registry.RegistryOps
 import net.minecraft.sound.SoundCategory
 import net.minecraft.sound.SoundEvent
+import net.minecraft.storage.NbtWriteView
+import net.minecraft.client.render.Camera
 import net.minecraft.util.Identifier
+import net.minecraft.util.math.BlockPos
+import net.minecraft.util.math.Vec3d
+import org.joml.Matrix4fc
+import org.joml.Vector3fc
+import org.joml.Vector4fc
 
 /**
  * Version compatibility implementation for Minecraft 1.21.5 - 1.21.7
@@ -145,5 +162,88 @@ object VersionCompatImpl : VersionCompat {
     override fun shouldUseNonConsumingKeybind(): Boolean {
         // 1.21.7 and earlier need non-consuming keybinds to handle conflicts
         return true
+    }
+
+    fun supportsChunkedPreview(): Boolean {
+        return true
+    }
+
+    fun renderChunkedPreview(
+        sessionId: String,
+        context: AxionWorldRenderContext,
+        clipboard: ClipboardBuffer,
+        origins: Collection<BlockPos>,
+        color: Int,
+        alpha: Int,
+    ): Boolean {
+        val session = ChunkedPreviewLifecycle.acquire(sessionId)
+        session.setFromClipboard(clipboard, origins)
+        session.render(context, color, alpha)
+        return true
+    }
+
+    fun closeChunkedPreviews() {
+        ChunkedPreviewLifecycle.closeAll()
+    }
+
+    fun registerHudElements(
+        hudId: Identifier,
+        hintHudId: Identifier,
+        hudRenderer: (DrawContext, RenderTickCounter) -> Unit,
+        hintRenderer: (DrawContext, RenderTickCounter) -> Unit,
+    ) {
+        HudRenderCallback.EVENT.register { context, tickCounter ->
+            hudRenderer(context, tickCounter)
+            hintRenderer(context, tickCounter)
+        }
+    }
+
+    fun captureEntityData(entity: Entity): NbtCompound? {
+        // 1.21.7 - provide stub implementation
+        // TODO: Implement properly when API is understood
+        return null
+    }
+
+    fun drawGuiTexture(
+        context: DrawContext,
+        texture: Identifier,
+        x: Int,
+        y: Int,
+        width: Int,
+        height: Int,
+    ) {
+        // 1.21.7 - provide stub implementation
+        // TODO: Implement properly when API is understood
+    }
+
+    fun getCameraPos(camera: Camera): Vec3d {
+        return camera.pos
+    }
+
+    // Rendering compatibility for 1.21.7
+    fun getBlockAtlasTextureView(client: MinecraftClient): GpuTextureView? {
+        // 1.21.7 uses BakedModelManager.getAtlas() instead of atlasManager
+        return try {
+            client.getBakedModelManager().getAtlas(net.minecraft.client.texture.SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE)?.getGlTextureView()
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    fun bindTextureToRenderPass(pass: RenderPass, samplerName: String, textureView: GpuTextureView) {
+        // 1.21.7 uses bindSampler with just name and view
+        pass.bindSampler(samplerName, textureView)
+    }
+
+    fun writeDynamicUniforms(
+        dynamicUniforms: net.minecraft.client.gl.DynamicUniforms,
+        mvMatrix: Matrix4fc,
+        colorTint: Vector4fc,
+        zeroVec: Vector3fc,
+        normalMatrix: Matrix4fc,
+        lineWidth: Float
+    ): GpuBufferSlice {
+        // 1.21.7 DynamicUniforms.write takes 5 parameters including lineWidth
+        return dynamicUniforms.write(mvMatrix, colorTint, zeroVec, normalMatrix, lineWidth)
     }
 }

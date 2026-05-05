@@ -1,12 +1,13 @@
 package axion.client.render.gpu
+import axion.client.compat.CameraAccess
 
 import axion.client.render.AxionPreviewBuffer
+import axion.client.compat.VersionCompatImpl
 import com.mojang.blaze3d.systems.RenderSystem
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap
 import it.unimi.dsi.fastutil.objects.ObjectIterator
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.gl.RenderPipelines
-import net.minecraft.util.Identifier
 import net.minecraft.util.math.Vec3i
 import org.joml.Matrix4f
 import org.joml.Vector3f
@@ -112,7 +113,7 @@ object AxionPreviewBlockDrawer {
         val depthView = mainTarget.depthAttachmentView ?: return
 
         val camera = client.gameRenderer?.camera ?: return
-        val cameraPos = camera.cameraPos ?: return
+        val cameraPos = CameraAccess.getPos(camera) ?: return
 
         // Color tint applied via the DynamicTransforms `colorTint` slot.
         val r = ((color shr 16) and 0xFF) / 255f
@@ -157,21 +158,17 @@ object AxionPreviewBlockDrawer {
             pass.setUniform("Projection", RenderSystem.getProjectionMatrixBuffer())
             pass.setUniform("Globals", RenderSystem.getGlobalSettingsUniform())
 
-            // Block atlas → Sampler0 (1.21.11 atlas-id format)
-            val atlas = runCatching {
-                client.atlasManager?.getAtlasTexture(BLOCK_ATLAS_DEFINITION_ID)
-            }.getOrNull()
-            val atlasView = atlas?.glTextureView
-            val atlasSampler = atlas?.sampler
-            if (atlasView != null && atlasSampler != null) {
-                pass.bindTexture("Sampler0", atlasView, atlasSampler)
+            // Block atlas → Sampler0 (version-compatible access)
+            val atlasView = VersionCompatImpl.getBlockAtlasTextureView(client)
+            if (atlasView != null) {
+                VersionCompatImpl.bindTextureToRenderPass(pass, "Sampler0", atlasView)
             }
 
-            // Lightmap → Sampler2
+            // Lightmap → Sampler2 (version-compatible access)
             val lightmap = client.gameRenderer?.lightmapTextureManager
-            val lightmapView = lightmap?.glTextureView
-            if (lightmapView != null && atlasSampler != null) {
-                pass.bindTexture("Sampler2", lightmapView, atlasSampler)
+            val lightmapView = lightmap?.getGlTextureView()
+            if (lightmapView != null) {
+                VersionCompatImpl.bindTextureToRenderPass(pass, "Sampler2", lightmapView)
             }
 
             // Iterate sections; per-section update DynamicTransforms with the
@@ -209,7 +206,7 @@ object AxionPreviewBlockDrawer {
                     sectionY.toFloat() - cameraPos.y.toFloat() + deltaY.toFloat(),
                     sectionZ.toFloat() - cameraPos.z.toFloat() + deltaZ.toFloat(),
                 )
-                val transforms = dynamicUniforms.write(mvMatrix, colorTint, ZERO_VEC3, normalMatrix)
+                val transforms = VersionCompatImpl.writeDynamicUniforms(dynamicUniforms, mvMatrix, colorTint, ZERO_VEC3, normalMatrix, 1.0f)
                 pass.setUniform("DynamicTransforms", transforms)
                 buf.drawIndexed(pass)
             }
@@ -220,11 +217,4 @@ object AxionPreviewBlockDrawer {
 
     private val ZERO_VEC3 = Vector3f(0f, 0f, 0f)
     private val DEBUG_LABEL: Supplier<String> = Supplier { "Axion preview" }
-
-    /**
-     * Definition id of the block atlas in 1.21.11+. This lives at
-     * `assets/minecraft/atlases/blocks.json` and is what
-     * [net.minecraft.client.texture.AtlasManager.getAtlasTexture] expects.
-     */
-    private val BLOCK_ATLAS_DEFINITION_ID: Identifier = Identifier.of("minecraft", "blocks")
 }

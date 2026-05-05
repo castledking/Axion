@@ -1,4 +1,5 @@
 package axion.client.render.gpu
+import axion.client.compat.CameraAccess
 
 import axion.client.render.AxionBlockTessellator
 import axion.client.render.AxionPreviewBuffer
@@ -299,7 +300,7 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
     ) {
         val client = MinecraftClient.getInstance()
         val camera = client.gameRenderer.camera ?: return
-        val cameraPos = camera.cameraPos
+        val cameraPos = CameraAccess.getPos(camera)
         val layer = RenderLayerCompat.blockTranslucentCull()
         val rawConsumer = context.consumers().getBuffer(layer)
         val consumer = TintedAlphaVertexConsumer(rawConsumer, alpha / 255.0f, color)

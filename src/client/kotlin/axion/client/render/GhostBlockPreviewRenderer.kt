@@ -1,7 +1,8 @@
 package axion.client.render
+import axion.client.compat.CameraAccess
 
 import axion.client.network.BlockWrite
-import axion.client.render.gpu.ChunkedPreviewLifecycle
+import axion.client.compat.VersionCompatImpl
 import axion.common.model.ClipboardBuffer
 import net.minecraft.block.ShapeContext
 import net.minecraft.client.MinecraftClient
@@ -67,11 +68,9 @@ object GhostBlockPreviewRenderer {
         if (textured) {
             val totalCells = allOccupiedCells.size.toLong() * origins.size.toLong()
             if (totalCells > CHUNKED_PATH_CELL_THRESHOLD) {
-                val sessionId = "ghost:" + sessionTag
-                val session = ChunkedPreviewLifecycle.acquire(sessionId)
-                session.setFromClipboard(clipboard, origins)
-                session.render(context, color, alpha)
-                return
+                if (VersionCompatImpl.renderChunkedPreview("ghost:$sessionTag", context, clipboard, origins, color, alpha)) {
+                    return
+                }
             }
         }
 
@@ -100,7 +99,7 @@ object GhostBlockPreviewRenderer {
         val consumers = context.consumers()
         val fillLayer = RenderLayerCompat.debugQuads()
         val consumer = consumers.getBuffer(fillLayer)
-        val cameraPos = camera.cameraPos
+        val cameraPos = CameraAccess.getPos(camera)
         val matrixStack = context.matrices()
         val shapeContext = ShapeContext.absent()
 
@@ -149,7 +148,7 @@ object GhostBlockPreviewRenderer {
         val consumers = context.consumers()
         val fillLayer = RenderLayerCompat.debugQuads()
         val consumer = consumers.getBuffer(fillLayer)
-        val cameraPos = camera.cameraPos
+        val cameraPos = CameraAccess.getPos(camera)
         val matrixStack = context.matrices()
         val shapeContext = ShapeContext.absent()
 
@@ -175,7 +174,7 @@ object GhostBlockPreviewRenderer {
         val world = client.world ?: return
         val matrixStack = context.matrices()
         val camera = client.gameRenderer.camera ?: return
-        val cameraPos = camera.cameraPos
+        val cameraPos = CameraAccess.getPos(camera)
         val alphaScale = alpha / 255.0f
 
         val cachedMesh = AxionPreviewMeshCache.getOrBuild(
@@ -251,7 +250,7 @@ object GhostBlockPreviewRenderer {
         val world = client.world ?: return
         val matrixStack = context.matrices()
         val camera = client.gameRenderer.camera ?: return
-        val cameraPos = camera.cameraPos
+        val cameraPos = CameraAccess.getPos(camera)
         val alphaScale = alpha / 255.0f
 
         val cachedMesh = AxionPreviewMeshCache.getOrBuildForWrites(blockInfos, color, alpha)

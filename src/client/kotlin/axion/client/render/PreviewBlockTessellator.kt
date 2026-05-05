@@ -1,4 +1,5 @@
 package axion.client.render
+import axion.client.compat.CameraAccess
 
 import net.minecraft.block.BlockRenderType
 import net.minecraft.block.BlockState
@@ -30,7 +31,7 @@ object PreviewBlockTessellator {
         val blockRenderManager = client.blockRenderManager
         val previewView = PreviewRegionBlockRenderView(world, region.statesByPosition)
         val matrices = context.matrices()
-        val cameraPos = camera.cameraPos
+        val cameraPos = CameraAccess.getPos(camera)
         val consumer = TintedAlphaVertexConsumer(
             context.consumers().getBuffer(RenderLayerCompat.blockTranslucentCull()),
             alpha / 255.0f,

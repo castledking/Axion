@@ -3,6 +3,7 @@ package axion.client.hotbar
 import axion.client.AxionClientState
 import axion.client.compat.LitematicaCompat
 import axion.client.compat.VersionCompatImpl
+import axion.client.config.AxionConfigScreen
 import axion.client.input.AxionModifierKeys
 import axion.client.tool.AxionToolSelectionController
 import axion.common.model.AxionSubtool
@@ -184,6 +185,19 @@ object AxionAltMenuController {
         )
     }
 
+    fun isHoveringToolboxButton(client: MinecraftClient, screenWidth: Int, screenHeight: Int): Boolean {
+        if (!SavedHotbarController.isOverlayActive(client)) {
+            return false
+        }
+        val bounds = AxionHudLayout.toolboxSlotBounds(client, screenWidth, screenHeight)
+        val mouseX = VersionCompatImpl.getScaledMouseX(client)
+        val mouseY = VersionCompatImpl.getScaledMouseY(client)
+        return mouseX >= bounds.x &&
+            mouseX < bounds.x + bounds.size &&
+            mouseY >= bounds.y &&
+            mouseY < bounds.y + bounds.size
+    }
+
     fun handleFlyingSpeedSliderDrag(client: MinecraftClient, screenWidth: Int, screenHeight: Int) {
         if (!isDraggingSlider) return
         val bounds = AxionHudLayout.flyingSpeedSliderBounds(screenWidth, screenHeight, SavedHotbarController.selectedPage())
@@ -226,6 +240,12 @@ object AxionAltMenuController {
                     isDraggingSlider = true
                     // Immediately update value based on click position
                     handleFlyingSpeedSliderDrag(client, client.window.scaledWidth, client.window.scaledHeight)
+                    return true
+                }
+                if (isHoveringToolboxButton(client, client.window.scaledWidth, client.window.scaledHeight)) {
+                    cursorUnlockedByAxion = false
+                    isDraggingSlider = false
+                    client.setScreen(AxionConfigScreen(null))
                     return true
                 }
                 hoveringSavedHotbarPageButton(

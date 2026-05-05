@@ -7,19 +7,20 @@ cd "$ROOT_DIR"
 MOD_VERSION="${MOD_VERSION:-$(awk -F= '/^mod_version=/{print $2}' gradle.properties)}"
 
 # Two-range release strategy (mirroring Axiom's multi-version-jar approach):
-#   range "legacy"  → covers 1.21.6 .. 1.21.8, compiled against 1.21.7
+#   range "mc1_21_5" → covers 1.21.5, compiled against 1.21.5
+#   range "legacy"   → covers 1.21.6 .. 1.21.8, compiled against 1.21.7
 #   range "modern"  → covers 1.21.9 .. 1.21.11, compiled against 1.21.11
-# (1.21.5 is excluded — major API changes in GpuBuffer/HudElementRegistry/NbtWriteView.)
-#
 # Within each range, cross-version mixin compatibility is handled by `require = 0`
 # dual-signature injections.
 SUPPORTED_RANGES=(
+  "mc1_21_5"
   "legacy"
   "modern"
 )
 
 resolve_compile_version() {
   case "$1" in
+    "mc1_21_5") echo "1.21.5" ;;
     "legacy") echo "1.21.7" ;;
     "modern") echo "1.21.11" ;;
     *) return 1 ;;
@@ -28,6 +29,7 @@ resolve_compile_version() {
 
 resolve_yarn_mappings() {
   case "$1" in
+    "1.21.5") echo "1.21.5+build.1" ;;
     "1.21.7") echo "1.21.7+build.1" ;;
     "1.21.11") echo "1.21.11+build.4" ;;
     *) return 1 ;;
@@ -36,6 +38,7 @@ resolve_yarn_mappings() {
 
 resolve_fabric_version() {
   case "$1" in
+    "1.21.5") echo "0.119.5+1.21.5" ;;
     "1.21.7") echo "0.129.0+1.21.7" ;;
     "1.21.11") echo "0.141.3+1.21.11" ;;
     *) return 1 ;;
@@ -44,6 +47,7 @@ resolve_fabric_version() {
 
 resolve_paper_version() {
   case "$1" in
+    "1.21.5") echo "1.21.5-R0.1-SNAPSHOT" ;;
     "1.21.7") echo "1.21.7-R0.1-SNAPSHOT" ;;
     "1.21.11") echo "1.21.11-R0.1-SNAPSHOT" ;;
     *) return 1 ;;
@@ -52,6 +56,7 @@ resolve_paper_version() {
 
 resolve_range_tag() {
   case "$1" in
+    "mc1_21_5") echo "mc1.21.5" ;;
     "legacy") echo "mc1.21.6-1.21.8" ;;
     "modern") echo "mc1.21.9-1.21.11" ;;
     *) return 1 ;;
@@ -77,8 +82,9 @@ build_range() {
   range_tag="$(resolve_range_tag "$range")"
   mod_jar="Axion-v${MOD_VERSION}-${range_tag}.jar"
   paper_jar="AxionPaper-v${MOD_VERSION}-${range_tag}.jar"
-  mod_output_dir="build/libs/${range_tag}"
-  paper_output_dir="paper-plugin/build/libs/${range_tag}"
+  local output_dir_tag="${range_tag}"
+  mod_output_dir="build/libs/${output_dir_tag}"
+  paper_output_dir="paper-plugin/build/libs/${output_dir_tag}"
 
   echo
   echo "==> Building Axion v${MOD_VERSION} for range ${range_tag} (compiled against MC ${compile_version})"
@@ -112,6 +118,7 @@ print_menu() {
   echo "  1) Legacy range (Minecraft 1.21.6 - 1.21.8)"
   echo "  2) Modern range (Minecraft 1.21.9 - 1.21.11)"
   echo "  3) Both ranges"
+  echo "  4) Minecraft 1.21.5"
   echo "  q) Cancel"
 }
 
@@ -133,6 +140,9 @@ case "$choice" in
     for range in "${SUPPORTED_RANGES[@]}"; do
       build_range "$range"
     done
+    ;;
+  4|1.21.5|mc1.21.5|mc1_21_5|MC1_21_5)
+    build_range "mc1_21_5"
     ;;
   q|Q|quit|QUIT)
     echo "Cancelled."

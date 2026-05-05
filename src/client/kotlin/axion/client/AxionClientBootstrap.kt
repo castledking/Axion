@@ -1,6 +1,7 @@
 package axion.client
 
 import axion.client.compat.VersionCompatInit
+import axion.client.compat.VersionCompatImpl
 import axion.client.config.AxionClientConfig
 import axion.client.hotbar.AxionHotbarHud
 import axion.client.hotbar.AxionToolHintHud
@@ -17,8 +18,6 @@ import axion.client.render.SmearPreviewRenderer
 import axion.client.render.StackPreviewRenderer
 import axion.client.render.WorldRenderCompat
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
-import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry
-import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements
 import net.minecraft.util.Identifier
 
 object AxionClientBootstrap {
@@ -30,8 +29,7 @@ object AxionClientBootstrap {
         AxionClientConfig.initialize()
         AxionServerConnection.initialize()
         AxionKeybindings.register()
-        HudElementRegistry.attachElementAfter(VanillaHudElements.HOTBAR, hudId, AxionHotbarHud::render)
-        HudElementRegistry.attachElementAfter(VanillaHudElements.HOTBAR, hintHudId, AxionToolHintHud::render)
+        VersionCompatImpl.registerHudElements(hudId, hintHudId, AxionHotbarHud::render, AxionToolHintHud::render)
         ClientTickEvents.END_CLIENT_TICK.register(AxionTickHandler::onEndTick)
         WorldRenderCompat.registerBeforeDebugRender(TargetHighlightRenderer::render)
         WorldRenderCompat.registerEndMain(SelectionBoxRenderer::render)

@@ -1,4 +1,5 @@
 package axion.client.render
+import axion.client.compat.CameraAccess
 
 import axion.client.selection.SelectionBounds
 import com.mojang.blaze3d.vertex.VertexFormat
@@ -28,7 +29,7 @@ object PulsingCuboidRenderer {
         val client = MinecraftClient.getInstance()
         val camera = client.gameRenderer.camera ?: return
         val consumers = context.consumers()
-        val cameraPos = camera.cameraPos
+        val cameraPos = CameraAccess.getPos(camera)
         val matrixStack = context.matrices()
         val fillLayer = RenderLayerCompat.debugQuads()
 
@@ -64,7 +65,7 @@ object PulsingCuboidRenderer {
         val client = MinecraftClient.getInstance()
         val camera = client.gameRenderer.camera ?: return
         val consumers = context.consumers()
-        val cameraPos = camera.cameraPos
+        val cameraPos = CameraAccess.getPos(camera)
         val matrixStack = context.matrices()
         val alpha = pulsingAlpha(minAlpha, maxAlpha)
         val fillLayer = RenderLayerCompat.lightning()
@@ -106,7 +107,7 @@ object PulsingCuboidRenderer {
         val client = MinecraftClient.getInstance()
         val camera = client.gameRenderer.camera ?: return
         val consumers = context.consumers()
-        val cameraPos = camera.cameraPos
+        val cameraPos = CameraAccess.getPos(camera)
         val matrixStack = context.matrices()
         val outlinedBox = SelectionBounds.outlineBox(box)
         val fillLayer = RenderLayerCompat.debugQuads()
@@ -155,7 +156,7 @@ object PulsingCuboidRenderer {
         val client = MinecraftClient.getInstance()
         val camera = client.gameRenderer.camera ?: return
         val consumers = context.consumers()
-        val cameraPos = camera.cameraPos
+        val cameraPos = CameraAccess.getPos(camera)
 
         VertexRenderingCompat.drawOutline(
             context.matrices(),

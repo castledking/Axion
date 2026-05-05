@@ -22,7 +22,7 @@ Axion is an open-source Minecraft building toolkit inspired by Axiom, built as a
 </p>
 
 <p align="center">
-  <img alt="Requires Paper 1.21.11" src="https://img.shields.io/badge/Requires-Paper%201.21.11-white?style=for-the-badge">
+  <img alt="Supports Paper 1.21.5 to 1.21.11" src="https://img.shields.io/badge/Supports-Paper%201.21.5--1.21.11-white?style=for-the-badge">
 </p>
 
 ## What Is Axion?
@@ -91,9 +91,9 @@ The Paper plugin handles authoritative multiplayer edit application, validation,
 
 | Component | Version |
 | --- | --- |
-| Minecraft | `1.21.11` |
-| Fabric Mod | `1.21.11` |
-| Paper Plugin | `1.21.11` |
+| Fabric Mod (client) | `1.21.5` – `1.21.11` |
+| Paper Plugin | `1.21.5` – `1.21.11` |
+| Fabric Dedicated Server | `1.21.11` only |
 
 ## Requirements
 
@@ -105,14 +105,14 @@ The Paper plugin handles authoritative multiplayer edit application, validation,
 
 ### Paper Plugin
 
-- Paper `1.21.11`
+- Paper `1.21.5` through `1.21.11`
 - Matching Axion client version for players using the toolset
 
 ## Quick Start
 
 ### Singleplayer / Client Use
 
-1. Install Fabric Loader for Minecraft `1.21.11`.
+1. Install Fabric Loader for your Minecraft version (`1.21.5` through `1.21.11`).
 2. Put the Axion mod jar in your `mods` folder.
 3. Install Fabric API and Fabric Language Kotlin.
 4. Launch Minecraft in creative mode.

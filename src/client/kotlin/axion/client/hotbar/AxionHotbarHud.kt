@@ -1,6 +1,7 @@
 package axion.client.hotbar
 
 import axion.client.AxionClientState
+import axion.client.compat.VersionCompatImpl
 import axion.client.input.AxionModifierKeys
 import axion.client.tool.AxionToolSelectionController
 import axion.client.ui.drawStrokedRectangleCompat
@@ -9,8 +10,10 @@ import net.minecraft.client.MinecraftClient
 import net.minecraft.client.gui.DrawContext
 import net.minecraft.item.ItemStack
 import net.minecraft.util.Formatting
+import net.minecraft.util.Identifier
 
 object AxionHotbarHud {
+    private val TOOLBOX_TEXTURE: Identifier = Identifier.of("axion", "textures/gui/toolbox.png")
     private const val OUTER_BACKGROUND: Int = 0xB0101010.toInt()
     private const val INNER_BACKGROUND: Int = 0xAA1E1E1E.toInt()
     private const val BORDER_NEUTRAL: Int = 0xFF7C7C7C.toInt()
@@ -153,6 +156,7 @@ object AxionHotbarHud {
         )
         renderSavedHotbarPageButtons(context, client, page)
         renderFlyingSpeedSlider(context, client, page)
+        renderToolboxButton(context, client)
     }
 
     private fun renderFlyingSpeedSlider(
@@ -244,6 +248,28 @@ object AxionHotbarHud {
         context.fill(minus.x + 1, minus.y + 1, minus.x + minus.width - 1, minus.y + minus.height - 1, INNER_BACKGROUND)
         context.drawStrokedRectangleCompat(minus.x, minus.y, minus.width, minus.height, minusBorderColor)
         context.drawCenteredTextWithShadow(client.textRenderer, "-", minus.x + minus.width / 2, minus.y + 2, minusTextColor)
+    }
+
+    private fun renderToolboxButton(
+        context: DrawContext,
+        client: MinecraftClient,
+    ) {
+        val bounds = AxionHudLayout.toolboxSlotBounds(client, context.scaledWindowWidth, context.scaledWindowHeight)
+        val hovered = AxionAltMenuController.isHoveringToolboxButton(client, context.scaledWindowWidth, context.scaledWindowHeight)
+        val borderColor = if (hovered) BORDER_HOVER else BORDER_NEUTRAL
+        val inset = 3
+
+        context.fill(bounds.x, bounds.y, bounds.x + bounds.size, bounds.y + bounds.size, OUTER_BACKGROUND)
+        context.fill(bounds.x + 2, bounds.y + 2, bounds.x + bounds.size - 2, bounds.y + bounds.size - 2, INNER_BACKGROUND)
+        VersionCompatImpl.drawGuiTexture(
+            context,
+            TOOLBOX_TEXTURE,
+            bounds.x + inset,
+            bounds.y + inset,
+            bounds.size - (inset * 2),
+            bounds.size - (inset * 2),
+        )
+        context.drawStrokedRectangleCompat(bounds.x, bounds.y, bounds.size, bounds.size, borderColor)
     }
 
     private fun interpolateGradientColor(stops: List<Pair<Float, Int>>, t: Float): Int {
