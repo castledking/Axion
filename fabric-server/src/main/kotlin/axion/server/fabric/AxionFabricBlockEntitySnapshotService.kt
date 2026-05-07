@@ -35,10 +35,15 @@ object AxionFabricBlockEntitySnapshotService {
             return
         }
 
+        val restoredNbt = StringNbtReader.readCompound(blockEntityData)
+        restoredNbt.putInt("x", pos.x)
+        restoredNbt.putInt("y", pos.y)
+        restoredNbt.putInt("z", pos.z)
+
         val restored = BlockEntity.createFromNbt(
             pos,
             state,
-            StringNbtReader.readCompound(blockEntityData),
+            restoredNbt,
             world.registryManager,
         ) ?: return
 

@@ -14,8 +14,14 @@ import net.minecraft.client.render.VertexConsumerProvider
 import net.minecraft.client.util.math.MatrixStack
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Box
+import org.slf4j.LoggerFactory
 
 object GhostBlockPreviewRenderer {
+    private val logger = LoggerFactory.getLogger(GhostBlockPreviewRenderer::class.java)
+    private const val DEBUG_LOG: Boolean = false
+    private const val LOG_INTERVAL_MS: Long = 1000
+    private var lastLogTime: Long = 0
+
     private const val GHOST_ALPHA: Int = 44
     private const val MAX_GHOST_BLOCKS: Int = 65536
     private const val MAX_TEXTURED_GHOST_BLOCKS: Int = 32768
@@ -25,7 +31,11 @@ object GhostBlockPreviewRenderer {
     // chunked preview session (Phase A+B GPU-style pipeline). Below this,
     // the existing per-frame tessellation path is fine and avoids the
     // session's diff-overhead for tiny clipboards.
-    private const val CHUNKED_PATH_CELL_THRESHOLD: Int = 1024
+    // Keep medium previews on the established CPU textured path. The chunked
+    // GPU path is still useful for truly huge structures, but it can currently
+    // produce outline-only previews on some 1.21.x render callbacks.
+    private const val CHUNKED_PATH_CELL_THRESHOLD: Int = MAX_TEXTURED_GHOST_BLOCKS
+    private const val FORCE_CHUNKED_PREVIEW: Boolean = false
 
     fun maxOriginsFor(nonAirCellCount: Int): Int {
         if (nonAirCellCount <= 0) {
@@ -44,6 +54,7 @@ object GhostBlockPreviewRenderer {
         fullBlock: Boolean = false,
         scale: Float = 1.0f,
         sessionTag: String = "default",
+        forceChunked: Boolean = false,
     ) {
         if (origins.isEmpty()) {
             return
@@ -67,8 +78,19 @@ object GhostBlockPreviewRenderer {
         // shares one slot for "the active textured ghost preview".
         if (textured) {
             val totalCells = allOccupiedCells.size.toLong() * origins.size.toLong()
-            if (totalCells > CHUNKED_PATH_CELL_THRESHOLD) {
-                if (VersionCompatImpl.renderChunkedPreview("ghost:$sessionTag", context, clipboard, origins, color, alpha)) {
+            if (forceChunked || FORCE_CHUNKED_PREVIEW || totalCells > CHUNKED_PATH_CELL_THRESHOLD) {
+                val handled = VersionCompatImpl.renderChunkedPreview("ghost:$sessionTag", context, clipboard, origins, color, alpha)
+                if (DEBUG_LOG) {
+                    val now = System.currentTimeMillis()
+                    if (now - lastLogTime >= LOG_INTERVAL_MS) {
+                        lastLogTime = now
+                        logger.info(
+                            "[Axion diag] chunked path: cells={} origins={} session=ghost:{} handled={}",
+                            totalCells, origins.size, sessionTag, handled,
+                        )
+                    }
+                }
+                if (handled) {
                     return
                 }
             }
@@ -202,6 +224,7 @@ object GhostBlockPreviewRenderer {
                 cameraY = cameraPos.y,
                 cameraZ = cameraPos.z,
                 checkSides = true,
+                scale = scale,
             )
             return
         }
@@ -271,6 +294,7 @@ object GhostBlockPreviewRenderer {
                 cameraY = cameraPos.y,
                 cameraZ = cameraPos.z,
                 checkSides = true,
+                scale = scale,
             )
             return
         }

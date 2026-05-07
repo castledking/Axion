@@ -3,15 +3,20 @@ package axion.client.compat
 import axion.common.compat.VersionCompat
 import axion.client.render.AxionWorldRenderContext
 import axion.client.render.gpu.ChunkedPreviewLifecycle
+import axion.client.render.gpu.SectionDrawEntry
+import axion.mixin.client.CameraAccessor
 import axion.common.model.ClipboardBuffer
+import com.mojang.blaze3d.pipeline.RenderPipeline
 import com.mojang.blaze3d.buffers.GpuBufferSlice
 import com.mojang.blaze3d.systems.RenderPass
 import com.mojang.blaze3d.textures.GpuTextureView
 import net.minecraft.block.Block
 import net.minecraft.block.BlockState
 import net.minecraft.client.MinecraftClient
+import net.minecraft.client.gl.RenderPipelines
 import net.minecraft.client.gui.DrawContext
 import net.minecraft.client.render.Camera
+import net.minecraft.client.render.RenderLayer
 import net.minecraft.client.render.RenderTickCounter
 import net.minecraft.command.argument.BlockArgumentParser
 import net.minecraft.entity.Entity
@@ -137,12 +142,41 @@ object VersionCompatImpl : VersionCompat {
     ): Boolean {
         val session = ChunkedPreviewLifecycle.acquire(sessionId)
         session.setFromClipboard(clipboard, origins)
-        session.render(context, color, alpha)
-        return true
+        return session.render(context, color, alpha).handled
     }
 
     fun closeChunkedPreviews() {
         ChunkedPreviewLifecycle.closeAll()
+    }
+
+    fun drawMultipleIndexedPreview(
+        pass: RenderPass,
+        drawList: List<SectionDrawEntry>,
+        uniformSlices: List<GpuBufferSlice>,
+    ): Boolean {
+        if (drawList.isEmpty()) return false
+        val renderObjects = ArrayList<RenderPass.RenderObject<Unit>>(drawList.size)
+        for (i in drawList.indices) {
+            val entry = drawList[i]
+            val vb = entry.buffer.vertexBufferGpu ?: return false
+            val ib = entry.buffer.indexBufferGpu ?: return false
+            val slice = uniformSlices[i]
+            renderObjects += RenderPass.RenderObject<Unit>(
+                0, vb, ib, entry.indexType, 0, entry.indexCount,
+                java.util.function.BiConsumer { _, uploader ->
+                    uploader.upload("DynamicTransforms", slice)
+                },
+            )
+        }
+        val first = renderObjects[0]
+        pass.drawMultipleIndexed(
+            renderObjects,
+            first.indexBuffer(),
+            first.indexType(),
+            listOf("DynamicTransforms"),
+            Unit,
+        )
+        return true
     }
 
     // Rendering compatibility for 1.21.11
@@ -161,6 +195,10 @@ object VersionCompatImpl : VersionCompat {
         // 1.21.11 uses bindTexture with name, view, and sampler
         val sampler = currentAtlasSampler ?: return
         pass.bindTexture(samplerName, textureView, sampler)
+    }
+
+    fun getRenderPipeline(layer: RenderLayer): RenderPipeline {
+        return layer.renderPipeline
     }
 
     fun writeDynamicUniforms(
@@ -227,14 +265,10 @@ object VersionCompatImpl : VersionCompat {
         width: Int,
         height: Int,
     ) {
-        // 1.21.11 - provide stub implementation
-        // TODO: Implement properly when API is understood
+        context.drawTexture(RenderPipelines.GUI_TEXTURED, texture, x, y, 0.0f, 0.0f, width, height, width, height)
     }
 
     fun getCameraPos(camera: Camera): Vec3d {
-        // In 1.21.11, camera.pos is private
-        // Use Fabric Loom access transformer or return a default value
-        // For now, return zero vector as fallback
-        return Vec3d.ZERO
+        return (camera as CameraAccessor).axionGetPos()
     }
 }

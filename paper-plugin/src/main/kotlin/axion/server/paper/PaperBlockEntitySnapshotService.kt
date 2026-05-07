@@ -27,19 +27,33 @@ object PaperBlockEntitySnapshotService {
             return
         }
 
-        val tag = TagParser.parseCompoundFully(blockEntityPayload)
+        val tag = try {
+            rebase(TagParser.parseCompoundFully(blockEntityPayload), pos)
+        } catch (_: Exception) {
+            return
+        }
         val existing = level.getBlockEntity(pos)
         if (existing != null) {
-            loadBlockEntityWithComponents(existing, tag.copy(), level.registryAccess())
+            runCatching { loadBlockEntityWithComponents(existing, tag.copy(), level.registryAccess()) }
+                .getOrElse { return }
             existing.setChanged()
             level.sendBlockUpdated(pos, blockState, blockState, 3)
             return
         }
 
-        val restored = BlockEntity.loadStatic(pos, blockState, tag.copy(), level.registryAccess()) ?: return
+        val restored = runCatching {
+            BlockEntity.loadStatic(pos, blockState, tag.copy(), level.registryAccess())
+        }.getOrNull() ?: return
         level.getChunkAt(pos).setBlockEntity(restored)
         restored.setChanged()
         level.sendBlockUpdated(pos, blockState, blockState, 3)
+    }
+
+    private fun rebase(tag: CompoundTag, pos: BlockPos): CompoundTag {
+        tag.putInt("x", pos.x)
+        tag.putInt("y", pos.y)
+        tag.putInt("z", pos.z)
+        return tag
     }
 
     private fun loadBlockEntityWithComponents(

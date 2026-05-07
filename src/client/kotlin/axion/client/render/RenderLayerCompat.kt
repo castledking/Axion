@@ -37,7 +37,10 @@ object RenderLayerCompat {
         "translucentMovingBlock" to "method_75977",
         "debugQuads" to "method_76023",
         "debugFilledBox" to "method_76019",
+        "cutout" to "method_75995",
     )
+
+    fun cutout(): RenderLayer = resolve("cutout", "cutout")
 
     fun lines(): RenderLayer = resolve("lines", "getLines")
 

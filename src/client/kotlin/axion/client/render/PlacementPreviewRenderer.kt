@@ -28,10 +28,10 @@ object PlacementPreviewRenderer {
     // Phase B.5 (persistent GpuBuffer per chunk) will further drop per-frame
     // cost to a handful of draw calls, after which these caps can probably go
     // away entirely.
-    private const val MAX_MOVE_DETAILED_SELECTION_CELLS: Int = 200000
-    private const val MAX_MOVE_SOURCE_CELLS: Int = 200000
-    private const val MAX_MOVE_DESTINATION_GHOST_CELLS: Int = 200000
-    private const val MAX_CLONE_DESTINATION_GHOST_CELLS: Int = 200000
+    private const val MAX_MOVE_DETAILED_SELECTION_CELLS: Int = 4_000_000
+    private const val MAX_MOVE_SOURCE_CELLS: Int = 4_000_000
+    private const val MAX_MOVE_DESTINATION_GHOST_CELLS: Int = 4_000_000
+    private const val MAX_CLONE_DESTINATION_GHOST_CELLS: Int = 4_000_000
     private val moveSourceClipboardCache = java.util.WeakHashMap<ClipboardBuffer, ClipboardBuffer?>()
 
     fun render(context: AxionWorldRenderContext) {

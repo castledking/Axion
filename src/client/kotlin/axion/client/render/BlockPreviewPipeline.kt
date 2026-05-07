@@ -215,6 +215,7 @@ object BlockPreviewPipeline {
                 textured = true,
                 scale = scene.ghostScale,
                 sessionTag = scene.sessionTag,
+                forceChunked = true,
             )
             return true
         }

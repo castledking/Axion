@@ -555,7 +555,8 @@ object ClipboardSelectionRenderer {
             if (occupiedCells.size <= 1) {
                 occupiedCells
             } else {
-                val occupied = occupiedCells.asSequence()
+                val opaquePositions = occupiedCells.asSequence()
+                    .filter { it.state.isOpaqueFullCube }
                     .map { Triple(it.offset.x, it.offset.y, it.offset.z) }
                     .toHashSet()
                 occupiedCells.filter { cell ->
@@ -569,7 +570,7 @@ object ClipboardSelectionRenderer {
                         Triple(x, y + 1, z),
                         Triple(x, y, z - 1),
                         Triple(x, y, z + 1),
-                    ).any { neighbor -> neighbor !in occupied }
+                    ).any { neighbor -> neighbor !in opaquePositions }
                 }
             }
         }

@@ -3,7 +3,9 @@ package axion.client.compat
 import axion.common.compat.VersionCompat
 import axion.client.render.AxionWorldRenderContext
 import axion.client.render.gpu.ChunkedPreviewLifecycle
+import axion.client.render.gpu.SectionDrawEntry
 import axion.common.model.ClipboardBuffer
+import com.mojang.blaze3d.pipeline.RenderPipeline
 import com.mojang.blaze3d.buffers.GpuBufferSlice
 import com.mojang.blaze3d.systems.RenderPass
 import com.mojang.blaze3d.textures.GpuTextureView
@@ -13,6 +15,8 @@ import net.minecraft.block.Block
 import net.minecraft.block.BlockState
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.gui.DrawContext
+import net.minecraft.client.gl.RenderPipelines
+import net.minecraft.client.render.RenderLayer
 import net.minecraft.client.render.RenderTickCounter
 import net.minecraft.client.world.ClientWorld
 import net.minecraft.command.argument.BlockArgumentParser
@@ -42,6 +46,13 @@ import org.joml.Vector4fc
  * Uses Codec-based NBT serialization introduced in 1.21.5
  */
 object VersionCompatImpl : VersionCompat {
+    private val renderLayerPipelineField: java.lang.reflect.Field? by lazy {
+        RenderLayer::class.java.declaredClasses
+            .firstOrNull { it.simpleName == "MultiPhase" }
+            ?.declaredFields
+            ?.firstOrNull { it.type.name == "com.mojang.blaze3d.pipeline.RenderPipeline" }
+            ?.also { it.isAccessible = true }
+    }
 
     private fun getRegistryManager(): DynamicRegistryManager? {
         return MinecraftClient.getInstance().world?.registryManager
@@ -178,12 +189,22 @@ object VersionCompatImpl : VersionCompat {
     ): Boolean {
         val session = ChunkedPreviewLifecycle.acquire(sessionId)
         session.setFromClipboard(clipboard, origins)
-        session.render(context, color, alpha)
-        return true
+        return session.render(context, color, alpha).handled
     }
 
     fun closeChunkedPreviews() {
         ChunkedPreviewLifecycle.closeAll()
+    }
+
+    @Suppress("UNUSED_PARAMETER")
+    fun drawMultipleIndexedPreview(
+        pass: RenderPass,
+        drawList: List<SectionDrawEntry>,
+        uniformSlices: List<GpuBufferSlice>,
+    ): Boolean {
+        // 1.21.7 UniformUploader only supports float varargs, not GpuBufferSlice.
+        // Cannot upload DynamicTransforms UBO through the per-object callback.
+        return false
     }
 
     fun registerHudElements(
@@ -212,8 +233,7 @@ object VersionCompatImpl : VersionCompat {
         width: Int,
         height: Int,
     ) {
-        // 1.21.7 - provide stub implementation
-        // TODO: Implement properly when API is understood
+        context.drawTexture(RenderPipelines.GUI_TEXTURED, texture, x, y, 0.0f, 0.0f, width, height, width, height)
     }
 
     fun getCameraPos(camera: Camera): Vec3d {
@@ -233,6 +253,12 @@ object VersionCompatImpl : VersionCompat {
     fun bindTextureToRenderPass(pass: RenderPass, samplerName: String, textureView: GpuTextureView) {
         // 1.21.7 uses bindSampler with just name and view
         pass.bindSampler(samplerName, textureView)
+    }
+
+    fun getRenderPipeline(layer: RenderLayer): RenderPipeline {
+        return runCatching {
+            renderLayerPipelineField?.get(layer) as? RenderPipeline
+        }.getOrNull() ?: RenderPipelines.RENDERTYPE_TRANSLUCENT_MOVING_BLOCK
     }
 
     fun writeDynamicUniforms(

@@ -2,12 +2,13 @@ package axion.client.render.gpu
 import axion.client.compat.CameraAccess
 
 import axion.client.render.AxionPreviewBuffer
+import axion.client.render.RenderLayerCompat
 import axion.client.compat.VersionCompatImpl
+import com.mojang.blaze3d.buffers.GpuBufferSlice
 import com.mojang.blaze3d.systems.RenderSystem
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap
-import it.unimi.dsi.fastutil.objects.ObjectIterator
 import net.minecraft.client.MinecraftClient
-import net.minecraft.client.gl.RenderPipelines
+import net.minecraft.client.render.Frustum
 import net.minecraft.util.math.Vec3i
 import org.joml.Matrix4f
 import org.joml.Vector3f
@@ -16,6 +17,7 @@ import org.slf4j.LoggerFactory
 import java.util.OptionalDouble
 import java.util.OptionalInt
 import java.util.function.Supplier
+import org.joml.Matrix4fc
 
 /**
  * GPU-side draw orchestrator for cached preview chunks.
@@ -31,9 +33,14 @@ import java.util.function.Supplier
  * tessellation, no upload.
  *
  * Uniforms wired:
+ * Pipeline and vertex format come from [RenderLayerCompat.blockTranslucentCull],
+ * matching the layer used when tessellating the cached [BuiltBuffer].
+ *
+ * Uniforms wired:
  *   - `Projection`           — `RenderSystem.getProjectionMatrixBuffer()`
  *   - `DynamicTransforms`    — written PER SECTION via [DynamicUniforms.write]
  *   - `Globals`              — `RenderSystem.getGlobalSettingsUniform()`
+ *   - `Fog`                  — `RenderSystem.getShaderFog()`
  *   - `Sampler0` (atlas)     — block-atlas texture view + sampler
  *   - `Sampler2` (lightmap)  — lightmap view + atlas sampler
  *
@@ -43,6 +50,40 @@ import java.util.function.Supplier
  */
 object AxionPreviewBlockDrawer {
     private val logger = LoggerFactory.getLogger(AxionPreviewBlockDrawer::class.java)
+    private const val DEBUG_LOG: Boolean = false
+    private const val LOG_INTERVAL_MS: Long = 1000
+    private var lastLogTime: Long = 0
+
+    /**
+     * Gate for the experimental drawMultipleIndexed submission path.
+     * When true, pre-computed uniform slices are submitted via
+     * [VersionCompatImpl.drawMultipleIndexedPreview] (1.21.11 only;
+     * 1.21.7 falls back to manual). When false, the manual per-section
+     * setUniform + drawIndexed loop is used unconditionally.
+     */
+    private const val USE_MULTI_DRAW: Boolean = true
+
+    /**
+     * Cull cached preview sections against the same deferred world-render
+     * projection used to submit the draw. This is especially important for
+     * large previews: looking away should produce an empty draw list instead
+     * of still submitting every cached section.
+     */
+    private const val USE_SECTION_FRUSTUM_CULLING: Boolean = true
+
+    /**
+     * Force all sections to draw at a fixed camera-relative offset (0, 0, -8)
+     * instead of their real world position. If this makes geometry visible,
+     * the render pass setup is correct and the per-section transform is wrong.
+     */
+    private const val DEBUG_FORCE_FIXED_TRANSFORM: Boolean = false
+
+    /**
+     * Clear the depth buffer at the start of our render pass (depth = 1.0).
+     * If this makes geometry visible, the preview is being hidden by existing
+     * world depth — likely a compositing-order issue.
+     */
+    private const val DEBUG_CLEAR_DEPTH: Boolean = false
 
     private const val MAX_FAILURES: Int = 3
     private var failureCount: Int = 0
@@ -70,18 +111,30 @@ object AxionPreviewBlockDrawer {
         color: Int,
         alpha: Int,
         translationDelta: Vec3i = Vec3i.ZERO,
-    ) {
-        if (disabled || sectionBuffers.isEmpty()) return
+        baseModelView: Matrix4fc? = null,
+        cullingModelView: Matrix4fc? = null,
+        projectionMatrix: Matrix4fc? = null,
+    ): ChunkedDrawResult {
+        if (disabled || sectionBuffers.isEmpty()) return ChunkedDrawResult.FAILED
 
-        try {
-            doDrawChunked(sectionBuffers, color, alpha, translationDelta)
-            if (!loggedFirstSuccess) {
+        return try {
+            val result = doDrawChunked(
+                sectionBuffers,
+                color,
+                alpha,
+                translationDelta,
+                baseModelView,
+                cullingModelView,
+                projectionMatrix,
+            )
+            if (result == ChunkedDrawResult.DREW && !loggedFirstSuccess) {
                 loggedFirstSuccess = true
                 logger.info(
-                    "[Axion GPU] Preview drawer active — drew {} chunks via RenderPipelines.TRANSLUCENT.",
+                    "[Axion GPU] Preview drawer active — drew {} chunks via blockTranslucentCull pipeline.",
                     sectionBuffers.size,
                 )
             }
+            result
         } catch (t: Throwable) {
             failureCount++
             if (failureCount <= MAX_FAILURES) {
@@ -97,6 +150,7 @@ object AxionPreviewBlockDrawer {
                     MAX_FAILURES,
                 )
             }
+            ChunkedDrawResult.FAILED
         }
     }
 
@@ -105,115 +159,157 @@ object AxionPreviewBlockDrawer {
         color: Int,
         alpha: Int,
         translationDelta: Vec3i,
-    ) {
+        baseModelView: Matrix4fc?,
+        cullingModelView: Matrix4fc?,
+        projectionMatrix: Matrix4fc?,
+    ): ChunkedDrawResult {
         val client = MinecraftClient.getInstance()
         val device = RenderSystem.getDevice()
-        val mainTarget = client.framebuffer ?: return
-        val colorView = mainTarget.colorAttachmentView ?: return
-        val depthView = mainTarget.depthAttachmentView ?: return
+        val mainTarget = client.framebuffer ?: return ChunkedDrawResult.FAILED
+        val colorView = mainTarget.colorAttachmentView ?: return ChunkedDrawResult.FAILED
+        val depthView = mainTarget.depthAttachmentView ?: return ChunkedDrawResult.FAILED
 
-        val camera = client.gameRenderer?.camera ?: return
-        val cameraPos = CameraAccess.getPos(camera) ?: return
+        val camera = client.gameRenderer?.camera ?: return ChunkedDrawResult.FAILED
+        val cameraPos = CameraAccess.getPos(camera)
 
-        // Color tint applied via the DynamicTransforms `colorTint` slot.
+        val baseMv = Matrix4f(cullingModelView ?: baseModelView ?: RenderSystem.getModelViewMatrix())
+        val normalMatrix = Matrix4f(baseMv).invert().transpose()
+        val frameStartNs = if (DEBUG_LOG) System.nanoTime() else 0L
+
+        // --- Phase 1: build the draw list ----------------------------------
+        val drawList = if (USE_SECTION_FRUSTUM_CULLING) {
+            val proj = Matrix4f(projectionMatrix ?: client.gameRenderer?.getBasicProjectionMatrix(1.0f) ?: Matrix4f())
+            val frustum = Frustum(Matrix4f(cullingModelView ?: baseMv), proj)
+            frustum.setPosition(cameraPos.x, cameraPos.y, cameraPos.z)
+            SectionDrawList.buildVisible(sectionBuffers, frustum, translationDelta)
+        } else {
+            SectionDrawList.buildAll(sectionBuffers)
+        }
+        val cullDoneNs = if (DEBUG_LOG) System.nanoTime() else 0L
+        if (drawList.isEmpty()) {
+            val result = if (USE_SECTION_FRUSTUM_CULLING) {
+                ChunkedDrawResult.NO_VISIBLE_SECTIONS
+            } else {
+                ChunkedDrawResult.NO_BUFFERS
+            }
+            if (DEBUG_LOG) {
+                logDrawStats(sectionBuffers.size, 0, false, result, frameStartNs, cullDoneNs, cullDoneNs, cullDoneNs)
+            }
+            return result
+        }
+
+        // --- Phase 2: pre-compute per-section uniform data ------------------
         val r = ((color shr 16) and 0xFF) / 255f
         val g = ((color shr 8) and 0xFF) / 255f
         val b = (color and 0xFF) / 255f
         val a = (alpha and 0xFF) / 255f
         val colorTint = Vector4f(r, g, b, a)
-
-        // Base model-view matrix = current frame's matrix (camera rotation
-        // already applied at this hook point). Per-section we'll add a
-        // translate(sectionOrigin - cameraPos) on top.
-        val baseMv = Matrix4f(RenderSystem.getModelViewMatrix())
-
-        // The per-section translation we add on top of [baseMv] only affects
-        // the last column of [mvMatrix]; the upper-3x3 (i.e. the camera
-        // rotation) is identical across every section. The shader's normal
-        // matrix only depends on that upper-3x3, so we can compute it ONCE
-        // up front instead of doing a 4x4 invert+transpose per section.
-        val normalMatrix = Matrix4f(baseMv).invert().transpose()
-
-        // Frustum planes for cheap section-AABB culling. Extracted from
-        // `proj * baseMv` once per frame; section centers offset by
-        // [translationDelta] so they match the world position the GPU will
-        // actually draw at after the per-section translate.
-        val proj = client.gameRenderer?.getBasicProjectionMatrix(1.0f) ?: Matrix4f()
-        val viewProj = Matrix4f(proj).mul(baseMv)
-        val frustum = FrustumPlanes.fromViewProj(viewProj, cameraPos.x, cameraPos.y, cameraPos.z)
         val deltaX = translationDelta.x
         val deltaY = translationDelta.y
         val deltaZ = translationDelta.z
+        val camX = cameraPos.x.toFloat()
+        val camY = cameraPos.y.toFloat()
+        val camZ = cameraPos.z.toFloat()
+        val dynamicUniforms = RenderSystem.getDynamicUniforms()
+        val uniformSlices = ArrayList<GpuBufferSlice>(drawList.size)
+        for (entry in drawList) {
+            val mvMatrix = Matrix4f(baseMv)
+            if (DEBUG_FORCE_FIXED_TRANSFORM) {
+                mvMatrix.identity()
+                mvMatrix.translate(0f, 0f, -8f)
+            } else {
+                mvMatrix.translate(
+                    entry.sectionOriginX.toFloat() - camX + deltaX.toFloat(),
+                    entry.sectionOriginY.toFloat() - camY + deltaY.toFloat(),
+                    entry.sectionOriginZ.toFloat() - camZ + deltaZ.toFloat(),
+                )
+            }
+            uniformSlices += VersionCompatImpl.writeDynamicUniforms(
+                dynamicUniforms, mvMatrix, colorTint, ZERO_VEC3, normalMatrix, 1.0f,
+            )
+        }
+        val uniformsDoneNs = if (DEBUG_LOG) System.nanoTime() else 0L
 
+        // --- Phase 3: submit draw calls -------------------------------------
         val encoder = device.createCommandEncoder()
+        val depthClear = if (DEBUG_CLEAR_DEPTH) OptionalDouble.of(1.0) else OptionalDouble.empty()
         val pass = encoder.createRenderPass(
             DEBUG_LABEL,
             colorView,
             OptionalInt.empty(),
             depthView,
-            OptionalDouble.empty(),
+            depthClear,
         )
         try {
-            pass.setPipeline(RenderPipelines.TRANSLUCENT)
-            pass.setUniform("Projection", RenderSystem.getProjectionMatrixBuffer())
-            pass.setUniform("Globals", RenderSystem.getGlobalSettingsUniform())
+            val renderLayer = RenderLayerCompat.blockTranslucentCull()
+            pass.setPipeline(VersionCompatImpl.getRenderPipeline(renderLayer))
+            RenderSystem.bindDefaultUniforms(pass)
 
-            // Block atlas → Sampler0 (version-compatible access)
             val atlasView = VersionCompatImpl.getBlockAtlasTextureView(client)
             if (atlasView != null) {
                 VersionCompatImpl.bindTextureToRenderPass(pass, "Sampler0", atlasView)
             }
 
-            // Lightmap → Sampler2 (version-compatible access)
             val lightmap = client.gameRenderer?.lightmapTextureManager
             val lightmapView = lightmap?.getGlTextureView()
             if (lightmapView != null) {
                 VersionCompatImpl.bindTextureToRenderPass(pass, "Sampler2", lightmapView)
             }
 
-            // Iterate sections; per-section update DynamicTransforms with the
-            // section-specific translation, then drawIndexed that section.
-            val dynamicUniforms = RenderSystem.getDynamicUniforms()
-            val iter: ObjectIterator<Long2ObjectMap.Entry<AxionPreviewBuffer>> =
-                sectionBuffers.long2ObjectEntrySet().iterator()
-            while (iter.hasNext()) {
-                val entry = iter.next()
-                val buf = entry.value
-                if (!buf.isUploaded || buf.indexCountValue <= 0) continue
-
-                val sectionKey = entry.longKey
-                val sectionX = ChunkedBooleanStore.sectionX(sectionKey) shl 4
-                val sectionY = ChunkedBooleanStore.sectionY(sectionKey) shl 4
-                val sectionZ = ChunkedBooleanStore.sectionZ(sectionKey) shl 4
-
-                // Frustum cull: skip sections whose 16³ AABB is fully outside
-                // the camera view at its actual on-screen position.
-                if (!frustum.isAabbVisible(
-                        (sectionX + deltaX).toFloat(),
-                        (sectionY + deltaY).toFloat(),
-                        (sectionZ + deltaZ).toFloat(),
-                        (sectionX + deltaX + 16).toFloat(),
-                        (sectionY + deltaY + 16).toFloat(),
-                        (sectionZ + deltaZ + 16).toFloat(),
-                    )
-                ) {
-                    continue
+            val batched = USE_MULTI_DRAW &&
+                VersionCompatImpl.drawMultipleIndexedPreview(pass, drawList, uniformSlices)
+            if (!batched) {
+                for (i in drawList.indices) {
+                    pass.setUniform("DynamicTransforms", uniformSlices[i])
+                    drawList[i].buffer.drawIndexed(pass)
                 }
-
-                val mvMatrix = Matrix4f(baseMv)
-                mvMatrix.translate(
-                    sectionX.toFloat() - cameraPos.x.toFloat() + deltaX.toFloat(),
-                    sectionY.toFloat() - cameraPos.y.toFloat() + deltaY.toFloat(),
-                    sectionZ.toFloat() - cameraPos.z.toFloat() + deltaZ.toFloat(),
-                )
-                val transforms = VersionCompatImpl.writeDynamicUniforms(dynamicUniforms, mvMatrix, colorTint, ZERO_VEC3, normalMatrix, 1.0f)
-                pass.setUniform("DynamicTransforms", transforms)
-                buf.drawIndexed(pass)
             }
+            if (DEBUG_LOG) {
+                logDrawStats(
+                    sectionBuffers.size,
+                    drawList.size,
+                    batched,
+                    ChunkedDrawResult.DREW,
+                    frameStartNs,
+                    cullDoneNs,
+                    uniformsDoneNs,
+                    System.nanoTime(),
+                )
+            }
+            return ChunkedDrawResult.DREW
         } finally {
             pass.close()
         }
     }
+
+    private fun logDrawStats(
+        totalSections: Int,
+        visibleSections: Int,
+        batched: Boolean,
+        result: ChunkedDrawResult,
+        frameStartNs: Long,
+        cullDoneNs: Long,
+        uniformsDoneNs: Long,
+        submitDoneNs: Long,
+    ) {
+        val now = System.currentTimeMillis()
+        if (now - lastLogTime < LOG_INTERVAL_MS) return
+        lastLogTime = now
+        logger.info(
+            "[Axion diag] drawChunked: sections={} visible={} culling={} batched={} result={} timesMs(cull={}, uniforms={}, submit={}, total={})",
+            totalSections,
+            visibleSections,
+            USE_SECTION_FRUSTUM_CULLING,
+            batched,
+            result,
+            millis(cullDoneNs - frameStartNs),
+            millis(uniformsDoneNs - cullDoneNs),
+            millis(submitDoneNs - uniformsDoneNs),
+            millis(submitDoneNs - frameStartNs),
+        )
+    }
+
+    private fun millis(ns: Long): String = "%.3f".format(ns / 1_000_000.0)
 
     private val ZERO_VEC3 = Vector3f(0f, 0f, 0f)
     private val DEBUG_LABEL: Supplier<String> = Supplier { "Axion preview" }

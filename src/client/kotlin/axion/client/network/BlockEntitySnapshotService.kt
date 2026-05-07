@@ -32,10 +32,15 @@ object BlockEntitySnapshotService {
             return
         }
 
+        val restoredNbt = payload.nbt.copy()
+        restoredNbt.putInt("x", write.pos.x)
+        restoredNbt.putInt("y", write.pos.y)
+        restoredNbt.putInt("z", write.pos.z)
+
         val restored = BlockEntity.createFromNbt(
             write.pos,
             write.state,
-            payload.nbt.copy(),
+            restoredNbt,
             world.registryManager,
         ) ?: return
 

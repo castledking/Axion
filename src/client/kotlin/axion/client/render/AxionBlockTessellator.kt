@@ -2,6 +2,7 @@ package axion.client.render
 
 import net.minecraft.block.BlockRenderType
 import net.minecraft.block.BlockState
+import net.minecraft.block.Blocks
 import net.minecraft.block.entity.BlockEntity
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.render.VertexConsumer
@@ -11,6 +12,7 @@ import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Direction
 import net.minecraft.util.math.random.Random
 import net.minecraft.world.BlockRenderView
+import net.minecraft.world.LightType
 import net.minecraft.world.biome.ColorResolver
 import net.minecraft.world.chunk.light.LightingProvider
 
@@ -49,21 +51,40 @@ object AxionBlockTessellator {
         consumer: VertexConsumer,
         checkSides: Boolean = true,
     ): Boolean {
-        if (state.isAir || state.renderType != BlockRenderType.MODEL) {
+        if (state.isAir) {
             return false
         }
         val blockRenderManager = MinecraftClient.getInstance().blockRenderManager
-        val model = blockRenderManager.getModel(state)
-        val random = threadLocalRandom.get()
-        val parts = threadLocalParts.get()
-        parts.clear()
-        random.setSeed(state.getRenderingSeed(pos))
-        model.addParts(random, parts)
-        if (parts.isEmpty()) {
-            return false
+        var rendered = false
+
+        if (state.renderType == BlockRenderType.MODEL) {
+            val model = blockRenderManager.getModel(state)
+            val random = threadLocalRandom.get()
+            val parts = threadLocalParts.get()
+            parts.clear()
+            random.setSeed(state.getRenderingSeed(pos))
+            model.addParts(random, parts)
+            if (parts.isNotEmpty()) {
+                // For grass blocks, render each part individually with checkSides=false
+                // This bypasses the grass block model's built-in top-face culling
+                if (state.block == Blocks.GRASS_BLOCK) {
+                    for (part in parts) {
+                        blockRenderManager.renderBlock(state, pos, world, matrixStack, consumer, false, listOf(part))
+                    }
+                } else {
+                    blockRenderManager.renderBlock(state, pos, world, matrixStack, consumer, checkSides, parts)
+                }
+                rendered = true
+            }
         }
-        blockRenderManager.renderBlock(state, pos, world, matrixStack, consumer, checkSides, parts)
-        return true
+
+        val fluidState = state.fluidState
+        if (!fluidState.isEmpty) {
+            blockRenderManager.renderFluid(pos, world, consumer, state, fluidState)
+            rendered = true
+        }
+
+        return rendered
     }
 
     /**
@@ -79,6 +100,8 @@ object AxionBlockTessellator {
         cameraY: Double,
         cameraZ: Double,
         checkSides: Boolean = true,
+        checkSidesFor: ((PreviewBlockInfo) -> Boolean)? = null,
+        scale: Float = 1.0f,
     ): Int {
         var rendered = 0
         for (block in blocks) {
@@ -88,7 +111,19 @@ object AxionBlockTessellator {
                 block.pos.y - cameraY,
                 block.pos.z - cameraZ,
             )
-            if (tessellateBlock(block.state, block.pos, world, matrixStack, consumer, checkSides)) {
+            if (scale != 1.0f) {
+                matrixStack.translate(0.5, 0.5, 0.5)
+                matrixStack.scale(scale, scale, scale)
+                matrixStack.translate(-0.5, -0.5, -0.5)
+            }
+            val blockCheckSides = checkSidesFor?.invoke(block) ?: checkSides
+            // Create a fresh view for each block to pass the rendering position
+            val blockWorld = when (world) {
+                is PreviewBlockRenderView -> PreviewBlockRenderView(world.world, world.statesByPosition, block.pos)
+                is TemplateBlockRenderView -> TemplateBlockRenderView(world.world, world.statesByPosition, block.pos)
+                else -> world
+            }
+            if (tessellateBlock(block.state, block.pos, blockWorld, matrixStack, consumer, blockCheckSides)) {
                 rendered++
             }
             matrixStack.pop()
@@ -102,15 +137,25 @@ object AxionBlockTessellator {
      * fall through to the actual ClientWorld.
      */
     class PreviewBlockRenderView(
-        private val world: net.minecraft.client.world.ClientWorld,
-        private val statesByPosition: Map<Long, BlockState>,
+        val world: net.minecraft.client.world.ClientWorld,
+        val statesByPosition: Map<Long, BlockState>,
+        private val renderingPos: BlockPos? = null,
     ) : BlockRenderView {
-        override fun getBlockEntity(pos: BlockPos): BlockEntity? {
-            return if (statesByPosition.containsKey(pos.asLong())) null else world.getBlockEntity(pos)
-        }
+        private val airState: BlockState = Blocks.AIR.defaultState
+
+        override fun getBlockEntity(pos: BlockPos): BlockEntity? = null
 
         override fun getBlockState(pos: BlockPos): BlockState {
-            return statesByPosition[pos.asLong()] ?: world.getBlockState(pos)
+            // When rendering a block, if the position directly above it is a non-opaque block
+            // (short grass, crops, flowers, etc.), return AIR for that position so the
+            // block renderer doesn't cull its top face.
+            if (renderingPos != null && pos == renderingPos.up()) {
+                val aboveState = statesByPosition[pos.asLong()]
+                if (aboveState != null && !aboveState.isOpaqueFullCube) {
+                    return airState
+                }
+            }
+            return statesByPosition[pos.asLong()] ?: airState
         }
 
         override fun getFluidState(pos: BlockPos) = getBlockState(pos).fluidState
@@ -120,9 +165,15 @@ object AxionBlockTessellator {
         override fun getBottomY(): Int = world.bottomY
 
         override fun getBrightness(direction: Direction, shaded: Boolean): Float =
-            world.getBrightness(direction, shaded)
+            previewBrightness(direction, shaded)
 
         override fun getLightingProvider(): LightingProvider = world.lightingProvider
+
+        override fun getLightLevel(type: LightType, pos: BlockPos): Int = 15
+
+        override fun getBaseLightLevel(pos: BlockPos, ambientDarkness: Int): Int = 15
+
+        override fun isSkyVisible(pos: BlockPos): Boolean = true
 
         override fun getColor(pos: BlockPos, colorResolver: ColorResolver): Int =
             world.getColor(pos, colorResolver)
@@ -134,14 +185,24 @@ object AxionBlockTessellator {
      * correctly regardless of real-world blocks at those coordinates.
      */
     class TemplateBlockRenderView(
-        private val world: net.minecraft.client.world.ClientWorld,
-        private val statesByPosition: Map<Long, BlockState>,
+        val world: net.minecraft.client.world.ClientWorld,
+        val statesByPosition: Map<Long, BlockState>,
+        private val renderingPos: BlockPos? = null,
     ) : BlockRenderView {
-        private val airState: BlockState = net.minecraft.block.Blocks.AIR.defaultState
+        private val airState: BlockState = Blocks.AIR.defaultState
 
         override fun getBlockEntity(pos: BlockPos): BlockEntity? = null
 
         override fun getBlockState(pos: BlockPos): BlockState {
+            // When rendering a block, if the position directly above it is a non-opaque block
+            // (short grass, crops, flowers, etc.), return AIR for that position so the
+            // block renderer doesn't cull its top face.
+            if (renderingPos != null && pos == renderingPos.up()) {
+                val aboveState = statesByPosition[pos.asLong()]
+                if (aboveState != null && !aboveState.isOpaqueFullCube) {
+                    return airState
+                }
+            }
             return statesByPosition[pos.asLong()] ?: airState
         }
 
@@ -152,12 +213,28 @@ object AxionBlockTessellator {
         override fun getBottomY(): Int = world.bottomY
 
         override fun getBrightness(direction: Direction, shaded: Boolean): Float =
-            world.getBrightness(direction, shaded)
+            previewBrightness(direction, shaded)
 
         override fun getLightingProvider(): LightingProvider = world.lightingProvider
 
+        override fun getLightLevel(type: LightType, pos: BlockPos): Int = 15
+
+        override fun getBaseLightLevel(pos: BlockPos, ambientDarkness: Int): Int = 15
+
+        override fun isSkyVisible(pos: BlockPos): Boolean = true
+
         override fun getColor(pos: BlockPos, colorResolver: ColorResolver): Int =
             world.getColor(pos, colorResolver)
+    }
+
+    private fun previewBrightness(direction: Direction, shaded: Boolean): Float {
+        if (!shaded) return 1.0f
+        return when (direction) {
+            Direction.DOWN -> 0.5f
+            Direction.UP -> 1.0f
+            Direction.NORTH, Direction.SOUTH -> 0.8f
+            Direction.WEST, Direction.EAST -> 0.6f
+        }
     }
 }
 

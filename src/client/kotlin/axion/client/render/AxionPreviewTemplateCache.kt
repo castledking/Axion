@@ -236,9 +236,9 @@ object AxionPreviewTemplateCache {
     }
 
     private fun filterSurfaceCells(cells: List<ClipboardCell>): List<ClipboardCell> {
-        val positionSet = HashSet<Long>(cells.size)
+        val stateByPos = HashMap<Long, net.minecraft.block.BlockState>(cells.size)
         cells.forEach { cell ->
-            positionSet.add(BlockPos.asLong(cell.offset.x, cell.offset.y, cell.offset.z))
+            stateByPos[BlockPos.asLong(cell.offset.x, cell.offset.y, cell.offset.z)] = cell.state
         }
         return cells.filter { cell ->
             if (cell.state.isAir) return@filter false
@@ -248,7 +248,8 @@ object AxionPreviewTemplateCache {
                     cell.offset.y + face.offsetY,
                     cell.offset.z + face.offsetZ,
                 )
-                !positionSet.contains(neighborKey)
+                val neighborState = stateByPos[neighborKey]
+                neighborState == null || !neighborState.isOpaqueFullCube
             }
         }
     }

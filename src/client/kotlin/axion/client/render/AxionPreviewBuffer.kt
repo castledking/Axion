@@ -86,6 +86,9 @@ class AxionPreviewBuffer : AutoCloseable {
             } else if (!existingIb.isClosed) {
                 commandEncoder.writeToBuffer(existingIb.slice(), indexData)
             }
+        } else {
+            indexBuffer?.close()
+            indexBuffer = null
         }
 
         vertexCount = params.vertexCount
@@ -105,9 +108,17 @@ class AxionPreviewBuffer : AutoCloseable {
 
         renderPass.setVertexBuffer(0, vb)
 
-        val ib = indexBuffer
-        if (ib != null && !ib.isClosed && indexCount > 0) {
-            renderPass.setIndexBuffer(ib, indexType)
+        if (indexCount > 0) {
+            val ib = indexBuffer
+            if (ib != null && !ib.isClosed) {
+                renderPass.setIndexBuffer(ib, indexType)
+            } else {
+                val sequential = RenderSystem.getSequentialBuffer(drawMode)
+                renderPass.setIndexBuffer(
+                    sequential.getIndexBuffer(indexCount),
+                    sequential.indexType,
+                )
+            }
             renderPass.drawIndexed(0, 0, indexCount, 1)
         } else if (vertexCount > 0) {
             renderPass.draw(0, vertexCount)

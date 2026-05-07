@@ -200,8 +200,6 @@ object ClientModeController {
     private fun applyFlyingSpeed(client: MinecraftClient) {
         val player = client.player ?: return
         if (!player.abilities.flying) {
-            // Reset to vanilla speed when not flying
-            player.abilities.flySpeed = 0.05f
             return
         }
 
