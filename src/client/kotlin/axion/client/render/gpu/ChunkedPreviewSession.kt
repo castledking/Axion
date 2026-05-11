@@ -17,6 +17,7 @@ import net.minecraft.client.util.BufferAllocator
 import net.minecraft.client.util.math.MatrixStack
 import net.minecraft.client.world.ClientWorld
 import net.minecraft.util.math.BlockPos
+import net.minecraft.util.math.Vec3d
 import net.minecraft.util.math.Vec3i
 import org.slf4j.LoggerFactory
 import org.joml.Matrix4f
@@ -143,9 +144,10 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
             return ChunkedDrawResult.DREW
         }
 
+        val camera = client.gameRenderer.camera ?: return ChunkedDrawResult.FAILED
+        val cameraPos = CameraAccess.getPos(camera)
         val baseModelView = Matrix4f(context.matrices().peek().positionMatrix)
-        ChunkedPreviewLifecycle.enqueueDeferredDraw(this, color, alpha, translationDelta, baseModelView)
-        return ChunkedDrawResult.DREW
+        return drawDeferred(color, alpha, translationDelta, baseModelView, cameraPos)
     }
 
     fun drawDeferred(
@@ -153,13 +155,14 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
         alpha: Int,
         translationDelta: Vec3i,
         baseModelView: Matrix4f,
+        cameraPos: Vec3d? = null,
         cullingModelView: org.joml.Matrix4fc? = null,
         projectionMatrix: org.joml.Matrix4fc? = null,
     ): ChunkedDrawResult {
         if (chunkBuffers.isEmpty()) return ChunkedDrawResult.NO_BUFFERS
         return AxionPreviewBlockDrawer.drawChunked(
             chunkBuffers, color, alpha, translationDelta,
-            baseModelView, cullingModelView, projectionMatrix,
+            baseModelView, cameraPos, cullingModelView, projectionMatrix,
         )
     }
 

@@ -50,6 +50,10 @@ object AxionBlockTessellator {
         matrixStack: MatrixStack,
         consumer: VertexConsumer,
         checkSides: Boolean = true,
+        cameraX: Double = 0.0,
+        cameraY: Double = 0.0,
+        cameraZ: Double = 0.0,
+        scale: Float = 1.0f,
     ): Boolean {
         if (state.isAir) {
             return false
@@ -80,7 +84,13 @@ object AxionBlockTessellator {
 
         val fluidState = state.fluidState
         if (!fluidState.isEmpty) {
-            blockRenderManager.renderFluid(pos, world, consumer, state, fluidState)
+            blockRenderManager.renderFluid(
+                pos,
+                world,
+                FluidOffsetVertexConsumer(consumer, pos, cameraX, cameraY, cameraZ, scale),
+                state,
+                fluidState,
+            )
             rendered = true
         }
 
@@ -123,7 +133,7 @@ object AxionBlockTessellator {
                 is TemplateBlockRenderView -> TemplateBlockRenderView(world.world, world.statesByPosition, block.pos)
                 else -> world
             }
-            if (tessellateBlock(block.state, block.pos, blockWorld, matrixStack, consumer, blockCheckSides)) {
+            if (tessellateBlock(block.state, block.pos, blockWorld, matrixStack, consumer, blockCheckSides, cameraX, cameraY, cameraZ, scale)) {
                 rendered++
             }
             matrixStack.pop()
@@ -234,6 +244,92 @@ object AxionBlockTessellator {
             Direction.UP -> 1.0f
             Direction.NORTH, Direction.SOUTH -> 0.8f
             Direction.WEST, Direction.EAST -> 0.6f
+        }
+    }
+
+    private class FluidOffsetVertexConsumer(
+        private val delegate: VertexConsumer,
+        private val pos: BlockPos,
+        private val cameraX: Double,
+        private val cameraY: Double,
+        private val cameraZ: Double,
+        private val scale: Float,
+    ) : VertexConsumer {
+        override fun vertex(x: Float, y: Float, z: Float): VertexConsumer {
+            delegate.vertex(transformX(x), transformY(y), transformZ(z))
+            return this
+        }
+
+        override fun color(red: Int, green: Int, blue: Int, alpha: Int): VertexConsumer {
+            delegate.color(red, green, blue, alpha)
+            return this
+        }
+
+        override fun color(color: Int): VertexConsumer {
+            delegate.color(color)
+            return this
+        }
+
+        override fun texture(u: Float, v: Float): VertexConsumer {
+            delegate.texture(u, v)
+            return this
+        }
+
+        override fun overlay(u: Int, v: Int): VertexConsumer {
+            delegate.overlay(u, v)
+            return this
+        }
+
+        override fun light(u: Int, v: Int): VertexConsumer {
+            delegate.light(u, v)
+            return this
+        }
+
+        override fun normal(x: Float, y: Float, z: Float): VertexConsumer {
+            delegate.normal(x, y, z)
+            return this
+        }
+
+        @Suppress("NOTHING_TO_OVERRIDE", "ACCIDENTAL_OVERRIDE")
+        override fun lineWidth(w: Float): VertexConsumer {
+            lineWidthMethod?.invoke(delegate, w)
+            return this
+        }
+
+        override fun vertex(
+            x: Float,
+            y: Float,
+            z: Float,
+            color: Int,
+            u: Float,
+            v: Float,
+            overlay: Int,
+            light: Int,
+            nx: Float,
+            ny: Float,
+            nz: Float,
+        ) {
+            delegate.vertex(transformX(x), transformY(y), transformZ(z), color, u, v, overlay, light, nx, ny, nz)
+        }
+
+        private fun transformX(value: Float): Float = transform(value, pos.x, cameraX)
+
+        private fun transformY(value: Float): Float = transform(value, pos.y, cameraY)
+
+        private fun transformZ(value: Float): Float = transform(value, pos.z, cameraZ)
+
+        private fun transform(value: Float, blockCoord: Int, cameraCoord: Double): Float {
+            if (scale == 1.0f) {
+                return (value - cameraCoord).toFloat()
+            }
+            val local = value - blockCoord
+            return (blockCoord - cameraCoord + 0.5 + (local - 0.5) * scale).toFloat()
+        }
+
+        companion object {
+            private val lineWidthMethod: java.lang.reflect.Method? = runCatching {
+                VertexConsumer::class.java.getMethod("lineWidth", Float::class.javaPrimitiveType)
+            }.getOrNull()
         }
     }
 }

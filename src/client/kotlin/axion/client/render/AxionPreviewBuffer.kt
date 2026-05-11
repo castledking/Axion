@@ -39,6 +39,12 @@ class AxionPreviewBuffer : AutoCloseable {
     /** Expose index count for drawMultipleIndexed instanced draw path. */
     val indexCountValue: Int get() = indexCount
 
+    /** Expose vertex format for custom preview pipelines. */
+    val vertexFormatValue: com.mojang.blaze3d.vertex.VertexFormat get() = RenderLayerCompat.blockTranslucentCull().vertexFormat
+
+    /** Expose draw mode for custom preview pipelines. */
+    val drawModeValue: VertexFormat.DrawMode get() = drawMode
+
     /**
      * Upload a BuiltBuffer to GPU. Follows ChunkRenderData.upload pattern:
      * - If existing buffer is too small, close and recreate

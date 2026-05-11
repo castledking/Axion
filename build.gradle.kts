@@ -122,6 +122,9 @@ tasks.processResources {
             "minecraft_version_range" to minecraftVersionRange,
         )
     }
+    if (rangeMc1215) {
+        exclude("assets/axion/shaders/core/preview_shell.*")
+    }
 }
 
 tasks.named<ProcessResources>("processClientResources") {

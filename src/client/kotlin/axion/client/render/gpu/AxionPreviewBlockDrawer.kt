@@ -9,6 +9,7 @@ import com.mojang.blaze3d.systems.RenderSystem
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.render.Frustum
+import net.minecraft.util.math.Vec3d
 import net.minecraft.util.math.Vec3i
 import org.joml.Matrix4f
 import org.joml.Vector3f
@@ -62,6 +63,7 @@ object AxionPreviewBlockDrawer {
      * setUniform + drawIndexed loop is used unconditionally.
      */
     private const val USE_MULTI_DRAW: Boolean = true
+    private const val USE_CUSTOM_PREVIEW_PIPELINE: Boolean = true
 
     /**
      * Cull cached preview sections against the same deferred world-render
@@ -112,6 +114,7 @@ object AxionPreviewBlockDrawer {
         alpha: Int,
         translationDelta: Vec3i = Vec3i.ZERO,
         baseModelView: Matrix4fc? = null,
+        cameraPosOverride: Vec3d? = null,
         cullingModelView: Matrix4fc? = null,
         projectionMatrix: Matrix4fc? = null,
     ): ChunkedDrawResult {
@@ -124,6 +127,7 @@ object AxionPreviewBlockDrawer {
                 alpha,
                 translationDelta,
                 baseModelView,
+                cameraPosOverride,
                 cullingModelView,
                 projectionMatrix,
             )
@@ -160,6 +164,7 @@ object AxionPreviewBlockDrawer {
         alpha: Int,
         translationDelta: Vec3i,
         baseModelView: Matrix4fc?,
+        cameraPosOverride: Vec3d?,
         cullingModelView: Matrix4fc?,
         projectionMatrix: Matrix4fc?,
     ): ChunkedDrawResult {
@@ -170,14 +175,19 @@ object AxionPreviewBlockDrawer {
         val depthView = mainTarget.depthAttachmentView ?: return ChunkedDrawResult.FAILED
 
         val camera = client.gameRenderer?.camera ?: return ChunkedDrawResult.FAILED
-        val cameraPos = CameraAccess.getPos(camera)
+        val cameraPos = cameraPosOverride ?: CameraAccess.getPos(camera)
 
-        val baseMv = Matrix4f(cullingModelView ?: baseModelView ?: RenderSystem.getModelViewMatrix())
+        val baseMv = if (USE_CUSTOM_PREVIEW_PIPELINE) {
+            Matrix4f(RenderSystem.getModelViewMatrix())
+        } else {
+            Matrix4f(cullingModelView ?: baseModelView ?: RenderSystem.getModelViewMatrix())
+        }
         val normalMatrix = Matrix4f(baseMv).invert().transpose()
         val frameStartNs = if (DEBUG_LOG) System.nanoTime() else 0L
 
         // --- Phase 1: build the draw list ----------------------------------
-        val drawList = if (USE_SECTION_FRUSTUM_CULLING) {
+        val useSectionFrustumCulling = USE_SECTION_FRUSTUM_CULLING && !USE_CUSTOM_PREVIEW_PIPELINE
+        val drawList = if (useSectionFrustumCulling) {
             val proj = Matrix4f(projectionMatrix ?: client.gameRenderer?.getBasicProjectionMatrix(1.0f) ?: Matrix4f())
             val frustum = Frustum(Matrix4f(cullingModelView ?: baseMv), proj)
             frustum.setPosition(cameraPos.x, cameraPos.y, cameraPos.z)
@@ -187,7 +197,7 @@ object AxionPreviewBlockDrawer {
         }
         val cullDoneNs = if (DEBUG_LOG) System.nanoTime() else 0L
         if (drawList.isEmpty()) {
-            val result = if (USE_SECTION_FRUSTUM_CULLING) {
+            val result = if (useSectionFrustumCulling) {
                 ChunkedDrawResult.NO_VISIBLE_SECTIONS
             } else {
                 ChunkedDrawResult.NO_BUFFERS
@@ -207,9 +217,9 @@ object AxionPreviewBlockDrawer {
         val deltaX = translationDelta.x
         val deltaY = translationDelta.y
         val deltaZ = translationDelta.z
-        val camX = cameraPos.x.toFloat()
-        val camY = cameraPos.y.toFloat()
-        val camZ = cameraPos.z.toFloat()
+        val camX = cameraPos.x
+        val camY = cameraPos.y
+        val camZ = cameraPos.z
         val dynamicUniforms = RenderSystem.getDynamicUniforms()
         val uniformSlices = ArrayList<GpuBufferSlice>(drawList.size)
         for (entry in drawList) {
@@ -219,9 +229,9 @@ object AxionPreviewBlockDrawer {
                 mvMatrix.translate(0f, 0f, -8f)
             } else {
                 mvMatrix.translate(
-                    entry.sectionOriginX.toFloat() - camX + deltaX.toFloat(),
-                    entry.sectionOriginY.toFloat() - camY + deltaY.toFloat(),
-                    entry.sectionOriginZ.toFloat() - camZ + deltaZ.toFloat(),
+                    (entry.sectionOriginX.toDouble() - camX + deltaX.toDouble()).toFloat(),
+                    (entry.sectionOriginY.toDouble() - camY + deltaY.toDouble()).toFloat(),
+                    (entry.sectionOriginZ.toDouble() - camZ + deltaZ.toDouble()).toFloat(),
                 )
             }
             uniformSlices += VersionCompatImpl.writeDynamicUniforms(
@@ -242,7 +252,13 @@ object AxionPreviewBlockDrawer {
         )
         try {
             val renderLayer = RenderLayerCompat.blockTranslucentCull()
-            pass.setPipeline(VersionCompatImpl.getRenderPipeline(renderLayer))
+            val pipeline = if (USE_CUSTOM_PREVIEW_PIPELINE) {
+                val firstBuffer = drawList.first().buffer
+                VersionCompatImpl.getPreviewShellPipeline(firstBuffer.vertexFormatValue, firstBuffer.drawModeValue)
+            } else {
+                VersionCompatImpl.getRenderPipeline(renderLayer)
+            }
+            pass.setPipeline(pipeline)
             RenderSystem.bindDefaultUniforms(pass)
 
             val atlasView = VersionCompatImpl.getBlockAtlasTextureView(client)

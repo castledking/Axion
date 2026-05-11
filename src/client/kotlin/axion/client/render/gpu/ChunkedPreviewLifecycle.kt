@@ -1,6 +1,7 @@
 package axion.client.render.gpu
 
 import java.util.concurrent.ConcurrentHashMap
+import net.minecraft.util.math.Vec3d
 import net.minecraft.util.math.Vec3i
 import org.joml.Matrix4f
 import org.joml.Matrix4fc
@@ -31,6 +32,7 @@ object ChunkedPreviewLifecycle {
         val alpha: Int,
         val translationDelta: Vec3i,
         val baseModelView: Matrix4f,
+        val cameraPos: Vec3d?,
     )
 
     /**
@@ -65,9 +67,10 @@ object ChunkedPreviewLifecycle {
         alpha: Int,
         translationDelta: Vec3i,
         baseModelView: Matrix4f,
+        cameraPos: Vec3d? = null,
     ) {
         synchronized(deferredDraws) {
-            deferredDraws += DeferredDraw(session, color, alpha, translationDelta, Matrix4f(baseModelView))
+            deferredDraws += DeferredDraw(session, color, alpha, translationDelta, Matrix4f(baseModelView), cameraPos)
         }
     }
 
@@ -95,6 +98,7 @@ object ChunkedPreviewLifecycle {
                 draw.alpha,
                 draw.translationDelta,
                 draw.baseModelView,
+                draw.cameraPos,
                 cullingModelView,
                 projectionMatrix,
             )

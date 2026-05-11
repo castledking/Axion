@@ -6,9 +6,12 @@ import axion.client.render.gpu.ChunkedPreviewLifecycle
 import axion.client.render.gpu.SectionDrawEntry
 import axion.mixin.client.CameraAccessor
 import axion.common.model.ClipboardBuffer
+import com.mojang.blaze3d.pipeline.BlendFunction
 import com.mojang.blaze3d.pipeline.RenderPipeline
+import com.mojang.blaze3d.platform.DepthTestFunction
 import com.mojang.blaze3d.buffers.GpuBufferSlice
 import com.mojang.blaze3d.systems.RenderPass
+import com.mojang.blaze3d.vertex.VertexFormat
 import com.mojang.blaze3d.textures.GpuTextureView
 import net.minecraft.block.Block
 import net.minecraft.block.BlockState
@@ -39,6 +42,7 @@ import org.joml.Vector4fc
  */
 object VersionCompatImpl : VersionCompat {
     private var currentAtlasSampler: net.minecraft.client.gl.GpuSampler? = null
+    private val previewShellPipelines = java.util.EnumMap<VertexFormat.DrawMode, RenderPipeline>(VertexFormat.DrawMode::class.java)
 
     private fun getRegistryManager(): DynamicRegistryManager? {
         return MinecraftClient.getInstance().world?.registryManager
@@ -199,6 +203,22 @@ object VersionCompatImpl : VersionCompat {
 
     fun getRenderPipeline(layer: RenderLayer): RenderPipeline {
         return layer.renderPipeline
+    }
+
+    fun getPreviewShellPipeline(vertexFormat: VertexFormat, drawMode: VertexFormat.DrawMode): RenderPipeline {
+        return previewShellPipelines.computeIfAbsent(drawMode) {
+            RenderPipeline.builder(RenderPipelines.TRANSFORMS_AND_PROJECTION_SNIPPET)
+                .withLocation(Identifier.of("axion", "preview_shell"))
+                .withVertexShader(Identifier.of("axion", "core/preview_shell"))
+                .withFragmentShader(Identifier.of("axion", "core/preview_shell"))
+                .withSampler("Sampler0")
+                .withBlend(BlendFunction.TRANSLUCENT)
+                .withDepthTestFunction(DepthTestFunction.LEQUAL_DEPTH_TEST)
+                .withDepthWrite(true)
+                .withCull(true)
+                .withVertexFormat(vertexFormat, drawMode)
+                .build()
+        }
     }
 
     fun writeDynamicUniforms(

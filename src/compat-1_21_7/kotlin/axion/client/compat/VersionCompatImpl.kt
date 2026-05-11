@@ -8,6 +8,7 @@ import axion.common.model.ClipboardBuffer
 import com.mojang.blaze3d.pipeline.RenderPipeline
 import com.mojang.blaze3d.buffers.GpuBufferSlice
 import com.mojang.blaze3d.systems.RenderPass
+import com.mojang.blaze3d.vertex.VertexFormat
 import com.mojang.blaze3d.textures.GpuTextureView
 import com.mojang.serialization.DynamicOps
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback
@@ -259,6 +260,11 @@ object VersionCompatImpl : VersionCompat {
         return runCatching {
             renderLayerPipelineField?.get(layer) as? RenderPipeline
         }.getOrNull() ?: RenderPipelines.RENDERTYPE_TRANSLUCENT_MOVING_BLOCK
+    }
+
+    @Suppress("UNUSED_PARAMETER")
+    fun getPreviewShellPipeline(vertexFormat: VertexFormat, drawMode: VertexFormat.DrawMode): RenderPipeline {
+        return RenderPipelines.RENDERTYPE_TRANSLUCENT_MOVING_BLOCK
     }
 
     fun writeDynamicUniforms(

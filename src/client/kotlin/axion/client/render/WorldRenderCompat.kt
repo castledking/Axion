@@ -31,6 +31,13 @@ class AxionWorldRenderContext private constructor(
             ?: error("Unsupported world render context: ${currentDelegate.javaClass.name}")
     }
 
+    fun drawConsumers() {
+        try {
+            consumers().draw()
+        } catch (_: Throwable) {
+        }
+    }
+
     private fun invokeNullable(name: String): Any? {
         val currentDelegate = delegate ?: return null
         val method = currentDelegate.javaClass.methods.firstOrNull { it.name == name && it.parameterCount == 0 }
@@ -43,20 +50,25 @@ object WorldRenderCompat {
     private val logger = LoggerFactory.getLogger(WorldRenderCompat::class.java)
     private val beforeDebugRenderCallbacks: MutableList<(AxionWorldRenderContext) -> Unit> = mutableListOf()
     private val endMainCallbacks: MutableList<(AxionWorldRenderContext) -> Unit> = mutableListOf()
+    private var fabricBeforeDebugRegistered = false
+    private var fabricEndMainAvailable = false
     private val eventsClassNames: List<String> = listOf(
         "net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents",
         "net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents",
     )
 
     fun registerBeforeDebugRender(callback: (AxionWorldRenderContext) -> Unit) {
-        register("BEFORE_DEBUG_RENDER", "DebugRender", callback, beforeDebugRenderCallbacks)
+        beforeDebugRenderCallbacks += callback
+        ensureFabricBeforeDebugListener()
     }
 
     fun registerEndMain(callback: (AxionWorldRenderContext) -> Unit) {
-        if (registerIfPresent("END_MAIN", "EndMain", callback)) {
-            return
+        endMainCallbacks += callback
+        if (!tryRegisterEndMainListener()) {
+            logger.warn(
+                "Fabric END_MAIN event unavailable — using fallback mixin path",
+            )
         }
-        register("BEFORE_DEBUG_RENDER", "DebugRender", callback, endMainCallbacks)
     }
 
     fun dispatchFallbackCallbacks(
@@ -77,28 +89,47 @@ object WorldRenderCompat {
     }
 
     fun hasFallbackCallbacks(): Boolean {
-        return beforeDebugRenderCallbacks.isNotEmpty() || endMainCallbacks.isNotEmpty()
+        val needsBeforeDebugFallback = beforeDebugRenderCallbacks.isNotEmpty() && !fabricBeforeDebugRegistered
+        val needsEndMainFallback = endMainCallbacks.isNotEmpty() && !fabricEndMainAvailable
+        return needsBeforeDebugFallback || needsEndMainFallback
     }
 
-    private fun register(
-        fieldName: String,
-        nestedInterfaceName: String,
-        callback: (AxionWorldRenderContext) -> Unit,
-        fallbackCallbacks: MutableList<(AxionWorldRenderContext) -> Unit>,
-    ) {
-        if (!registerIfPresent(fieldName, nestedInterfaceName, callback)) {
-            fallbackCallbacks += callback
+    private fun ensureFabricBeforeDebugListener() {
+        if (fabricBeforeDebugRegistered) return
+        val registered = registerBatchedListener("BEFORE_DEBUG_RENDER", "DebugRender") { rawContext ->
+            val ctx = AxionWorldRenderContext(rawContext)
+            if (!fabricEndMainAvailable) {
+                for (cb in endMainCallbacks) cb(ctx)
+            }
+            for (cb in beforeDebugRenderCallbacks) cb(ctx)
+            ctx.drawConsumers()
+        }
+        if (registered) {
+            fabricBeforeDebugRegistered = true
+        } else {
             logger.warn(
-                "Skipping Fabric world render callback registration for {} because the event API is unavailable in this runtime",
-                fieldName,
+                "Fabric BEFORE_DEBUG_RENDER event unavailable — using fallback mixin path",
             )
         }
     }
 
-    private fun registerIfPresent(
+    private fun tryRegisterEndMainListener(): Boolean {
+        if (fabricEndMainAvailable) return true
+        val registered = registerBatchedListener("END_MAIN", "EndMain") { rawContext ->
+            val ctx = AxionWorldRenderContext(rawContext)
+            for (cb in endMainCallbacks) cb(ctx)
+            ctx.drawConsumers()
+        }
+        if (registered) {
+            fabricEndMainAvailable = true
+        }
+        return registered
+    }
+
+    private fun registerBatchedListener(
         fieldName: String,
         nestedInterfaceName: String,
-        callback: (AxionWorldRenderContext) -> Unit,
+        dispatch: (Any) -> Unit,
     ): Boolean {
         val eventsClass = eventsClass() ?: return false
         val eventField = runCatching { eventsClass.getField(fieldName) }.getOrNull() ?: return false
@@ -108,11 +139,11 @@ object WorldRenderCompat {
         val listener = Proxy.newProxyInstance(callbackType.classLoader, arrayOf(callbackType)) { _, method, args ->
             when (method.name) {
                 "equals" -> false
-                "hashCode" -> System.identityHashCode(callback)
+                "hashCode" -> System.identityHashCode(dispatch)
                 "toString" -> "AxionWorldRenderCompat($fieldName)"
                 else -> {
                     val rawContext = args?.firstOrNull() ?: return@newProxyInstance null
-                    callback(AxionWorldRenderContext(rawContext))
+                    dispatch(rawContext)
                     null
                 }
             }

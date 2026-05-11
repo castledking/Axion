@@ -146,7 +146,6 @@ object ChunkMeshTessellator {
             (v and (mask shr 1)) != 0
         }
         if (!minusXPresent) return false
-        if (statesByPosition != null && !isOpaqueAt(statesByPosition, baseX + x - 1, baseY + y, baseZ + z)) return false
 
         // +X
         val plusXPresent = if (x == 15) {
@@ -155,7 +154,6 @@ object ChunkMeshTessellator {
             (v and (mask shl 1)) != 0
         }
         if (!plusXPresent) return false
-        if (statesByPosition != null && !isOpaqueAt(statesByPosition, baseX + x + 1, baseY + y, baseZ + z)) return false
 
         // -Y
         val minusYPresent = if (y == 0) {
@@ -190,7 +188,6 @@ object ChunkMeshTessellator {
             (section[y + (z - 1) * 16].toInt() and mask) != 0
         }
         if (!minusZPresent) return false
-        if (statesByPosition != null && !isOpaqueAt(statesByPosition, baseX + x, baseY + y, baseZ + z - 1)) return false
 
         // +Z
         val plusZPresent = if (z == 15) {
@@ -199,7 +196,6 @@ object ChunkMeshTessellator {
             (section[y + (z + 1) * 16].toInt() and mask) != 0
         }
         if (!plusZPresent) return false
-        if (statesByPosition != null && !isOpaqueAt(statesByPosition, baseX + x, baseY + y, baseZ + z + 1)) return false
 
         return true
     }

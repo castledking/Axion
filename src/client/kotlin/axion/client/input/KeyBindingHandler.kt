@@ -74,7 +74,7 @@ object KeyBindingHandler {
      * Returns true on the first tick where both Ctrl and the bound key are held,
      * and doesn't re-trigger until the combo is released and pressed again.
      */
-    fun wasCtrlComboPressed(keyBinding: KeyBinding): Boolean {
+    fun wasCtrlComboPressed(keyBinding: KeyBinding, allowShift: Boolean = true): Boolean {
         val keyCode = getBoundKeyCode(keyBinding)
         if (keyCode == null || keyCode == GLFW.GLFW_KEY_UNKNOWN) {
             // Can't resolve key code — fall back to MC's system
@@ -86,7 +86,9 @@ object KeyBindingHandler {
         val keyDown = GLFW.glfwGetKey(handle, keyCode) == GLFW.GLFW_PRESS
         val ctrlDown = GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_LEFT_CONTROL) == GLFW.GLFW_PRESS ||
             GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_RIGHT_CONTROL) == GLFW.GLFW_PRESS
-        val comboActive = keyDown && ctrlDown
+        val shiftDown = GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_LEFT_SHIFT) == GLFW.GLFW_PRESS ||
+            GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_RIGHT_SHIFT) == GLFW.GLFW_PRESS
+        val comboActive = keyDown && ctrlDown && (allowShift || !shiftDown)
         val wasActive = ctrlComboActive.contains(keyCode)
 
         if (comboActive) {

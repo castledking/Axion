@@ -57,7 +57,7 @@ object AxionTickHandler {
             // suppresses KeyBinding.isPressed when modifier keys are held, and wasPressed()
             // can be consumed by conflicting vanilla bindings. wasCtrlComboPressed reads both
             // keys directly from GLFW and edge-detects the combo, bypassing both issues.
-            if (KeyBindingHandler.wasCtrlComboPressed(AxionKeybindings.symmetryToggleRotation)) {
+            if (KeyBindingHandler.wasCtrlComboPressed(AxionKeybindings.symmetryToggleRotation, allowShift = false)) {
                 if (!PlacementToolController.handleRotateAction()) {
                     if (!StackToolController.handleRotateAction()) {
                         SymmetryController.toggleRotational()
@@ -65,7 +65,7 @@ object AxionTickHandler {
                 }
             }
 
-            if (KeyBindingHandler.wasCtrlComboPressed(AxionKeybindings.symmetryToggleMirror)) {
+            if (KeyBindingHandler.wasCtrlComboPressed(AxionKeybindings.symmetryToggleMirror, allowShift = false)) {
                 if (!PlacementToolController.handleMirrorAction(client)) {
                     if (!StackToolController.handleMirrorAction(client)) {
                         SymmetryController.toggleMirror(client)
