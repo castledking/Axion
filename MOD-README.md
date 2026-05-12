@@ -32,134 +32,126 @@ The Fabric mod is the client-side half of Axion. It handles:
 - builder modes like replace mode, infinite reach, and no clip
 - local singleplayer behavior
 
+**Version Support:** Axion currently supports `1.21.5` through `1.21.11` & `26.1.x` for both the Fabric client and the Paper plugin. Fabric dedicated server support is currently only available for `1.21.11`.
+
 For multiplayer editing:
 
 - on Paper, use the Axion Paper plugin
 - on Fabric dedicated server, use the same Axion Fabric jar in the server `mods` folder, but this server path currently only targets Minecraft `1.21.11`
 
-## Version Support
-
-Axion currently supports `1.21.5` through `1.21.11` for both the Fabric client and the Paper plugin. Fabric dedicated server support is currently only available for `1.21.11`.
-
 ## Features
 
-- Hotbar-based tools for:
-  - Move
-  - Clone
-  - Stack
-  - Smear
-  - Erase
-  - Extrude
-  - Symmetry
-- Magic Select with:
-  - editable templates
-  - shared custom masks
-  - searchable block picker
-  - brush size control
-- Saved hotbars / hotbar workspace:
-  - hold `Alt` to open the saved hotbar overlay
-  - scroll or click to switch saved hotbars
-  - release `Alt` to load the selected saved hotbar into your live hotbar
-  - the previously active hotbar is saved back automatically
-- Fly speed adjustment via Alt menu
-  - slider from 100% to 999%
-- Builder utilities:
+- **Hotbar Tools**
+  - `Move`
+  - `Clone`
+  - `Stack`
+  - `Smear`
+  - `Erase`
+  - `Extrude`
+  - `Symmetry`
+- **Magic Select**
+  - blob-style selection before point two
+  - configurable templates and custom masks
+  - searchable block picker and adjustable brush size
+- **Live Previews**
+  - scrolling ghost previews
+  - direction arrows
+  - pulsing source-region visualization
+  - first/second point markers
+- **Builder Modes**
   - replace mode
   - infinite reach
   - no clip
-  - far pick block
   - bulldozer
   - fast place
-- Preview and selection feedback:
-  - pulsing cuboid feedback
-  - ghost block previews
-  - guide arrows
-  - clearer helper text
-- Mod Menu integration and in-game config screen
+- **Config and UI**
+  - Mod Menu support
+  - in-game config screen
+  - Alt hotbar menu for adjusting fly speed andhotbar saving/loading
+- **Multiplayer Support**
+  - server-backed edits through the companion Paper plugin
+  - undo/redo and validation on the server side
+- **Open Source**
+  - GPL-3.0 licensed
+
+## Current Highlights
+
+- **Minecraft 26.1.x Support** — Full compatibility with the latest Minecraft version
+- **Smear Tool Overhaul** — True block smearing that samples your selection and spreads blocks as you scroll, perfect for creating staircases and roofs
+- **Magic Selection Enhancements**
+  - More block tags available for custom masks
+  - Red outline for disabled templates for easy visual identification
+  - Same Block Select toggle to pick up matching blocks outside your mask
+  - Continuous stroke support for faster large selections
+- **Flying Speed Slider** — Adjust creative flight speed from 100% to 999% via Alt menu
+- **Improved Infinite Reach** — Replace mode, bulldozer, and fast place now work seamlessly at any distance
+- Better move/clone/stack preview flow and scrolling visualization
+- Multi-directional stack previews
+- Improved symmetry anchors, mirror controls, and feedback
+- Alt hotbar toggles like `Keep Existing`, `Copy Entities`, and `Copy Air`
+
+## Quick Links
+
+- [MOD-README](https://github.com/castledking/Axion/blob/main/MOD-README.md)
+  - Fabric mod install and usage
+- [PLUGIN-README](https://github.com/castledking/Axion/blob/main/PLUGIN-README.md)
+  - Paper plugin install and server notes
+- [Wiki](https://github.com/castledking/Axion/wiki)
+  - documentation, usage notes, and setup pages
+
+## Supported Versions
+
+| Component | Version |
+| --- | --- |
+| Fabric Mod (client) | `1.21.5 - 1.21.11 & 26.1.x`  |
+| Paper Plugin | `1.21.5 - 1.21.11 & 26.1.x` |
+| Fabric Dedicated Server | `1.21.11` only |
 
 ## Requirements
 
-For Fabric client:
+### Fabric Mod
 
 - Fabric Loader
 - Fabric API
 - Fabric Language Kotlin
 
-Minecraft version support:
+### Paper Plugin
 
-- `1.21.5` through `1.21.11` on the client
+- Matching Axion client version for players using the toolset
+- Rest of the requirements are optional but recommended for protection hooks:
+  - WorldGuard 7.0.14 or later
+  - GriefPrevention 16.1.3 or later
+  - GriefPrevention3D 17.0.0 or later
 
-For Fabric dedicated server:
+## Quick Start
 
-- Minecraft `1.21.11`
-- Fabric Loader
-- Fabric API
-- Fabric Language Kotlin
-- the same Axion Fabric jar that the client uses for `1.21.11`
+### Singleplayer / Client Use
 
-## Installation
-
-### Fabric Client
-
-1. Install Fabric Loader for your supported Minecraft version (`1.21.5` through `1.21.11`).
-2. Put the Axion mod jar in your client `mods` folder.
+1. Install Fabric Loader for your Minecraft version.
+2. Put the Axion mod jar in your `mods` folder.
 3. Install Fabric API and Fabric Language Kotlin.
 4. Launch Minecraft in creative mode.
 
-### Fabric Dedicated Server (`1.21.11` only)
+### Multiplayer / Server Use
 
-1. Install Fabric Loader for Minecraft `1.21.11`.
-2. Put the same Axion Fabric jar in the server `mods` folder.
-3. Install Fabric API and Fabric Language Kotlin on the server.
-4. Start the server.
-
-Important:
-
-- the `1.21.11` main Axion Fabric jar is dual-use
-- you do not need a separate Fabric server-only Axion jar
-- the same file goes in the client `mods` folder and the Fabric server `mods` folder
-
-## Controls and Usage
-
-Axion is designed around a dedicated hotbar slot workflow.
-
-- Equip the Axion slot to access the tool strip
-- Use the selected subtool directly in-world
-- Hold `Alt` while on Axion to open the hotbar tool menu / saved hotbar overlay
-- Press `Right Shift` to open the Axion config screen
-
-Saved hotbars:
-
-- hold `Alt` to preview saved hotbars
-- scroll or click to choose a saved hotbar
-- release `Alt` to load it
-- your previous hotbar is saved back automatically
-
-Magic Select:
-
-- Toggle `Middle Mouse` to `Magic Select` in the Alt menu
-- Use `MMB` to select blob-like regions before point two
-- Use `Main Mod + MMB` to open Magic Select Templates
-- Use `Main Mod + Scroll` to adjust brush size
-
-## Multiplayer
-
-Axion works in three broad modes:
-
-- singleplayer / integrated server
-- Paper multiplayer with the Axion Paper plugin
-- Fabric dedicated server multiplayer on `1.21.11`
-
-Paper is still the more mature multiplayer backend, especially for protection/policy integrations.
-
-Fabric server support on `1.21.11` now covers real authoritative editing, but it is currently only available for that exact Minecraft version.
+1. Install the Axion Fabric mod on clients.
+2. Install the Axion Paper plugin on the server.
+3. Restart the server.
+4. Keep the mod and plugin on matching compatible builds.
 
 ## Notes
 
-- Axion is built for creative-mode building workflows.
-- Keep the client and server/plugin on matching compatible versions where possible.
-- Fabric dedicated server support currently only exists for `1.21.11`.
-- Paper plugin support and Fabric client support cover `1.21.8` through `1.21.11`.
+- Axion is designed around creative-mode building workflows.
+- The Fabric mod by itself does not replace the Paper plugin for multiplayer server edits.
+- Some newer features, especially server-backed edit behavior, are best tested with matching client and plugin versions.
+
+## Roadmap
+
+- More "capabilities" like `No Updates`, `Phantom`, `Angel Placement` and `Tinker`
+- Add support for versions `1.20` through `1.21.4` for mod and plugin
+- Add support for other Minecraft versions for the Fabric dedicated server
+- UI improvements and polish
+- 0.3.0 and beyond: Develop the `Editor Mode` for more advanced building workflows (MCEdit-style editor)
 
 ## Links
 
