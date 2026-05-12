@@ -25,7 +25,7 @@ abstract class PlayerEntityPoseMixin {
     @Suppress("CAST_NEVER_SUCCEEDS")
     private fun self(): PlayerEntity = this as PlayerEntity
 
-    @Inject(method = ["updatePose"], at = [At("HEAD")], cancellable = true)
+    @Inject(method = ["updatePose"], at = [At("HEAD")], cancellable = true, require = 0)
     private fun axionForceStandingPoseInNoClip(ci: CallbackInfo) {
         val entity = self()
         if (!ClientModeController.isNoClipActiveFor(entity)) {

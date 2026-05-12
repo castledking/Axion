@@ -17,12 +17,18 @@ import axion.client.tool.SmearToolController
 import axion.client.tool.StackToolState
 import axion.client.tool.StackToolController
 import axion.common.model.AxionSubtool
+import axion.client.selection.SelectionController
+import axion.client.compat.toImmutable
+import axion.client.selection.blockPosOrNull
 import net.minecraft.client.MinecraftClient
 import net.minecraft.text.Text
+import net.minecraft.util.math.BlockPos
+import org.lwjgl.glfw.GLFW
 
 object AxionInteractionRouter {
     private var suppressPrimaryUntilRelease: Boolean = false
     private var suppressSecondaryUntilRelease: Boolean = false
+    private var lastHeldMiddleMagicTarget: BlockPos? = null
 
     fun onEndTick(client: MinecraftClient) {
         if (!client.options.attackKey.isPressed) {
@@ -34,6 +40,8 @@ object AxionInteractionRouter {
         if (!client.options.useKey.isPressed) {
             suppressSecondaryUntilRelease = false
         }
+
+        handleHeldMiddleMagicSelect(client)
     }
 
     fun shouldSuppressPrimary(client: MinecraftClient): Boolean {
@@ -126,7 +134,7 @@ object AxionInteractionRouter {
             return true
         }
 
-        return when (AxionToolSelectionController.selectedSubtool()) {
+        val handled = when (AxionToolSelectionController.selectedSubtool()) {
             AxionSubtool.CLONE,
             AxionSubtool.MOVE,
                 -> PlacementToolController.handleMiddleAction(client)
@@ -135,6 +143,10 @@ object AxionInteractionRouter {
             AxionSubtool.ERASE -> EraseToolController.handleMiddleAction(client)
             else -> false
         }
+        if (handled && supportsHeldMiddleMagicSelect()) {
+            lastHeldMiddleMagicTarget = currentTargetBlock()
+        }
+        return handled
     }
 
     fun handleDeleteAction(client: MinecraftClient): Boolean {
@@ -222,6 +234,90 @@ object AxionInteractionRouter {
             AxionSubtool.SMEAR,
             AxionSubtool.ERASE,
                 -> AxionToolSelectionController.isAxionSlotActive()
+
+            else -> false
+        }
+    }
+
+    private fun handleHeldMiddleMagicSelect(client: MinecraftClient) {
+        if (client.currentScreen != null || !isMiddleMousePressed(client)) {
+            lastHeldMiddleMagicTarget = null
+            return
+        }
+
+        if (AxionModifierKeys.isControlDown(client) || !supportsHeldMiddleMagicSelect()) {
+            lastHeldMiddleMagicTarget = currentTargetBlock()
+            return
+        }
+
+        val target = currentTargetBlock()
+        if (target == null) {
+            lastHeldMiddleMagicTarget = null
+            return
+        }
+        if (target == lastHeldMiddleMagicTarget) {
+            return
+        }
+
+        lastHeldMiddleMagicTarget = target
+        handleMiddleAction(client)
+    }
+
+    private fun isMiddleMousePressed(client: MinecraftClient): Boolean {
+        return GLFW.glfwGetMouseButton(client.window.handle, GLFW.GLFW_MOUSE_BUTTON_MIDDLE) == GLFW.GLFW_PRESS
+    }
+
+    private fun currentTargetBlock(): BlockPos? {
+        return SelectionController.currentTarget().blockPosOrNull()?.toImmutable()
+    }
+
+    private fun supportsHeldMiddleMagicSelect(): Boolean {
+        if (!AxionClientState.middleClickMagicSelectEnabled || !AxionToolSelectionController.isAxionSlotActive()) {
+            return false
+        }
+
+        return when (AxionToolSelectionController.selectedSubtool()) {
+            AxionSubtool.CLONE,
+            AxionSubtool.MOVE,
+                -> when (AxionClientState.placementToolState) {
+                    CloneToolState.Idle,
+                    is CloneToolState.FirstCornerSet,
+                        -> true
+
+                    is CloneToolState.RegionDefined,
+                    is CloneToolState.PreviewingOffset,
+                    is CloneToolState.AwaitingConfirm,
+                        -> false
+                }
+
+            AxionSubtool.STACK -> when (AxionClientState.stackToolState) {
+                StackToolState.Idle,
+                is StackToolState.FirstCornerSet,
+                    -> true
+
+                is StackToolState.RegionDefined,
+                is StackToolState.PreviewingStack,
+                    -> false
+            }
+
+            AxionSubtool.SMEAR -> when (AxionClientState.smearToolState) {
+                SmearToolState.Idle,
+                is SmearToolState.FirstCornerSet,
+                    -> true
+
+                is SmearToolState.RegionDefined,
+                is SmearToolState.PreviewingSmear,
+                    -> false
+            }
+
+            AxionSubtool.ERASE -> when (AxionClientState.eraseToolState) {
+                EraseToolState.Idle,
+                is EraseToolState.FirstCornerSet,
+                    -> true
+
+                is EraseToolState.RegionDefined,
+                    -> false
+            }
 
             else -> false
         }

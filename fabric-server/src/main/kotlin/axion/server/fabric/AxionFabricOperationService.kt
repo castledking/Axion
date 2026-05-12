@@ -94,7 +94,7 @@ class AxionFabricOperationService(
                     is MoveEntitiesRequest -> entityMoves += AxionFabricEntityMoveService.move(world, operation)
                     is PlaceBlocksRequest -> applyPlacements(world, operation)
                     is StackRegionRequest -> applyRepeatedClipboard(world, operation.sourceOrigin, operation.cells, operation.step, operation.repeatCount, airOnly = false)
-                    is SmearRegionRequest -> applyRepeatedClipboard(world, operation.sourceOrigin, operation.cells, operation.step, operation.repeatCount, airOnly = true)
+                    is SmearRegionRequest -> applySmearedClipboard(world, operation)
                     is ExtrudeRequest -> applyExtrude(world, plannedExtrudes[operation])
                     else -> Unit
                 }
@@ -243,6 +243,56 @@ class AxionFabricOperationService(
         }
     }
 
+    private fun applySmearedClipboard(world: ServerWorld, operation: SmearRegionRequest) {
+        val offsets = smearOffsets(operation.step, operation.repeatCount)
+        if (offsets.isEmpty()) {
+            return
+        }
+
+        val sourcePositions = operation.cells.mapTo(linkedSetOf()) { cell ->
+            BlockPos(
+                operation.sourceOrigin.x + cell.offset.x,
+                operation.sourceOrigin.y + cell.offset.y,
+                operation.sourceOrigin.z + cell.offset.z,
+            )
+        }
+        val captured = operation.cells.map { cell ->
+            val sourcePos = BlockPos(
+                operation.sourceOrigin.x + cell.offset.x,
+                operation.sourceOrigin.y + cell.offset.y,
+                operation.sourceOrigin.z + cell.offset.z,
+            )
+            CapturedBlock(
+                offset = cell.offset,
+                state = world.getBlockState(sourcePos),
+                blockEntityData = AxionFabricBlockEntitySnapshotService.capture(world, sourcePos),
+            )
+        }
+
+        for (cell in captured) {
+            if (cell.state.isAir) {
+                continue
+            }
+
+            for (offset in offsets) {
+                val destination = BlockPos(
+                    operation.sourceOrigin.x + cell.offset.x + offset.x,
+                    operation.sourceOrigin.y + cell.offset.y + offset.y,
+                    operation.sourceOrigin.z + cell.offset.z + offset.z,
+                )
+                if (destination !in sourcePositions && !world.getBlockState(destination).isAir) {
+                    break
+                }
+                AxionFabricBlockEntitySnapshotService.apply(
+                    world = world,
+                    pos = destination,
+                    state = cell.state,
+                    blockEntityData = cell.blockEntityData,
+                )
+            }
+        }
+    }
+
     private fun resolveServerWorld(player: ServerPlayerEntity): ServerWorld {
         val playerClass = player.javaClass
         val directWorld = runCatching {
@@ -304,7 +354,7 @@ class AxionFabricOperationService(
                 if (world.isInBuildLimit(pos)) null else placement.pos
             }
             is StackRegionRequest -> firstOutOfBoundsRepeated(world, operation.sourceOrigin, operation.cells, operation.step, operation.repeatCount)
-            is SmearRegionRequest -> firstOutOfBoundsRepeated(world, operation.sourceOrigin, operation.cells, operation.step, operation.repeatCount)
+            is SmearRegionRequest -> firstOutOfBoundsSmeared(world, operation.sourceOrigin, operation.cells, operation.step, operation.repeatCount)
             is CloneEntitiesRequest -> firstOutOfBounds(world, minVector(operation.sourceMin, operation.sourceMax), maxVector(operation.sourceMin, operation.sourceMax))
             is DeleteEntitiesRequest -> firstOutOfBounds(world, minVector(operation.sourceMin, operation.sourceMax), maxVector(operation.sourceMin, operation.sourceMax))
             is MoveEntitiesRequest -> {
@@ -344,6 +394,28 @@ class AxionFabricOperationService(
                     sourceOrigin.x + cell.offset.x + offsetX,
                     sourceOrigin.y + cell.offset.y + offsetY,
                     sourceOrigin.z + cell.offset.z + offsetZ,
+                )
+                if (!world.isInBuildLimit(pos)) {
+                    return IntVector3(pos.x, pos.y, pos.z)
+                }
+            }
+        }
+        return null
+    }
+
+    private fun firstOutOfBoundsSmeared(
+        world: ServerWorld,
+        sourceOrigin: IntVector3,
+        cells: List<ClipboardCellPayload>,
+        offset: IntVector3,
+        repeatCount: Int,
+    ): IntVector3? {
+        smearOffsets(offset, repeatCount).forEach { smearOffset ->
+            cells.forEach { cell ->
+                val pos = BlockPos(
+                    sourceOrigin.x + cell.offset.x + smearOffset.x,
+                    sourceOrigin.y + cell.offset.y + smearOffset.y,
+                    sourceOrigin.z + cell.offset.z + smearOffset.z,
                 )
                 if (!world.isInBuildLimit(pos)) {
                     return IntVector3(pos.x, pos.y, pos.z)
@@ -417,6 +489,19 @@ class AxionFabricOperationService(
 
     private fun maxVector(a: IntVector3, b: IntVector3): IntVector3 {
         return IntVector3(maxOf(a.x, b.x), maxOf(a.y, b.y), maxOf(a.z, b.z))
+    }
+
+    private fun smearOffsets(offset: IntVector3, steps: Int): List<IntVector3> {
+        if (steps <= 0) {
+            return emptyList()
+        }
+        return (1..steps).map { index ->
+            IntVector3(
+                java.lang.Math.round(index * offset.x.toFloat() / steps),
+                java.lang.Math.round(index * offset.y.toFloat() / steps),
+                java.lang.Math.round(index * offset.z.toFloat() / steps),
+            )
+        }.distinct()
     }
 
     private data class CapturedBlock(

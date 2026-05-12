@@ -1,7 +1,9 @@
 package axion.client.render
 
 import net.minecraft.client.render.VertexConsumer
+import net.minecraft.client.util.math.Entry
 import net.minecraft.client.util.math.MatrixStack
+import net.minecraft.util.math.Box
 import net.minecraft.util.shape.VoxelShape
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
@@ -45,6 +47,23 @@ object VertexRenderingCompat {
         } ?: error("Missing VertexRendering.drawOutline overload")
     }
 
+    private val useManualOutline: Boolean = false
+
+    private val lineWidthMethod: Method? by lazy {
+        VertexConsumer::class.java.methods.firstOrNull { method ->
+            (method.name == "setLineWidth" || method.name == "lineWidth") &&
+                method.parameterCount == 1 &&
+                method.parameterTypes[0] == Float::class.javaPrimitiveType
+        }
+    }
+
+    private val getBoxesMethod: Method? by lazy {
+        VoxelShape::class.java.methods.firstOrNull { method ->
+            method.parameterCount == 0 &&
+                (method.name == "toAabbs" || method.name == "getBoundingBoxes")
+        }
+    }
+
     private val drawFilledBoxMethod: Method? by lazy {
         net.minecraft.client.render.VertexRendering::class.java.methods.firstOrNull { method ->
             if (!Modifier.isStatic(method.modifiers) || method.returnType != Void.TYPE) {
@@ -80,11 +99,99 @@ object VertexRenderingCompat {
         color: Int,
         lineWidth: Float,
     ) {
+        if (useManualOutline) {
+            drawOutlineManual(matrixStack, consumer, shape, cameraX, cameraY, cameraZ, color, lineWidth)
+            return
+        }
         if (drawOutlineMethod.parameterCount == 8) {
             drawOutlineMethod.invoke(null, matrixStack, consumer, shape, cameraX, cameraY, cameraZ, color, lineWidth)
         } else {
             drawOutlineMethod.invoke(null, matrixStack, consumer, shape, cameraX, cameraY, cameraZ, color)
         }
+    }
+
+    fun drawOutlineNoOffset(
+        matrixStack: MatrixStack,
+        consumer: VertexConsumer,
+        shape: VoxelShape,
+        color: Int,
+        lineWidth: Float,
+    ) {
+        if (useManualOutline) {
+            drawOutlineManual(matrixStack, consumer, shape, 0.0, 0.0, 0.0, color, lineWidth)
+            return
+        }
+        if (drawOutlineMethod.parameterCount == 8) {
+            drawOutlineMethod.invoke(null, matrixStack, consumer, shape, 0.0, 0.0, 0.0, color, lineWidth)
+        } else {
+            drawOutlineMethod.invoke(null, matrixStack, consumer, shape, 0.0, 0.0, 0.0, color)
+        }
+    }
+
+    private fun drawOutlineManual(
+        matrixStack: MatrixStack,
+        consumer: VertexConsumer,
+        shape: VoxelShape,
+        cameraX: Double,
+        cameraY: Double,
+        cameraZ: Double,
+        color: Int,
+        lineWidth: Float,
+    ) {
+        val boxes = getBoxesMethod?.invoke(shape) as? List<*> ?: return
+        val entry = matrixStack.peek()
+        val red = (color shr 16) and 0xFF
+        val green = (color shr 8) and 0xFF
+        val blue = color and 0xFF
+        val alpha = (color ushr 24) and 0xFF
+
+        for (obj in boxes) {
+            val box = obj as? Box ?: continue
+            val minX = (box.minX - cameraX).toFloat()
+            val minY = (box.minY - cameraY).toFloat()
+            val minZ = (box.minZ - cameraZ).toFloat()
+            val maxX = (box.maxX - cameraX).toFloat()
+            val maxY = (box.maxY - cameraY).toFloat()
+            val maxZ = (box.maxZ - cameraZ).toFloat()
+
+            val nx = 0f
+            val ny = 0f
+            val nz = 0f
+
+            // 12 edges of a cuboid — bottom, top, then vertical
+            emitLine(consumer, entry, minX, minY, minZ, maxX, minY, minZ, red, green, blue, alpha, lineWidth)
+            emitLine(consumer, entry, maxX, minY, minZ, maxX, minY, maxZ, red, green, blue, alpha, lineWidth)
+            emitLine(consumer, entry, maxX, minY, maxZ, minX, minY, maxZ, red, green, blue, alpha, lineWidth)
+            emitLine(consumer, entry, minX, minY, maxZ, minX, minY, minZ, red, green, blue, alpha, lineWidth)
+
+            emitLine(consumer, entry, minX, maxY, minZ, maxX, maxY, minZ, red, green, blue, alpha, lineWidth)
+            emitLine(consumer, entry, maxX, maxY, minZ, maxX, maxY, maxZ, red, green, blue, alpha, lineWidth)
+            emitLine(consumer, entry, maxX, maxY, maxZ, minX, maxY, maxZ, red, green, blue, alpha, lineWidth)
+            emitLine(consumer, entry, minX, maxY, maxZ, minX, maxY, minZ, red, green, blue, alpha, lineWidth)
+
+            emitLine(consumer, entry, minX, minY, minZ, minX, maxY, minZ, red, green, blue, alpha, lineWidth)
+            emitLine(consumer, entry, maxX, minY, minZ, maxX, maxY, minZ, red, green, blue, alpha, lineWidth)
+            emitLine(consumer, entry, maxX, minY, maxZ, maxX, maxY, maxZ, red, green, blue, alpha, lineWidth)
+            emitLine(consumer, entry, minX, minY, maxZ, minX, maxY, maxZ, red, green, blue, alpha, lineWidth)
+        }
+    }
+
+    private fun emitLine(
+        consumer: VertexConsumer,
+        entry: Entry,
+        x1: Float, y1: Float, z1: Float,
+        x2: Float, y2: Float, z2: Float,
+        red: Int, green: Int, blue: Int, alpha: Int,
+        lineWidth: Float,
+    ) {
+        val normalX = (x2 - x1).coerceIn(-1f, 1f)
+        val normalY = (y2 - y1).coerceIn(-1f, 1f)
+        val normalZ = (z2 - z1).coerceIn(-1f, 1f)
+        val lwm = lineWidthMethod
+        consumer.vertex(entry, x1, y1, z1).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
+        lwm?.invoke(consumer, lineWidth)
+        consumer.vertex(entry, x2, y2, z2).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
+        lwm?.invoke(consumer, lineWidth)
     }
 
     fun drawFilledBox(

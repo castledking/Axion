@@ -2,6 +2,8 @@ package axion.client.tool
 
 import axion.client.selection.AxionTarget
 import axion.client.selection.blockPosOrNull
+import axion.client.compat.toImmutable
+import axion.client.compat.add
 import net.minecraft.client.MinecraftClient
 import net.minecraft.util.math.BlockPos
 import net.minecraft.world.BlockView

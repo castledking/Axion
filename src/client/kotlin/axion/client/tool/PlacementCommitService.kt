@@ -13,6 +13,8 @@ import axion.common.operation.SymmetryBlockPlacement
 import axion.common.operation.SymmetryPlacementOperation
 import net.minecraft.block.Blocks
 import net.minecraft.util.math.BlockPos
+import axion.client.compat.toImmutable
+import axion.client.compat.add
 
 object PlacementCommitService {
     fun toOperation(preview: ClonePreviewState): EditOperation {

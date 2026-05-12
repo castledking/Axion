@@ -1,6 +1,7 @@
 package axion.client.input
 
 import axion.client.compat.VersionCompatImpl
+import axion.client.config.AxionClientConfig
 import axion.client.config.AxionConfigScreen
 import axion.client.hotbar.AxionAltMenuController
 import axion.client.hotbar.SavedHotbarController
@@ -28,6 +29,7 @@ object AxionTickHandler {
     fun onEndTick(client: MinecraftClient) {
         observeWorldLifecycle(client.world)
         AxionServerConnection.onEndTick()
+        SelectionController.onEndTick(client)
         AxionInteractionRouter.onEndTick(client)
         val player = client.player ?: return
         AxionToolSelectionController.syncWithPlayerSlot(player.inventory.selectedSlot)
@@ -96,9 +98,25 @@ object AxionTickHandler {
             while (AxionKeybindings.openConfigScreen.wasPressed()) {
                 client.setScreen(AxionConfigScreen(client.currentScreen))
             }
+
+            while (AxionKeybindings.toggleSameBlockMagicSelect.wasPressed()) {
+                val enabled = AxionClientConfig.toggleSameBlockMagicSelect()
+                client.inGameHud.setOverlayMessage(
+                    net.minecraft.text.Text.translatable(
+                        "axion.config.magic_select.same_block_select.overlay",
+                        net.minecraft.text.Text.translatable(
+                            if (enabled) {
+                                "axion.config.toggle.on"
+                            } else {
+                                "axion.config.toggle.off"
+                            },
+                        ),
+                    ),
+                    false,
+                )
+            }
         }
 
-        SelectionController.onEndTick(client)
         SymmetryController.onEndTick(client)
         ClientModeController.onEndTick(client)
         PlacementToolController.onEndTick(client)

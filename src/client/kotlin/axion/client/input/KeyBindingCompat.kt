@@ -1,7 +1,8 @@
 package axion.client.input
 
+import axion.common.compat.VersionCompat
+import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.option.KeyBinding
-import net.minecraft.client.util.InputUtil
 import net.minecraft.util.Identifier
 import java.lang.reflect.Constructor
 import java.lang.reflect.Method
@@ -35,8 +36,8 @@ object KeyBindingCompat {
             return constructor.newInstance(translationKey, code, categoryKey) as KeyBinding
         }
 
-        val inputUtilType = InputUtil.Type::class.java
-        val keySym = InputUtil.Type.KEYSYM
+        val inputUtilType = InputConstants.Type::class.java
+        val keySym = InputConstants.Type.KEYSYM
         findConstructor(
             String::class.java,
             inputUtilType,
@@ -73,9 +74,9 @@ object KeyBindingCompat {
         val suffix = categoryKey.removePrefix("keycategory.")
         val separatorIndex = suffix.indexOf('.')
         return if (separatorIndex > 0) {
-            Identifier.of(suffix.substring(0, separatorIndex), suffix.substring(separatorIndex + 1))
+            VersionCompat.INSTANCE.identifierOf(suffix.substring(0, separatorIndex), suffix.substring(separatorIndex + 1))
         } else {
-            Identifier.of("axion", suffix)
+            VersionCompat.INSTANCE.identifierOf("axion", suffix)
         }
     }
 
@@ -96,7 +97,7 @@ object KeyBindingCompat {
 
                 parameterTypes.size >= 4 &&
                     parameterTypes[0] == String::class.java &&
-                    parameterTypes[1] == InputUtil.Type::class.java &&
+                    parameterTypes[1] == InputConstants.Type::class.java &&
                     parameterTypes[2] == primitiveInt &&
                     parameterTypes[3] != String::class.java -> parameterTypes[3]
 

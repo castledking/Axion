@@ -135,25 +135,28 @@ class AxionHistoryActionService(
     ): Boolean {
         transaction.changes.forEach { change ->
             val expected = if (expectNewState) change.newState else change.oldState
+            val target = if (expectNewState) change.oldState else change.newState
             // Block entities and some transient block properties can legitimately drift after an
             // edit due to timers, inventories, fluid updates, power state, or server-side
             // normalization. Prefer an exact block-state match, but allow same-material matches
             // so immediate redo remains reliable after a valid undo.
             val current = world.getBlockAt(change.pos.x, change.pos.y, change.pos.z).blockData
             if (!stateMatchesExpected(current = current, expected = expected)) {
-                logger.warn(
-                    "Axion {} mismatch for transaction {} [{}] in world {} at {},{},{}: current='{}' expected='{}'",
-                    if (expectNewState) "undo" else "redo",
-                    transaction.id,
-                    transaction.label,
-                    world.name,
-                    change.pos.x,
-                    change.pos.y,
-                    change.pos.z,
-                    current.getAsString(false),
-                    expected,
-                )
-                return false
+                if (!stateMatchesExpected(current = current, expected = target)) {
+                    logger.warn(
+                        "Axion {} mismatch for transaction {} [{}] in world {} at {},{},{}: current='{}' expected='{}'",
+                        if (expectNewState) "undo" else "redo",
+                        transaction.id,
+                        transaction.label,
+                        world.name,
+                        change.pos.x,
+                        change.pos.y,
+                        change.pos.z,
+                        current.getAsString(false),
+                        expected,
+                    )
+                    return false
+                }
             }
         }
         return true

@@ -98,6 +98,12 @@ object AxionKeybindings {
         category,
     )
 
+    val toggleSameBlockMagicSelect: KeyBinding = KeyBindingCompat.create(
+        "key.${AxionMod.MOD_ID}.toggle_same_block_magic_select",
+        GLFW.GLFW_KEY_UNKNOWN,
+        category,
+    )
+
     fun register() {
         KeyBindingHelper.registerKeyBinding(selectAxionTool)
         KeyBindingHelper.registerKeyBinding(nextSubtool)
@@ -114,5 +120,6 @@ object AxionKeybindings {
         KeyBindingHelper.registerKeyBinding(undoAction)
         KeyBindingHelper.registerKeyBinding(redoAction)
         KeyBindingHelper.registerKeyBinding(openConfigScreen)
+        KeyBindingHelper.registerKeyBinding(toggleSameBlockMagicSelect)
     }
 }

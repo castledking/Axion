@@ -6,6 +6,6 @@ import com.terraformersmc.modmenu.api.ModMenuApi
 
 class AxionModMenuIntegration : ModMenuApi {
     override fun getModConfigScreenFactory(): ConfigScreenFactory<*> {
-        return ConfigScreenFactory { parent -> AxionConfigScreen(parent) }
+        return ConfigScreenFactory { parent -> AxionConfigScreen(parent as? net.minecraft.client.gui.screen.Screen) }
     }
 }

@@ -1,6 +1,7 @@
 package axion.client.network
 
 import axion.AxionMod
+import axion.client.compat.VersionCompatImpl
 import axion.client.history.HistoryManager
 import axion.client.history.RemoteHistoryAdapter
 import axion.protocol.AxionClientMessage
@@ -13,12 +14,7 @@ import axion.protocol.OperationBatchResult
 import axion.protocol.RedoRequest
 import axion.protocol.ServerHello
 import axion.protocol.UndoRequest
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
-import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry
-import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.client.MinecraftClient
-import net.minecraft.text.Text
 import net.minecraft.util.Formatting
 
 object AxionServerConnection {
@@ -40,21 +36,17 @@ object AxionServerConnection {
     private var lastSentNoClipArmed: Boolean? = null
 
     fun initialize() {
-        PayloadTypeRegistry.playC2S().register(AxionPluginPayload.ID, AxionPluginPayload.CODEC)
-        PayloadTypeRegistry.playS2C().register(AxionPluginPayload.ID, AxionPluginPayload.CODEC)
-
-        ClientPlayNetworking.registerGlobalReceiver(AxionPluginPayload.ID) { payload, context ->
-            context.client().execute {
-                AxionServerMessageAssembler.consume(payload.bytes)?.let(::handleServerMessage)
-            }
+        VersionCompatImpl.registerAxionPayloadChannel(AxionPluginPayload.ID, AxionPluginPayload.CODEC)
+        VersionCompatImpl.registerAxionReceiver(AxionPluginPayload.ID) { payload ->
+            AxionServerMessageAssembler.consume(payload.bytes)?.let(::handleServerMessage)
         }
 
-        ClientPlayConnectionEvents.JOIN.register(ClientPlayConnectionEvents.Join { _, _, client ->
-            if (client.server != null) {
+        VersionCompatImpl.onPlayJoin { client, _ ->
+            if (VersionCompatImpl.hasLocalServer(client)) {
                 state = State.Disconnected
                 lastSentNoClipArmed = null
                 nextTransferId = 1L
-                return@Join
+                return@onPlayJoin
             }
 
             state = State.AwaitingHello
@@ -63,17 +55,12 @@ object AxionServerConnection {
             send(
                 ClientHello(
                     protocolVersion = AxionProtocol.PROTOCOL_VERSION,
-                    clientVersion = FabricLoader.getInstance()
-                        .getModContainer(AxionMod.MOD_ID)
-                        .orElseThrow()
-                        .metadata
-                        .version
-                        .friendlyString,
+                    clientVersion = VersionCompatImpl.getModVersion(AxionMod.MOD_ID),
                 ),
             )
-        })
+        }
 
-        ClientPlayConnectionEvents.DISCONNECT.register(ClientPlayConnectionEvents.Disconnect { _, client ->
+        VersionCompatImpl.onPlayDisconnect { client ->
             state = State.Disconnected
             lastStatusMessage = null
             lastSentNoClipArmed = null
@@ -82,8 +69,8 @@ object AxionServerConnection {
             AxionServerMessageAssembler.clear()
             axion.client.render.AxionPreviewBufferCache.invalidate()
             axion.client.render.AxionPreviewTemplateCache.invalidate()
-            client.execute { }
-        })
+            VersionCompatImpl.runOnRenderThread(client) { }
+        }
     }
 
     fun state(): State = state
@@ -108,7 +95,7 @@ object AxionServerConnection {
         }
 
         lastStatusMessage = message
-        MinecraftClient.getInstance().player?.sendMessage(Text.literal(message), false)
+        VersionCompatImpl.notifyPlayer(MinecraftClient.getInstance().player, VersionCompatImpl.createLiteral(message), false)
     }
 
     fun clearStatusMessage(message: String) {
@@ -119,9 +106,7 @@ object AxionServerConnection {
 
     fun sendClientMessage(message: AxionClientMessage) {
         AxionTransportCodec.encodeClientMessage(message, nextTransferId++)
-            .forEach { payload ->
-                ClientPlayNetworking.send(AxionPluginPayload(payload))
-            }
+            .forEach { payload -> VersionCompatImpl.sendAxionPayload(AxionPluginPayload(payload)) }
     }
 
     fun syncNoClipState(armed: Boolean) {
@@ -197,8 +182,12 @@ object AxionServerConnection {
                 val requestKind = AxionRequestTracker.complete(message.requestId)
                 if (!message.accepted) {
                     if (message.source == axion.protocol.AxionResultSource.GRIEF_PREVENTION) {
-                        MinecraftClient.getInstance().player?.sendMessage(
-                            Text.literal("Couldn't apply edit, try again.").formatted(Formatting.RED),
+                        VersionCompatImpl.notifyPlayer(
+                            MinecraftClient.getInstance().player,
+                            VersionCompatImpl.formatText(
+                                VersionCompatImpl.createLiteral("Couldn't apply edit, try again."),
+                                Formatting.RED,
+                            ),
                             true,
                         )
                     } else {

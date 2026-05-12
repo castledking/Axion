@@ -300,7 +300,7 @@ class AxionOperationService(
     }
 
     private fun applySmear(world: World, operation: SmearRegionRequest) {
-        applyRepeatedClipboard(world, operation.sourceOrigin, operation.cells, operation.step, operation.repeatCount, airOnly = true)
+        applySmearedClipboard(world, operation)
     }
 
     private fun applyExtrude(world: World, plan: ServerExtrudePlanner.PlannedExtrude) {
@@ -372,6 +372,74 @@ class AxionOperationService(
                 )
             }
         }
+    }
+
+    private fun applySmearedClipboard(world: World, operation: SmearRegionRequest) {
+        val offsets = smearOffsets(operation.step, operation.repeatCount)
+        if (offsets.isEmpty()) {
+            return
+        }
+
+        val sourcePositions = operation.cells.mapTo(linkedSetOf()) { cell ->
+            IntVector3(
+                operation.sourceOrigin.x + cell.offset.x,
+                operation.sourceOrigin.y + cell.offset.y,
+                operation.sourceOrigin.z + cell.offset.z,
+            )
+        }
+        val sourceStates = operation.cells.map { cell ->
+            val sourcePos = IntVector3(
+                operation.sourceOrigin.x + cell.offset.x,
+                operation.sourceOrigin.y + cell.offset.y,
+                operation.sourceOrigin.z + cell.offset.z,
+            )
+            ServerCapturedBlock(
+                offset = cell.offset,
+                blockState = world.getBlockAt(sourcePos.x, sourcePos.y, sourcePos.z).blockData.getAsString(false),
+                blockEntityData = PaperBlockEntitySnapshotService.capture(
+                    world,
+                    net.minecraft.core.BlockPos(sourcePos.x, sourcePos.y, sourcePos.z),
+                ),
+            )
+        }
+
+        for (cell in sourceStates) {
+            if (org.bukkit.Bukkit.createBlockData(cell.blockState).material.isAir) {
+                continue
+            }
+
+            for (offset in offsets) {
+                val destination = IntVector3(
+                    operation.sourceOrigin.x + cell.offset.x + offset.x,
+                    operation.sourceOrigin.y + cell.offset.y + offset.y,
+                    operation.sourceOrigin.z + cell.offset.z + offset.z,
+                )
+                val block = world.getBlockAt(destination.x, destination.y, destination.z)
+                if (destination !in sourcePositions && !block.type.isAir) {
+                    break
+                }
+
+                PaperBlockEntitySnapshotService.apply(
+                    world = world,
+                    pos = net.minecraft.core.BlockPos(destination.x, destination.y, destination.z),
+                    blockStateString = cell.blockState,
+                    blockEntityPayload = cell.blockEntityData,
+                )
+            }
+        }
+    }
+
+    private fun smearOffsets(offset: IntVector3, steps: Int): List<IntVector3> {
+        if (steps <= 0) {
+            return emptyList()
+        }
+        return (1..steps).map { index ->
+            IntVector3(
+                java.lang.Math.round(index * offset.x.toFloat() / steps),
+                java.lang.Math.round(index * offset.y.toFloat() / steps),
+                java.lang.Math.round(index * offset.z.toFloat() / steps),
+            )
+        }.distinct()
     }
 
     private fun rejected(

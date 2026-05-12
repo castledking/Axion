@@ -76,29 +76,20 @@ object SymmetryTransformService {
         )
     }
 
-    fun transformVector(
-        vector: Vec3i,
-        transform: SymmetryTransformSpec,
-    ): Vec3i {
-        val rotated = when (Math.floorMod(transform.rotationQuarterTurns, 4)) {
-            0 -> Vec3i(vector.x, vector.y, vector.z)
-            1 -> Vec3i(-vector.z, vector.y, vector.x)
-            2 -> Vec3i(-vector.x, vector.y, -vector.z)
-            else -> Vec3i(vector.z, vector.y, -vector.x)
-        }
-
-        return when (transform.mirrorAxis) {
-            null -> rotated
-            SymmetryMirrorAxis.X -> Vec3i(-rotated.x, rotated.y, rotated.z)
-            SymmetryMirrorAxis.Z -> Vec3i(rotated.x, rotated.y, -rotated.z)
-        }
+    fun transformVector(vector: Vec3i, transform: SymmetryTransformSpec): Vec3i {
+        val rotated = rotate(vector.x, vector.y, vector.z, transform.rotationQuarterTurns)
+        return mirror(rotated, transform.mirrorAxis)
     }
 
     fun transformDirection(
         direction: Direction,
         transform: SymmetryTransformSpec,
     ): Direction {
-        val transformed = transformVector(direction.vector, transform)
+        val coreVec = direction.vector
+        val transformed = transformVector(
+            net.minecraft.util.math.Vec3i(coreVec.x, coreVec.y, coreVec.z),
+            transform
+        )
         return Direction.entries.first { candidate ->
             candidate.offsetX == transformed.x &&
                 candidate.offsetY == transformed.y &&
@@ -108,18 +99,18 @@ object SymmetryTransformService {
 
     private fun rotate(x: Int, y: Int, z: Int, quarterTurns: Int): Vec3i {
         return when (Math.floorMod(quarterTurns, 4)) {
-            0 -> Vec3i(x, y, z)
-            1 -> Vec3i(-z, y, x)
-            2 -> Vec3i(-x, y, -z)
-            else -> Vec3i(z, y, -x)
+            0 -> net.minecraft.util.math.Vec3i(x, y, z)
+            1 -> net.minecraft.util.math.Vec3i(-z, y, x)
+            2 -> net.minecraft.util.math.Vec3i(-x, y, -z)
+            else -> net.minecraft.util.math.Vec3i(z, y, -x)
         }
     }
 
     private fun mirror(vector: Vec3i, axis: SymmetryMirrorAxis?): Vec3i {
         return when (axis) {
             null -> vector
-            SymmetryMirrorAxis.X -> Vec3i(-vector.x, vector.y, vector.z)
-            SymmetryMirrorAxis.Z -> Vec3i(vector.x, vector.y, -vector.z)
+            SymmetryMirrorAxis.X -> net.minecraft.util.math.Vec3i(-vector.x, vector.y, vector.z)
+            SymmetryMirrorAxis.Z -> net.minecraft.util.math.Vec3i(vector.x, vector.y, -vector.z)
         }
     }
 

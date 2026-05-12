@@ -1,6 +1,7 @@
 package axion.client.network
 
 import axion.client.compat.VersionCompatImpl
+import axion.common.compat.VersionCompat
 import axion.common.history.EntityCloneChange
 import axion.common.operation.DeleteEntitiesOperation
 import net.minecraft.entity.Entity
@@ -25,14 +26,16 @@ object LocalEntityDeleteService {
             sourceMax.z + 1.0,
         )
         val seen = linkedSetOf<java.util.UUID>()
-        return serverWorld.getOtherEntities(null, queryBox)
+        val dummyEntity = serverWorld.getEntitiesOfClass(Entity::class.java, queryBox).firstOrNull()
+        return VersionCompat.INSTANCE.worldGetOtherEntities(serverWorld, dummyEntity ?: return emptyList(), queryBox)
             .asSequence()
+            .mapNotNull { it as? Entity }
             .map(::rootEntity)
             .filter { entity ->
                 entity !is PlayerEntity &&
-                    !entity.isRemoved &&
-                    entity.vehicle == null &&
-                    seen.add(entity.uuid)
+                    !VersionCompat.INSTANCE.entityIsRemoved(entity) &&
+                    VersionCompat.INSTANCE.entityGetVehicle(entity) == null &&
+                    seen.add(VersionCompat.INSTANCE.entityGetUuid(entity))
             }
             .flatMap { entity ->
                 captureEntityTree(entity, parentEntityId = null).asSequence()
@@ -43,7 +46,7 @@ object LocalEntityDeleteService {
     fun apply(world: World, deletes: List<EntityCloneChange>) {
         val serverWorld = world as? ServerWorld ?: return
         deletes.forEach { delete ->
-            serverWorld.getEntity(delete.entityId)?.remove(Entity.RemovalReason.DISCARDED)
+            serverWorld.getEntity(delete.entityId)?.discard()
         }
     }
 
@@ -55,17 +58,18 @@ object LocalEntityDeleteService {
         return buildList {
             add(
                 EntityCloneChange(
-                    entityId = entity.uuid,
+                    entityId = VersionCompat.INSTANCE.entityGetUuid(entity),
                     parentEntityId = parentEntityId,
                     entityData = snapshot,
-                    pos = net.minecraft.util.math.Vec3d(entity.x, entity.y, entity.z),
-                    yaw = entity.yaw,
-                    pitch = entity.pitch,
+                    pos = net.minecraft.util.math.Vec3d(VersionCompat.INSTANCE.entityGetX(entity), VersionCompat.INSTANCE.entityGetY(entity), VersionCompat.INSTANCE.entityGetZ(entity)),
+                    yaw = VersionCompat.INSTANCE.entityGetYaw(entity),
+                    pitch = VersionCompat.INSTANCE.entityGetPitch(entity),
                 ),
             )
-            entity.passengerList.forEach { passenger ->
-                if (passenger !is PlayerEntity && !passenger.isRemoved) {
-                    addAll(captureEntityTree(passenger, parentEntityId = entity.uuid))
+            VersionCompat.INSTANCE.entityGetPassengerList(entity).forEach { passenger ->
+                val p = passenger as? Entity ?: return@forEach
+                if (p !is PlayerEntity && !VersionCompat.INSTANCE.entityIsRemoved(p)) {
+                    addAll(captureEntityTree(p, parentEntityId = VersionCompat.INSTANCE.entityGetUuid(entity)))
                 }
             }
         }
@@ -77,8 +81,8 @@ object LocalEntityDeleteService {
 
     private fun rootEntity(entity: Entity): Entity {
         var current = entity
-        while (current.vehicle != null) {
-            current = current.vehicle!!
+        while (VersionCompat.INSTANCE.entityGetVehicle(current) != null) {
+            current = VersionCompat.INSTANCE.entityGetVehicle(current) as Entity
         }
         return current
     }

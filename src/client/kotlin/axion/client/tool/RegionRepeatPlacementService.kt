@@ -7,9 +7,16 @@ import axion.common.operation.CompositeOperation
 import axion.common.operation.EditOperation
 import axion.common.operation.SmearRegionOperation
 import axion.common.operation.StackRegionOperation
+import axion.client.tool.directionGetFacing
+import axion.client.tool.floorMod
+import axion.client.hotbar.blockPosIterate
+import axion.client.compat.add
+import axion.client.compat.toImmutable
+import axion.client.compat.ORIGIN
 import net.minecraft.block.Blocks
 import net.minecraft.client.MinecraftClient
 import net.minecraft.util.math.BlockPos
+import net.minecraft.util.math.Axis
 import net.minecraft.util.math.Direction
 import net.minecraft.util.math.Vec3i
 import kotlin.math.abs
@@ -34,6 +41,19 @@ object RegionRepeatPlacementService {
         }
 
         val direction = dominantLookDirection(client)
+        if (mode == Mode.SMEAR) {
+            return createPreview(
+                firstCorner = firstCorner,
+                sourceRegion = sourceRegion,
+                clipboardBuffer = clipboardBuffer,
+                lookDirection = direction,
+                step = direction.vector.multiply(scrollDirection).let { Vec3i(it.x, it.y, it.z) },
+                scrollSign = scrollDirection,
+                repeatCount = 1,
+                committedSegments = emptyList(),
+            )
+        }
+
         return createPreview(
             firstCorner = firstCorner,
             sourceRegion = sourceRegion,
@@ -58,11 +78,38 @@ object RegionRepeatPlacementService {
         }
 
         val currentDirection = dominantLookDirection(client)
+        if (mode == Mode.SMEAR) {
+            return nudgeSmearNode(preview, currentDirection, scrollDirection)
+        }
+
         return if (preview.lookDirection == currentDirection) {
             nudgeCurrentSegment(preview, scrollDirection)
         } else {
             redirectPreview(preview, currentDirection, scrollDirection, mode)
         }
+    }
+
+    private fun nudgeSmearNode(
+        preview: RepeatRegionPreview,
+        currentDirection: Direction,
+        scrollDirection: Int,
+    ): RepeatRegionPreview? {
+        val nextStep = preview.step.add(currentDirection.vector.multiply(scrollDirection))
+        val nextRepeatCount = maxAbsComponent(nextStep)
+        if (nextRepeatCount == 0) {
+            return null
+        }
+
+        return createPreview(
+            firstCorner = preview.firstCorner,
+            sourceRegion = preview.sourceRegion,
+            clipboardBuffer = preview.clipboardBuffer,
+            lookDirection = currentDirection,
+            step = nextStep,
+            scrollSign = intSign(scrollDirection),
+            repeatCount = nextRepeatCount,
+            committedSegments = emptyList(),
+        )
     }
 
     fun toOperation(preview: RepeatRegionPreview, mode: Mode): EditOperation {
@@ -279,7 +326,7 @@ object RegionRepeatPlacementService {
         }
 
         val foldedCells = buildList {
-            for (pos in BlockPos.iterate(min, max)) {
+            for (pos in blockPosIterate(min, max)) {
                 val absolutePos = pos.toImmutable()
                 val cell = absoluteCells[absolutePos]
                 add(
@@ -312,17 +359,34 @@ object RegionRepeatPlacementService {
 
     private fun dominantLookDirection(client: MinecraftClient): Direction {
         val look = client.player?.rotationVecClient ?: return Direction.UP
-        return Direction.getFacing(look)
+        return directionGetFacing(look)
     }
 
     private fun stepFor(region: BlockRegion, direction: Direction, scrollDirection: Int): Vec3i {
         val stepLength = region.normalized().size().componentAlong(direction.axis)
-        return direction.vector.multiply(stepLength * scrollDirection)
+        return direction.vector.multiply(stepLength * scrollDirection).let { Vec3i(it.x, it.y, it.z) }
+    }
+
+    fun smearOffsets(offset: Vec3i, steps: Int = maxAbsComponent(offset)): List<Vec3i> {
+        if (steps <= 0) {
+            return emptyList()
+        }
+        return (1..steps).map { index ->
+            Vec3i(
+                java.lang.Math.round(index * offset.x.toFloat() / steps),
+                java.lang.Math.round(index * offset.y.toFloat() / steps),
+                java.lang.Math.round(index * offset.z.toFloat() / steps),
+            )
+        }.distinct()
+    }
+
+    fun maxAbsComponent(vector: Vec3i): Int {
+        return maxOf(abs(vector.x), abs(vector.y), abs(vector.z))
     }
 
     private fun boundingRegion(positions: Collection<BlockPos>): BlockRegion {
         if (positions.isEmpty()) {
-            return BlockRegion(BlockPos.ORIGIN, BlockPos.ORIGIN)
+            return BlockRegion(ORIGIN, ORIGIN)
         }
         val iterator = positions.iterator()
         val first = iterator.next()
@@ -344,11 +408,11 @@ object RegionRepeatPlacementService {
         return BlockRegion(BlockPos(minX, minY, minZ), BlockPos(maxX, maxY, maxZ)).normalized()
     }
 
-    private fun Vec3i.componentAlong(axis: Direction.Axis): Int {
+    private fun Vec3i.componentAlong(axis: Axis): Int {
         return when (axis) {
-            Direction.Axis.X -> x
-            Direction.Axis.Y -> y
-            Direction.Axis.Z -> z
+            Axis.X -> x
+            Axis.Y -> y
+            Axis.Z -> z
         }
     }
 

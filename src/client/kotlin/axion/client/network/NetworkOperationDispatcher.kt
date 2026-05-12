@@ -1,14 +1,14 @@
 package axion.client.network
 
+import axion.common.compat.VersionCompat
 import axion.common.operation.ClearRegionOperation
 import axion.common.operation.CloneRegionOperation
 import axion.client.history.HistoryManager
 import axion.client.history.RemoteHistoryAdapter
+import axion.client.compat.VersionCompatImpl
 import axion.common.operation.CompositeOperation
 import axion.common.operation.EditOperation
 import net.minecraft.client.MinecraftClient
-import net.minecraft.text.Text
-import net.minecraft.util.Formatting
 import axion.common.operation.ExtrudeOperation
 import axion.common.operation.FilteredCloneRegionOperation
 import axion.common.operation.MoveEntitiesOperation
@@ -60,9 +60,13 @@ class NetworkOperationDispatcher(
             AxionServerConnection.notifyPlayerOnce(message)
             // Show action bar alert for Disconnected state (no plugin installed)
             if (state == AxionServerConnection.State.Disconnected) {
-                MinecraftClient.getInstance().player?.sendMessage(
-                    Text.literal("⚠ Axion server plugin required for multiplayer editing").formatted(Formatting.RED),
-                    true, // Action bar (overlay)
+                VersionCompatImpl.notifyPlayer(
+                    MinecraftClient.getInstance().player,
+                    VersionCompatImpl.formatText(
+                        VersionCompatImpl.createLiteral("⚠ Axion server plugin required for multiplayer editing"),
+                        net.minecraft.util.Formatting.RED,
+                    ),
+                    true,
                 )
             }
             return
@@ -183,8 +187,8 @@ class NetworkOperationDispatcher(
 
             is ExtrudeOperation -> ExtrudeRequest(
                 origin = operation.origin.toProtocolVector(),
-                direction = operation.direction.vector.toProtocolVector(),
-                expectedState = BlockArgumentParser.stringifyBlockState(operation.sourceState),
+                direction = (VersionCompat.INSTANCE.directionGetVector(operation.direction) as net.minecraft.core.Vec3i).toProtocolVector(),
+                expectedState = VersionCompat.INSTANCE.blockStateStringify(operation.sourceState),
                 mode = when (operation.mode) {
                     axion.common.operation.ExtrudeMode.EXTEND -> AxionExtrudeMode.EXTEND
                     axion.common.operation.ExtrudeMode.SHRINK -> AxionExtrudeMode.SHRINK
@@ -196,7 +200,7 @@ class NetworkOperationDispatcher(
                 placements = operation.placements.map { placement ->
                     PlacedBlockPayload(
                         pos = placement.pos.toProtocolVector(),
-                        blockState = BlockArgumentParser.stringifyBlockState(placement.state),
+                        blockState = VersionCompat.INSTANCE.blockStateStringify(placement.state),
                         blockEntityData = placement.blockEntityData?.nbt?.toString(),
                     )
                 },
@@ -207,18 +211,18 @@ class NetworkOperationDispatcher(
     }
 }
 
-private fun net.minecraft.util.math.BlockPos.toProtocolVector(): IntVector3 {
+private fun net.minecraft.core.BlockPos.toProtocolVector(): IntVector3 {
     return IntVector3(x, y, z)
 }
 
-private fun net.minecraft.util.math.Vec3i.toProtocolVector(): IntVector3 {
+private fun net.minecraft.core.Vec3i.toProtocolVector(): IntVector3 {
     return IntVector3(x, y, z)
 }
 
 private fun axion.common.model.ClipboardCell.toPayload(): ClipboardCellPayload {
     return ClipboardCellPayload(
         offset = offset.toProtocolVector(),
-        blockState = BlockArgumentParser.stringifyBlockState(state),
+        blockState = VersionCompat.INSTANCE.blockStateStringify(state),
         blockEntityData = blockEntityData?.nbt?.toString(),
     )
 }

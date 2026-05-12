@@ -1,5 +1,6 @@
 package axion.client.network
 
+import axion.common.compat.VersionCompat
 import axion.protocol.AxionProtocol
 import net.minecraft.network.RegistryByteBuf
 import net.minecraft.network.codec.PacketCodec
@@ -13,10 +14,10 @@ data class AxionPluginPayload(
 
     companion object {
         val ID: CustomPayload.Id<AxionPluginPayload> = CustomPayload.Id(
-            Identifier.of(AxionProtocol.CHANNEL_ID.substringBefore(':'), AxionProtocol.CHANNEL_ID.substringAfter(':')),
+            VersionCompat.INSTANCE.identifierOf(AxionProtocol.CHANNEL_ID.substringBefore(':'), AxionProtocol.CHANNEL_ID.substringAfter(':')),
         )
 
-        val CODEC: PacketCodec<RegistryByteBuf, AxionPluginPayload> = PacketCodec.of(
+        val CODEC: PacketCodec<RegistryByteBuf, AxionPluginPayload> = PacketCodec.ofMember(
             { value, buf -> buf.writeBytes(value.bytes) },
             { buf ->
                 val bytes = ByteArray(buf.readableBytes())

@@ -1,6 +1,7 @@
 package axion.client.config
 
 import com.google.gson.GsonBuilder
+import axion.common.compat.VersionCompat
 import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.item.Item
 import net.minecraft.item.Items
@@ -92,6 +93,19 @@ object AxionClientConfig {
     fun magicSelectCustomMasks(): List<MagicSelectCustomMask> = data.magicSelectCustomMasks
 
     fun customMaskById(id: String): MagicSelectCustomMask? = data.magicSelectCustomMasks.firstOrNull { it.id == id }
+
+    fun sameBlockMagicSelectEnabled(): Boolean = data.sameBlockMagicSelectEnabled
+
+    fun setSameBlockMagicSelectEnabled(enabled: Boolean) {
+        data = data.copy(sameBlockMagicSelectEnabled = enabled)
+        save()
+    }
+
+    fun toggleSameBlockMagicSelect(): Boolean {
+        val enabled = !data.sameBlockMagicSelectEnabled
+        setSameBlockMagicSelectEnabled(enabled)
+        return enabled
+    }
 
     fun updateMagicSelectTemplate(template: MagicSelectTemplateConfig) {
         data = data.copy(
@@ -226,7 +240,7 @@ object AxionClientConfig {
         }
 
         val blockIcons = mask.customBlockIds.mapNotNull { blockId ->
-            Identifier.tryParse(blockId)?.let(Registries.BLOCK::get)
+            Identifier.tryParse(blockId)?.let(VersionCompat.INSTANCE::getBlock)
                 ?.asItem()
                 ?.takeIf { it != Items.AIR }
         }.distinct()
@@ -258,6 +272,7 @@ object AxionClientConfig {
                 Data(
                     useCommandModifierOnMac = fileData.useCommandModifierOnMac ?: defaults.useCommandModifierOnMac,
                     useSuperModifierOnLinux = fileData.useSuperModifierOnLinux ?: defaults.useSuperModifierOnLinux,
+                    sameBlockMagicSelectEnabled = fileData.sameBlockMagicSelectEnabled ?: defaults.sameBlockMagicSelectEnabled,
                     activeSavedHotbarIndex = (fileData.activeSavedHotbarIndex ?: defaults.activeSavedHotbarIndex)
                         .coerceIn(0, sanitizeSavedHotbars(fileData.savedHotbars ?: defaults.savedHotbars).lastIndex),
                     nextMagicTemplateIndex = maxOf(
@@ -340,6 +355,7 @@ object AxionClientConfig {
     data class Data(
         val useCommandModifierOnMac: Boolean,
         val useSuperModifierOnLinux: Boolean,
+        val sameBlockMagicSelectEnabled: Boolean,
         val activeSavedHotbarIndex: Int,
         val nextMagicTemplateIndex: Int,
         val nextMagicCustomMaskIndex: Int,
@@ -357,6 +373,7 @@ object AxionClientConfig {
                     // Linux users default to Alt (matches every other platform); they can
                     // opt into Super via the config screen if their Alt key has issues.
                     useSuperModifierOnLinux = false,
+                    sameBlockMagicSelectEnabled = false,
                     activeSavedHotbarIndex = 0,
                     nextMagicTemplateIndex = 3,
                     nextMagicCustomMaskIndex = 3,
@@ -403,6 +420,7 @@ object AxionClientConfig {
     private data class FileData(
         val useCommandModifierOnMac: Boolean? = null,
         val useSuperModifierOnLinux: Boolean? = null,
+        val sameBlockMagicSelectEnabled: Boolean? = null,
         val activeSavedHotbarIndex: Int? = null,
         val nextMagicTemplateIndex: Int? = null,
         val nextMagicCustomMaskIndex: Int? = null,

@@ -4,8 +4,8 @@ import axion.client.AxionClientState
 import axion.common.model.AxionSubtool
 import axion.common.model.ClipboardState
 import axion.common.model.ToolSelectionState
+import axion.client.tool.floorMod
 import net.minecraft.client.MinecraftClient
-import net.minecraft.util.math.MathHelper
 
 object AxionToolSelectionController {
     private const val HOTBAR_SLOT_COUNT: Int = 9
@@ -102,7 +102,7 @@ object AxionToolSelectionController {
             is ToolSelectionState.Axion -> AXION_SLOT_INDEX
         }
 
-        val nextIndex = MathHelper.floorMod(currentScrollIndex - direction, TOTAL_SCROLL_POSITIONS)
+        val nextIndex = floorMod(currentScrollIndex - direction, TOTAL_SCROLL_POSITIONS)
         return if (nextIndex == AXION_SLOT_INDEX) {
             AxionClientState.updateToolSelection(ToolSelectionState.Axion(previousVanillaSlot = currentVanillaSlot))
             ScrollOutcome.Consumed

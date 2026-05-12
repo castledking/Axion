@@ -20,7 +20,7 @@ class MagicSelectMaskConfigScreen(
 
     private val rows = mutableListOf<TemplateRow>()
     private val selectedBorderColor = 0xFF58D06F.toInt()
-    private val idleBorderColor = 0xFF767676.toInt()
+    private val idleBorderColor = 0xFFE05A5A.toInt()
 
     override fun init() {
         rows.clear()
@@ -40,6 +40,14 @@ class MagicSelectMaskConfigScreen(
         addDrawableChild(
             ButtonWidget.builder(Text.translatable("axion.config.magic_select.disable_all.button")) {
                 AxionClientConfig.disableAllMagicSelectTemplates()
+                clearAndInit()
+            }.dimensions(leftX, y, contentWidth, 20).build(),
+        )
+        y += 30
+
+        addDrawableChild(
+            ButtonWidget.builder(sameBlockSelectLabel()) {
+                AxionClientConfig.toggleSameBlockMagicSelect()
                 clearAndInit()
             }.dimensions(leftX, y, contentWidth, 20).build(),
         )
@@ -114,5 +122,18 @@ class MagicSelectMaskConfigScreen(
             .append(FormattedNameText.parse(name))
             .append(Text.literal(": "))
             .append(Text.translatable(if (enabled) "axion.config.toggle.on" else "axion.config.toggle.off"))
+    }
+
+    private fun sameBlockSelectLabel(): Text {
+        return Text.translatable(
+            "axion.config.magic_select.same_block_select.button",
+            Text.translatable(
+                if (AxionClientConfig.sameBlockMagicSelectEnabled()) {
+                    "axion.config.toggle.on"
+                } else {
+                    "axion.config.toggle.off"
+                },
+            ),
+        )
     }
 }

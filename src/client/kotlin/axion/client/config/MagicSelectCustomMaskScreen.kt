@@ -2,6 +2,7 @@ package axion.client.config
 
 import axion.client.ui.FormattedNameText
 import axion.client.ui.drawStrokedRectangleCompat
+import axion.common.compat.VersionCompat
 import net.minecraft.block.Block
 import net.minecraft.client.gui.DrawContext
 import net.minecraft.client.gui.screen.Screen
@@ -55,7 +56,7 @@ class MagicSelectCustomMaskScreen(
             } else {
                 BlockEntry(
                     block = block,
-                    id = Registries.BLOCK.getId(block),
+                    id = VersionCompat.INSTANCE.getBlockId(block),
                     label = item.name.string.lowercase(),
                 )
             }
@@ -67,6 +68,8 @@ class MagicSelectCustomMaskScreen(
 
     override fun init() {
         val centerX = width / 2
+        val contentWidth = 360
+        val leftX = centerX - (contentWidth / 2)
         val topY = 40
         if (!draftInitialized) {
             existingMask?.let { mask ->
@@ -78,14 +81,14 @@ class MagicSelectCustomMaskScreen(
             draftInitialized = true
         }
 
-        nameField = TextFieldWidget(textRenderer, centerX - 130, topY, 260, 20, Text.empty())
+        nameField = TextFieldWidget(textRenderer, leftX, topY, contentWidth, 20, Text.empty())
         nameField.setMaxLength(48)
         nameField.text = draftName
         nameField.setChangedListener { draftName = it }
         addSelectableChild(nameField)
         setInitialFocus(nameField)
 
-        searchField = TextFieldWidget(textRenderer, centerX - 130, 158, 260, 20, Text.empty())
+        searchField = TextFieldWidget(textRenderer, leftX, 272, contentWidth, 20, Text.empty())
         searchField.text = searchQuery
         searchField.setChangedListener {
             searchQuery = it
@@ -94,7 +97,7 @@ class MagicSelectCustomMaskScreen(
         }
         addSelectableChild(searchField)
 
-        var ruleX = centerX - 130
+        var ruleX = leftX
         var ruleY = 92
         MagicSelectRule.customMaskRules().forEachIndexed { index, rule ->
             addDrawableChild(
@@ -107,9 +110,9 @@ class MagicSelectCustomMaskScreen(
                     clearAndInit()
                 }.dimensions(ruleX, ruleY, 84, 20).build(),
             )
-            ruleX += 88
-            if ((index + 1) % 3 == 0) {
-                ruleX = centerX - 130
+            ruleX += 92
+            if ((index + 1) % 4 == 0) {
+                ruleX = leftX
                 ruleY += 24
             }
         }
@@ -224,7 +227,8 @@ class MagicSelectCustomMaskScreen(
         super.render(context, mouseX, mouseY, deltaTicks)
 
         val centerX = width / 2
-        val leftX = centerX - 130
+        val contentWidth = 360
+        val leftX = centerX - (contentWidth / 2)
 
         context.drawCenteredTextWithShadow(textRenderer, screenTitle(), centerX, 18, 0xFFFFFF)
         context.drawCenteredTextWithShadow(
@@ -263,7 +267,7 @@ class MagicSelectCustomMaskScreen(
             textRenderer,
             Text.translatable("axion.config.magic_select.custom_mask.blocks"),
             leftX,
-            136,
+            250,
             0xFFFFFF,
         )
         searchField.render(context, mouseX, mouseY, deltaTicks)
@@ -348,7 +352,7 @@ class MagicSelectCustomMaskScreen(
         val visible = filtered.subList(start, end)
         val totalWidth = (COLUMNS * TILE_SIZE) + ((COLUMNS - 1) * TILE_GAP)
         val startX = (width / 2) - (totalWidth / 2)
-        val startY = 218
+        val startY = 302
 
         return visible.mapIndexed { index, entry ->
             val column = index % COLUMNS
@@ -368,7 +372,7 @@ class MagicSelectCustomMaskScreen(
             isRuleCustomized(rule) -> "axion.config.magic_select.custom_mask.custom"
             else -> "axion.config.toggle.on"
         }
-        return Text.translatable("axion.config.magic_select.edit.rule_button", Text.of(rule.displayName), Text.translatable(statusKey))
+        return Text.translatable("axion.config.magic_select.edit.rule_button", Text.literal(rule.displayName), Text.translatable(statusKey))
     }
 
     private fun isRuleCustomized(rule: MagicSelectRule): Boolean {
@@ -376,7 +380,7 @@ class MagicSelectCustomMaskScreen(
             return false
         }
         return excludedBlockIds.any { blockId ->
-            val block = Identifier.tryParse(blockId)?.let(Registries.BLOCK::get) ?: return@any false
+            val block = Identifier.tryParse(blockId)?.let(VersionCompat.INSTANCE::getBlock) ?: return@any false
             rule.includes(block.defaultState)
         }
     }

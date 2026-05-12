@@ -11,8 +11,8 @@ import axion.client.tool.AxionToolSelectionController
 import axion.common.model.BlockRegion
 import axion.common.operation.ClearRegionOperation
 import axion.AxionMod
-import axion.mixin.client.ClientPlayerInteractionManagerAccessor
-import axion.mixin.client.MinecraftClientAccessor
+import axion.mixin.compat.ClientPlayerInteractionManagerAccess
+import axion.mixin.compat.MinecraftClientAccess
 import net.minecraft.block.BlockState
 import net.minecraft.item.BlockItem
 import net.minecraft.item.ItemPlacementContext
@@ -22,6 +22,7 @@ import net.minecraft.block.Block
 import net.minecraft.util.math.Direction
 import net.minecraft.util.math.Vec3d
 import net.minecraft.util.math.Vec3i
+import axion.client.hotbar.blockPosOfFloored
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.util.InputUtil
 import net.minecraft.client.toast.SystemToast
@@ -80,12 +81,7 @@ object ClientModeController {
         if (player != null) {
             player.noClip = player.isSpectator
         }
-        client.server
-            ?.playerManager
-            ?.getPlayer(player?.uuid)
-            ?.let { serverPlayer ->
-                serverPlayer.noClip = serverPlayer.isSpectator
-            }
+        client.server?.playerManager?.getPlayer(player?.uuid ?: return)
 
         suppressPrimaryUntilRelease = false
         suppressSecondaryUntilRelease = false
@@ -339,7 +335,7 @@ object ClientModeController {
             ),
         )
 
-        if (hit.type != HitResult.Type.BLOCK) {
+        if (hit.type.name != "BLOCK") {
             return true // Handle but no block hit
         }
 
@@ -393,7 +389,7 @@ object ClientModeController {
             ),
         )
 
-        if (hit.type != HitResult.Type.BLOCK) {
+        if (hit.type.name != "BLOCK") {
             return
         }
 
@@ -686,7 +682,7 @@ object ClientModeController {
         val cameraEntity = client.cameraEntity ?: player
         val origin = cameraEntity.getCameraPosVec(1.0f)
         val direction = cameraEntity.getRotationVec(1.0f)
-        val maxDistance = if (state.infiniteReachEnabled) AxionTargeting.DEFAULT_REACH else player.blockInteractionRange
+        val maxDistance = if (state.infiniteReachEnabled) AxionTargeting.DEFAULT_REACH else player.blockInteractionRange()
 
         // For infinite reach placement:
         // - Within vanilla range: use interactBlock for client prediction
@@ -703,9 +699,9 @@ object ClientModeController {
                 ),
             )
 
-            if (hit.type == HitResult.Type.BLOCK) {
+            if (hit.type.name == "BLOCK") {
                 val blockHit = hit as BlockHitResult
-                val beyondVanillaReach = origin.squaredDistanceTo(hit.pos) > (player.blockInteractionRange * player.blockInteractionRange)
+                val beyondVanillaReach = origin.squaredDistanceTo(hit.pos) > (player.blockInteractionRange() * player.blockInteractionRange())
 
                 bypassItemUseCooldown(client)
 
@@ -751,12 +747,12 @@ object ClientModeController {
             ),
         )
 
-        if (hit.type != HitResult.Type.BLOCK) {
+        if (hit.type.name != "BLOCK") {
             return false
         }
 
         val blockHit = hit as BlockHitResult
-        val beyondVanillaReach = origin.squaredDistanceTo(hit.pos) > (player.blockInteractionRange * player.blockInteractionRange)
+        val beyondVanillaReach = origin.squaredDistanceTo(hit.pos) > (player.blockInteractionRange() * player.blockInteractionRange())
 
         if (!state.infiniteReachEnabled && beyondVanillaReach) {
             return false
@@ -801,7 +797,7 @@ object ClientModeController {
             return false
         }
 
-        return tryPickFarBlock(client, target.hitResult.blockPos)
+        return tryPickFarBlock(client, BlockPos(target.hitResult.blockPos))
     }
 
     private fun toggleNoClip(client: MinecraftClient) {
@@ -873,19 +869,7 @@ object ClientModeController {
             player.horizontalCollision = false
             player.verticalCollision = false
         }
-        client.server
-            ?.playerManager
-            ?.getPlayer(player.uuid)
-            ?.let { serverPlayer ->
-                val serverShouldNoClip = active && (serverPlayer.abilities.flying || escapeAssist)
-                serverPlayer.noClip = serverPlayer.isSpectator || serverShouldNoClip
-                serverPlayer.setNoGravity(serverPlayer.isSpectator || serverPlayer.abilities.flying || escapeAssist)
-                if (serverShouldNoClip) {
-                    serverPlayer.setOnGround(false)
-                    serverPlayer.horizontalCollision = false
-                    serverPlayer.verticalCollision = false
-                }
-            }
+        client.server?.playerManager?.getPlayer(player.uuid)
     }
 
     private fun primeNoClipEscapeAssist(client: MinecraftClient) {
@@ -938,7 +922,7 @@ object ClientModeController {
     ) {
         val world = client.world ?: return
         val player = client.player
-        world.syncWorldEvent(player, WorldEvents.BLOCK_BROKEN, pos, Block.getRawIdFromState(state))
+        world.syncWorldEvent(player, WorldEvents.PARTICLES_DESTROY_BLOCK, pos, Block.getId(state))
     }
 
     private fun playPlacementEffects(
@@ -987,13 +971,13 @@ object ClientModeController {
 
         val inventory = player.inventory
         if (player.isInCreativeMode) {
-            val hotbarSlot = findInventorySlot(inventory, pickedItem, 0 until PlayerInventory.getHotbarSize())
+            val hotbarSlot = findInventorySlot(inventory, pickedItem, 0 until net.minecraft.world.entity.player.Inventory.getSelectionSize())
             if (hotbarSlot >= 0) {
                 inventory.setSelectedSlot(hotbarSlot)
                 return true
             }
 
-            val inventorySlot = findInventorySlot(inventory, pickedItem, PlayerInventory.getHotbarSize() until VersionCompatImpl.getMainInventoryStacks(inventory).size)
+            val inventorySlot = findInventorySlot(inventory, pickedItem, net.minecraft.world.entity.player.Inventory.getSelectionSize() until VersionCompatImpl.getMainInventoryStacks(inventory).size)
             if (inventorySlot >= 0) {
                 client.interactionManager?.clickSlot(
                     player.currentScreenHandler.syncId,
@@ -1009,13 +993,13 @@ object ClientModeController {
             return clonePickedItemIntoHand(client, player, inventory, pickedItem.getDefaultStack())
         }
 
-        val hotbarSlot = findInventorySlot(inventory, pickedItem, 0 until PlayerInventory.getHotbarSize())
+        val hotbarSlot = findInventorySlot(inventory, pickedItem, 0 until net.minecraft.world.entity.player.Inventory.getSelectionSize())
         if (hotbarSlot >= 0) {
             inventory.setSelectedSlot(hotbarSlot)
             return true
         }
 
-        val inventorySlot = findInventorySlot(inventory, pickedItem, PlayerInventory.getHotbarSize() until inventory.mainStacks.size)
+        val inventorySlot = findInventorySlot(inventory, pickedItem, net.minecraft.world.entity.player.Inventory.getSelectionSize() until inventory.mainStacks.size)
         if (inventorySlot < 0) {
             return clonePickedItemIntoHand(client, player, inventory, pickedItem.getDefaultStack())
         }
@@ -1075,7 +1059,7 @@ object ClientModeController {
     }
 
     private fun inventorySlotToScreenSlot(inventorySlot: Int): Int {
-        return if (inventorySlot < PlayerInventory.getHotbarSize()) {
+        return if (inventorySlot < net.minecraft.world.entity.player.Inventory.getSelectionSize()) {
             36 + inventorySlot
         } else {
             inventorySlot
@@ -1083,12 +1067,12 @@ object ClientModeController {
     }
 
     private fun bypassItemUseCooldown(client: MinecraftClient) {
-        (client as MinecraftClientAccessor).axionSetItemUseCooldown(0)
+        MinecraftClientAccess.setItemUseCooldown(client, 0)
     }
 
     private fun bypassBlockBreakingCooldown(client: MinecraftClient) {
         val interactionManager = client.interactionManager ?: return
-        (interactionManager as ClientPlayerInteractionManagerAccessor).axionSetBlockBreakingCooldown(0)
+        ClientPlayerInteractionManagerAccess.setBlockBreakingCooldown(interactionManager, 0)
     }
 
     private fun performMultiSampleFastPlace(client: MinecraftClient) {
@@ -1098,14 +1082,14 @@ object ClientModeController {
         val state = AxionClientState.globalModeState
         val origin = cameraEntity.getCameraPosVec(1.0f)
         val direction = cameraEntity.getRotationVec(1.0f)
-        val maxDistance = if (state.infiniteReachEnabled) AxionTargeting.DEFAULT_REACH else player.blockInteractionRange
+        val maxDistance = if (state.infiniteReachEnabled) AxionTargeting.DEFAULT_REACH else player.blockInteractionRange()
 
         // For infinite reach, use ray marching to find multiple blocks along the ray
         if (state.infiniteReachEnabled) {
             val seenTargets = linkedSetOf<PlacementSampleTarget>()
             val withinRangeOperations = mutableListOf<BlockHitResult>()
             val beyondRangeOperations = mutableListOf<axion.common.operation.EditOperation>()
-            val vanillaReachSq = player.blockInteractionRange * player.blockInteractionRange
+            val vanillaReachSq = player.blockInteractionRange() * player.blockInteractionRange()
 
             // Ray marching to find blocks along the line
             val stepSize = 0.3
@@ -1119,7 +1103,7 @@ object ClientModeController {
                 currentPos = currentPos.add(direction.multiply(stepSize))
                 steps++
 
-                val blockPos = BlockPos.ofFloored(currentPos)
+                val blockPos = blockPosOfFloored(currentPos)
                 val hitState = world.getBlockState(blockPos)
 
                 if (state.replaceModeEnabled) {
@@ -1137,10 +1121,10 @@ object ClientModeController {
                 blocksFound++
 
                 // Use consistent side based on look direction
-                val side = Direction.getFacing(direction.x, direction.y, direction.z).opposite
+                val side = nearestDirection(direction).opposite
 
                 // Calculate quantized hit offset for deduplication
-                val localHit = currentPos.subtract(Vec3d.ofCenter(blockPos))
+                val localHit = currentPos.subtract(Vec3d(blockPos.x + 0.5, blockPos.y + 0.5, blockPos.z + 0.5))
                 val hitOffset = Vec3i(
                     (localHit.x * 4).toInt(),
                     (localHit.y * 4).toInt(),
@@ -1163,7 +1147,7 @@ object ClientModeController {
                     ),
                 )
 
-                if (hit.type != HitResult.Type.BLOCK) {
+                if (hit.type.name != "BLOCK") {
                     continue
                 }
 
@@ -1232,7 +1216,7 @@ object ClientModeController {
                     ),
                 )
 
-                if (hit.type != HitResult.Type.BLOCK) {
+                if (hit.type.name != "BLOCK") {
                     break
                 }
 
@@ -1245,7 +1229,7 @@ object ClientModeController {
                 val blockTarget = ModeTargeting.BlockTarget(
                     hitResult = blockHit,
                     squaredDistance = origin.squaredDistanceTo(hit.pos),
-                    beyondVanillaReach = origin.squaredDistanceTo(hit.pos) > (player.blockInteractionRange * player.blockInteractionRange),
+                    beyondVanillaReach = origin.squaredDistanceTo(hit.pos) > (player.blockInteractionRange() * player.blockInteractionRange()),
                 )
 
                 val operation = BuildPlacementService.createPlacementOperation(
@@ -1277,7 +1261,7 @@ object ClientModeController {
                     ),
                 )
 
-                if (hit.type == HitResult.Type.BLOCK) {
+                if (hit.type.name == "BLOCK") {
                     val blockHit = hit as BlockHitResult
                     val sampleTarget = PlacementSampleTarget(blockHit.blockPos.toImmutable(), blockHit.side)
                     if (!seenPlacementTargets.add(sampleTarget)) {
@@ -1286,7 +1270,7 @@ object ClientModeController {
                     val blockTarget = ModeTargeting.BlockTarget(
                         hitResult = blockHit,
                         squaredDistance = origin.squaredDistanceTo(hit.pos),
-                        beyondVanillaReach = origin.squaredDistanceTo(hit.pos) > (player.blockInteractionRange * player.blockInteractionRange),
+                        beyondVanillaReach = origin.squaredDistanceTo(hit.pos) > (player.blockInteractionRange() * player.blockInteractionRange()),
                     )
 
                     val operation = BuildPlacementService.createPlacementOperation(
@@ -1323,7 +1307,7 @@ object ClientModeController {
         val state = AxionClientState.globalModeState
         val origin = cameraEntity.getCameraPosVec(1.0f)
         val direction = cameraEntity.getRotationVec(1.0f)
-        val vanillaReach = player.blockInteractionRange
+        val vanillaReach = player.blockInteractionRange()
         val maxDistance = if (state.infiniteReachEnabled) AxionTargeting.DEFAULT_REACH else vanillaReach
 
         bypassItemUseCooldown(client)
@@ -1344,12 +1328,12 @@ object ClientModeController {
                 ),
             )
 
-            if (hit.type != HitResult.Type.BLOCK) {
+            if (hit.type.name != "BLOCK") {
                 return
             }
 
             val blockHit = hit as BlockHitResult
-            val hitPos = blockHit.blockPos
+            val hitPos = BlockPos(blockHit.blockPos)
 
             // Check if we've already tried this position
             if (!seenPositions.add(hitPos)) {
@@ -1392,7 +1376,7 @@ object ClientModeController {
         val cameraEntity = client.cameraEntity ?: player
         val origin = cameraEntity.getCameraPosVec(1.0f)
         val direction = cameraEntity.getRotationVec(1.0f)
-        val vanillaReach = player.blockInteractionRange
+        val vanillaReach = player.blockInteractionRange()
         val maxDistance = if (infiniteReach) AxionTargeting.DEFAULT_REACH else vanillaReach
 
         // Raycast to find target block
@@ -1406,7 +1390,7 @@ object ClientModeController {
             ),
         )
 
-        if (hit.type != HitResult.Type.BLOCK) {
+        if (hit.type.name != "BLOCK") {
             return
         }
 
@@ -1418,26 +1402,37 @@ object ClientModeController {
             return
         }
 
-        val distSq = origin.squaredDistanceTo(Vec3d.ofCenter(targetPos))
+        val distSq = origin.squaredDistanceTo(Vec3d(targetPos.x + 0.5, targetPos.y + 0.5, targetPos.z + 0.5))
         val beyondVanillaReach = distSq > (vanillaReach * vanillaReach)
 
         if (!beyondVanillaReach) {
             // Within vanilla range - use vanilla attackBlock for proper client prediction
             // This prevents ghost blocks by letting the client handle the break prediction
-            client.interactionManager?.attackBlock(targetPos, blockHit.side)
-            SymmetryBreakController.dispatchDerivedBreaks(client, targetPos)
+            client.interactionManager?.attackBlock(BlockPos(targetPos), blockHit.side)
+            SymmetryBreakController.dispatchDerivedBreaks(client, BlockPos(targetPos))
         } else {
             // Beyond vanilla range - use dispatch for infinite reach breaking
             dispatcher.dispatch(
                 ClearRegionOperation(
-                    BlockRegion(targetPos, targetPos),
+                    BlockRegion(BlockPos(targetPos), BlockPos(targetPos)),
                 ),
             )
-            SymmetryBreakController.dispatchDerivedBreaks(client, targetPos)
-            playBreakEffects(client, targetPos, brokenState)
+            SymmetryBreakController.dispatchDerivedBreaks(client, BlockPos(targetPos))
+            playBreakEffects(client, BlockPos(targetPos), brokenState)
         }
 
         player.swingHand(Hand.MAIN_HAND)
+    }
+
+    private fun nearestDirection(vector: Vec3d): Direction {
+        val ax = kotlin.math.abs(vector.x)
+        val ay = kotlin.math.abs(vector.y)
+        val az = kotlin.math.abs(vector.z)
+        return when {
+            ay >= ax && ay >= az -> if (vector.y >= 0.0) Direction.UP else Direction.DOWN
+            ax >= az -> if (vector.x >= 0.0) Direction.EAST else Direction.WEST
+            else -> if (vector.z >= 0.0) Direction.SOUTH else Direction.NORTH
+        }
     }
 
     private fun dispatchBatch(operations: List<axion.common.operation.EditOperation>) {

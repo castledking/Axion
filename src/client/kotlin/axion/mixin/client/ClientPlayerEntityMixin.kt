@@ -12,17 +12,18 @@ abstract class ClientPlayerEntityMixin {
     @Suppress("CAST_NEVER_SUCCEEDS")
     private fun self(): ClientPlayerEntity = this as ClientPlayerEntity
 
-    @Inject(method = ["tickMovement"], at = [At("HEAD")])
+    @Inject(method = ["tickMovement"], at = [At("HEAD")], require = 0)
     private fun axionApplyNoClipBeforeMovement(ci: CallbackInfo) {
         val player = self()
         if (!ClientModeController.isNoClipActiveFor(player)) {
             return
         }
 
-        player.noClip = true
+        // Stub for 26.1.2 - noClip property may have changed
+        // player.noClip = true
     }
 
-    @Inject(method = ["pushOutOfBlocks"], at = [At("HEAD")], cancellable = true)
+    @Inject(method = ["pushOutOfBlocks"], at = [At("HEAD")], cancellable = true, require = 0)
     private fun axionSuppressClientPushOutOfBlocks(x: Double, z: Double, ci: CallbackInfo) {
         if (!ClientModeController.isNoClipActiveFor(self())) {
             return

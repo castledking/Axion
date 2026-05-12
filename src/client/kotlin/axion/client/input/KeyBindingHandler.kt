@@ -1,9 +1,9 @@
 package axion.client.input
 
 import axion.common.compat.VersionCompat
+import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.option.KeyBinding
-import net.minecraft.client.util.InputUtil
 import org.lwjgl.glfw.GLFW
 import java.lang.reflect.Field
 
@@ -30,7 +30,7 @@ object KeyBindingHandler {
         }.getOrElse {
             // Fallback: search for InputUtil.Key typed non-static mutable fields
             KeyBinding::class.java.declaredFields.firstOrNull { f ->
-                f.type == InputUtil.Key::class.java && !java.lang.reflect.Modifier.isStatic(f.modifiers)
+                f.type == InputConstants.Key::class.java && !java.lang.reflect.Modifier.isStatic(f.modifiers)
                     && !java.lang.reflect.Modifier.isFinal(f.modifiers)
             }?.also { it.isAccessible = true }
         }
@@ -107,8 +107,10 @@ object KeyBindingHandler {
     private fun getBoundKeyCode(keyBinding: KeyBinding): Int? {
         return runCatching {
             val field = boundKeyField ?: return null
-            val key = field.get(keyBinding) as? InputUtil.Key ?: return null
-            key.code
+            val key = field.get(keyBinding) as? InputConstants.Key ?: return null
+            key.javaClass.methods.firstOrNull { it.name == "getValue" && it.parameterCount == 0 }
+                ?.invoke(key) as? Int
+                ?: key.javaClass.fields.firstOrNull { it.name == "code" }?.get(key) as? Int
         }.getOrNull()
     }
 }

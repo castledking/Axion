@@ -37,5 +37,7 @@ bin/
 .kotlin/
 .modrinth/
 .idea/
-run/logs
+**/run/*
 *.txt
+docs/
+

@@ -2,6 +2,8 @@ package axion.client.tool
 
 import axion.common.model.BlockRegion
 import axion.common.model.ClipboardBuffer
+import axion.client.tool.directionGetFacing
+import axion.client.compat.add
 import net.minecraft.client.MinecraftClient
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Direction
@@ -141,7 +143,7 @@ object ClonePlacementService {
 
     private fun dominantLookDirection(client: MinecraftClient): Direction {
         val look = client.player?.rotationVecClient ?: return Direction.UP
-        return Direction.getFacing(look)
+        return directionGetFacing(look)
     }
 
     private fun dominantMirrorAxis(client: MinecraftClient): PlacementMirrorAxis {

@@ -9,21 +9,10 @@ import org.spongepowered.asm.mixin.Shadow
 import org.spongepowered.asm.mixin.injection.At
 import org.spongepowered.asm.mixin.injection.Inject
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo
+import java.lang.reflect.Method
 
 @Mixin(Entity::class)
 abstract class EntityMixin {
-    @Shadow
-    public var horizontalCollision: Boolean = false
-
-    @Shadow
-    public var verticalCollision: Boolean = false
-
-    @Shadow
-    public var groundCollision: Boolean = false
-
-    @Shadow
-    public var collidedSoftly: Boolean = false
-
     @Shadow
     public abstract fun getX(): Double
 
@@ -33,11 +22,13 @@ abstract class EntityMixin {
     @Shadow
     public abstract fun getZ(): Double
 
-    @Shadow
-    public abstract fun setPosition(x: Double, y: Double, z: Double)
-
     @Suppress("CAST_NEVER_SUCCEEDS")
     private fun self(): Entity = this as Entity
+
+    private fun setPositionCompat(x: Double, y: Double, z: Double) {
+        val method = SET_POS_METHOD ?: return
+        method.invoke(self(), x, y, z)
+    }
 
     @Inject(method = ["move"], at = [At("HEAD")], cancellable = true)
     private fun axionApplyNoClipMovement(type: MovementType, movement: Vec3d, ci: CallbackInfo) {
@@ -45,20 +36,60 @@ abstract class EntityMixin {
             return
         }
 
-        setPosition(getX() + movement.x, getY() + movement.y, getZ() + movement.z)
-        horizontalCollision = false
-        verticalCollision = false
-        groundCollision = false
-        collidedSoftly = false
+        setPositionCompat(getX() + movement.x, getY() + movement.y, getZ() + movement.z)
+        self().clearCollisionFlags()
         ci.cancel()
     }
 
-    @Inject(method = ["pushOutOfBlocks"], at = [At("HEAD")], cancellable = true)
+    @Inject(method = ["pushOutOfBlocks"], at = [At("HEAD")], cancellable = true, require = 0)
     private fun axionSuppressPushOutOfBlocks(x: Double, y: Double, z: Double, ci: CallbackInfo) {
         if (!ClientModeController.isNoClipActiveFor(self())) {
             return
         }
 
         ci.cancel()
+    }
+
+}
+
+private val SET_POS_METHOD: Method? by lazy {
+    val entityClass = Entity::class.java
+    val parameters = arrayOf(Double::class.javaPrimitiveType, Double::class.javaPrimitiveType, Double::class.javaPrimitiveType)
+    sequenceOf("setPos", "setPosition")
+        .mapNotNull { name ->
+            try {
+                entityClass.getMethod(name, *parameters)
+            } catch (_: NoSuchMethodException) {
+                null
+            }
+        }
+        .firstOrNull()
+}
+
+private val COLLISION_FIELD_NAMES = listOf(
+    "horizontalCollision",
+    "verticalCollision",
+    "groundCollision",
+    "collidedSoftly",
+    "collidesHorizontally",
+    "collidesVertically",
+    "collides",
+)
+
+private fun Entity.clearCollisionFlags() {
+    for (name in COLLISION_FIELD_NAMES) {
+        try {
+            val field = javaClass.getDeclaredField(name)
+            if (!field.trySetAccessible()) {
+                continue
+            }
+            when (field.type) {
+                Boolean::class.javaPrimitiveType, Boolean::class.javaObjectType -> field.setBoolean(this, false)
+            }
+        } catch (_: NoSuchFieldException) {
+            // Ignore missing fields – names changed between versions.
+        } catch (_: IllegalAccessException) {
+            // Ignore inaccessible fields.
+        }
     }
 }

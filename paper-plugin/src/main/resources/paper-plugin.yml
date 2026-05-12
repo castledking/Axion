@@ -3,7 +3,7 @@ version: ${version}
 main: axion.server.paper.AxionPaperPlugin
 api-version: "1.21"
 folia-supported: true
-author: CASTLEDKING
+author: castledking
 website: https://castled.codes
 dependencies:
   server:

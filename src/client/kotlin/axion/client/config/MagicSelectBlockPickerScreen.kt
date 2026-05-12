@@ -1,6 +1,7 @@
 package axion.client.config
 
 import axion.client.ui.drawStrokedRectangleCompat
+import axion.common.compat.VersionCompat
 import net.minecraft.block.Block
 import net.minecraft.client.gui.DrawContext
 import net.minecraft.client.gui.screen.Screen
@@ -48,7 +49,7 @@ class MagicSelectBlockPickerScreen(
             } else {
                 BlockEntry(
                     block = block,
-                    id = Registries.BLOCK.getId(block),
+                    id = VersionCompat.INSTANCE.getBlockId(block),
                     label = item.name.string.lowercase(),
                 )
             }

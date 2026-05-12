@@ -17,12 +17,13 @@ import axion.client.render.PlacementPreviewRenderer
 import axion.client.render.SmearPreviewRenderer
 import axion.client.render.StackPreviewRenderer
 import axion.client.render.WorldRenderCompat
+import axion.common.compat.VersionCompat
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 import net.minecraft.util.Identifier
 
 object AxionClientBootstrap {
-    private val hudId: Identifier = Identifier.of("axion", "side_hotbar")
-    private val hintHudId: Identifier = Identifier.of("axion", "tool_hints")
+    private val hudId: Identifier by lazy { VersionCompat.INSTANCE.identifierOf("axion", "side_hotbar") }
+    private val hintHudId: Identifier by lazy { VersionCompat.INSTANCE.identifierOf("axion", "tool_hints") }
 
     fun initialize() {
         VersionCompatInit.init()

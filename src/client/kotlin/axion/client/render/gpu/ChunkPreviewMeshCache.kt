@@ -5,6 +5,10 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet
 import net.minecraft.block.BlockState
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Box
+import axion.client.compat.MutableBlockPos
+import axion.client.compat.unpackLongX
+import axion.client.compat.unpackLongY
+import axion.client.compat.unpackLongZ
 
 /**
  * Per-section cache of surface-cell metadata, kept in lockstep with a
@@ -101,12 +105,12 @@ class ChunkPreviewMeshCache {
 }
 
 /**
- * Convenience: unpacks a packed-long surface-cell into a [BlockPos.Mutable]
- * without allocating. Hot loops should reuse a single Mutable across all
+ * Convenience: unpacks a packed-long surface-cell into a [MutableBlockPos]
+ * without allocating. Hot loops should reuse a single MutableBlockPos across all
  * cells in a section.
  */
-fun BlockPos.Mutable.setFromPacked(packed: Long): BlockPos.Mutable {
-    return this.set(BlockPos.unpackLongX(packed), BlockPos.unpackLongY(packed), BlockPos.unpackLongZ(packed))
+fun MutableBlockPos.setFromPacked(packed: Long): MutableBlockPos {
+    return this.set(unpackLongX(packed), unpackLongY(packed), unpackLongZ(packed))
 }
 
 /**

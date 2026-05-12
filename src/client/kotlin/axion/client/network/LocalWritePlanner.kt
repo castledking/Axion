@@ -1,5 +1,7 @@
 package axion.client.network
 
+import axion.client.config.defaultState
+import axion.common.compat.VersionCompat
 import axion.common.model.BlockEntityDataSnapshot
 import axion.common.model.BlockRegion
 import axion.common.operation.CloneEntitiesOperation
@@ -19,6 +21,9 @@ import net.minecraft.block.BlockState
 import net.minecraft.block.Blocks
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Vec3i
+import axion.client.hotbar.blockPosIterate
+import axion.client.compat.toImmutable
+import axion.client.compat.add
 import net.minecraft.world.World
 
 class LocalWritePlanner {
@@ -87,7 +92,7 @@ class LocalWritePlanner {
         writes: MutableList<BlockWrite>,
     ) {
         val region = operation.region.normalized()
-        BlockPos.iterate(region.minCorner(), region.maxCorner()).forEach { pos ->
+        blockPosIterate(region.minCorner(), region.maxCorner()).forEach { pos ->
             appendWrite(pos.toImmutable(), Blocks.AIR.defaultState, null, overlay, writes)
         }
     }
@@ -143,17 +148,32 @@ class LocalWritePlanner {
         overlay: MutableMap<BlockPos, BlockWrite>,
         writes: MutableList<BlockWrite>,
     ) {
-        if (operation.repeatCount <= 0) {
+        val smearOffsets = axion.client.tool.RegionRepeatPlacementService.smearOffsets(
+            operation.step,
+            operation.repeatCount,
+        )
+        if (smearOffsets.isEmpty()) {
             return
         }
 
         val source = operation.sourceRegion.normalized()
-        for (index in 1..operation.repeatCount) {
-            val destinationOrigin = source.minCorner().add(operation.step.multiply(index))
-            operation.clipboardBuffer.cells.forEach { cell ->
-                val destinationPos = destinationOrigin.add(cell.offset).toImmutable()
-                if (!currentStateAt(world, overlay, destinationPos).isAir) {
-                    return@forEach
+        val sourceOrigin = source.minCorner()
+        val sourcePositions = operation.clipboardBuffer.cells.mapTo(linkedSetOf()) { cell ->
+            sourceOrigin.add(cell.offset).toImmutable()
+        }
+
+        operation.clipboardBuffer.cells.forEach { cell ->
+            if (cell.state.isAir) {
+                return@forEach
+            }
+
+            for (offset in smearOffsets) {
+                val destinationPos = sourceOrigin
+                    .add(cell.offset)
+                    .add(offset)
+                    .toImmutable()
+                if (destinationPos !in sourcePositions && !currentStateAt(world, overlay, destinationPos).isAir) {
+                    break
                 }
 
                 appendWrite(destinationPos, cell.state, cell.blockEntityData, overlay, writes)
@@ -175,7 +195,7 @@ class LocalWritePlanner {
                     }
 
                     appendWrite(
-                        pos = sourcePos.add(operation.direction.vector),
+                        pos = sourcePos.add(VersionCompat.INSTANCE.directionGetVector(operation.direction) as net.minecraft.core.Vec3i),
                         state = operation.sourceState,
                         blockEntityData = currentBlockEntityAt(world, overlay, sourcePos),
                         overlay = overlay,
@@ -226,7 +246,7 @@ class LocalWritePlanner {
         val min = normalized.minCorner()
         val max = normalized.maxCorner()
         return buildList {
-            for (pos in BlockPos.iterate(min, max)) {
+            for (pos in blockPosIterate(min, max)) {
                 add(
                     CapturedCell(
                         offset = Vec3i(pos.x - min.x, pos.y - min.y, pos.z - min.z),

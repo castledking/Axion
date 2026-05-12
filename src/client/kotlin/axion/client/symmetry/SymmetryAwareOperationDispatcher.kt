@@ -1,6 +1,7 @@
 package axion.client.symmetry
 
 import axion.AxionMod
+import axion.common.compat.VersionCompat
 import axion.client.history.HistoryManager
 import axion.client.network.LocalOperationApplier
 import axion.client.network.LocalWritePlanner
@@ -39,29 +40,29 @@ class SymmetryAwareOperationDispatcher(
         }
 
         val client = MinecraftClient.getInstance()
-        val server = client.server
+        val server = VersionCompat.INSTANCE.clientGetServer(client)
         if (server == null) {
             networkDispatcher.dispatch(expandedOperation)
             return
         }
 
-        val worldKey = client.world?.registryKey
-        server.execute {
-            val targetWorld = server.getWorld(worldKey)
+        val worldKey = VersionCompat.INSTANCE.clientGetWorldRegistryKey(client)
+        VersionCompat.INSTANCE.serverExecute(server) {
+            val targetWorld = VersionCompat.INSTANCE.serverGetWorld(server, worldKey ?: return@serverExecute)
             if (targetWorld == null) {
                 AxionMod.LOGGER.warn("Dropping operation {} because no local world is available", expandedOperation.kind)
-                return@execute
+                return@serverExecute
             }
 
-            val plan = planner.plan(targetWorld, expandedOperation)
+            val plan = planner.plan(targetWorld as net.minecraft.world.level.Level, expandedOperation)
             if (plan.writes.isEmpty() && plan.entityMoves.isEmpty() && plan.entityClones.isEmpty() && plan.entityDeletes.isEmpty()) {
-                return@execute
+                return@serverExecute
             }
 
             if (recordHistory) {
-                HistoryManager.record(targetWorld, plan)
+                HistoryManager.record(targetWorld as net.minecraft.world.level.Level, plan)
             }
-            applier.apply(targetWorld, plan)
+            applier.apply(targetWorld as net.minecraft.world.level.Level, plan)
         }
     }
 }

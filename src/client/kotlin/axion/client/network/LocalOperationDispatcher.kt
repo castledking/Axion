@@ -2,6 +2,7 @@ package axion.client.network
 
 import axion.AxionMod
 import axion.client.history.HistoryManager
+import axion.common.compat.VersionCompat
 import axion.common.operation.EditOperation
 import axion.common.operation.OperationDispatcher
 import net.minecraft.client.MinecraftClient
@@ -14,32 +15,29 @@ class LocalOperationDispatcher : OperationDispatcher {
 
     override fun dispatch(operation: EditOperation) {
         if (!validator.validate(operation)) {
-            MinecraftClient.getInstance().player?.sendMessage(Text.literal(validator.lastFailureMessage ?: "Axion edit canceled."), false)
+            val client = MinecraftClient.getInstance()
+            client.player?.let { VersionCompat.INSTANCE.playerSendMessage(it, Text.literal(validator.lastFailureMessage ?: "Axion edit canceled."), false) }
             return
         }
 
         val client = MinecraftClient.getInstance()
-        val server = client.server
-        val worldKey = client.world?.registryKey
-        if (server == null) {
-            AxionMod.LOGGER.warn("Dropping operation {} because no integrated server is available", operation.kind)
-            return
-        }
+        val server = VersionCompat.INSTANCE.clientGetServer(client) ?: return
+        val worldKey = VersionCompat.INSTANCE.clientGetWorldRegistryKey(client) ?: return
 
-        server.execute {
-            val targetWorld = server.getWorld(worldKey)
+        VersionCompat.INSTANCE.serverExecute(server, Runnable {
+            val targetWorld = VersionCompat.INSTANCE.serverGetWorld(server, worldKey)
             if (targetWorld == null) {
                 AxionMod.LOGGER.warn("Dropping operation {} because no integrated server world is available", operation.kind)
-                return@execute
+                return@Runnable
             }
 
-            val plan = planner.plan(targetWorld, operation)
+            val plan = planner.plan(targetWorld as net.minecraft.world.World, operation)
             if (plan.writes.isEmpty() && plan.entityMoves.isEmpty() && plan.entityClones.isEmpty() && plan.entityDeletes.isEmpty()) {
-                return@execute
+                return@Runnable
             }
 
-            HistoryManager.record(targetWorld, plan)
-            applier.apply(targetWorld, plan)
-        }
+            HistoryManager.record(targetWorld as net.minecraft.world.World, plan)
+            applier.apply(targetWorld as net.minecraft.world.World, plan)
+        })
     }
 }

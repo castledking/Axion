@@ -8,8 +8,12 @@ import axion.common.model.ClipboardCell
 import net.minecraft.block.BlockState
 import net.minecraft.registry.Registries
 import net.minecraft.util.math.BlockPos
+import net.minecraft.util.math.Direction
 import net.minecraft.util.math.Vec3i
 import net.minecraft.world.World
+import axion.client.compat.toImmutable
+import axion.client.compat.add
+import java.util.ArrayDeque
 
 object MagicSelectionService {
     private const val DEFAULT_RADIUS: Int = 8
@@ -45,30 +49,12 @@ object MagicSelectionService {
             return null
         }
 
-        val selectedPositions = buildList {
-            for (x in center.x - radius..center.x + radius) {
-                for (y in center.y - radius..center.y + radius) {
-                    for (z in center.z - radius..center.z + radius) {
-                        val dx = x - center.x
-                        val dy = y - center.y
-                        val dz = z - center.z
-                        if ((dx * dx) + (dy * dy) + (dz * dz) > radiusSquared) {
-                            continue
-                        }
-
-                        val pos = BlockPos(x, y, z)
-                        if (pos == center) {
-                            add(pos.toImmutable())
-                            continue
-                        }
-                        val state = world.getBlockState(pos)
-                        if (matchesFamily(seedState, state)) {
-                            add(pos.toImmutable())
-                        }
-                    }
-                }
-            }
-        }
+        val selectedPositions = collectConnectedSelection(
+            world = world,
+            center = center,
+            radiusSquared = radiusSquared,
+            seedState = seedState,
+        )
 
         if (selectedPositions.isEmpty()) {
             return null
@@ -139,12 +125,55 @@ object MagicSelectionService {
         }
     }
 
+    private fun collectConnectedSelection(
+        world: World,
+        center: BlockPos,
+        radiusSquared: Int,
+        seedState: BlockState,
+    ): List<BlockPos> {
+        val selected = linkedSetOf<BlockPos>()
+        val visited = mutableSetOf<BlockPos>()
+        val queue = ArrayDeque<BlockPos>()
+        val centerPos = center.toImmutable()
+
+        visited += centerPos
+        queue += centerPos
+
+        while (queue.isNotEmpty()) {
+            val pos = queue.removeFirst()
+            val state = world.getBlockState(pos)
+            if (pos != centerPos && !matchesFamily(seedState, state)) {
+                continue
+            }
+
+            selected += pos
+
+            Direction.entries.forEach { direction ->
+                val next = pos.offset(direction.vector).toImmutable()
+                if (next in visited || !withinRadius(centerPos, next, radiusSquared)) {
+                    return@forEach
+                }
+                visited += next
+                queue += next
+            }
+        }
+
+        return selected.toList()
+    }
+
+    private fun withinRadius(center: BlockPos, candidate: BlockPos, radiusSquared: Int): Boolean {
+        val dx = candidate.x - center.x
+        val dy = candidate.y - center.y
+        val dz = candidate.z - center.z
+        return (dx * dx) + (dy * dy) + (dz * dz) <= radiusSquared
+    }
+
     private fun matchesFamily(seedState: BlockState, candidateState: BlockState): Boolean {
         if (candidateState.isAir) {
             return false
         }
         val enabledTemplates = AxionClientConfig.enabledMagicSelectTemplates()
-        if (enabledTemplates.isEmpty()) {
+        if (enabledTemplates.isEmpty() || shouldUseSameBlockFallback(enabledTemplates, seedState)) {
             return seedState.block == candidateState.block
         }
         return enabledTemplates.any { template ->
@@ -153,6 +182,37 @@ object MagicSelectionService {
                     .mapNotNull(AxionClientConfig::customMaskById)
                     .any { mask -> customMaskMatches(mask, seedState, candidateState) }
         }
+    }
+
+    private fun shouldUseSameBlockFallback(
+        enabledTemplates: List<axion.client.config.MagicSelectTemplateConfig>,
+        seedState: BlockState,
+    ): Boolean {
+        if (!AxionClientConfig.sameBlockMagicSelectEnabled()) {
+            return false
+        }
+        return enabledTemplates.none { template ->
+            templateIncludesSeed(template, seedState)
+        }
+    }
+
+    private fun templateIncludesSeed(
+        template: axion.client.config.MagicSelectTemplateConfig,
+        seedState: BlockState,
+    ): Boolean {
+        val seedId = blockId(seedState)
+        if (seedId in template.customBlockIds) {
+            return true
+        }
+        if (template.rules().any { rule -> rule.includes(seedState) }) {
+            return true
+        }
+        return template.selectedCustomMaskIds
+            .mapNotNull(AxionClientConfig::customMaskById)
+            .any { mask ->
+                seedId !in mask.excludedBlockIds &&
+                    (seedId in mask.customBlockIds || mask.rules().any { rule -> rule.includes(seedState) })
+            }
     }
 
     private fun templateMatches(

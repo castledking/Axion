@@ -25,7 +25,7 @@ object SelectionBounds {
 
     fun regionBox(region: BlockRegion): Box = region.normalized().toBox()
 
-    fun outlineBox(box: Box): Box = box.expand(OUTLINE_PADDING)
+    fun outlineBox(box: Box): Box = box.expand(OUTLINE_PADDING, OUTLINE_PADDING, OUTLINE_PADDING)
 
     fun faceBox(pos: BlockPos, face: RegionFace): Box {
         val box = blockBox(pos)
@@ -56,7 +56,7 @@ object SelectionBounds {
     fun outwardFaceToward(region: BlockRegion, target: BlockPos, point: Vec3d): RegionFace? {
         val normalized = region.normalized()
         val box = regionBox(normalized)
-        val center = Vec3d.ofCenter(target)
+        val center = Vec3d(target.x + 0.5, target.y + 0.5, target.z + 0.5)
         val candidates = buildList {
             if (target.x < normalized.start.x) {
                 add(
@@ -192,7 +192,7 @@ object SelectionBounds {
 
         return FaceHit(
             face = face,
-            point = origin.add(direction.multiply(t)),
+            point = origin.add(direction.x * t, direction.y * t, direction.z * t),
         )
     }
 

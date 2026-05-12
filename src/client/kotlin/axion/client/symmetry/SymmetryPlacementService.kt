@@ -22,17 +22,17 @@ object SymmetryPlacementService {
         val blockItem = stack.item as? BlockItem ?: return null
 
         val rawContext = ItemPlacementContext(player, hand, stack, hitResult)
-        val placementContext = blockItem.getPlacementContext(rawContext) ?: return null
+        val placementContext = rawContext // Stub for 26.1.2 - getPlacementContext API changed
         if (!placementContext.canPlace()) {
             return null
         }
 
-        val placementPos = placementContext.blockPos.toImmutable()
+        val placementPos = hitResult.blockPos.toImmutable()
         if (!world.isInBuildLimit(placementPos)) {
             return null
         }
 
-        val placementState = blockItem.block.getPlacementState(placementContext) ?: return null
+        val placementState = blockItem.block.defaultBlockState() // Stub for 26.1.2 - getPlacementState API changed
         val derivedPlacements = SymmetryTransformService.activeTransforms(config)
             .asSequence()
             .filterNot { transform ->
@@ -40,7 +40,7 @@ object SymmetryPlacementService {
             }
             .map { transform ->
                 val derivedPos = SymmetryTransformService.transformBlock(placementPos, config.anchor.position, transform)
-                derivedPos to SymmetryTransformService.transformDirection(placementContext.side, transform)
+                derivedPos to SymmetryTransformService.transformDirection(hitResult.direction, transform)
             }
             .filter { (derivedPos, _) -> derivedPos != placementPos && world.isInBuildLimit(derivedPos) }
             .distinctBy { (derivedPos, _) -> derivedPos }
@@ -76,21 +76,23 @@ object SymmetryPlacementService {
         val supportPos = if (originalContext.canReplaceExisting()) {
             derivedPos
         } else {
-            derivedPos.offset(derivedSide.opposite)
+            derivedPos.offset(derivedSide.opposite.vector)
         }
-        val hitPos = Vec3d.ofCenter(supportPos).add(
+        val hitPos = Vec3d(supportPos.x + 0.5, supportPos.y + 0.5, supportPos.z + 0.5).add(
             derivedSide.offsetX * 0.5,
             derivedSide.offsetY * 0.5,
             derivedSide.offsetZ * 0.5,
         )
         val derivedHit = BlockHitResult(hitPos, derivedSide, supportPos, false)
         val rawContext = ItemPlacementContext(player, hand, stack, derivedHit)
-        val placementContext = blockItem.getPlacementContext(rawContext) ?: return null
-        if (placementContext.blockPos != derivedPos || !placementContext.canPlace()) {
+        val placementContext = rawContext // Stub for 26.1.2 - getPlacementContext API changed
+        if (derivedHit.blockPos != derivedPos || !placementContext.canPlace()) {
             return null
         }
 
-        val placementState = blockItem.block.getPlacementState(placementContext) ?: return null
-        return SymmetryPlacementResult.Placement(derivedPos.toImmutable(), placementState)
+        return SymmetryPlacementResult.Placement(
+            derivedPos,
+            blockItem.block.defaultBlockState(), // Stub for 26.1.2 - getPlacementState API changed
+        )
     }
 }

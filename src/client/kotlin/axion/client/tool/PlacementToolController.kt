@@ -11,6 +11,7 @@ import axion.protocol.AxionTransportCodec
 import net.minecraft.client.MinecraftClient
 import net.minecraft.text.Text
 import net.minecraft.util.math.BlockPos
+import axion.client.compat.toImmutable
 
 object PlacementToolController {
     private val dispatcher = SymmetryAwareOperationDispatcher()

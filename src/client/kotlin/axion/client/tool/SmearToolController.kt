@@ -9,6 +9,7 @@ import axion.common.model.BlockRegion
 import axion.common.model.ClipboardState
 import axion.common.model.SelectionState
 import net.minecraft.client.MinecraftClient
+import axion.client.compat.toImmutable
 
 object SmearToolController {
     private val dispatcher = SymmetryAwareOperationDispatcher()

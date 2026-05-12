@@ -25,5 +25,5 @@ data class ClipboardCell(
     val state: BlockState,
     val blockEntityData: BlockEntityDataSnapshot? = null,
 ) {
-    fun absolutePos(origin: BlockPos): BlockPos = origin.add(offset)
+    fun absolutePos(origin: BlockPos): BlockPos = origin.offset(offset)
 }

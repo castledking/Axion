@@ -3,11 +3,8 @@
   "package": "axion.mixin.client",
   "compatibilityLevel": "JAVA_21",
   "client": [
-    "CameraAccessor",
     "ClientPlayerEntityMixin",
-    "ClientPlayerInteractionManagerAccessor",
     "EntityMixin",
-    "MinecraftClientAccessor",
     "MinecraftClientMixin",
     "MouseMixin",
     "PlayerEntityPoseMixin",

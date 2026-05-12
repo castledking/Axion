@@ -27,11 +27,14 @@ object AxionTargeting {
     const val DEFAULT_REACH: Double = 256.0
 
     fun fromBlockHit(origin: Vec3d, hit: BlockHitResult): AxionTarget.FaceTarget {
+        val dx = hit.pos.x - origin.x
+        val dy = hit.pos.y - origin.y
+        val dz = hit.pos.z - origin.z
         return AxionTarget.FaceTarget(
             blockPos = hit.blockPos.toImmutable(),
             face = hit.side.toRegionFace(),
             hitPos = hit.pos,
-            squaredDistance = origin.squaredDistanceTo(hit.pos),
+            squaredDistance = dx * dx + dy * dy + dz * dz,
         )
     }
 }

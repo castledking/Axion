@@ -2,6 +2,7 @@ package axion.client.tool
 
 import axion.client.selection.AxionTarget
 import axion.client.selection.toDirection
+import axion.client.tool.directionGetFacing
 import net.minecraft.client.MinecraftClient
 import net.minecraft.util.math.Direction
 
@@ -16,6 +17,6 @@ object ExtrudeTargetService {
 
     private fun dominantLookDirection(client: MinecraftClient): Direction {
         val look = client.player?.rotationVecClient ?: return Direction.UP
-        return Direction.getFacing(look)
+        return directionGetFacing(look)
     }
 }

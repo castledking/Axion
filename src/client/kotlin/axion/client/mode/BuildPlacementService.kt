@@ -238,7 +238,7 @@ object BuildPlacementService {
         for (face in facesToTry) {
             val supportPos = pos.offset(face.opposite)
             if (world.getBlockState(supportPos).isAir) continue
-            val hitPos = Vec3d.ofCenter(supportPos).add(
+            val hitPos = centerOf(supportPos).add(
                 face.offsetX * 0.5,
                 face.offsetY * 0.5,
                 face.offsetZ * 0.5,
@@ -325,7 +325,7 @@ object BuildPlacementService {
         side: Direction,
     ): SymmetryBlockPlacement? {
         val supportPos = pos.offset(side.opposite)
-        val hitPos = Vec3d.ofCenter(supportPos).add(
+        val hitPos = centerOf(supportPos).add(
             side.offsetX * 0.5,
             side.offsetY * 0.5,
             side.offsetZ * 0.5,
@@ -368,4 +368,7 @@ object BuildPlacementService {
             BooleanBiFunction.AND,
         )
     }
+
+    private fun centerOf(pos: BlockPos): Vec3d =
+        Vec3d(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5)
 }

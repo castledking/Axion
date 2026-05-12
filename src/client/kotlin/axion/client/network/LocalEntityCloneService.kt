@@ -1,6 +1,7 @@
 package axion.client.network
 
 import axion.client.compat.VersionCompatImpl
+import axion.common.compat.VersionCompat
 import axion.common.history.EntityCloneChange
 import axion.common.operation.CloneEntitiesOperation
 import axion.common.operation.EntityMoveMirrorAxis
@@ -32,9 +33,9 @@ object LocalEntityCloneService {
             .map(::rootEntity)
             .filter { entity ->
                 entity !is PlayerEntity &&
-                    !entity.isRemoved &&
-                    entity.vehicle == null &&
-                    seen.add(entity.uuid)
+                    !VersionCompat.INSTANCE.entityIsRemoved(entity) &&
+                    VersionCompat.INSTANCE.entityGetVehicle(entity) == null &&
+                    seen.add(VersionCompat.INSTANCE.entityGetUuid(entity))
             }
             .flatMap { entity ->
                 planEntityTree(
@@ -61,34 +62,34 @@ object LocalEntityCloneService {
             startRidingCompat(child, parent)
         }
         spawned.values
-            .filter { it.vehicle == null }
+            .filter { VersionCompat.INSTANCE.entityGetVehicle(it) == null }
             .forEach(::refreshPassengerPositions)
     }
 
     fun remove(world: World, clones: List<EntityCloneChange>) {
         val serverWorld = world as? ServerWorld ?: return
         clones.forEach { clone ->
-            serverWorld.getEntity(clone.entityId)?.remove(Entity.RemovalReason.DISCARDED)
+            serverWorld.getEntity(clone.entityId)?.discard()
         }
     }
 
     private fun spawnClone(world: ServerWorld, clone: EntityCloneChange): Entity? {
         val tag = clone.entityData.copy()
         stripUuids(tag)
-        val entity = EntityType.loadEntityWithPassengers(tag, world, SpawnReason.COMMAND) { entity ->
-            entity.setUuid(clone.entityId)
-            entity.refreshPositionAndAngles(clone.pos.x, clone.pos.y, clone.pos.z, clone.yaw, clone.pitch)
+        val entity = VersionCompat.INSTANCE.entityTypeLoadEntityWithPassengers(tag, world, SpawnReason.COMMAND) { entity ->
+            VersionCompat.INSTANCE.entitySetUuid(entity, clone.entityId)
             entity
         } ?: return null
-        world.spawnNewEntityAndPassengers(entity)
-        return entity
+        VersionCompat.INSTANCE.worldSpawnNewEntityAndPassengers(world, entity)
+        return entity as? Entity
     }
 
     private fun capture(entity: Entity): NbtCompound? {
         val tag = VersionCompatImpl.captureEntityData(entity) ?: return null
         val passengers = NbtList()
-        entity.getPassengerList().forEach { passenger ->
-            capture(passenger)?.let(passengers::add)
+        VersionCompat.INSTANCE.entityGetPassengerList(entity).forEach { passenger ->
+            val p = passenger as? Entity ?: return@forEach
+            capture(p)?.let(passengers::add)
         }
         if (!passengers.isEmpty()) {
             tag.put("Passengers", passengers)
@@ -108,8 +109,8 @@ object LocalEntityCloneService {
 
     private fun rootEntity(entity: Entity): Entity {
         var current = entity
-        while (current.vehicle != null) {
-            current = current.vehicle!!
+        while (VersionCompat.INSTANCE.entityGetVehicle(current) != null) {
+            current = VersionCompat.INSTANCE.entityGetVehicle(current) as Entity
         }
         return current
     }
@@ -124,8 +125,8 @@ object LocalEntityCloneService {
         val snapshot = capture(entity) ?: return emptyList()
         stripUuids(snapshot)
         val target = transformEntity(
-            position = Vec3d(entity.x, entity.y, entity.z),
-            direction = directionFromAngles(entity.yaw, entity.pitch),
+            position = Vec3d(VersionCompat.INSTANCE.entityGetX(entity), VersionCompat.INSTANCE.entityGetY(entity), VersionCompat.INSTANCE.entityGetZ(entity)),
+            direction = directionFromAngles(VersionCompat.INSTANCE.entityGetYaw(entity), VersionCompat.INSTANCE.entityGetPitch(entity)),
             sourceMin = sourceMin,
             sourceMax = sourceMax,
             destinationOrigin = operation.destinationOrigin,
@@ -144,11 +145,12 @@ object LocalEntityCloneService {
                     pitch = target.pitch,
                 ),
             )
-            entity.getPassengerList().forEach { passenger ->
-                if (passenger !is PlayerEntity && !passenger.isRemoved) {
+            VersionCompat.INSTANCE.entityGetPassengerList(entity).forEach { passenger ->
+                val p = passenger as? Entity ?: return@forEach
+                if (p !is PlayerEntity && !VersionCompat.INSTANCE.entityIsRemoved(p)) {
                     addAll(
                         planEntityTree(
-                            entity = passenger,
+                            entity = p,
                             sourceMin = sourceMin,
                             sourceMax = sourceMax,
                             operation = operation,
@@ -161,9 +163,9 @@ object LocalEntityCloneService {
     }
 
     private fun refreshPassengerPositions(entity: Entity) {
-        entity.getPassengerList().forEach { passenger ->
-            entity.updatePassengerPosition(passenger)
-            refreshPassengerPositions(passenger)
+        VersionCompat.INSTANCE.entityGetPassengerList(entity).forEach { passenger ->
+            VersionCompat.INSTANCE.entityUpdatePassengerPosition(entity, passenger)
+            refreshPassengerPositions(passenger as Entity)
         }
     }
 

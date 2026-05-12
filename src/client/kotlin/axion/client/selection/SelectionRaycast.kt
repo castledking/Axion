@@ -12,7 +12,7 @@ object SelectionRaycast {
         val cameraEntity = client.cameraEntity ?: client.player ?: return AxionTarget.MissTarget
         val origin = cameraEntity.getCameraPosVec(1.0f)
         val direction = cameraEntity.getRotationVec(1.0f)
-        val target = origin.add(direction.multiply(maxDistance))
+        val target = origin.add(direction.x * maxDistance, direction.y * maxDistance, direction.z * maxDistance)
         val hit = world.raycast(
             RaycastContext(
                 origin,
@@ -23,8 +23,8 @@ object SelectionRaycast {
             ),
         )
 
-        return if (hit.type == net.minecraft.util.hit.HitResult.Type.BLOCK) {
-            AxionTargeting.fromBlockHit(origin, hit as net.minecraft.util.hit.BlockHitResult)
+        return if (hit.type == net.minecraft.world.phys.HitResult.Type.BLOCK) {
+            AxionTargeting.fromBlockHit(origin, hit as net.minecraft.world.phys.BlockHitResult)
         } else {
             AxionTarget.MissTarget
         }

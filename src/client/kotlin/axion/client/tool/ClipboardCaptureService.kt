@@ -6,6 +6,7 @@ import axion.common.model.ClipboardCell
 import axion.client.network.BlockEntitySnapshotService
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Vec3i
+import axion.client.hotbar.blockPosIterate
 import net.minecraft.world.World
 
 object ClipboardCaptureService {
@@ -14,7 +15,7 @@ object ClipboardCaptureService {
         val min = normalized.minCorner()
         val max = normalized.maxCorner()
         val cells = buildList {
-            for (pos in BlockPos.iterate(min, max)) {
+            for (pos in blockPosIterate(min, max)) {
                 add(
                     ClipboardCell(
                         offset = Vec3i(pos.x - min.x, pos.y - min.y, pos.z - min.z),

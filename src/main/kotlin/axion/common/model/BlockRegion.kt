@@ -59,12 +59,12 @@ data class BlockRegion(
         val normalized = normalized()
         val clampedAmount = amount.coerceAtLeast(1)
         return when (face) {
-            RegionFace.DOWN -> BlockRegion(normalized.start.add(0, -clampedAmount, 0), normalized.end)
-            RegionFace.UP -> BlockRegion(normalized.start, normalized.end.add(0, clampedAmount, 0))
-            RegionFace.NORTH -> BlockRegion(normalized.start.add(0, 0, -clampedAmount), normalized.end)
-            RegionFace.SOUTH -> BlockRegion(normalized.start, normalized.end.add(0, 0, clampedAmount))
-            RegionFace.WEST -> BlockRegion(normalized.start.add(-clampedAmount, 0, 0), normalized.end)
-            RegionFace.EAST -> BlockRegion(normalized.start, normalized.end.add(clampedAmount, 0, 0))
+            RegionFace.DOWN -> BlockRegion(normalized.start.offset(0, -clampedAmount, 0), normalized.end)
+            RegionFace.UP -> BlockRegion(normalized.start, normalized.end.offset(0, clampedAmount, 0))
+            RegionFace.NORTH -> BlockRegion(normalized.start.offset(0, 0, -clampedAmount), normalized.end)
+            RegionFace.SOUTH -> BlockRegion(normalized.start, normalized.end.offset(0, 0, clampedAmount))
+            RegionFace.WEST -> BlockRegion(normalized.start.offset(-clampedAmount, 0, 0), normalized.end)
+            RegionFace.EAST -> BlockRegion(normalized.start, normalized.end.offset(clampedAmount, 0, 0))
         }
     }
 
@@ -78,7 +78,7 @@ data class BlockRegion(
     }
 
     fun offset(delta: Vec3i): BlockRegion {
-        return BlockRegion(start.add(delta), end.add(delta))
+        return BlockRegion(start.offset(delta), end.offset(delta))
     }
 
     fun oppositeCorner(anchor: BlockPos): BlockPos {

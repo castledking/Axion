@@ -1,6 +1,7 @@
 package axion.client.symmetry
 
 import axion.client.selection.AxionTarget
+import axion.client.symmetry.directionGetFacing
 import axion.common.model.SymmetryMirrorAxis
 import axion.common.model.SymmetryAnchor
 import net.minecraft.client.MinecraftClient
@@ -25,8 +26,8 @@ object SymmetryTargetService {
     fun resolveNudgeDirection(client: MinecraftClient, target: AxionTarget): Direction {
         return when (target) {
             is AxionTarget.FaceTarget -> target.face.direction
-            is AxionTarget.BlockTarget -> Direction.getFacing(client.player?.rotationVecClient ?: Vec3d(0.0, 1.0, 0.0))
-            AxionTarget.MissTarget -> Direction.getFacing(client.player?.rotationVecClient ?: Vec3d(0.0, 1.0, 0.0))
+            is AxionTarget.BlockTarget -> directionGetFacing(client.player?.rotationVecClient ?: Vec3d(0.0, 1.0, 0.0))
+            AxionTarget.MissTarget -> directionGetFacing(client.player?.rotationVecClient ?: Vec3d(0.0, 1.0, 0.0))
         }
     }
 

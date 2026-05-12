@@ -16,6 +16,8 @@ import axion.common.operation.SymmetryPlacementOperation
 import net.minecraft.block.Blocks
 import net.minecraft.client.MinecraftClient
 import net.minecraft.util.math.BlockPos
+import axion.client.compat.toImmutable
+import axion.client.compat.add
 
 object EraseToolController {
     private val dispatcher = SymmetryAwareOperationDispatcher()

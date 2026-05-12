@@ -11,6 +11,7 @@ import axion.common.model.SelectionState
 import net.minecraft.client.MinecraftClient
 import axion.client.tool.ClipboardTransformService
 import axion.client.tool.PlacementMirrorAxis
+import axion.client.compat.toImmutable
 
 object StackToolController {
     private val dispatcher = SymmetryAwareOperationDispatcher()

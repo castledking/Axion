@@ -74,7 +74,7 @@ class AxionOperationValidator(
             }
 
             is StackRegionRequest -> validateRepeatedClipboard(operation.sourceOrigin, operation.cells, operation.step, operation.repeatCount)
-            is SmearRegionRequest -> validateRepeatedClipboard(operation.sourceOrigin, operation.cells, operation.step, operation.repeatCount)
+            is SmearRegionRequest -> validateSmearedClipboard(operation.sourceOrigin, operation.cells, operation.step, operation.repeatCount)
             is ExtrudeRequest -> validateExtrude(operation)
             is PlaceBlocksRequest -> validatePlacedBlocks(operation)
         }
@@ -183,6 +183,59 @@ class AxionOperationValidator(
         return null
     }
 
+    private fun validateSmearedClipboard(
+        sourceOrigin: IntVector3,
+        cells: List<axion.protocol.ClipboardCellPayload>,
+        offset: IntVector3,
+        repeatCount: Int,
+    ): AxionRejection? {
+        if (repeatCount <= 0) {
+            return AxionRejection(
+                code = AxionResultCode.REPEAT_LIMIT_EXCEEDED,
+                source = AxionResultSource.REQUEST,
+                message = "Smear offset must be non-zero",
+            )
+        }
+
+        if (repeatCount > policy.maxRepeatCount) {
+            return AxionRejection(
+                code = AxionResultCode.REPEAT_LIMIT_EXCEEDED,
+                source = AxionResultSource.POLICY,
+                message = "Smear offset exceeds the configured repeat limit for world ${world.name}",
+            )
+        }
+
+        if (cells.size > policy.maxClipboardCells) {
+            return AxionRejection(
+                code = AxionResultCode.CLIPBOARD_LIMIT_EXCEEDED,
+                source = AxionResultSource.POLICY,
+                message = "Clipboard is too large",
+            )
+        }
+
+        if (cells.size.toLong() * repeatCount.toLong() > policy.maxTotalWrites.toLong()) {
+            return AxionRejection(
+                code = AxionResultCode.WRITE_LIMIT_EXCEEDED,
+                source = AxionResultSource.POLICY,
+                message = "Edit expands to too many writes",
+            )
+        }
+
+        smearOffsets(offset, repeatCount).forEach { smearOffset ->
+            cells.forEach { cell ->
+                val y = sourceOrigin.y + cell.offset.y + smearOffset.y
+                if (y < world.minHeight || y >= world.maxHeight) {
+                    return AxionRejection(
+                        code = AxionResultCode.VALIDATION_FAILED,
+                        source = AxionResultSource.REQUEST,
+                        message = "Edit is outside build height",
+                    )
+                }
+            }
+        }
+        return null
+    }
+
     private fun validateExtrude(operation: ExtrudeRequest): AxionRejection? {
         val origin = operation.origin
         if (origin.y < world.minHeight || origin.y >= world.maxHeight) {
@@ -208,3 +261,16 @@ class AxionOperationValidator(
 }
 
 private fun abs(value: Int): Int = kotlin.math.abs(value)
+
+private fun smearOffsets(offset: IntVector3, steps: Int): List<IntVector3> {
+    if (steps <= 0) {
+        return emptyList()
+    }
+    return (1..steps).map { index ->
+        IntVector3(
+            java.lang.Math.round(index * offset.x.toFloat() / steps),
+            java.lang.Math.round(index * offset.y.toFloat() / steps),
+            java.lang.Math.round(index * offset.z.toFloat() / steps),
+        )
+    }.distinct()
+}

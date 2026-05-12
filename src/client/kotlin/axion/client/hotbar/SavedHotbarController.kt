@@ -5,6 +5,7 @@ import axion.client.config.AxionClientConfig
 import axion.client.config.SavedHotbarConfig
 import axion.client.input.AxionModifierKeys
 import axion.client.tool.AxionToolSelectionController
+import axion.common.compat.VersionCompat
 import io.netty.buffer.Unpooled
 import net.minecraft.client.MinecraftClient
 import net.minecraft.item.ItemStack
@@ -193,12 +194,22 @@ object SavedHotbarController {
             return null
         }
 
+        // Use VersionCompat helper for 26.1.x, fall back to reflection for older versions
+        val bytes = VersionCompat.INSTANCE.itemStackEncode(registryManager, stack)
+        if (bytes != null) {
+            return Base64.getEncoder().encodeToString(bytes)
+        }
+
+        // Fallback to reflection for older versions
         return runCatching {
             val buf = RegistryByteBuf(Unpooled.buffer(), registryManager)
-            ItemStack.PACKET_CODEC.encode(buf, stack)
-            val bytes = ByteArray(buf.readableBytes())
-            buf.getBytes(0, bytes)
-            Base64.getEncoder().encodeToString(bytes)
+            itemStackStreamCodec().javaClass
+                .methods
+                .first { it.name == "encode" && it.parameterTypes.size == 2 }
+                .invoke(itemStackStreamCodec(), buf, stack)
+            val fallbackBytes = ByteArray(buf.readableBytes())
+            buf.getBytes(0, fallbackBytes)
+            Base64.getEncoder().encodeToString(fallbackBytes)
         }.getOrNull()
     }
 
@@ -212,12 +223,27 @@ object SavedHotbarController {
 
         stackCache[serialized]?.let { return it.copy() }
 
+        // Use VersionCompat helper for 26.1.x, fall back to reflection for older versions
+        val bytes = Base64.getDecoder().decode(serialized)
+        val decoded = VersionCompat.INSTANCE.itemStackDecode(registryManager, bytes)
+        if (decoded != null) {
+            return (decoded as ItemStack).also { stackCache[serialized] = it.copy() }
+        }
+
+        // Fallback to reflection for older versions
         return runCatching {
-            val bytes = Base64.getDecoder().decode(serialized)
             val buf = RegistryByteBuf(Unpooled.wrappedBuffer(bytes), registryManager)
-            ItemStack.PACKET_CODEC.decode(buf)
+            itemStackStreamCodec().javaClass
+                .methods
+                .first { it.name == "decode" && it.parameterTypes.size == 1 }
+                .invoke(itemStackStreamCodec(), buf) as ItemStack
         }.getOrDefault(ItemStack.EMPTY).also { decoded ->
             stackCache[serialized] = decoded.copy()
         }
+    }
+
+    private fun itemStackStreamCodec(): Any {
+        return runCatching { ItemStack::class.java.getField("PACKET_CODEC").get(null) }
+            .getOrElse { ItemStack::class.java.getField("STREAM_CODEC").get(null) }
     }
 }

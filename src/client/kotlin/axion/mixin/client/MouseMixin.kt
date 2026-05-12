@@ -5,11 +5,11 @@ import axion.client.hotbar.AxionAltMenuController
 import axion.client.input.AxionInteractionRouter
 import axion.client.input.AxionModifierKeys
 import axion.client.mode.ClientModeController
+import axion.mixin.compat.currentScreen
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.Mouse
 import net.minecraft.client.input.MouseInput
 import org.spongepowered.asm.mixin.Mixin
-import org.spongepowered.asm.mixin.Shadow
 import org.spongepowered.asm.mixin.injection.At
 import org.spongepowered.asm.mixin.injection.Inject
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo
@@ -17,8 +17,7 @@ import org.lwjgl.glfw.GLFW
 
 @Mixin(Mouse::class)
 abstract class MouseMixin {
-    @Shadow
-    private lateinit var client: MinecraftClient
+    private fun getClient(): MinecraftClient = MinecraftClient.getInstance()
 
     @Inject(method = ["onMouseButton(JIII)V"], at = [At("HEAD")], cancellable = true, require = 0)
     private fun axionHandleMouseButtonLegacy(window: Long, button: Int, action: Int, mods: Int, ci: CallbackInfo) {
@@ -35,7 +34,19 @@ abstract class MouseMixin {
         axionHandleMouseButton(mouseInput.button(), action, ci)
     }
 
+    // 26.1.x official namespace: onButton(long, MouseButtonInfo, int)
+    @Inject(
+        method = ["onButton(JLnet/minecraft/client/input/MouseButtonInfo;I)V"],
+        at = [At("HEAD")],
+        cancellable = true,
+        require = 0,
+    )
+    private fun axionHandleMouseButtonOfficial(window: Long, buttonInfo: net.minecraft.client.input.MouseButtonInfo, action: Int, ci: CallbackInfo) {
+        axionHandleMouseButton(buttonInfo.button(), action, ci)
+    }
+
     private fun axionHandleMouseButton(button: Int, action: Int, ci: CallbackInfo) {
+        val client = getClient()
         if (AxionAltMenuController.handleMouseButton(client, button, action)) {
             ci.cancel()
             return
@@ -82,8 +93,20 @@ abstract class MouseMixin {
         }
     }
 
-    @Inject(method = ["onMouseScroll"], at = [At("HEAD")], cancellable = true)
+    // Yarn name: onMouseScroll (1.21.x)
+    @Inject(method = ["onMouseScroll"], at = [At("HEAD")], cancellable = true, require = 0)
     private fun axionHandleScroll(window: Long, horizontal: Double, vertical: Double, ci: CallbackInfo) {
+        axionHandleScrollImpl(vertical, ci)
+    }
+
+    // 26.1.x official namespace: onScroll
+    @Inject(method = ["onScroll"], at = [At("HEAD")], cancellable = true, require = 0)
+    private fun axionHandleScrollOfficial(window: Long, horizontal: Double, vertical: Double, ci: CallbackInfo) {
+        axionHandleScrollImpl(vertical, ci)
+    }
+
+    private fun axionHandleScrollImpl(vertical: Double, ci: CallbackInfo) {
+        val client = getClient()
         if (client.currentScreen != null) {
             return
         }

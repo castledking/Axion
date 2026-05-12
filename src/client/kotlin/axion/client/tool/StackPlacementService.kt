@@ -7,6 +7,8 @@ import axion.common.operation.EditOperation
 import axion.common.model.BlockRegion
 import axion.common.model.ClipboardBuffer
 import net.minecraft.client.MinecraftClient
+import axion.client.compat.add
+import axion.client.compat.toImmutable
 
 object StackPlacementService {
     fun toOperation(preview: StackPreviewState): EditOperation {

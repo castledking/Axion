@@ -15,8 +15,19 @@ abstract class MinecraftClientMixin {
     @Suppress("CAST_NEVER_SUCCEEDS")
     private fun self(): MinecraftClient = this as MinecraftClient
 
-    @Inject(method = ["doAttack"], at = [At("HEAD")], cancellable = true)
+    // Yarn name: doAttack (1.21.x)
+    @Inject(method = ["doAttack"], at = [At("HEAD")], cancellable = true, require = 0)
     private fun axionHandlePrimaryAction(ci: CallbackInfoReturnable<Boolean>) {
+        axionHandlePrimaryActionImpl(ci)
+    }
+
+    // 26.1.x official namespace: startAttack
+    @Inject(method = ["startAttack"], at = [At("HEAD")], cancellable = true, require = 0)
+    private fun axionHandlePrimaryActionOfficial(ci: CallbackInfoReturnable<Boolean>) {
+        axionHandlePrimaryActionImpl(ci)
+    }
+
+    private fun axionHandlePrimaryActionImpl(ci: CallbackInfoReturnable<Boolean>) {
         // Manually track attack key press since cancelling prevents vanilla key binding updates
         ClientModeController.setAttackKeyManuallyPressed()
 
@@ -60,8 +71,19 @@ abstract class MinecraftClientMixin {
         }
     }
 
-    @Inject(method = ["doItemUse"], at = [At("HEAD")], cancellable = true)
+    // Yarn name: doItemUse (1.21.x)
+    @Inject(method = ["doItemUse"], at = [At("HEAD")], cancellable = true, require = 0)
     private fun axionHandleSecondaryAction(ci: CallbackInfo) {
+        axionHandleSecondaryActionImpl(ci)
+    }
+
+    // 26.1.x official namespace: startUseItem
+    @Inject(method = ["startUseItem"], at = [At("HEAD")], cancellable = true, require = 0)
+    private fun axionHandleSecondaryActionOfficial(ci: CallbackInfo) {
+        axionHandleSecondaryActionImpl(ci)
+    }
+
+    private fun axionHandleSecondaryActionImpl(ci: CallbackInfo) {
         // Manually track use key press since cancelling prevents vanilla key binding updates
         ClientModeController.setUseKeyManuallyPressed()
 
@@ -98,8 +120,19 @@ abstract class MinecraftClientMixin {
         }
     }
 
-    @Inject(method = ["handleBlockBreaking"], at = [At("HEAD")], cancellable = true)
+    // Yarn name: handleBlockBreaking (1.21.x)
+    @Inject(method = ["handleBlockBreaking"], at = [At("HEAD")], cancellable = true, require = 0)
     private fun axionHandleBlockBreaking(breaking: Boolean, ci: CallbackInfo) {
+        axionHandleBlockBreakingImpl(breaking, ci)
+    }
+
+    // 26.1.x official namespace: continueAttack
+    @Inject(method = ["continueAttack"], at = [At("HEAD")], cancellable = true, require = 0)
+    private fun axionHandleBlockBreakingOfficial(breaking: Boolean, ci: CallbackInfo) {
+        axionHandleBlockBreakingImpl(breaking, ci)
+    }
+
+    private fun axionHandleBlockBreakingImpl(breaking: Boolean, ci: CallbackInfo) {
         if (AxionInteractionRouter.shouldSuppressPrimary(self())) {
             ci.cancel()
             return
@@ -111,7 +144,6 @@ abstract class MinecraftClientMixin {
         }
 
         if (breaking && AxionInteractionRouter.ownsPrimaryAction()) {
-            self().interactionManager?.cancelBlockBreaking()
             ci.cancel()
             return
         }
@@ -122,13 +154,23 @@ abstract class MinecraftClientMixin {
         }
 
         if (breaking && ClientModeController.ownsPrimaryAction(self())) {
-            self().interactionManager?.cancelBlockBreaking()
             ci.cancel()
         }
     }
 
-    @Inject(method = ["doItemPick"], at = [At("HEAD")], cancellable = true)
+    // Yarn name: doItemPick (1.21.x)
+    @Inject(method = ["doItemPick"], at = [At("HEAD")], cancellable = true, require = 0)
     private fun axionHandleMiddleAction(ci: CallbackInfo) {
+        axionHandleMiddleActionImpl(ci)
+    }
+
+    // 26.1.x official namespace: pickBlockOrEntity
+    @Inject(method = ["pickBlockOrEntity"], at = [At("HEAD")], cancellable = true, require = 0)
+    private fun axionHandleMiddleActionOfficial(ci: CallbackInfo) {
+        axionHandleMiddleActionImpl(ci)
+    }
+
+    private fun axionHandleMiddleActionImpl(ci: CallbackInfo) {
         if (AxionInteractionRouter.handleMiddleAction(self())) {
             ci.cancel()
             return

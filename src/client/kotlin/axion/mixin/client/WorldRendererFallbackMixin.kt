@@ -32,7 +32,7 @@ abstract class WorldRendererFallbackMixin {
     )
     private fun axionFallbackAfterBlockDamageModern(
         matrices: MatrixStack,
-        immediate: net.minecraft.client.render.VertexConsumerProvider.Immediate,
+        immediate: net.minecraft.client.render.Immediate,
         renderState: WorldRenderState,
         ci: CallbackInfo,
     ) {
@@ -48,7 +48,7 @@ abstract class WorldRendererFallbackMixin {
         require = 0,
     )
     private fun axionFallbackAfterTargetOutlineModern(
-        immediate: net.minecraft.client.render.VertexConsumerProvider.Immediate,
+        immediate: net.minecraft.client.render.Immediate,
         matrices: MatrixStack,
         renderHitOutline: Boolean,
         renderState: WorldRenderState,
@@ -70,7 +70,7 @@ abstract class WorldRendererFallbackMixin {
     private fun axionFallbackAfterBlockDamageLegacy(
         matrices: MatrixStack,
         camera: Camera,
-        immediate: net.minecraft.client.render.VertexConsumerProvider.Immediate,
+        immediate: net.minecraft.client.render.Immediate,
         ci: CallbackInfo,
     ) {
         if (!WorldRenderCompat.hasFallbackCallbacks()) {
@@ -86,7 +86,7 @@ abstract class WorldRendererFallbackMixin {
     )
     private fun axionFallbackAfterTargetOutlineLegacy(
         camera: Camera,
-        immediate: net.minecraft.client.render.VertexConsumerProvider.Immediate,
+        immediate: net.minecraft.client.render.Immediate,
         matrices: MatrixStack,
         renderHitOutline: Boolean,
         ci: CallbackInfo,

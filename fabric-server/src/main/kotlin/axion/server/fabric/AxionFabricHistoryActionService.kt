@@ -85,7 +85,9 @@ class AxionFabricHistoryActionService(
         return changes.all { change ->
             val current = world.getBlockState(BlockPos(change.pos.x, change.pos.y, change.pos.z))
             val expectedState = if (expectNewState) change.newState else change.oldState
-            stateMatchesExpected(world, current, expectedState)
+            val targetState = if (expectNewState) change.oldState else change.newState
+            stateMatchesExpected(world, current, expectedState) ||
+                stateMatchesExpected(world, current, targetState)
         }
     }
 

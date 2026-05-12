@@ -5,6 +5,7 @@ import axion.client.compat.VersionCompatImpl
 import axion.client.input.AxionModifierKeys
 import axion.client.tool.AxionToolSelectionController
 import axion.client.ui.drawStrokedRectangleCompat
+import axion.common.compat.VersionCompat
 import axion.common.model.AxionSubtool
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.gui.DrawContext
@@ -13,7 +14,9 @@ import net.minecraft.util.Formatting
 import net.minecraft.util.Identifier
 
 object AxionHotbarHud {
-    private val TOOLBOX_TEXTURE: Identifier = Identifier.of("axion", "textures/gui/toolbox.png")
+    private val TOOLBOX_TEXTURE: Identifier by lazy {
+        VersionCompat.INSTANCE.identifierOf("axion", "textures/gui/toolbox.png")
+    }
     private const val OUTER_BACKGROUND: Int = 0xB0101010.toInt()
     private const val INNER_BACKGROUND: Int = 0xAA1E1E1E.toInt()
     private const val BORDER_NEUTRAL: Int = 0xFF7C7C7C.toInt()
@@ -261,13 +264,13 @@ object AxionHotbarHud {
 
         context.fill(bounds.x, bounds.y, bounds.x + bounds.size, bounds.y + bounds.size, OUTER_BACKGROUND)
         context.fill(bounds.x + 2, bounds.y + 2, bounds.x + bounds.size - 2, bounds.y + bounds.size - 2, INNER_BACKGROUND)
-        VersionCompatImpl.drawGuiTexture(
-            context,
-            TOOLBOX_TEXTURE,
-            bounds.x + inset,
-            bounds.y + inset,
-            bounds.size - (inset * 2),
-            bounds.size - (inset * 2),
+        // Draw text icon instead of texture for 26.1.x compatibility
+        context.drawCenteredTextWithShadow(
+            client.textRenderer,
+            "⚙",
+            bounds.x + (bounds.size / 2),
+            bounds.y + 3,
+            if (hovered) TEXT_SELECTED else TEXT_IDLE,
         )
         context.drawStrokedRectangleCompat(bounds.x, bounds.y, bounds.size, bounds.size, borderColor)
     }

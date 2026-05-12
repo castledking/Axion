@@ -36,7 +36,7 @@ object FormattedNameText {
                     style = if (formatting == Formatting.RESET) {
                         Style.EMPTY
                     } else {
-                        style.withFormatting(formatting)
+                        Style.EMPTY.withColor(formatting)
                     }
                     index += 2
                     continue

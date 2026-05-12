@@ -154,6 +154,6 @@ object SymmetryOperationExpander {
             config.anchor.position,
             transform,
         )
-        return normalized.offset(transformedMin.subtract(normalized.minCorner())).normalized()
+        return normalized.offset(transformedMin.subtract(normalized.minCorner()).let { net.minecraft.util.math.Vec3i(it.x, it.y, it.z) }).normalized()
     }
 }

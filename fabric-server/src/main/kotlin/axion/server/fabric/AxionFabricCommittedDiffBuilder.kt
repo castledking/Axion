@@ -118,7 +118,7 @@ class AxionFabricCommittedDiffBuilder(
 
                     is PlaceBlocksRequest -> operation.placements.forEach { touched += it.pos }
                     is StackRegionRequest -> collectRepeatedClipboard(touched, operation.sourceOrigin, operation.cells, operation.step, operation.repeatCount)
-                    is SmearRegionRequest -> collectRepeatedClipboard(touched, operation.sourceOrigin, operation.cells, operation.step, operation.repeatCount)
+                    is SmearRegionRequest -> collectSmearedClipboard(touched, operation.sourceOrigin, operation.cells, operation.step, operation.repeatCount)
                     is ExtrudeRequest -> Unit
                     is CloneEntitiesRequest -> Unit
                     is DeleteEntitiesRequest -> Unit
@@ -161,12 +161,43 @@ class AxionFabricCommittedDiffBuilder(
             }
         }
 
+        private fun collectSmearedClipboard(
+            target: MutableSet<IntVector3>,
+            sourceOrigin: IntVector3,
+            cells: List<axion.protocol.ClipboardCellPayload>,
+            offset: IntVector3,
+            repeatCount: Int,
+        ) {
+            smearOffsets(offset, repeatCount).forEach { smearOffset ->
+                cells.forEach { cell ->
+                    target += IntVector3(
+                        sourceOrigin.x + cell.offset.x + smearOffset.x,
+                        sourceOrigin.y + cell.offset.y + smearOffset.y,
+                        sourceOrigin.z + cell.offset.z + smearOffset.z,
+                    )
+                }
+            }
+        }
+
         private fun minVector(a: IntVector3, b: IntVector3): IntVector3 {
             return IntVector3(minOf(a.x, b.x), minOf(a.y, b.y), minOf(a.z, b.z))
         }
 
         private fun maxVector(a: IntVector3, b: IntVector3): IntVector3 {
             return IntVector3(maxOf(a.x, b.x), maxOf(a.y, b.y), maxOf(a.z, b.z))
+        }
+
+        private fun smearOffsets(offset: IntVector3, steps: Int): List<IntVector3> {
+            if (steps <= 0) {
+                return emptyList()
+            }
+            return (1..steps).map { index ->
+                IntVector3(
+                    java.lang.Math.round(index * offset.x.toFloat() / steps),
+                    java.lang.Math.round(index * offset.y.toFloat() / steps),
+                    java.lang.Math.round(index * offset.z.toFloat() / steps),
+                )
+            }.distinct()
         }
     }
 }

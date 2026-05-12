@@ -1,8 +1,6 @@
 package axion.common.math
 
-import net.minecraft.util.math.Direction
-
 data class AxisOffset(
-    val axis: Direction.Axis,
+    val axis: Any,
     val amount: Int,
 )

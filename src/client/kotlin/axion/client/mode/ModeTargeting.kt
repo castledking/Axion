@@ -20,7 +20,7 @@ object ModeTargeting {
         val player = client.player ?: return null
         val cameraEntity = client.cameraEntity ?: player
         val origin = cameraEntity.getCameraPosVec(1.0f)
-        val vanillaReach = player.blockInteractionRange
+        val vanillaReach = player.blockInteractionRange()
         val vanillaCrosshair = currentVanillaCrosshairBlock(client)
         val hitResult = if (vanillaCrosshair != null) {
             vanillaCrosshair
@@ -46,7 +46,7 @@ object ModeTargeting {
         } else {
             when (val crosshair = client.crosshairTarget) {
                 is BlockHitResult -> {
-                    if (crosshair.type == HitResult.Type.BLOCK) {
+                    if (crosshair.type.name == "BLOCK") {
                         crosshair
                     } else {
                         null
@@ -74,6 +74,6 @@ object ModeTargeting {
 
     private fun currentVanillaCrosshairBlock(client: MinecraftClient): BlockHitResult? {
         val crosshair = client.crosshairTarget as? BlockHitResult ?: return null
-        return if (crosshair.type == HitResult.Type.BLOCK) crosshair else null
+        return if (crosshair.type.name == "BLOCK") crosshair else null
     }
 }

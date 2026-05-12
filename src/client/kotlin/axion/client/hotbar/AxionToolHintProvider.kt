@@ -47,10 +47,10 @@ object AxionToolHintProvider {
         if (!AxionClientState.middleClickMagicSelectEnabled) {
             return
         }
-        lines += Text.of("Magic Select Info:")
+        lines += Text.literal("Magic Select Info:")
         val templateLine = Text.literal("Template: ").append(FormattedNameText.parse(AxionClientConfig.magicSelectTemplateSummary()))
         lines += templateLine
-        lines += Text.of("Brush Size: ${MagicSelectionService.defaultBrushSize()}")
+        lines += Text.literal("Brush Size: ${MagicSelectionService.defaultBrushSize()}")
     }
 
     fun currentPanel(): ToolHintPanel? {
@@ -124,15 +124,15 @@ object AxionToolHintProvider {
             subtitle = subtitle,
             entries = entries,
             statusLines = buildList {
-                currentSelectionSize()?.let { add(Text.of("Selection: $it")) }
+                currentSelectionSize()?.let { add(Text.literal("Selection: $it")) }
                 preview?.let {
-                    add(Text.of("Offset: ${formatAxis(it.offset)} x ${formatStepLength(it.offset)}"))
-                    add(Text.of("Destination: ${formatRegionSize(it.destinationRegion)}"))
-                    add(Text.of("Rotation: ${it.transform.normalizedRotationQuarterTurns * 90}deg"))
-                    add(Text.of("Mirror: ${formatMirrorAxis(it.transform.mirrorAxis)}"))
+                    add(Text.literal("Offset: ${formatAxis(it.offset)} x ${formatStepLength(it.offset)}"))
+                    add(Text.literal("Destination: ${formatRegionSize(it.destinationRegion)}"))
+                    add(Text.literal("Rotation: ${it.transform.normalizedRotationQuarterTurns * 90}deg"))
+                    add(Text.literal("Mirror: ${formatMirrorAxis(it.transform.mirrorAxis)}"))
                 }
                 appendMagicSelectInfo(this)
-                targetSummary()?.let { add(Text.of(it)) }
+                targetSummary()?.let { add(Text.literal(it)) }
             },
             footer = symmetrySummary(),
         )
@@ -209,13 +209,13 @@ object AxionToolHintProvider {
 
             is SmearToolState.RegionDefined -> listOf(
                 ToolHintEntry("MMB", middleClickLabel()),
-                ToolHintEntry("Scroll", "Start smear preview"),
+                ToolHintEntry("Scroll", "Move smear node"),
                 ToolHintEntry("LMB", "Restart selection"),
                 ToolHintEntry("RMB", "Set second corner again"),
             ) + magicConfigHintEntries()
 
             is SmearToolState.PreviewingSmear -> listOf(
-                ToolHintEntry("Scroll", "Adjust repeat count"),
+                ToolHintEntry("Scroll", "Move smear node"),
                 ToolHintEntry("RMB", "Confirm smear"),
                 ToolHintEntry("LMB", "Cancel preview"),
             )
@@ -225,7 +225,7 @@ object AxionToolHintProvider {
             title = "AXION - Smear",
             subtitle = subtitle,
             entries = entries,
-            statusLines = repeatStatusLines(preview, "Mode: Air-only"),
+            statusLines = smearStatusLines(preview),
             footer = symmetrySummary(),
         )
     }
@@ -262,10 +262,10 @@ object AxionToolHintProvider {
             subtitle = subtitle,
             entries = entries,
             statusLines = buildList {
-                currentSelectionSize()?.let { add(Text.of("Selection: $it")) }
-                currentSelectionCorners()?.let { add(Text.of(it)) }
+                currentSelectionSize()?.let { add(Text.literal("Selection: $it")) }
+                currentSelectionCorners()?.let { add(Text.literal(it)) }
                 appendMagicSelectInfo(this)
-                targetSummary()?.let { add(Text.of(it)) }
+                targetSummary()?.let { add(Text.literal(it)) }
             },
         )
     }
@@ -285,10 +285,10 @@ object AxionToolHintProvider {
             ),
             statusLines = buildList {
                 preview?.let {
-                    add(Text.of("Footprint: ${it.footprint.size}"))
-                    add(Text.of("Axis: ${formatAxis(it.direction.vector)}"))
+                    add(Text.literal("Footprint: ${it.footprint.size}"))
+                    add(Text.literal("Axis: ${formatAxis(it.direction.vector)}"))
                 }
-                targetSummary()?.let { add(Text.of(it)) }
+                targetSummary()?.let { add(Text.literal(it)) }
             },
         )
     }
@@ -311,12 +311,12 @@ object AxionToolHintProvider {
                 ToolHintEntry("Del", "Clear symmetry"),
             ),
             statusLines = when (state) {
-                SymmetryState.Inactive -> listOfNotNull(targetSummary()?.let(Text::of))
+                SymmetryState.Inactive -> listOfNotNull(targetSummary()?.let(Text::literal))
                 is SymmetryState.Active -> buildList {
-                    add(Text.of("Rot: ${if (state.config.rotationalEnabled) "On" else "Off"}"))
-                    add(Text.of("Mirror: ${formatSymmetryMirror(state.config)}"))
-                    add(Text.of("Construct: ${if (state.config.constructEnabled) "On" else "Off"}"))
-                    targetSummary()?.let { add(Text.of(it)) }
+                    add(Text.literal("Rot: ${if (state.config.rotationalEnabled) "On" else "Off"}"))
+                    add(Text.literal("Mirror: ${formatSymmetryMirror(state.config)}"))
+                    add(Text.literal("Construct: ${if (state.config.constructEnabled) "On" else "Off"}"))
+                    targetSummary()?.let { add(Text.literal(it)) }
                 }
             },
         )
@@ -324,15 +324,29 @@ object AxionToolHintProvider {
 
     private fun repeatStatusLines(preview: RepeatRegionPreview?, modeText: String): List<Text> {
         return buildList {
-            currentSelectionSize()?.let { add(Text.of("Selection: $it")) }
-            currentSelectionCorners()?.let { add(Text.of(it)) }
+            currentSelectionSize()?.let { add(Text.literal("Selection: $it")) }
+            currentSelectionCorners()?.let { add(Text.literal(it)) }
             preview?.let {
-                add(Text.of("Repeats: ${it.repeatCount}"))
-                add(Text.of("Step: ${formatAxis(it.step)} x ${formatStepLength(it.step)}"))
+                add(Text.literal("Repeats: ${it.repeatCount}"))
+                add(Text.literal("Step: ${formatAxis(it.step)} x ${formatStepLength(it.step)}"))
             }
-            add(Text.of(modeText))
+            add(Text.literal(modeText))
             appendMagicSelectInfo(this)
-            targetSummary()?.let { add(Text.of(it)) }
+            targetSummary()?.let { add(Text.literal(it)) }
+        }
+    }
+
+    private fun smearStatusLines(preview: RepeatRegionPreview?): List<Text> {
+        return buildList {
+            currentSelectionSize()?.let { add(Text.literal("Selection: $it")) }
+            currentSelectionCorners()?.let { add(Text.literal(it)) }
+            preview?.let {
+                add(Text.literal("Node: ${it.step.x}, ${it.step.y}, ${it.step.z}"))
+                add(Text.literal("Length: ${it.repeatCount}"))
+            }
+            add(Text.literal("Mode: Air-only"))
+            appendMagicSelectInfo(this)
+            targetSummary()?.let { add(Text.literal(it)) }
         }
     }
 

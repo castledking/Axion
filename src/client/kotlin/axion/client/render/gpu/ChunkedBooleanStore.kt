@@ -3,6 +3,9 @@ package axion.client.render.gpu
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet
 import net.minecraft.util.math.BlockPos
+import axion.client.compat.unpackLongX
+import axion.client.compat.unpackLongY
+import axion.client.compat.unpackLongZ
 
 /**
  * Bit-packed positional store for chunked preview rendering.
@@ -147,8 +150,8 @@ class ChunkedBooleanStore {
 
     companion object {
         fun sectionKey(x: Int, y: Int, z: Int): Long = BlockPos.asLong(x shr 4, y shr 4, z shr 4)
-        fun sectionX(key: Long): Int = BlockPos.unpackLongX(key)
-        fun sectionY(key: Long): Int = BlockPos.unpackLongY(key)
-        fun sectionZ(key: Long): Int = BlockPos.unpackLongZ(key)
+        fun sectionX(key: Long): Int = unpackLongX(key)
+        fun sectionY(key: Long): Int = unpackLongY(key)
+        fun sectionZ(key: Long): Int = unpackLongZ(key)
     }
 }

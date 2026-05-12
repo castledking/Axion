@@ -5,7 +5,7 @@ VERSION=$1
 
 if [ -z "$VERSION" ]; then
     echo "Usage: ./switch-version.sh <version>"
-    echo "Supported versions: 1.20.6, 1.21.0, 1.21.1, 1.21.2, 1.21.3, 1.21.4, 1.21.5, 1.21.6, 1.21.7, 1.21.11"
+    echo "Supported versions: 1.20.6, 1.21.0, 1.21.1, 1.21.2, 1.21.3, 1.21.4, 1.21.5, 1.21.6, 1.21.7, 1.21.11, 26.1"
     exit 1
 fi
 
@@ -20,7 +20,7 @@ echo "Switching to Minecraft $VERSION..."
 cp versions/$VERSION/gradle.properties gradle.properties.version
 
 # Preserve mod_version and maven_group from existing gradle.properties
-grep -E "^(mod_version|maven_group|archives_base_name|loom_version|kotlin_version|org.gradle)" gradle.properties >> gradle.properties.version
+grep -E "^(mod_version|maven_group|archives_base_name|loom_version|kotlin_version|paperweight_version|org.gradle)" gradle.properties >> gradle.properties.version
 
 # Replace gradle.properties
 mv gradle.properties.version gradle.properties

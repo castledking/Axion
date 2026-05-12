@@ -1,5 +1,6 @@
 package axion.client.network
 
+import axion.common.compat.VersionCompat
 import axion.common.operation.EntityMoveMirrorAxis
 import axion.common.operation.MoveEntitiesOperation
 import net.minecraft.entity.Entity
@@ -28,24 +29,26 @@ object LocalEntityMoveService {
             sourceMax.z + 1.0,
         )
         val seen = linkedSetOf<UUID>()
-        return serverWorld.getOtherEntities(null, queryBox)
+        val dummyEntity = serverWorld.getEntitiesOfClass(Entity::class.java, queryBox).firstOrNull()
+        return VersionCompat.INSTANCE.worldGetOtherEntities(serverWorld, dummyEntity ?: return emptyList(), queryBox)
             .asSequence()
+            .mapNotNull { it as? Entity }
             .map(::rootEntity)
             .filter { entity ->
                 entity !is PlayerEntity &&
-                    !entity.isRemoved &&
-                    entity.vehicle == null &&
-                    seen.add(entity.uuid)
+                    !VersionCompat.INSTANCE.entityIsRemoved(entity) &&
+                    VersionCompat.INSTANCE.entityGetVehicle(entity) == null &&
+                    seen.add(VersionCompat.INSTANCE.entityGetUuid(entity))
             }
             .map { entity ->
-                val currentPos = Vec3d(entity.x, entity.y, entity.z)
-                val target = transformEntity(currentPos, directionFromAngles(entity.yaw, entity.pitch), sourceMin, sourceMax, operation)
+                val currentPos = Vec3d(VersionCompat.INSTANCE.entityGetX(entity), VersionCompat.INSTANCE.entityGetY(entity), VersionCompat.INSTANCE.entityGetZ(entity))
+                val target = transformEntity(currentPos, directionFromAngles(VersionCompat.INSTANCE.entityGetYaw(entity), VersionCompat.INSTANCE.entityGetPitch(entity)), sourceMin, sourceMax, operation)
                 EntityMovePlan(
-                    entityId = entity.uuid,
+                    entityId = VersionCompat.INSTANCE.entityGetUuid(entity),
                     fromPos = currentPos,
                     toPos = target.position,
-                    fromYaw = entity.yaw,
-                    fromPitch = entity.pitch,
+                    fromYaw = VersionCompat.INSTANCE.entityGetYaw(entity),
+                    fromPitch = VersionCompat.INSTANCE.entityGetPitch(entity),
                     toYaw = target.yaw,
                     toPitch = target.pitch,
                 )
@@ -63,22 +66,23 @@ object LocalEntityMoveService {
             val targetPos = if (reverse) move.fromPos else move.toPos
             val yaw = if (reverse) move.fromYaw else move.toYaw
             val pitch = if (reverse) move.fromPitch else move.toPitch
-            entity.refreshPositionAndAngles(targetPos.x, targetPos.y, targetPos.z, yaw, pitch)
+            VersionCompat.INSTANCE.entityRefreshPositionAndAngles(entity)
             refreshPassengerPositions(entity)
         }
     }
 
     private fun refreshPassengerPositions(entity: Entity) {
-        entity.getPassengerList().forEach { passenger ->
-            entity.updatePassengerPosition(passenger)
-            refreshPassengerPositions(passenger)
+        VersionCompat.INSTANCE.entityGetPassengerList(entity).forEach { passenger ->
+            val p = passenger as? Entity ?: return@forEach
+            VersionCompat.INSTANCE.entityUpdatePassengerPosition(entity, p)
+            refreshPassengerPositions(p)
         }
     }
 
     private fun rootEntity(entity: Entity): Entity {
         var current = entity
-        while (current.vehicle != null) {
-            current = current.vehicle!!
+        while (VersionCompat.INSTANCE.entityGetVehicle(current) != null) {
+            current = VersionCompat.INSTANCE.entityGetVehicle(current) as Entity
         }
         return current
     }
