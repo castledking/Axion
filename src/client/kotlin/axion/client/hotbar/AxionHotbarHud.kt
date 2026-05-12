@@ -264,13 +264,13 @@ object AxionHotbarHud {
 
         context.fill(bounds.x, bounds.y, bounds.x + bounds.size, bounds.y + bounds.size, OUTER_BACKGROUND)
         context.fill(bounds.x + 2, bounds.y + 2, bounds.x + bounds.size - 2, bounds.y + bounds.size - 2, INNER_BACKGROUND)
-        // Draw text icon instead of texture for 26.1.x compatibility
-        context.drawCenteredTextWithShadow(
-            client.textRenderer,
-            "⚙",
-            bounds.x + (bounds.size / 2),
-            bounds.y + 3,
-            if (hovered) TEXT_SELECTED else TEXT_IDLE,
+        VersionCompatImpl.drawGuiTexture(
+            context = context,
+            texture = TOOLBOX_TEXTURE,
+            x = bounds.x + inset,
+            y = bounds.y + inset,
+            width = bounds.size - (inset * 2),
+            height = bounds.size - (inset * 2),
         )
         context.drawStrokedRectangleCompat(bounds.x, bounds.y, bounds.size, bounds.size, borderColor)
     }

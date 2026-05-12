@@ -22,6 +22,7 @@ object BlockPreviewPipeline {
         val scale: Float,
         val textured: Boolean = true,
         val sessionTag: String = "overlay",
+        val forceChunked: Boolean = false,
     )
 
     data class SelectionScene(
@@ -73,6 +74,7 @@ object BlockPreviewPipeline {
             textured = scene.textured,
             scale = scene.scale,
             sessionTag = scene.sessionTag,
+            forceChunked = scene.forceChunked,
         )
         return true
     }

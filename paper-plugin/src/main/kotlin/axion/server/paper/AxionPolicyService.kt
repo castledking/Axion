@@ -169,7 +169,7 @@ class AxionPolicyService(
             tools = tools,
             maxBlocksPerBatch = getInt(worldSection, "max-blocks-per-batch", getInt(defaultSection, "max-blocks-per-batch", 1_262_144)),
             maxClipboardCells = getInt(worldSection, "max-clipboard-cells", getInt(defaultSection, "max-clipboard-cells", 1_262_144)),
-            maxRepeatCount = getInt(worldSection, "max-repeat-count", getInt(defaultSection, "max-repeat-count", 64)),
+            maxRepeatCount = getInt(worldSection, "max-repeat-count", getInt(defaultSection, "max-repeat-count", 4096)),
             maxTotalWrites = getInt(worldSection, "max-total-writes", getInt(defaultSection, "max-total-writes", 2_097_152)),
             maxExtrudeFootprintSize = getInt(
                 worldSection,

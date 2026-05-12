@@ -37,7 +37,7 @@ class AxionPaperPlugin : JavaPlugin() {
             "axion",
             "Axion Paper admin utilities.",
             listOf("ax"),
-            AxionAdminCommand(messaging),
+            AxionAdminCommand(this),
         )
         server.pluginManager.registerEvents(AxionNoClipListener(noClipService), this)
         server.pluginManager.registerEvents(flightSpeedService, this)
@@ -64,6 +64,28 @@ class AxionPaperPlugin : JavaPlugin() {
 
     fun installRegionAccessPolicy(policy: RegionAccessPolicy) {
         regionAccessPolicy = policy
+    }
+
+    fun reloadAxionConfig() {
+        reloadConfig()
+        installConfiguredProtectionAdapters()
+        if (::messaging.isInitialized) {
+            server.messenger.unregisterIncomingPluginChannel(this, AxionProtocol.CHANNEL_ID, messaging)
+            messaging = AxionPluginMessaging(this, policyService, noClipService, flightSpeedService)
+            server.messenger.registerIncomingPluginChannel(this, AxionProtocol.CHANNEL_ID, messaging)
+        }
+    }
+
+    fun logTimingSummary(reason: String) {
+        if (::messaging.isInitialized) {
+            messaging.logTimingSummary(reason)
+        }
+    }
+
+    fun resetTimingSummary() {
+        if (::messaging.isInitialized) {
+            messaging.resetTimingSummary()
+        }
     }
 
     private fun installConfiguredProtectionAdapters() {

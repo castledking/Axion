@@ -59,6 +59,6 @@ class DrawContext(
     }
 
     fun drawGuiTexture(texture: Identifier, x: Int, y: Int, width: Int, height: Int) {
-        delegate.blitSprite(RenderPipelines.GUI_TEXTURED, texture, x, y, width, height)
+        delegate.blit(RenderPipelines.GUI_TEXTURED, texture, x, y, 0.0f, 0.0f, width, height, width, height)
     }
 }

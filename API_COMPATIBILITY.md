@@ -1,0 +1,247 @@
+# Axion API Compatibility Map
+
+This document maps API differences across supported Minecraft versions and documents the VersionCompat abstraction layer.
+
+## Version Support
+
+- **1.21.5 - 1.21.7**: Primary support with full feature parity
+- **1.21.8 - 1.21.11**: Extended support with GPU rendering enhancements
+- **26.1.x**: Latest Minecraft version (ongoing port)
+
+## VersionCompat Interface Methods
+
+The `VersionCompat` interface provides a common abstraction for operations that differ between Minecraft versions. Implementations exist in:
+- `src/compat-1_21_5/kotlin/axion/client/compat/VersionCompatImpl.kt` (1.21.5 - 1.21.7)
+- `src/compat-1_21_11/kotlin/axion/client/compat/VersionCompatImpl.kt` (1.21.8 - 1.21.11)
+- `src/compat-26_1/kotlin/axion/client/compat/VersionCompatImpl.kt` (26.1.x)
+
+### API Area: Registry Operations
+
+| Method | 1.21.5-1.21.7 | 1.21.11 | 26.1.x | Notes |
+|--------|---------------|---------|--------|-------|
+| `getBlock(id)` | `Registries.BLOCK.get(id)` | `Registries.BLOCK.get(id)` | `Registries.BLOCK.getOptional(id).orElse(null)` | 26.1.x uses Optional API |
+| `getItem(id)` | `Registries.ITEM.get(id)` | `Registries.ITEM.get(id)` | `Registries.ITEM.getOptional(id).orElse(null)` | 26.1.x uses Optional API |
+| `getBlockId(block)` | `Registries.BLOCK.getId(block)` | `Registries.BLOCK.getId(block)` | `Registries.BLOCK.getKey(block)` | 26.1.x renamed to getKey |
+| `getItemId(item)` | `Registries.ITEM.getId(item)` | `Registries.ITEM.getId(item)` | `Registries.ITEM.getKey(item)` | 26.1.x renamed to getKey |
+
+### API Area: ResourceLocation/Identifier
+
+| Method | 1.21.5-1.21.7 | 1.21.11 | 26.1.x | Notes |
+|--------|---------------|---------|--------|-------|
+| `parseIdentifier(id)` | `Identifier.of(parts[0], parts[1])` | `Identifier.of(parts[0], parts[1])` | `Identifier.parse(id)` | 26.1.x has built-in parser |
+| `identifierOf(ns, path)` | `Identifier.of(namespace, path)` | `Identifier.of(namespace, path)` | `Identifier.fromNamespaceAndPath(namespace, path)` | 26.1.x renamed method |
+
+### API Area: BlockState Operations
+
+| Method | 1.21.5-1.21.7 | 1.21.11 | 26.1.x | Notes |
+|--------|---------------|---------|--------|-------|
+| `blockStateToString(state)` | `BlockArgumentParser.stringifyBlockState(state)` | `BlockArgumentParser.stringifyBlockState(state)` | `state.toString()` | 26.1.x simplified |
+| `stringToBlockState(str)` | `BlockArgumentParser.block(...).blockState()` | `BlockArgumentParser.block(...).blockState()` | `null` (stub) | 26.1.x API changed significantly |
+
+### API Area: NBT Serialization
+
+| Method | 1.21.5-1.21.7 | 1.21.11 | 26.1.x | Notes |
+|--------|---------------|---------|--------|-------|
+| `itemStackToNbt(stack)` | `nbt.copyFromCodec(ItemStack.MAP_CODEC, ops, stack)` | `NbtCompound()` (stub) | `NbtCompound()` (stub) | 1.21.5+ uses Codec |
+| `nbtToItemStack(nbt)` | `nbt.decode(ItemStack.MAP_CODEC, ops).orElse(EMPTY)` | `ItemStack.EMPTY` (stub) | `ItemStack.EMPTY` (stub) | 1.21.5+ uses Codec |
+
+**26.1.x ItemStack Codec (Hotbar Save/Load):**
+- Uses typed `ItemStack.STREAM_CODEC` through `RegistryByteBuf`.
+- Requires a `DynamicRegistryManager` from `ClientWorld.registryAccess()`.
+- `PlayerInventory.setStack(slot, stack)` must call `setChanged()` after `setItem(...)`; otherwise hotbar pages can decode correctly but fail to refresh visually.
+- Implemented in `src/compat-26_1/kotlin/axion/client/compat/VersionCompatImpl.kt` and `src/compat-26_1/kotlin/axion/client/hotbar/CompatExtensions.kt`.
+
+### API Area: Keybinding Handling
+
+| Method | 1.21.5-1.21.7 | 1.21.8-1.21.11 | 26.1.x | Notes |
+|--------|---------------|----------------|--------|-------|
+| `shouldUseNonConsumingKeybind()` | `true` | `false` | `false` | 1.21.8+ fixed keybind conflicts with `wasPressed()` |
+
+### API Area: Rendering Helpers (Block Tessellation)
+
+| Method | 1.21.5-1.21.7 | 1.21.11 | 26.1.x | Notes |
+|--------|---------------|---------|--------|-------|
+| `getBlockRenderManager(client)` | Not implemented | `client.blockRenderManager` | `client` (stub) | 26.1.x needs implementation |
+| `getBlockRenderType(state)` | Not implemented | `state.renderType` | `state` (stub) | 26.1.x needs implementation |
+| `getRenderingSeed(state, pos)` | Not implemented | `state.getRenderingSeed(pos)` | `0L` (stub) | 26.1.x needs implementation |
+| `matrixStackPush(stack)` | Not implemented | `stack.push()` | `stack` (stub) | 26.1.x needs implementation |
+| `matrixStackPop(stack)` | Not implemented | `stack.pop()` | (stub) | 26.1.x needs implementation |
+
+**Status:** These legacy `VersionCompat` rendering helpers are still stubbed in 26.1.x. The active 26.1.x preview path bypasses them and uses version-specific tessellators/renderers in `src/compat-26_1/kotlin/axion/client/render/`.
+
+### API Area: Entity API
+
+| Method | 1.21.5-1.21.7 | 1.21.11 | 26.1.x | Notes |
+|--------|---------------|---------|--------|-------|
+| `entityIsRemoved(entity)` | `entity.isRemoved` | `entity.isRemoved` | `entity.isRemoved()` | 26.1.x changed to method |
+| `entityGetVehicle(entity)` | `entity.vehicle` | `entity.vehicle` | `entity.vehicle` | Same |
+| `entityGetUuid(entity)` | `entity.uuid` | `entity.uuid` | `entity.uuid` | Same |
+| `entityGetX/Y/Z(entity)` | `entity.x/y/z` | `entity.x/y/z` | `entity.x/y/z` | Same |
+| `entityGetYaw(entity)` | `entity.yaw` | `entity.yaw` | `entity.getYRot()` | 26.1.x renamed |
+| `entityGetPitch(entity)` | `entity.pitch` | `entity.pitch` | `entity.getXRot()` | 26.1.x renamed |
+| `entityGetPassengerList(entity)` | `entity.passengerList` | `entity.passengerList` | `entity.passengers` | 26.1.x renamed |
+| `entitySetUuid(entity, uuid)` | `entity.setUuid(uuid)` | `entity.setUuid(uuid)` | `entity.setUUID(uuid)` | 26.1.x renamed |
+| `entityRefreshPositionAndAngles(entity)` | Not implemented | `entity.refreshPositionAndAngles()` | Manual implementation | 26.1.x method removed |
+| `entityUpdatePassengerPosition(entity, passenger)` | Not implemented | `entity.updatePassengerPosition(passenger)` | Manual implementation | 26.1.x method removed |
+| `entityTypeLoadEntityWithPassengers(...)` | Not implemented | `EntityType.loadEntityWithPassengers(...)` | `null` (stub) | 26.1.x API changed |
+| `worldSpawnNewEntityAndPassengers(...)` | Not implemented | `world.spawnNewEntityAndPassengers(entity)` | `world.addFreshEntityWithPassengers(entity)` | 26.1.x renamed |
+| `worldGetOtherEntities(...)` | Not implemented | `world.getOtherEntities(entity, box)` | `world.getEntitiesOfClass(Entity::class, box)` | 26.1.x API changed |
+
+### API Area: MinecraftClient API
+
+| Method | 1.21.5-1.21.7 | 1.21.11 | 26.1.x | Notes |
+|--------|---------------|---------|--------|-------|
+| `clientGetServer(client)` | Not implemented | `client.server` | `client.getSingleplayerServer()` | 26.1.x renamed |
+| `clientGetWorldRegistryKey(client)` | Not implemented | `client.world?.registryKey` | `client.level?.dimension()` | 26.1.x renamed |
+| `serverExecute(server, task)` | Not implemented | `server.execute(task)` | `server.execute(task)` | Same |
+| `serverGetWorld(server, registryKey)` | Not implemented | `server.getWorld(registryKey)` | `server.getLevel(registryKey)` | 26.1.x renamed |
+| `playerSendMessage(player, message, overlay)` | Not implemented | `player.sendMessage(message, overlay)` | Same logic, different types | 26.1.x uses net.minecraft.network.chat package |
+
+### API Area: Direction/BlockState API
+
+| Method | 1.21.5-1.21.7 | 1.21.11 | 26.1.x | Notes |
+|--------|---------------|---------|--------|-------|
+| `directionGetVector(direction)` | Not implemented | `direction.vector` | `Vec3i(d.step().x.toInt(), ...)` | 26.1.x API changed significantly |
+| `blockStateStringify(state)` | Not implemented | `state.toString()` | `state.toString()` | Same |
+
+### API Area: Registry/BlockArgumentParser
+
+| Method | 1.21.5-1.21.7 | 1.21.11 | 26.1.x | Notes |
+|--------|---------------|---------|--------|-------|
+| `worldGetRegistryManager(world)` | Not implemented | `world.registryManager` | `world.registryAccess()` | 26.1.x renamed |
+| `blockArgumentParserBlock(registry, state)` | Not implemented | `BlockArgumentParser.block(registry, state, false)` | `Blocks.AIR` (stub) | 26.1.x API changed |
+
+## Additional Version-Specific Methods
+
+### Client-Specific Methods (not in interface)
+
+#### Sound Playback
+- **1.21.5-1.21.7**: `world.playSoundClient(x, y, z, sound, category, volume, pitch, false)`
+- **1.21.11**: Same as 1.21.5-1.21.7
+- **26.1.x**: `world.playLocalSound(x, y, z, sound, category, volume, pitch, false)` - renamed method
+
+#### Inventory Access
+- **1.21.5-1.21.7**: `inventory.mainStacks`
+- **1.21.11**: `inventory.mainStacks`
+- **26.1.x**: `inventory.nonEquipmentItems` - renamed property
+
+#### Mouse Scaling
+- **1.21.5-1.21.7**: `client.mouse.getScaledX/Y(client.window)`
+- **1.21.11**: Same as 1.21.5-1.21.7
+- **26.1.x**: `client.mouseHandler.xpos/ypos() * client.window.guiScaledWidth/Height / client.window.screenWidth/Height` - completely different API
+
+#### HUD Registration
+- **1.21.5-1.21.7**: `HudRenderCallback.EVENT.register { context, tickCounter -> ... }`
+- **1.21.11**: Same as 1.21.5-1.21.7
+- **26.1.x**: `HudElementRegistry.attachElementAfter(hotbar, hudId, HudElement { extractor, deltaTracker -> ... })` - uses new registry API
+
+#### GUI Texture Drawing
+- **1.21.5-1.21.7**: `context.drawTexture(RenderLayer::getGuiTextured, texture, x, y, 0.0f, 0.0f, width, height, width, height)`
+- **1.21.11**: `context.drawTexture(RenderPipelines.GUI_TEXTURED, texture, x, y, 0.0f, 0.0f, width, height, width, height)`
+- **26.1.x**: `context.delegate.blit(RenderPipelines.GUI_TEXTURED, texture, x, y, 0.0f, 0.0f, width, height, width, height)` - use raw texture blitting for `assets/.../textures/...` resources
+
+#### Camera Position
+- **1.21.5-1.21.7**: `camera.pos`
+- **1.21.11**: Reflection-based fallback to `camera.pos` or `camera.position()`
+- **26.1.x**: `camera.position()` - method instead of property
+
+#### 26.1.x Texture Resource Finding
+- `GuiGraphicsExtractor.blitSprite(...)` expects sprite atlas ids, not raw `assets/<namespace>/textures/...` paths.
+- The toolbox alt-menu icon uses `axion:textures/gui/toolbox.png`, so it must go through raw `blit(...)`.
+- Using `blitSprite(...)` for that icon renders Minecraft's purple/black missing texture.
+- Fixed in `src/compat-26_1/kotlin/net/minecraft/client/gui/DrawContext.kt` and `src/compat-26_1/kotlin/axion/client/compat/VersionCompatImpl.kt`.
+
+#### GPU Rendering (1.21.11 only)
+- `supportsChunkedPreview()`: Returns `true`
+- `renderChunkedPreview()`: Full implementation using `ChunkedPreviewLifecycle`
+- `drawMultipleIndexedPreview()`: Full implementation with `RenderPass.RenderObject`
+- `getBlockAtlasTextureView()`: Uses `client.atlasManager?.getAtlasTexture()`
+- `bindTextureToRenderPass()`: Uses `pass.bindTexture(samplerName, textureView, sampler)`
+- `getRenderPipeline()`: Uses `layer.renderPipeline`
+- `getPreviewShellPipeline()`: Custom pipeline builder with shaders
+- `writeDynamicUniforms()`: Uses `dynamicUniforms.write(mvMatrix, colorTint, zeroVec, normalMatrix)` (4 params)
+
+#### GPU Rendering (26.1.x)
+- `supportsChunkedPreview()`: Returns `true`
+- `renderChunkedPreview()`: Implemented using the 26.1.x `ChunkedPreviewLifecycle`
+- `drawMultipleIndexedPreview()`: Uses `RenderPass.Draw` entries and `pass.drawMultipleIndexed(...)`
+- `writeDynamicUniforms()`: Uses `dynamicUniforms.writeTransform(mvMatrix, colorTint, zeroVec, normalMatrix)`; the `lineWidth` parameter is ignored because 26.1.x no longer uses the same dynamic uniform shape as 1.21.11
+- `getBlockAtlasTextureView()`: Uses `client.atlasManager.getAtlasOrThrow(TextureAtlas.LOCATION_BLOCKS)`, then binds `atlas.textureView` with `atlas.sampler`
+- GPU preview drawing must use `RenderSystem.getModelViewMatrix()` for the active model-view transform; using the matrix stack alone caused previews to render offset from the world and disappear when camera direction changed
+- Chunked preview sessions exist in `src/compat-26_1/kotlin/axion/client/render/gpu/`
+
+#### 26.1.x Preview Block Render View
+- 26.1.x block tessellation needs a `BlockAndTintGetter`, not the older 1.21.x render-view shape.
+- Required methods include `getLightEngine()`, `getBrightness(layer: LightType, pos: BlockPos): Int`, `cardinalLighting()`, `getBlockTint(...)`, `getHeight()`, and `getMinY()`.
+- Preview render views intentionally return air outside the preview buffer. Returning real world blocks outside the buffer can make adjacent real-world geometry occlude or cull preview faces.
+- Preview render views force brightness to `15` so selected underground dirt/stone does not preview as missing or black under grass and other top-lit blocks.
+- `getBlockState(pos.above())` is treated specially during per-block tessellation: translucent blocks above the block being rendered are hidden as air to prevent overlay/culling artifacts.
+- Implemented in `src/compat-26_1/kotlin/axion/client/render/PreviewBlockTessellator.kt` and `src/compat-26_1/kotlin/axion/client/render/gpu/ChunkedPreviewSession.kt`.
+
+#### 26.1.x Move-Origin Glass Overlay
+- The old CPU/legacy overlay path becomes very slow for large selections and can freeze the client for several seconds.
+- Move-source glass overlays now force the chunked GPU preview path via `BlockPreviewPipeline.OverlayScene.forceChunked`.
+- `PlacementPreviewRenderer` should set `forceChunked = true` for move-source overlays.
+- Large overlays still use the same textured block preview route, so the glass overlay depends on the 26.1.x block atlas texture binding described above.
+
+## Mixin Injection Points
+
+Mixin targets are separated by version source sets:
+
+### 1.21.x Mixins
+- Located in `src/client/kotlin/axion/client/mixin/`
+- Target 1.21.x client classes
+- Examples: Mouse input, keybinding, rendering hooks
+
+### 26.1.x Mixins
+- Located in `src/compat-26_1/kotlin/axion/client/mixin/`
+- Target 26.1.x client classes with official namespace
+- Need to handle renamed packages (e.g., `net.minecraft.util.math` → `net.minecraft.core`)
+
+## Type Aliases and Extension Functions
+
+### BlockPos/Vec3i Compatibility (26.1.x)
+Located in `src/compat-26_1/kotlin/net/minecraft/util/math/Aliases.kt` and `src/client/kotlin/axion/client/compat/BlockPosExtensions.kt`:
+
+- `BlockPos.add()`: Extension function for vector addition
+- `BlockPos.toImmutable()`: Extension function for immutability
+- `Vec3i.add()`: Extension function for vector addition
+- `MutableBlockPos`: Typealias to `net.minecraft.core.BlockPos.MutableBlockPos`
+- `unpackLongX/Y/Z(packed)`: Top-level functions for packed long unpacking
+- `blockPosIterate(min, max)`: Top-level function for iteration (replaces `BlockPos.Companion.iterate`)
+- `blockPosOfFloored(pos)`: Top-level function for floored position (replaces `BlockPos.Companion.ofFloored`)
+- `blockPosFromLong(packed)`: Top-level function for creating BlockPos from packed long (replaces `BlockPos.fromLong`)
+- `ORIGIN`: Constant for `BlockPos(0, 0, 0)` (replaces `BlockPos.ORIGIN`)
+
+**Reason:** Kotlin typealias limitations prevent companion object method bridging, so top-level functions are used instead.
+
+## Known Issues and TODO
+
+### 26.1.x Rendering
+- **Status:** GPU preview and move-origin glass overlay are ported for the Fabric client.
+- **Findings:**
+  - Preserve raw GUI texture blitting for non-atlas resources; do not route `textures/gui/*.png` through `blitSprite(...)`.
+  - Use `RenderSystem.getModelViewMatrix()` in 26.1.x GPU preview draw code to avoid world-space offset/camera culling issues.
+  - Use `BlockAndTintGetter` implementations that return air outside preview state maps and brightness `15`.
+  - Force large move-source glass overlays through the chunked GPU path.
+- **Remaining Risk:** Fabric dedicated server support for 26.1.x is still planned work, and several older compatibility stubs remain outside the client preview path.
+
+### 26.1.x BlockState Parsing
+- **Status:** Stubbed
+- **Issue:** `BlockArgumentParser.block()` API changed significantly
+- **Workaround:** Returns `null` for now
+
+### 26.1.x Entity Loading
+- **Status:** Partially implemented
+- **Issue:** `entityTypeLoadEntityWithPassengers()` API changed
+- **Workaround:** Returns `null` for now
+
+## Paper Plugin Compatibility
+
+The Paper plugin has separate compatibility considerations:
+
+- Protocol changes between Paper versions
+- Registry manager access differences
+- Block entity serialization differences
+
+Currently, the plugin uses reflection-based approaches for version compatibility where needed.

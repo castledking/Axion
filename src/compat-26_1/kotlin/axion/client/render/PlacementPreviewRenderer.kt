@@ -57,6 +57,7 @@ object PlacementPreviewRenderer {
                         alpha = MOVE_SOURCE_GHOST_ALPHA,
                         scale = MOVE_SOURCE_GHOST_SCALE,
                         sessionTag = "move-source",
+                        forceChunked = true,
                     ),
                 )
             }

@@ -256,21 +256,12 @@ class AxionFabricOperationService(
                 operation.sourceOrigin.z + cell.offset.z,
             )
         }
-        val captured = operation.cells.map { cell ->
-            val sourcePos = BlockPos(
-                operation.sourceOrigin.x + cell.offset.x,
-                operation.sourceOrigin.y + cell.offset.y,
-                operation.sourceOrigin.z + cell.offset.z,
-            )
-            CapturedBlock(
-                offset = cell.offset,
-                state = world.getBlockState(sourcePos),
-                blockEntityData = AxionFabricBlockEntitySnapshotService.capture(world, sourcePos),
-            )
-        }
+        val candidates = linkedMapOf<BlockPos, SmearCandidate>()
 
-        for (cell in captured) {
-            if (cell.state.isAir) {
+        for (cell in operation.cells) {
+            val parsed = parseBlockState(world, cell.blockState) ?: continue
+            val state = parsed.blockState()
+            if (state.isAir) {
                 continue
             }
 
@@ -283,14 +274,29 @@ class AxionFabricOperationService(
                 if (destination !in sourcePositions && !world.getBlockState(destination).isAir) {
                     break
                 }
-                AxionFabricBlockEntitySnapshotService.apply(
-                    world = world,
-                    pos = destination,
-                    state = cell.state,
-                    blockEntityData = cell.blockEntityData,
-                )
+                val distanceSq = offset.x * offset.x + offset.y * offset.y + offset.z * offset.z
+                val existing = candidates[destination]
+                if (existing == null || distanceSq < existing.distanceSq) {
+                    candidates[destination] = SmearCandidate(
+                        pos = destination,
+                        state = state,
+                        blockEntityData = cell.blockEntityData,
+                        distanceSq = distanceSq,
+                    )
+                }
             }
         }
+
+        candidates.values
+            .sortedWith(compareBy<SmearCandidate> { it.pos.x }.thenBy { it.pos.y }.thenBy { it.pos.z })
+            .forEach { candidate ->
+                AxionFabricBlockEntitySnapshotService.apply(
+                    world = world,
+                    pos = candidate.pos,
+                    state = candidate.state,
+                    blockEntityData = candidate.blockEntityData,
+                )
+            }
     }
 
     private fun resolveServerWorld(player: ServerPlayerEntity): ServerWorld {
@@ -508,6 +514,13 @@ class AxionFabricOperationService(
         val offset: IntVector3,
         val state: net.minecraft.block.BlockState,
         val blockEntityData: String?,
+    )
+
+    private data class SmearCandidate(
+        val pos: BlockPos,
+        val state: net.minecraft.block.BlockState,
+        val blockEntityData: String?,
+        val distanceSq: Int,
     )
 
     companion object {

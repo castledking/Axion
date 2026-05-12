@@ -191,8 +191,26 @@ class AxionOperationService(
         }
         val transactionId = result.transactionId
         val actionLabel = result.actionLabel
+        val changedAnything = result.changes.isNotEmpty() || entityMoves.isNotEmpty() || entityClones.isNotEmpty() || entityDeletes.isNotEmpty()
+        if (result.accepted && !changedAnything) {
+            if (request.operations.any { it is SmearRegionRequest }) {
+                return OperationBatchResult(
+                    requestId = request.requestId,
+                    accepted = false,
+                    message = "Smear placed no blocks; the target path is blocked or contains no air.",
+                    changedBlockCount = 0,
+                    code = AxionResultCode.VALIDATION_FAILED,
+                    source = AxionResultSource.SERVER,
+                    actionLabel = actionLabel,
+                )
+            }
+            return result.copy(
+                message = "No blocks changed",
+                transactionId = null,
+            )
+        }
         if (result.accepted && transactionId != null && actionLabel != null &&
-            (result.changes.isNotEmpty() || entityMoves.isNotEmpty() || entityClones.isNotEmpty() || entityDeletes.isNotEmpty())
+            changedAnything
         ) {
             history.recordNormal(
                 player.uniqueId,
@@ -387,23 +405,9 @@ class AxionOperationService(
                 operation.sourceOrigin.z + cell.offset.z,
             )
         }
-        val sourceStates = operation.cells.map { cell ->
-            val sourcePos = IntVector3(
-                operation.sourceOrigin.x + cell.offset.x,
-                operation.sourceOrigin.y + cell.offset.y,
-                operation.sourceOrigin.z + cell.offset.z,
-            )
-            ServerCapturedBlock(
-                offset = cell.offset,
-                blockState = world.getBlockAt(sourcePos.x, sourcePos.y, sourcePos.z).blockData.getAsString(false),
-                blockEntityData = PaperBlockEntitySnapshotService.capture(
-                    world,
-                    net.minecraft.core.BlockPos(sourcePos.x, sourcePos.y, sourcePos.z),
-                ),
-            )
-        }
+        val candidates = linkedMapOf<IntVector3, ServerSmearCandidate>()
 
-        for (cell in sourceStates) {
+        for (cell in operation.cells) {
             if (org.bukkit.Bukkit.createBlockData(cell.blockState).material.isAir) {
                 continue
             }
@@ -419,14 +423,29 @@ class AxionOperationService(
                     break
                 }
 
-                PaperBlockEntitySnapshotService.apply(
-                    world = world,
-                    pos = net.minecraft.core.BlockPos(destination.x, destination.y, destination.z),
-                    blockStateString = cell.blockState,
-                    blockEntityPayload = cell.blockEntityData,
-                )
+                val distanceSq = offset.x * offset.x + offset.y * offset.y + offset.z * offset.z
+                val existing = candidates[destination]
+                if (existing == null || distanceSq < existing.distanceSq) {
+                    candidates[destination] = ServerSmearCandidate(
+                        pos = destination,
+                        blockState = cell.blockState,
+                        blockEntityData = cell.blockEntityData,
+                        distanceSq = distanceSq,
+                    )
+                }
             }
         }
+
+        candidates.values
+            .sortedWith(compareBy<ServerSmearCandidate> { it.pos.x }.thenBy { it.pos.y }.thenBy { it.pos.z })
+            .forEach { candidate ->
+                PaperBlockEntitySnapshotService.apply(
+                    world = world,
+                    pos = net.minecraft.core.BlockPos(candidate.pos.x, candidate.pos.y, candidate.pos.z),
+                    blockStateString = candidate.blockState,
+                    blockEntityPayload = candidate.blockEntityData,
+                )
+            }
     }
 
     private fun smearOffsets(offset: IntVector3, steps: Int): List<IntVector3> {
@@ -548,6 +567,13 @@ class AxionOperationService(
         val offset: IntVector3,
         val blockState: String,
         val blockEntityData: String?,
+    )
+
+    private data class ServerSmearCandidate(
+        val pos: IntVector3,
+        val blockState: String,
+        val blockEntityData: String?,
+        val distanceSq: Int,
     )
 
     private sealed interface ExtrudePlanningResult {

@@ -3,6 +3,7 @@ package axion.client.render
 import axion.client.compat.CameraAccess
 import net.minecraft.block.BlockRenderType
 import net.minecraft.block.BlockState
+import net.minecraft.block.Blocks
 import net.minecraft.block.entity.BlockEntity
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.render.BlockRenderManager
@@ -32,7 +33,6 @@ object PreviewBlockTessellator {
         val camera = client.gameRenderer.camera ?: return false
         val blockRenderer = BlockRenderManager(true, true, client.blockColors)
         val modelSet = client.modelManager.blockStateModelSet
-        val previewView = PreviewRegionBlockRenderView(world, region.statesByPosition)
         val cameraPos = CameraAccess.getPos(camera)
         val consumer = TintedAlphaVertexConsumer(
             context.consumers().getBuffer(RenderLayerCompat.blockTranslucentCull()),
@@ -48,6 +48,7 @@ object PreviewBlockTessellator {
             }
 
             val model = modelSet.get(state)
+            val previewView = PreviewRegionBlockRenderView(world, region.statesByPosition, block.pos)
             val output = BlockQuadOutput { x: Float, y: Float, z: Float, quad: BakedQuad, quadInstance: QuadInstance ->
                 consumer.putBlockBakedQuad(
                     x - cameraPos.x.toFloat(),
@@ -78,13 +79,22 @@ object PreviewBlockTessellator {
     private class PreviewRegionBlockRenderView(
         private val world: net.minecraft.client.world.ClientWorld,
         private val statesByPosition: Map<Long, BlockState>,
+        private val renderingPos: BlockPos? = null,
     ) : BlockAndTintGetter {
+        private val airState: BlockState = Blocks.AIR.defaultState
+
         override fun getBlockEntity(pos: net.minecraft.core.BlockPos): BlockEntity? {
-            return if (statesByPosition.containsKey(pos.asLong())) null else world.getBlockEntity(pos)
+            return null
         }
 
         override fun getBlockState(pos: net.minecraft.core.BlockPos): BlockState {
-            return statesByPosition[pos.asLong()] ?: world.getBlockState(pos)
+            if (renderingPos != null && pos == renderingPos.above()) {
+                val aboveState = statesByPosition[pos.asLong()]
+                if (aboveState != null && !aboveState.isOpaqueFullCube) {
+                    return airState
+                }
+            }
+            return statesByPosition[pos.asLong()] ?: airState
         }
 
         override fun getFluidState(pos: net.minecraft.core.BlockPos) = getBlockState(pos).fluidState
@@ -95,7 +105,7 @@ object PreviewBlockTessellator {
 
         override fun getLightEngine(): LightingProvider = world.lightEngine
 
-        override fun getBrightness(layer: LightType, pos: net.minecraft.core.BlockPos): Int = world.getBrightness(layer, pos)
+        override fun getBrightness(layer: LightType, pos: net.minecraft.core.BlockPos): Int = 15
 
         override fun cardinalLighting(): CardinalLighting = world.cardinalLighting()
 

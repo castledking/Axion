@@ -16,12 +16,18 @@ Axion is an open-source Minecraft building toolkit inspired by Axiom, built as a
 - **[Wiki](https://github.com/castledking/Axion/wiki)** — Documentation, usage notes, and setup pages
 - **[Contributing](CONTRIBUTING.md)** — Development guide for contributors
 
-## Latest Work & Highlights
+## Changelog
 
 ### v0.2.7 (In development)
 
-- **Minecraft 26.1.x Support** — Full compatibility with the latest Minecraft version
+<a href="https://github.com/castledking/Axion/actions/workflows/cd.yml"><img alt="Build" src="https://github.com/castledking/Axion/actions/workflows/cd.yml/badge.svg?branch=main"></a>
+
+- **Minecraft 26.1.x Support** — Fabric client compatibility work for the latest Minecraft version
+- **26.1.x Rendering Fixes** — Restored toolbox icon textures, selection visuals, move-source glass overlays, and GPU block previews
 - **Smear Tool Overhaul** — True block smearing that samples your selection and spreads blocks as you scroll, perfect for creating staircases and roofs
+- **Stack & Smear Reliability** — Increased repeat limits, improved large GPU previews, fixed no-op smear feedback, and made smear overlap resolution more deterministic
+- **Hotbar Save/Load Fixes** — Saved hotbars restore correctly on 26.1.x
+- **Paper Admin Reload** — Added console-only `/axion reload` for reloading Paper plugin config and policy options without restarting the server
 - **Magic Selection Enhancements**
   - More block tags available for custom masks
   - Red outline for disabled templates for easy visual identification
@@ -30,12 +36,12 @@ Axion is an open-source Minecraft building toolkit inspired by Axiom, built as a
 - **Flying Speed Slider** — Adjust creative flight speed from 100% to 999% via Alt menu
 - **Improved Infinite Reach** — Replace mode, bulldozer, and fast place now work seamlessly at any distance
 
-## Roadmap & Upcoming
+## Next: v0.2.8
 
-### TODO
-- Fix toolbox icon rendering (currently using text ⚙ placeholder)
-- Add GPU renderer port for 26.1.2
-- Final pass on all tools + Paper server testing
+- **Version Support** — Add Paper/mod support for Minecraft 1.21.4 and Fabric dedicated server support for 26.1.x
+- **UI Improvements** — Replace the current screen-heavy tool hints/keybind/status overlay with a less intrusive UI for tool state, keybinds, offsets, and preview metadata
+
+## Roadmap & Upcoming
 
 ### Future Plans
 - More "capabilities" like `No Updates`, `Phantom`, `Angel Placement` and `Tinker`

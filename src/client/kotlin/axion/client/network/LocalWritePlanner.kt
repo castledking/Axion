@@ -161,6 +161,7 @@ class LocalWritePlanner {
         val sourcePositions = operation.clipboardBuffer.cells.mapTo(linkedSetOf()) { cell ->
             sourceOrigin.add(cell.offset).toImmutable()
         }
+        val candidates = linkedMapOf<BlockPos, SmearCandidate>()
 
         operation.clipboardBuffer.cells.forEach { cell ->
             if (cell.state.isAir) {
@@ -176,9 +177,24 @@ class LocalWritePlanner {
                     break
                 }
 
-                appendWrite(destinationPos, cell.state, cell.blockEntityData, overlay, writes)
+                val distanceSq = offset.x * offset.x + offset.y * offset.y + offset.z * offset.z
+                val existing = candidates[destinationPos]
+                if (existing == null || distanceSq < existing.distanceSq) {
+                    candidates[destinationPos] = SmearCandidate(
+                        pos = destinationPos,
+                        state = cell.state,
+                        blockEntityData = cell.blockEntityData,
+                        distanceSq = distanceSq,
+                    )
+                }
             }
         }
+
+        candidates.values
+            .sortedWith(compareBy<SmearCandidate> { it.pos.x }.thenBy { it.pos.y }.thenBy { it.pos.z })
+            .forEach { candidate ->
+                appendWrite(candidate.pos, candidate.state, candidate.blockEntityData, overlay, writes)
+            }
     }
 
     private fun appendExtrude(
@@ -305,5 +321,12 @@ class LocalWritePlanner {
         val offset: Vec3i,
         val state: BlockState,
         val blockEntityData: BlockEntityDataSnapshot?,
+    )
+
+    private data class SmearCandidate(
+        val pos: BlockPos,
+        val state: BlockState,
+        val blockEntityData: BlockEntityDataSnapshot?,
+        val distanceSq: Int,
     )
 }

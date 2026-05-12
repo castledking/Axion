@@ -186,25 +186,30 @@ object RepeatPreviewRenderer {
 
             val nonAirCells = ghostClipboard.nonAirCells()
             if (nonAirCells.isNotEmpty()) {
-                val maxGhostOrigins = maxOf(1, GhostBlockPreviewRenderer.maxOriginsFor(nonAirCells.size))
-                val canRenderAllGhostOrigins = repeatCount <= maxGhostOrigins
+                val maxLegacyGhostOrigins = maxOf(1, GhostBlockPreviewRenderer.maxOriginsFor(nonAirCells.size))
+                val canRenderAllGhostOrigins = repeatCount <= maxLegacyGhostOrigins
                 val baseGhostOrigins = if (forceAggregateOutline) {
                     if (mode == RegionRepeatPlacementService.Mode.SMEAR) {
-                        destinationRegionsForOffsets(sourceRegion, smearOffsets.take(maxGhostOrigins)).map { it.minCorner() }
+                        destinationRegionsForOffsets(sourceRegion, smearOffsets).map { it.minCorner() }
                     } else {
                         RepeatPreviewLayout.destinationRegions(
                             sourceRegion = sourceRegion,
                             step = step,
                             repeatCount = repeatCount,
-                            maxRegions = maxGhostOrigins,
+                            maxRegions = repeatCount,
                         ).map { it.minCorner() }
                     }
                 } else {
-                    destinationRegions
-                        .asSequence()
-                        .take(maxGhostOrigins)
-                        .map { it.minCorner() }
-                        .toList()
+                    if (mode == RegionRepeatPlacementService.Mode.SMEAR) {
+                        destinationRegionsForOffsets(sourceRegion, smearOffsets).map { it.minCorner() }
+                    } else {
+                        RepeatPreviewLayout.destinationRegions(
+                            sourceRegion = sourceRegion,
+                            step = step,
+                            repeatCount = repeatCount,
+                            maxRegions = repeatCount,
+                        ).map { it.minCorner() }
+                    }
                 }
                 val ghostOrigins = if (includeSourceOrigin) {
                     listOf(sourceRegion.normalized().minCorner()) + baseGhostOrigins

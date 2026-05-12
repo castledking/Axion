@@ -1,8 +1,8 @@
 package axion.client.compat
 
 import axion.client.render.AxionWorldRenderContext
-// Stub for 26.1.2 - SectionDrawEntry may have changed or been removed
-// import axion.client.render.gpu.SectionDrawEntry
+import axion.client.render.gpu.ChunkedPreviewLifecycle
+import axion.client.render.gpu.SectionDrawEntry
 import axion.common.model.ClipboardBuffer
 import com.mojang.blaze3d.buffers.GpuBufferSlice
 import com.mojang.blaze3d.pipeline.RenderPipeline
@@ -40,11 +40,13 @@ import net.minecraft.entity.EntityType
 import net.minecraft.item.ItemStack
 import net.minecraft.nbt.NbtCompound
 import net.minecraft.network.RegistryByteBuf
+import net.minecraft.network.codec.StreamCodec
 import net.minecraft.registry.DynamicRegistryManager
 import net.minecraft.registry.Registries
 import net.minecraft.util.Identifier
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Vec3d
+import net.minecraft.client.renderer.texture.TextureAtlas
 import org.lwjgl.glfw.GLFW
 import axion.common.compat.VersionCompat
 
@@ -99,7 +101,7 @@ object VersionCompatImpl : VersionCompat {
 
     override fun shouldUseNonConsumingKeybind(): Boolean = false
 
-    fun supportsChunkedPreview(): Boolean = false
+    fun supportsChunkedPreview(): Boolean = true
 
     fun renderChunkedPreview(
         sessionId: String,
@@ -108,16 +110,45 @@ object VersionCompatImpl : VersionCompat {
         origins: Collection<BlockPos>,
         color: Int,
         alpha: Int,
-    ): Boolean = false
+    ): Boolean {
+        val session = ChunkedPreviewLifecycle.acquire(sessionId)
+        session.setFromClipboard(clipboard, origins)
+        return session.render(context, color, alpha).handled
+    }
 
     fun closeChunkedPreviews() {
+        ChunkedPreviewLifecycle.closeAll()
     }
 
     fun drawMultipleIndexedPreview(
         pass: RenderPass,
-        drawList: List<Any>, // Stub for 26.1.2 - SectionDrawEntry may have changed or been removed
+        drawList: List<SectionDrawEntry>,
         uniformSlices: List<GpuBufferSlice>,
-    ): Boolean = false
+    ): Boolean {
+        if (drawList.isEmpty()) return false
+        val draws = ArrayList<RenderPass.Draw<Unit>>(drawList.size)
+        for (i in drawList.indices) {
+            val entry = drawList[i]
+            val vb = entry.buffer.vertexBufferGpu ?: return false
+            val ib = entry.buffer.indexBufferGpu ?: return false
+            val slice = uniformSlices[i]
+            draws += RenderPass.Draw<Unit>(
+                0,
+                vb,
+                ib,
+                entry.indexType,
+                0,
+                entry.indexCount,
+                0,
+                java.util.function.BiConsumer { _, uploader ->
+                    uploader.upload("DynamicTransforms", slice)
+                },
+            )
+        }
+        val first = draws[0]
+        pass.drawMultipleIndexed(draws, first.indexBuffer(), first.indexType(), listOf("DynamicTransforms"), Unit)
+        return true
+    }
 
     fun writeDynamicUniforms(
         dynamicUniforms: net.minecraft.client.gl.DynamicUniforms,
@@ -127,20 +158,32 @@ object VersionCompatImpl : VersionCompat {
         normalMatrix: org.joml.Matrix4fc,
         lineWidth: Float,
     ): GpuBufferSlice {
-        TODO("Dynamic uniforms are not ported to Minecraft 26.1.2 yet")
+        return dynamicUniforms.writeTransform(mvMatrix, colorTint, zeroVec, normalMatrix)
     }
 
-    fun getBlockAtlasTextureView(client: MinecraftClient): GpuTextureView? = null
+    private var currentAtlasSampler: com.mojang.blaze3d.textures.GpuSampler? = null
+
+    fun getBlockAtlasTextureView(client: MinecraftClient): GpuTextureView? {
+        return try {
+            val atlas = client.atlasManager.getAtlasOrThrow(TextureAtlas.LOCATION_BLOCKS)
+            currentAtlasSampler = atlas.sampler
+            atlas.textureView
+        } catch (_: Exception) {
+            null
+        }
+    }
 
     fun bindTextureToRenderPass(pass: RenderPass, samplerName: String, textureView: GpuTextureView) {
+        val sampler = currentAtlasSampler ?: return
+        pass.bindTexture(samplerName, textureView, sampler)
     }
 
     fun getRenderPipeline(layer: RenderLayer): RenderPipeline {
-        return RenderPipelines.LINES
+        return layer.pipeline()
     }
 
     fun getPreviewShellPipeline(vertexFormat: VertexFormat, drawMode: Any): RenderPipeline {
-        return RenderPipelines.LINES
+        return RenderPipelines.TRANSLUCENT_BLOCK
     }
 
     fun playSoundClient(
@@ -451,8 +494,7 @@ object VersionCompatImpl : VersionCompat {
         width: Int,
         height: Int,
     ) {
-        // In 26.1.x, the blit API changed. Use the delegate's blitSprite directly.
-        context.delegate.blitSprite(RenderPipelines.GUI_TEXTURED, texture, x, y, width, height)
+        context.delegate.blit(RenderPipelines.GUI_TEXTURED, texture, x, y, 0.0f, 0.0f, width, height, width, height)
     }
 
     fun getCameraPos(camera: Camera): Vec3d {
@@ -463,12 +505,7 @@ object VersionCompatImpl : VersionCompat {
     override fun itemStackEncode(registryManager: Any, stack: Any): ByteArray? {
         return runCatching {
             val buf = RegistryByteBuf(Unpooled.buffer(), registryManager as net.minecraft.registry.DynamicRegistryManager)
-            // Try different field names for the codec
-            val codec = runCatching { ItemStack::class.java.getField("PACKET_CODEC").get(null) }
-                .getOrElse { ItemStack::class.java.getField("STREAM_CODEC").get(null) }
-            codec.javaClass.methods
-                .first { it.name == "encode" && it.parameterTypes.size == 2 }
-                .invoke(codec, buf, stack)
+            itemStackStreamCodec().encode(buf, stack as ItemStack)
             val bytes = ByteArray(buf.readableBytes())
             buf.getBytes(0, bytes)
             bytes
@@ -478,11 +515,12 @@ object VersionCompatImpl : VersionCompat {
     override fun itemStackDecode(registryManager: Any, bytes: ByteArray): Any? {
         return runCatching {
             val buf = RegistryByteBuf(Unpooled.wrappedBuffer(bytes), registryManager as net.minecraft.registry.DynamicRegistryManager)
-            val codec = runCatching { ItemStack::class.java.getField("PACKET_CODEC").get(null) }
-                .getOrElse { ItemStack::class.java.getField("STREAM_CODEC").get(null) }
-            codec.javaClass.methods
-                .first { it.name == "decode" && it.parameterTypes.size == 1 }
-                .invoke(codec, buf)
+            itemStackStreamCodec().decode(buf)
         }.getOrNull()
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun itemStackStreamCodec(): StreamCodec<RegistryByteBuf, ItemStack> {
+        return ItemStack.STREAM_CODEC as StreamCodec<RegistryByteBuf, ItemStack>
     }
 }

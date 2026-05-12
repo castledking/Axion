@@ -34,6 +34,7 @@ fun PlayerInventory.getStack(slot: Int): ItemStack = getItem(slot)
 
 fun PlayerInventory.setStack(slot: Int, stack: ItemStack) {
     setItem(slot, stack)
+    setChanged()
 }
 
 fun MultiPlayerGameMode.clickCreativeStack(stack: ItemStack, slot: Int) {
