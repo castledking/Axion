@@ -1,7 +1,5 @@
 [![Axion Banner](https://castled.codes/assets/axion-banner.png)](https://github.com/castledking/Axion/wiki/)
 
-# Axion
-
 Axion is an open-source Minecraft building toolkit inspired by Axiom, built as a Fabric client mod with a companion Paper plugin for server-backed multiplayer editing.
 
 <p align="center">
