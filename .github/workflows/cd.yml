@@ -37,11 +37,11 @@ jobs:
         with:
           ref: ${{ github.event_name == 'release' && github.event.release.tag_name || github.event_name == 'workflow_dispatch' && github.event.inputs.checkout_ref || github.ref }}
 
-      - name: Set up Java 21
+      - name: Set up Java 25
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "21"
+          java-version: "25"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -52,7 +52,7 @@ jobs:
 
       - name: Build project
         if: github.event_name != 'release' && github.event_name != 'workflow_dispatch'
-        run: ./gradlew clean build :paper-plugin:jar
+        run: ./build-axion.sh all
 
       - name: Collect release jars
         if: (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v')) || (github.event_name == 'workflow_dispatch' && startsWith(github.event.inputs.release_tag, 'v'))
