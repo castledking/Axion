@@ -18,7 +18,7 @@ Axion is an open-source Minecraft building toolkit inspired by Axiom, built as a
 
 ## Changelog
 
-### v0.2.7 (In development)
+### v0.2.7 (Released)
 
 <a href="https://github.com/castledking/Axion/actions/workflows/cd.yml"><img alt="Build" src="https://github.com/castledking/Axion/actions/workflows/cd.yml/badge.svg?branch=main"></a>
 
@@ -33,8 +33,10 @@ Axion is an open-source Minecraft building toolkit inspired by Axiom, built as a
   - Red outline for disabled templates for easy visual identification
   - Same Block Select toggle to pick up matching blocks outside your mask
   - Continuous stroke support for faster large selections
-- **Flying Speed Slider** — Adjust creative flight speed from 100% to 999% via Alt menu
-- **Improved Infinite Reach** — Replace mode, bulldozer, and fast place now work seamlessly at any distance
+- **1.21.5 - 1.21.8 GPU Preview Compatibility**
+  - Added chunked GPU preview support for Minecraft 1.21.5
+  - Added chunked GPU preview support for the legacy 1.21.6 - 1.21.8 range, compiled against 1.21.7
+  - Large move, clone, stack, smear, and glass/origin overlay previews now use persistent per-section GPU buffers on these older ranges
 
 ## Next: v0.2.8
 
