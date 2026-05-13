@@ -2,7 +2,6 @@ package axion.client.render
 
 import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.client.render.RenderLayer
-import net.minecraft.client.render.RenderLayers
 import java.lang.reflect.Modifier
 
 object RenderLayerCompat {
@@ -52,13 +51,20 @@ object RenderLayerCompat {
 
     fun translucentMovingBlock(): RenderLayer = resolve("translucentMovingBlock", "getTranslucentMovingBlock")
 
+    // Safely probe for RenderLayers class (introduced in 1.21.11, absent on 1.21.9)
+    private val renderLayersClass: Class<*>? by lazy {
+        runCatching { Class.forName("net.minecraft.client.render.RenderLayers") }.getOrNull()
+    }
+
     fun blockTranslucentCull(): RenderLayer {
-        findMappedMethod(
-            RenderLayers::class.java,
-            "net.minecraft.client.render.RenderLayers",
-            "blockTranslucentCull",
-            modernIntermediaryNames["blockTranslucentCull"],
-        )?.let { return it.invoke(null) as RenderLayer }
+        renderLayersClass?.let { cls ->
+            findMappedMethod(
+                cls,
+                "net.minecraft.client.render.RenderLayers",
+                "blockTranslucentCull",
+                modernIntermediaryNames["blockTranslucentCull"],
+            )?.let { return it.invoke(null) as RenderLayer }
+        }
 
         findMappedMethod(
             RenderLayer::class.java,
@@ -71,13 +77,14 @@ object RenderLayerCompat {
     }
 
     private fun resolve(renderLayersMethod: String, renderLayerMethod: String): RenderLayer {
-        findMappedMethod(
-            RenderLayers::class.java,
-            "net.minecraft.client.render.RenderLayers",
-            renderLayersMethod,
-            modernIntermediaryNames[renderLayersMethod],
-        )
-            ?.let { return it.invoke(null) as RenderLayer }
+        renderLayersClass?.let { cls ->
+            findMappedMethod(
+                cls,
+                "net.minecraft.client.render.RenderLayers",
+                renderLayersMethod,
+                modernIntermediaryNames[renderLayersMethod],
+            )?.let { return it.invoke(null) as RenderLayer }
+        }
 
         val method = findMappedMethod(
             RenderLayer::class.java,

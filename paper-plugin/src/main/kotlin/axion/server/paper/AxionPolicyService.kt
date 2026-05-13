@@ -36,14 +36,15 @@ class AxionPolicyService(
                 message = "Axion is disabled in world ${world.name}",
             )
         }
-        if (!player.hasPermission(Permissions.USE)) {
+        val bypassPermissions = AxionDevMode.isEnabled(plugin)
+        if (!bypassPermissions && !player.hasPermission(Permissions.USE)) {
             return AxionRejection(
                 code = AxionResultCode.PERMISSION_DENIED,
                 source = AxionResultSource.PERMISSION,
                 message = "Missing permission ${Permissions.USE}",
             )
         }
-        if (usesSymmetry && !player.hasPermission(Permissions.SYMMETRY)) {
+        if (!bypassPermissions && usesSymmetry && !player.hasPermission(Permissions.SYMMETRY)) {
             return AxionRejection(
                 code = AxionResultCode.PERMISSION_DENIED,
                 source = AxionResultSource.PERMISSION,
@@ -60,7 +61,7 @@ class AxionPolicyService(
                 )
             }
             val permission = permissionFor(tool)
-            if (!player.hasPermission(permission)) {
+            if (!bypassPermissions && !player.hasPermission(permission)) {
                 return AxionRejection(
                     code = AxionResultCode.PERMISSION_DENIED,
                     source = AxionResultSource.PERMISSION,
@@ -77,7 +78,7 @@ class AxionPolicyService(
     }
 
     fun validateUndo(player: Player, world: World, touchedPositions: Set<IntVector3>, timing: AxionTimingContext): AxionRejection? {
-        if (!player.hasPermission(Permissions.UNDO)) {
+        if (!AxionDevMode.isEnabled(plugin) && !player.hasPermission(Permissions.UNDO)) {
             return AxionRejection(
                 code = AxionResultCode.PERMISSION_DENIED,
                 source = AxionResultSource.PERMISSION,
@@ -100,7 +101,7 @@ class AxionPolicyService(
     }
 
     fun validateRedo(player: Player, world: World, touchedPositions: Set<IntVector3>, timing: AxionTimingContext): AxionRejection? {
-        if (!player.hasPermission(Permissions.UNDO)) {
+        if (!AxionDevMode.isEnabled(plugin) && !player.hasPermission(Permissions.UNDO)) {
             return AxionRejection(
                 code = AxionResultCode.PERMISSION_DENIED,
                 source = AxionResultSource.PERMISSION,
@@ -191,7 +192,7 @@ class AxionPolicyService(
 
     fun effectiveWorldPolicy(player: Player, world: World): AxionWorldPolicy {
         val base = worldPolicy(world)
-        return if (player.hasPermission(Permissions.LARGE_EDITS)) {
+        return if (AxionDevMode.isEnabled(plugin) || player.hasPermission(Permissions.LARGE_EDITS)) {
             base.scaledForLargeEdits()
         } else {
             base

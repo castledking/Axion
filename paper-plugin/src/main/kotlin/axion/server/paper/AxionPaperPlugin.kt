@@ -45,6 +45,9 @@ class AxionPaperPlugin : JavaPlugin() {
         server.messenger.registerOutgoingPluginChannel(this, AxionProtocol.CHANNEL_ID)
         noClipService.start()
         flightSpeedService.start()
+        if (AxionDevMode.isEnabled(this)) {
+            logger.warning("Axion dev mode enabled by .axiondev marker on an offline-mode server; permission checks are bypassed.")
+        }
         logger.info("Axion Paper plugin enabled")
     }
 

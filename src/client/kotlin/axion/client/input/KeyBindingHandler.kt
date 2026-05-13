@@ -28,10 +28,14 @@ object KeyBindingHandler {
             }
         }.getOrElse {
             // Fallback: search for InputUtil/InputConstants.Key typed non-static mutable fields
-            KeyBinding::class.java.declaredFields.firstOrNull { f ->
-                isInputKeyClass(f.type) && !java.lang.reflect.Modifier.isStatic(f.modifiers)
+            // In 1.21.6, the Key class is obfuscated as class_3675$class_306
+            val fallback = KeyBinding::class.java.declaredFields.firstOrNull { f ->
+                val isKeyClass = isInputKeyClass(f.type) || f.type.name.contains("class_3675")
+                isKeyClass && !java.lang.reflect.Modifier.isStatic(f.modifiers)
                     && !java.lang.reflect.Modifier.isFinal(f.modifiers)
-            }?.also { it.isAccessible = true }
+            }
+            fallback?.also { it.isAccessible = true }
+            fallback
         }
     }
 
@@ -113,15 +117,29 @@ object KeyBindingHandler {
             keyClass.methods.firstOrNull { m ->
                 m.parameterCount == 0 && m.returnType.name == "int"
                     && m.name in setOf("getCode", "getValue")
-            }?.invoke(key) as? Int
+            }?.let { method ->
+                method.invoke(key) as? Int
+            }
+                ?: // Fallback: first zero-arg method returning int (obfuscated method like method_1444)
+                keyClass.methods.firstOrNull { m ->
+                    m.parameterCount == 0 && m.returnType.name == "int" &&
+                        !m.name.startsWith("wait") && !m.name.startsWith("notify") &&
+                        m.name != "hashCode"
+                }?.let { method ->
+                    method.invoke(key) as? Int
+                }
                 ?: // Try common field names (code in Mojang, keyCode in older Yarn)
                 keyClass.fields.firstOrNull { f ->
                     f.type.name == "int" && f.name in setOf("code", "keyCode")
-                }?.get(key) as? Int
+                }?.let { field ->
+                    field.get(key) as? Int
+                }
                 ?: // Last resort: first non-static int field (works for unmapped intermediaries)
                 keyClass.fields.firstOrNull { f ->
                     f.type.name == "int" && !java.lang.reflect.Modifier.isStatic(f.modifiers)
-                }?.get(key) as? Int
+                }?.let { field ->
+                    field.get(key) as? Int
+                }
         }.getOrNull()
     }
 

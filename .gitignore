@@ -37,6 +37,7 @@ bin/
 .kotlin/
 .modrinth/
 .idea/
+.run-workspaces/
 **/run/*
 *.txt
 docs/

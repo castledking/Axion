@@ -37,6 +37,7 @@ Axion is an open-source Minecraft building toolkit inspired by Axiom, built as a
   - Added chunked GPU preview support for Minecraft 1.21.5
   - Added chunked GPU preview support for the legacy 1.21.6 - 1.21.8 range, compiled against 1.21.7
   - Large move, clone, stack, smear, and glass/origin overlay previews now use persistent per-section GPU buffers on these older ranges
+  - Modern 1.21.9 - 1.21.11 previews adapt at runtime across the render-pass texture binding and `DynamicUniforms` API changes in that range
 
 ## Next: v0.2.8
 

@@ -148,38 +148,13 @@ object StackToolController {
     }
 
     fun handleRotateAction(): Boolean {
-        val state = AxionClientState.stackToolState
-        if (state !is StackToolState.PreviewingStack) return false
-        val preview = state.preview
-        val newTransform = preview.transform.rotateClockwise()
-        val transformed = ClipboardTransformService.transform(preview.sourceClipboardBuffer, newTransform)
-        val nextState = StackToolState.PreviewingStack(
-            preview.copy(
-                clipboardBuffer = transformed,
-                transform = newTransform,
-            ),
-        )
-        AxionClientState.updateStackToolState(nextState)
-        syncSelectionState(nextState)
-        return true
+        // Stack tool does not support rotation
+        return false
     }
 
     fun handleMirrorAction(client: MinecraftClient): Boolean {
-        val state = AxionClientState.stackToolState
-        if (state !is StackToolState.PreviewingStack) return false
-        val preview = state.preview
-        val axis = dominantMirrorAxis(client)
-        val newTransform = preview.transform.toggleMirror(axis)
-        val transformed = ClipboardTransformService.transform(preview.sourceClipboardBuffer, newTransform)
-        val nextState = StackToolState.PreviewingStack(
-            preview.copy(
-                clipboardBuffer = transformed,
-                transform = newTransform,
-            ),
-        )
-        AxionClientState.updateStackToolState(nextState)
-        syncSelectionState(nextState)
-        return true
+        // Stack tool does not support mirror/flip
+        return false
     }
 
     private fun dominantMirrorAxis(client: MinecraftClient): PlacementMirrorAxis {

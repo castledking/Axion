@@ -55,13 +55,82 @@ import net.minecraft.util.Formatting
 import org.joml.Matrix4fc
 import org.joml.Vector3fc
 import org.joml.Vector4fc
+import org.slf4j.LoggerFactory
 
 /**
  * Version compatibility implementation for Minecraft 1.21.11
  */
 object VersionCompatImpl : VersionCompat {
-    private var currentAtlasSampler: net.minecraft.client.gl.GpuSampler? = null
+    private val logger = LoggerFactory.getLogger(VersionCompatImpl::class.java)
+    private var currentAtlasSampler: Any? = null
     private val previewShellPipelines = java.util.EnumMap<VertexFormat.DrawMode, RenderPipeline>(VertexFormat.DrawMode::class.java)
+
+    private val dynamicUniformsWrite4 by lazy {
+        net.minecraft.client.gl.DynamicUniforms::class.java.methods.firstOrNull { method ->
+            method.parameterTypes.size == 4 &&
+                GpuBufferSlice::class.java.isAssignableFrom(method.returnType) &&
+                method.name != "equals" && method.name != "toString" && method.name != "hashCode"
+        }.also {
+            if (it != null) logger.info("[Axion GPU] Found DynamicUniforms.write(4-arg): {}", it.name)
+        }
+    }
+
+    private val dynamicUniformsWrite5 by lazy {
+        net.minecraft.client.gl.DynamicUniforms::class.java.methods.firstOrNull { method ->
+            method.parameterTypes.size == 5 &&
+                GpuBufferSlice::class.java.isAssignableFrom(method.returnType) &&
+                method.name != "equals" && method.name != "toString" && method.name != "hashCode"
+        }.also {
+            if (it != null) logger.info("[Axion GPU] Found DynamicUniforms.write(5-arg): {}", it.name)
+        }
+    }
+
+    private val dynamicUniformsWriteAny by lazy {
+        // Last resort: find ANY method returning GpuBufferSlice
+        net.minecraft.client.gl.DynamicUniforms::class.java.methods.filter { method ->
+            GpuBufferSlice::class.java.isAssignableFrom(method.returnType) &&
+                method.parameterTypes.isNotEmpty() &&
+                method.name != "equals" && method.name != "toString" && method.name != "hashCode"
+        }.also { methods ->
+            if (methods.isNotEmpty()) {
+                methods.forEach { m ->
+                    logger.info("[Axion GPU] DynamicUniforms candidate: {}({}) -> {}",
+                        m.name, m.parameterTypes.joinToString { it.simpleName }, m.returnType.simpleName)
+                }
+            } else {
+                logger.warn("[Axion GPU] No DynamicUniforms methods returning GpuBufferSlice found. All methods:")
+                net.minecraft.client.gl.DynamicUniforms::class.java.methods.forEach { m ->
+                    logger.warn("  {}({}) -> {}", m.name, m.parameterTypes.joinToString { it.simpleName }, m.returnType.simpleName)
+                }
+            }
+        }
+    }
+
+    private val renderPassBindTexture by lazy {
+        // 1.21.11: bindTexture(String, GpuTextureView, GpuSampler) — 3 params
+        RenderPass::class.java.methods.firstOrNull { method ->
+            method.name == "bindTexture" && method.parameterTypes.size == 3
+        }.also { m ->
+            if (m != null) {
+                logger.info("[Axion GPU] Found RenderPass.bindTexture(3-arg): {}", m)
+            }
+        }
+    }
+
+    private val renderPassBindSampler by lazy {
+        // 1.21.9/1.21.10: bindSampler(String, GpuTextureView) — 2 params
+        RenderPass::class.java.methods.firstOrNull { method ->
+            method.name == "bindSampler" && method.parameterTypes.size == 2
+        }.also { m ->
+            if (m != null) {
+                logger.info("[Axion GPU] Found RenderPass.bindSampler(2-arg): {}", m)
+            } else {
+                // Dump all RenderPass methods for diagnosis if neither primary lookup matched
+                val allMethods = RenderPass::class.java.methods.map { "${it.name}(${it.parameterTypes.joinToString { t -> t.simpleName }})" }
+                logger.warn("[Axion GPU] RenderPass.bindSampler(2-arg) NOT found. Available methods: {}", allMethods)
+            }
+        }
+    }
 
     private fun getRegistryManager(): DynamicRegistryManager? {
         return MinecraftClient.getInstance().world?.registryManager
@@ -245,7 +314,16 @@ object VersionCompatImpl : VersionCompat {
     }
 
     fun supportsChunkedPreview(): Boolean {
-        return true
+        val hasBindTexture = renderPassBindTexture != null
+        val hasBindSampler = renderPassBindSampler != null
+        val hasWrite4 = dynamicUniformsWrite4 != null
+        val hasWrite5 = dynamicUniformsWrite5 != null
+        val supported = hasBindTexture || hasBindSampler
+        logger.info(
+            "[Axion GPU] supportsChunkedPreview={} (bindTexture={}, bindSampler={}, dynWrite4={}, dynWrite5={})",
+            supported, hasBindTexture, hasBindSampler, hasWrite4, hasWrite5,
+        )
+        return supported
     }
 
     fun renderChunkedPreview(
@@ -256,9 +334,14 @@ object VersionCompatImpl : VersionCompat {
         color: Int,
         alpha: Int,
     ): Boolean {
-        val session = ChunkedPreviewLifecycle.acquire(sessionId)
-        session.setFromClipboard(clipboard, origins)
-        return session.render(context, color, alpha).handled
+        return try {
+            val session = ChunkedPreviewLifecycle.acquire(sessionId)
+            session.setFromClipboard(clipboard, origins)
+            session.render(context, color, alpha).handled
+        } catch (t: Throwable) {
+            logger.warn("[Axion GPU] renderChunkedPreview failed for session={} — falling back to CPU path", sessionId, t)
+            false
+        }
     }
 
     // Rendering helpers for 1.21.11
@@ -443,6 +526,20 @@ object VersionCompatImpl : VersionCompat {
         uniformSlices: List<GpuBufferSlice>,
     ): Boolean {
         if (drawList.isEmpty()) return false
+        return try {
+            doDrawMultipleIndexed(pass, drawList, uniformSlices)
+        } catch (_: NoClassDefFoundError) {
+            // RenderPass.RenderObject doesn't exist on 1.21.9/1.21.10 — fall back to manual loop
+            logger.info("[Axion GPU] drawMultipleIndexed not available (missing RenderObject class), using per-section draw loop")
+            false
+        }
+    }
+
+    private fun doDrawMultipleIndexed(
+        pass: RenderPass,
+        drawList: List<SectionDrawEntry>,
+        uniformSlices: List<GpuBufferSlice>,
+    ): Boolean {
         val renderObjects = ArrayList<RenderPass.RenderObject<Unit>>(drawList.size)
         for (i in drawList.indices) {
             val entry = drawList[i]
@@ -468,40 +565,95 @@ object VersionCompatImpl : VersionCompat {
     }
 
     // Rendering compatibility for 1.21.11
+    private var loggedAtlasResult: Boolean = false
+    private var loggedBindFailure: Boolean = false
+
     fun getBlockAtlasTextureView(client: MinecraftClient): GpuTextureView? {
-        // 1.21.11 uses atlasManager.getAtlasTexture()
         return try {
             val atlas = client.atlasManager?.getAtlasTexture(net.minecraft.util.Identifier.of("minecraft", "blocks"))
-            currentAtlasSampler = atlas?.getSampler()
-            atlas?.getGlTextureView()
+            currentAtlasSampler = atlas?.javaClass?.methods
+                ?.firstOrNull { it.name == "getSampler" && it.parameterCount == 0 }
+                ?.invoke(atlas)
+            val view = atlas?.getGlTextureView()
+            if (!loggedAtlasResult) {
+                loggedAtlasResult = true
+                logger.info("[Axion GPU] Atlas lookup: view={}, sampler={}", view != null, currentAtlasSampler != null)
+            }
+            view
         } catch (e: Exception) {
+            if (!loggedAtlasResult) {
+                loggedAtlasResult = true
+                logger.warn("[Axion GPU] Atlas lookup failed", e)
+            }
+            currentAtlasSampler = null
             null
         }
     }
 
     fun bindTextureToRenderPass(pass: RenderPass, samplerName: String, textureView: GpuTextureView) {
-        // 1.21.11 uses bindTexture with name, view, and sampler
-        val sampler = currentAtlasSampler ?: return
-        pass.bindTexture(samplerName, textureView, sampler)
+        val sampler = currentAtlasSampler
+        val bindTexture = renderPassBindTexture
+        if (bindTexture != null && sampler != null) {
+            try {
+                bindTexture.invoke(pass, samplerName, textureView, sampler)
+            } catch (e: Exception) {
+                logger.warn("[Axion GPU] bindTexture.invoke failed for {}", samplerName, e)
+            }
+            return
+        }
+
+        val bindSampler = renderPassBindSampler
+        if (bindSampler != null) {
+            try {
+                bindSampler.invoke(pass, samplerName, textureView)
+            } catch (e: Exception) {
+                logger.warn("[Axion GPU] bindSampler.invoke failed for {}", samplerName, e)
+            }
+        } else if (!loggedBindFailure) {
+            loggedBindFailure = true
+            logger.error("[Axion GPU] bindTextureToRenderPass: no bind method available — GPU preview will be invisible")
+        }
     }
 
-    fun getRenderPipeline(layer: RenderLayer): RenderPipeline {
-        return layer.renderPipeline
+    fun getRenderPipeline(layer: RenderLayer): RenderPipeline? {
+        return try {
+            layer.renderPipeline
+        } catch (_: Throwable) {
+            // renderPipeline property may not exist on 1.21.9 — try reflection
+            try {
+                val method = layer.javaClass.methods.firstOrNull {
+                    it.parameterCount == 0 && RenderPipeline::class.java.isAssignableFrom(it.returnType)
+                }
+                method?.invoke(layer) as? RenderPipeline
+            } catch (_: Throwable) {
+                null
+            }
+        }
     }
 
-    fun getPreviewShellPipeline(vertexFormat: VertexFormat, drawMode: VertexFormat.DrawMode): RenderPipeline {
-        return previewShellPipelines.computeIfAbsent(drawMode) {
-            RenderPipeline.builder(RenderPipelines.TRANSFORMS_AND_PROJECTION_SNIPPET)
-                .withLocation(Identifier.of("axion", "preview_shell"))
-                .withVertexShader(Identifier.of("axion", "core/preview_shell"))
-                .withFragmentShader(Identifier.of("axion", "core/preview_shell"))
-                .withSampler("Sampler0")
-                .withBlend(BlendFunction.TRANSLUCENT)
-                .withDepthTestFunction(DepthTestFunction.LEQUAL_DEPTH_TEST)
-                .withDepthWrite(true)
-                .withCull(true)
-                .withVertexFormat(vertexFormat, drawMode)
-                .build()
+    private var loggedPipelineCreation = false
+
+    fun getPreviewShellPipeline(vertexFormat: VertexFormat, drawMode: VertexFormat.DrawMode): RenderPipeline? {
+        return try {
+            previewShellPipelines.computeIfAbsent(drawMode) {
+                RenderPipeline.builder(RenderPipelines.TRANSFORMS_AND_PROJECTION_SNIPPET)
+                    .withLocation(Identifier.of("axion", "preview_shell"))
+                    .withVertexShader(Identifier.of("axion", "core/preview_shell"))
+                    .withFragmentShader(Identifier.of("axion", "core/preview_shell"))
+                    .withSampler("Sampler0")
+                    .withBlend(BlendFunction.TRANSLUCENT)
+                    .withDepthTestFunction(DepthTestFunction.LEQUAL_DEPTH_TEST)
+                    .withDepthWrite(true)
+                    .withCull(true)
+                    .withVertexFormat(vertexFormat, drawMode)
+                    .build()
+            }
+        } catch (t: Throwable) {
+            if (!loggedPipelineCreation) {
+                loggedPipelineCreation = true
+                logger.warn("[Axion GPU] Custom preview pipeline creation failed (1.21.9?), will use render layer pipeline", t)
+            }
+            null
         }
     }
 
@@ -513,8 +665,34 @@ object VersionCompatImpl : VersionCompat {
         normalMatrix: Matrix4fc,
         lineWidth: Float
     ): GpuBufferSlice {
-        // 1.21.11 DynamicUniforms.write takes 4 parameters (lineWidth is not passed here)
-        return dynamicUniforms.write(mvMatrix, colorTint, zeroVec, normalMatrix)
+        val write4 = dynamicUniformsWrite4
+        if (write4 != null) {
+            return write4.invoke(dynamicUniforms, mvMatrix, colorTint, zeroVec, normalMatrix) as GpuBufferSlice
+        }
+
+        val write5 = dynamicUniformsWrite5
+        if (write5 != null) {
+            return write5.invoke(dynamicUniforms, mvMatrix, colorTint, zeroVec, normalMatrix, lineWidth) as GpuBufferSlice
+        }
+
+        // Final fallback: try any method returning GpuBufferSlice, adapting arg count
+        val candidates = dynamicUniformsWriteAny
+        for (candidate in candidates) {
+            try {
+                val args: Array<Any?> = when (candidate.parameterTypes.size) {
+                    4 -> arrayOf(mvMatrix, colorTint, zeroVec, normalMatrix)
+                    5 -> arrayOf(mvMatrix, colorTint, zeroVec, normalMatrix, lineWidth)
+                    6 -> arrayOf(mvMatrix, colorTint, zeroVec, normalMatrix, lineWidth, 0f)
+                    3 -> arrayOf(mvMatrix, colorTint, normalMatrix)
+                    else -> continue
+                }
+                return candidate.invoke(dynamicUniforms, *args) as GpuBufferSlice
+            } catch (_: Exception) {
+                continue
+            }
+        }
+
+        throw NoSuchMethodError("No compatible DynamicUniforms.write overload found (checked write4=${write4 != null}, write5=${write5 != null}, candidates=${candidates.size})")
     }
 
     fun playSoundClient(
@@ -575,20 +753,35 @@ object VersionCompatImpl : VersionCompat {
         try {
             Camera::class.java.getDeclaredField("pos").apply { isAccessible = true }
         } catch (_: NoSuchFieldException) {
-            null
+            Camera::class.java.declaredFields.firstOrNull { it.type == Vec3d::class.java }
+                ?.apply { isAccessible = true }
         }
     }
 
-    fun getCameraPos(camera: Camera): Vec3d {
-        val field = cameraPosField
-        if (field != null) {
-            try {
-                return field.get(camera) as Vec3d
-            } catch (_: Exception) {
-                // Fall through
+    private val cameraPosMethod: java.lang.reflect.Method? by lazy {
+        Camera::class.java.methods.firstOrNull { it.name == "getPos" && it.parameterCount == 0 }
+            ?: Camera::class.java.methods.firstOrNull {
+                it.parameterCount == 0 && it.returnType == Vec3d::class.java
             }
+    }
+
+    fun getCameraPos(camera: Camera): Vec3d {
+        // Try mixin accessor (correctly remapped)
+        try {
+            return (camera as axion.mixin.client.CameraAccessor).axionGetPos()
+        } catch (_: Throwable) {}
+
+        // Try method reflection
+        cameraPosMethod?.let { m ->
+            try { return m.invoke(camera) as Vec3d } catch (_: Exception) {}
         }
-        throw IllegalStateException("Cannot access camera position")
+
+        // Try field reflection
+        cameraPosField?.let { f ->
+            try { return f.get(camera) as Vec3d } catch (_: Exception) {}
+        }
+
+        throw IllegalStateException("Cannot access camera position — no accessor, method, or field found on Camera class")
     }
 
     // ItemStack codec helpers for hotbar save/load (1.21.11 uses reflection directly)
@@ -598,5 +791,45 @@ object VersionCompatImpl : VersionCompat {
 
     override fun itemStackDecode(registryManager: Any, bytes: ByteArray): Any? {
         return null // Not used in 1.21.11, SavedHotbarController uses its own reflection
+    }
+
+    override fun createAxionPluginPayloadCodec(): Any {
+        // 1.21.11 PacketCodec API - try ofStatic with 2 parameters, fallback to any 2-parameter static method
+        val codecClass = PacketCodec::class.java
+
+        // Try ofStatic first
+        val method = codecClass.methods.firstOrNull { it.name == "ofStatic" && it.parameterCount == 2 }
+            // Fallback: try any static method with 2 parameters that returns PacketCodec
+            ?: codecClass.methods.firstOrNull {
+                it.parameterCount == 2 &&
+                it.returnType == codecClass &&
+                java.lang.reflect.Modifier.isStatic(it.modifiers)
+            }
+            ?: throw NoSuchMethodError("No compatible PacketCodec factory method found in 1.21.11")
+
+        val encoderType = method.parameterTypes[0]
+        val decoderType = method.parameterTypes[1]
+
+        val encoder = java.lang.reflect.Proxy.newProxyInstance(encoderType.classLoader, arrayOf(encoderType)) { _, method, args ->
+            if (method.name == "encode" && args != null && args.size == 2) {
+                val buf = args[0] as RegistryByteBuf
+                val payload = args[1] as AxionPluginPayload
+                buf.writeBytes(payload.bytes)
+            }
+            null
+        }
+
+        val decoder = java.lang.reflect.Proxy.newProxyInstance(decoderType.classLoader, arrayOf(decoderType)) { _, method, args ->
+            if (method.name == "decode" && args != null && args.size == 1) {
+                val buf = args[0] as RegistryByteBuf
+                val bytes = ByteArray(buf.readableBytes())
+                buf.readBytes(bytes)
+                AxionPluginPayload(bytes)
+            } else {
+                null
+            }
+        }
+
+        return method.invoke(null, encoder, decoder)
     }
 }

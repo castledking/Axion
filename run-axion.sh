@@ -4,42 +4,109 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
+SUPPORTED_VERSION_LIST=("1.21.5" "1.21.6" "1.21.7" "1.21.8" "1.21.9" "1.21.10" "1.21.11" "26.1")
+
 # Parse command line arguments
-VERSIONS="${1:-26.1}"
-BUILD_FIRST="${BUILD_FIRST:-false}"
+VERSION_ARG="26.1"
+if [[ $# -gt 0 && "$1" != -* && "$1" != "paper" && "$1" != "fabric" && "$1" != "with" ]]; then
+    VERSION_ARG="$1"
+    shift
+fi
+
 WITH_PAPER="${WITH_PAPER:-false}"
 WITH_FABRIC="${WITH_FABRIC:-false}"
 STARTED_SERVER_PIDS=()
+STARTED_CLIENT_PIDS=()
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        paper|with-paper|with_paper|--paper)
+            WITH_PAPER=true
+            ;;
+        fabric|with-fabric|with_fabric|--fabric)
+            WITH_FABRIC=true
+            ;;
+        with)
+            ;;
+        -h|--help)
+            VERSION_ARG="--help"
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            exit 1
+            ;;
+    esac
+    shift
+done
 
 # Display usage
-if [[ "$VERSIONS" == "-h" || "$VERSIONS" == "--help" ]]; then
+if [[ "$VERSION_ARG" == "-h" || "$VERSION_ARG" == "--help" ]]; then
     echo "Usage: ./run-axion.sh [VERSIONS] [OPTIONS]"
     echo ""
-    echo "VERSIONS: Minecraft version to run (1.21.5, 1.21.7, 1.21.11, or 26.1)"
+    echo "VERSIONS: Minecraft version, comma-separated versions, or all"
+    echo "  Supported: 1.21.5, 1.21.6, 1.21.7, 1.21.8, 1.21.9, 1.21.10, 1.21.11, 26.1"
     echo "  Default: 26.1"
     echo ""
     echo "OPTIONS:"
-    echo "  BUILD_FIRST=true    Build jars before running"
-    echo "  WITH_PAPER=true     Also start Paper server"
-    echo "  WITH_FABRIC=true    Start Fabric server for 1.21.11 (same port as Paper)"
+    echo "  paper, --paper      Also start Paper server(s)"
+    echo "  fabric, --fabric    Start Fabric server for 1.21.11"
+    echo "  WITH_PAPER=true     Environment equivalent for paper"
+    echo "  WITH_FABRIC=true    Environment equivalent for fabric"
     echo ""
     echo "Examples:"
     echo "  ./run-axion.sh 26.1"
-    echo "  BUILD_FIRST=true ./run-axion.sh 1.21.11"
+    echo "  ./run-axion.sh 1.21.6,1.21.7 paper"
+    echo "  ./run-axion.sh all paper fabric"
     echo "  WITH_PAPER=true ./run-axion.sh 26.1"
-    echo "  WITH_FABRIC=true ./run-axion.sh 1.21.11"
     exit 0
 fi
 
-# Build jars first if requested
-if [[ "$BUILD_FIRST" == "true" ]]; then
-    echo "Building jars first..."
-    case "$VERSIONS" in
+if [[ "$VERSION_ARG" == "all" ]]; then
+    VERSIONS=("${SUPPORTED_VERSION_LIST[@]}")
+else
+    IFS=',' read -r -a VERSIONS <<< "$VERSION_ARG"
+fi
+
+for i in "${!VERSIONS[@]}"; do
+    VERSIONS[$i]="$(printf '%s' "${VERSIONS[$i]}" | xargs)"
+done
+
+if [[ ${#VERSIONS[@]} -gt 1 && "$(uname -s)" != "Linux" ]]; then
+    echo "Multiple clients are currently only supported on Linux." >&2
+    exit 1
+fi
+
+RUN_AXION_LOG_DIR="${RUN_AXION_LOG_DIR:-.logs/run-axion}"
+RUN_AXION_LOG_FILE="${RUN_AXION_LOG_FILE:-$RUN_AXION_LOG_DIR/run-$(date +%Y%m%d-%H%M%S).log}"
+mkdir -p "$(dirname "$RUN_AXION_LOG_FILE")"
+ln -sfn "$(basename "$RUN_AXION_LOG_FILE")" "$(dirname "$RUN_AXION_LOG_FILE")/latest.log"
+exec > >(tee -a "$RUN_AXION_LOG_FILE") 2>&1
+
+echo "Run log: $ROOT_DIR/$RUN_AXION_LOG_FILE"
+echo "Versions: ${VERSIONS[*]}"
+echo "Options: WITH_PAPER=$WITH_PAPER WITH_FABRIC=$WITH_FABRIC"
+echo "Started: $(date -Is)"
+echo
+
+build_version() {
+    case "$1" in
         1.21.5)
             ./build-axion.sh mc1_21_5
             ;;
+        1.21.6)
+            ./build-axion.sh mc1_21_6
+            ;;
         1.21.7|legacy)
             ./build-axion.sh legacy
+            ;;
+        1.21.8)
+            ./build-axion.sh mc1_21_8
+            ;;
+        1.21.9)
+            ./build-axion.sh mc1_21_9
+            ;;
+        1.21.10)
+            ./build-axion.sh mc1_21_10
             ;;
         1.21.11|modern)
             ./build-axion.sh modern
@@ -48,16 +115,22 @@ if [[ "$BUILD_FIRST" == "true" ]]; then
             ./build-axion.sh mc26_1_x
             ;;
         *)
-            echo "Unknown version for build: $VERSIONS" >&2
+            echo "Unknown version for build: $1" >&2
+            echo "Supported versions: 1.21.5, 1.21.6, 1.21.7, 1.21.8, 1.21.9, 1.21.10, 1.21.11, 26.1" >&2
+            exit 1
             ;;
     esac
-fi
+}
 
 # Function to resolve Minecraft version for gradle
 resolve_mc_version() {
     case "$1" in
         1.21.5) echo "1.21.5" ;;
+        1.21.6) echo "1.21.6" ;;
         1.21.7) echo "1.21.7" ;;
+        1.21.8) echo "1.21.8" ;;
+        1.21.9) echo "1.21.9" ;;
+        1.21.10) echo "1.21.10" ;;
         1.21.11) echo "1.21.11" ;;
         26.1|26.1.x) echo "26.1.2" ;;
         *) echo "" ;;
@@ -67,7 +140,11 @@ resolve_mc_version() {
 resolve_yarn_mappings() {
     case "$1" in
         "1.21.5") echo "1.21.5+build.1" ;;
+        "1.21.6") echo "1.21.6+build.1" ;;
         "1.21.7") echo "1.21.7+build.1" ;;
+        "1.21.8") echo "1.21.8+build.1" ;;
+        "1.21.9") echo "1.21.9+build.1" ;;
+        "1.21.10") echo "1.21.10+build.3" ;;
         "1.21.11") echo "1.21.11+build.4" ;;
         "26.1"|"26.1.2") echo "" ;;
         *) return 1 ;;
@@ -77,7 +154,11 @@ resolve_yarn_mappings() {
 resolve_loader_version() {
     case "$1" in
         "1.21.5") echo "0.16.12" ;;
+        "1.21.6") echo "0.16.13" ;;
         "1.21.7") echo "0.16.13" ;;
+        "1.21.8") echo "0.16.14" ;;
+        "1.21.9") echo "0.17.3" ;;
+        "1.21.10") echo "0.17.3" ;;
         "1.21.11") echo "0.18.4" ;;
         "26.1"|"26.1.2") echo "0.19.2" ;;
         *) return 1 ;;
@@ -87,7 +168,11 @@ resolve_loader_version() {
 resolve_fabric_version() {
     case "$1" in
         "1.21.5") echo "0.119.5+1.21.5" ;;
+        "1.21.6") echo "0.128.2+1.21.6" ;;
         "1.21.7") echo "0.129.0+1.21.7" ;;
+        "1.21.8") echo "0.131.0+1.21.8" ;;
+        "1.21.9") echo "0.134.1+1.21.9" ;;
+        "1.21.10") echo "0.138.4+1.21.10" ;;
         "1.21.11") echo "0.141.3+1.21.11" ;;
         "26.1"|"26.1.2") echo "0.145.1+26.1" ;;
         *) return 1 ;;
@@ -97,7 +182,11 @@ resolve_fabric_version() {
 resolve_fabric_kotlin_version() {
     case "$1" in
         "1.21.5") echo "1.13.0+kotlin.2.1.0" ;;
+        "1.21.6") echo "1.13.0+kotlin.2.1.0" ;;
         "1.21.7") echo "1.13.0+kotlin.2.1.0" ;;
+        "1.21.8") echo "1.13.0+kotlin.2.1.0" ;;
+        "1.21.9") echo "1.13.9+kotlin.2.3.10" ;;
+        "1.21.10") echo "1.13.9+kotlin.2.3.10" ;;
         "1.21.11") echo "1.13.9+kotlin.2.3.10" ;;
         "26.1"|"26.1.2") echo "1.13.11+kotlin.2.3.21" ;;
         *) return 1 ;;
@@ -107,7 +196,11 @@ resolve_fabric_kotlin_version() {
 resolve_modmenu_version() {
     case "$1" in
         "1.21.5") echo "14.0.0" ;;
+        "1.21.6") echo "15.0.2" ;;
         "1.21.7") echo "15.0.2" ;;
+        "1.21.8") echo "15.0.2" ;;
+        "1.21.9") echo "16.0.1" ;;
+        "1.21.10") echo "16.0.1" ;;
         "1.21.11") echo "17.0.0-beta.2" ;;
         "26.1"|"26.1.2") echo "18.0.0-beta.1" ;;
         *) return 1 ;;
@@ -125,7 +218,11 @@ resolve_loom_version() {
 resolve_paper_version() {
     case "$1" in
         1.21.5) echo "1.21.5-R0.1-SNAPSHOT" ;;
+        1.21.6) echo "1.21.6-R0.1-SNAPSHOT" ;;
         1.21.7) echo "1.21.7-R0.1-SNAPSHOT" ;;
+        1.21.8) echo "1.21.8-R0.1-SNAPSHOT" ;;
+        1.21.9) echo "1.21.9-R0.1-SNAPSHOT" ;;
+        1.21.10) echo "1.21.10-R0.1-SNAPSHOT" ;;
         1.21.11) echo "1.21.11-R0.1-SNAPSHOT" ;;
         26.1|26.1.x) echo "26.1.2.build.63-stable" ;;
         *) echo "" ;;
@@ -136,11 +233,46 @@ resolve_paper_version() {
 resolve_range_tag() {
     case "$1" in
         1.21.5) echo "mc1.21.5" ;;
+        1.21.6) echo "mc1.21.6" ;;
         1.21.7) echo "mc1.21.6-1.21.8" ;;
+        1.21.8) echo "mc1.21.8" ;;
+        1.21.9) echo "mc1.21.9" ;;
+        1.21.10) echo "mc1.21.10" ;;
         1.21.11) echo "mc1.21.9-1.21.11" ;;
         26.1|26.1.x) echo "mc26.1.x" ;;
         *) echo "" ;;
     esac
+}
+
+set_server_property() {
+    local file="$1"
+    local key="$2"
+    local value="$3"
+
+    if grep -q "^${key}=" "$file" 2>/dev/null; then
+        sed -i "s/^${key}=.*/${key}=${value}/" "$file"
+    else
+        printf '%s=%s\n' "$key" "$value" >> "$file"
+    fi
+}
+
+configure_server_properties() {
+    local file="$1"
+    local port="$2"
+
+    set_server_property "$file" "server-ip" ""
+    set_server_property "$file" "server-port" "$port"
+    set_server_property "$file" "online-mode" "false"
+    set_server_property "$file" "enforce-secure-profile" "false"
+}
+
+write_axion_dev_marker() {
+    local marker="$1"
+    mkdir -p "$(dirname "$marker")"
+    cat > "$marker" << 'EOF'
+# Created by ./run-axion.sh for local Axion offline-mode testing.
+# Axion server integrations only honor this marker when online-mode=false.
+EOF
 }
 
 # Function to start Paper server
@@ -153,6 +285,7 @@ start_paper_server() {
     local paper_jar
     local plugins_dir
     local plugin_jar
+    local port
 
     paper_version="$(resolve_paper_version "$version")"
     range_tag="$(resolve_range_tag "$version")"
@@ -161,6 +294,17 @@ start_paper_server() {
     paper_jar="$run_dir/paper-server.jar"
     plugins_dir="$run_dir/plugins"
     plugin_jar="paper-plugin/build/libs/${range_tag}/AxionPaper-v${mod_version}-${range_tag}.jar"
+    case "$version" in
+        1.21.5) port=25567 ;;
+        1.21.6) port=25568 ;;
+        1.21.7) port=25569 ;;
+        1.21.8) port=25570 ;;
+        1.21.9) port=25571 ;;
+        1.21.10) port=25572 ;;
+        1.21.11) port=25573 ;;
+        26.1|26.1.x) port=25574 ;;
+        *) port=25565 ;;
+    esac
 
     echo "  Setting up Paper server for $version..."
 
@@ -176,7 +320,11 @@ start_paper_server() {
         local paper_url
         case "$version" in
             1.21.5) paper_url="https://fill-data.papermc.io/v1/objects/2ae6ae22adf417699746e0f89fc2ef6cb6ee050a5f6608cee58f0535d60b509e/paper-1.21.5-114.jar" ;;
+            1.21.6) paper_url="https://fill-data.papermc.io/v1/objects/35e2dfa66b3491b9d2f0bb033679fa5aca1e1fdf097e7a06a80ce8afeda5c214/paper-1.21.6-48.jar" ;;
             1.21.7) paper_url="https://fill-data.papermc.io/v1/objects/83838188699cb2837e55b890fb1a1d39ad0710285ed633fbf9fc14e9f47ce078/paper-1.21.7-32.jar" ;;
+            1.21.8) paper_url="https://fill-data.papermc.io/v1/objects/8de7c52c3b02403503d16fac58003f1efef7dd7a0256786843927fa92ee57f1e/paper-1.21.8-60.jar" ;;
+            1.21.9) paper_url="https://fill-data.papermc.io/v1/objects/aec002e77c7566e49494fdf05430b96078ffd1d7430e652d4f338fef951e7a10/paper-1.21.9-59.jar" ;;
+            1.21.10) paper_url="https://fill-data.papermc.io/v1/objects/158703f75a26f842ea656b3dc6d75bf3d1ec176b97a2c36384d0b80b3871af53/paper-1.21.10-130.jar" ;;
             1.21.11) paper_url="https://fill-data.papermc.io/v1/objects/e708e8c132dc143ffd73528cccb9532e2eb17628b1a0eee74469bf466c7003f8/paper-1.21.11-116.jar" ;;
             26.1|26.1.x) paper_url="https://fill-data.papermc.io/v1/objects/b51d49a5f62446b7cfc01e6c29e48e0ce6abd35a783134aace1047b839b178ef/paper-26.1.2-63.jar" ;;
             *) echo "    ERROR: Unknown version $version for Paper download" >&2; return 1 ;;
@@ -193,12 +341,13 @@ start_paper_server() {
     fi
 
     # Copy AxionPaper plugin
+    find "$plugins_dir" -maxdepth 1 -type f -name 'AxionPaper-*.jar' -delete
     if [[ -f "$plugin_jar" ]]; then
         echo "    Copying AxionPaper plugin..."
         cp "$plugin_jar" "$plugins_dir/"
     else
         echo "    WARNING: AxionPaper jar not found at $plugin_jar" >&2
-        echo "    Run BUILD_FIRST=true ./run-axion.sh to build the plugin first."
+        echo "    The automatic build completed, so check the build output above for errors."
     fi
 
     # Ensure eula.txt has eula=true
@@ -209,18 +358,12 @@ start_paper_server() {
 
     # Create server.properties if not present
     if [[ ! -f "$run_dir/server.properties" ]]; then
-        local port
-        case "$version" in
-            1.21.5) port=25567 ;;
-            1.21.7) port=25568 ;;
-            1.21.11) port=25569 ;;
-            26.1|26.1.x) port=25570 ;;
-            *) port=25565 ;;
-        esac
         echo "    Creating server.properties (port $port)..."
         cat > "$run_dir/server.properties" << EOF
 server-ip=127.0.0.1
 server-port=$port
+online-mode=false
+enforce-secure-profile=false
 enable-rcon=false
 enable-command-block=true
 spawn-protection=0
@@ -245,10 +388,10 @@ EOF
 EOF
     fi
 
-    # Ensure server-ip is empty (JDK 26+ defaults to 127.0.0.1)
-    if [[ -f "$run_dir/server.properties" ]]; then
-        sed -i 's/^server-ip=.*/server-ip=/' "$run_dir/server.properties"
-    fi
+    configure_server_properties "$run_dir/server.properties" "$port"
+    write_axion_dev_marker "$run_dir/.axiondev"
+    write_axion_dev_marker "$plugins_dir/Axion/.axiondev"
+    stop_server_in_run_dir "$run_dir"
 
     # Disable spark profiler (crashes on JDK 26+)
     local paper_global="$run_dir/config/paper-global.yml"
@@ -265,7 +408,7 @@ EOF
     # Start Paper server in background
     echo "    Starting Paper server in background..."
     cd "$run_dir"
-    java -Djava.net.preferIPv6Addresses=false -jar "paper-server.jar" nogui &
+    java -Xms128M -Xmx512M -Djava.net.preferIPv6Addresses=false -jar "paper-server.jar" nogui &
     local server_pid=$!
     cd "$ROOT_DIR"
     
@@ -289,7 +432,7 @@ start_fabric_server() {
     fi
 
     local mc_version="1.21.11"
-    local port=25569
+    local port=25573
     local mod_version
     local run_dir
     local mods_dir
@@ -299,6 +442,9 @@ start_fabric_server() {
     run_dir="run/fabric/$version"
     mods_dir="$run_dir/mods"
     installer_jar="$ROOT_DIR/.cache/fabric-installer.jar"
+    if [[ "$WITH_PAPER" == "true" ]]; then
+        port=25575
+    fi
 
     echo "  Setting up Fabric server for $version..."
 
@@ -387,6 +533,8 @@ start_fabric_server() {
         cat > "$run_dir/server.properties" << EOF
 server-ip=
 server-port=$port
+online-mode=false
+enforce-secure-profile=false
 enable-rcon=false
 enable-command-block=true
 spawn-protection=0
@@ -396,8 +544,10 @@ level-seed=axiontest
 EOF
     fi
 
-    # Ensure server-ip is empty
-    sed -i 's/^server-ip=.*/server-ip=/' "$run_dir/server.properties"
+    configure_server_properties "$run_dir/server.properties" "$port"
+    write_axion_dev_marker "$run_dir/.axiondev"
+    write_axion_dev_marker "$run_dir/config/axion/.axiondev"
+    stop_server_in_run_dir "$run_dir"
 
     # Create ops.json with pre-authorized users
     if [[ ! -f "$run_dir/ops.json" ]] || ! grep -q "ggpots" "$run_dir/ops.json" 2>/dev/null; then
@@ -417,7 +567,7 @@ EOF
     # Start Fabric server in background
     echo "    Starting Fabric server in background..."
     cd "$run_dir"
-    java -Djava.net.preferIPv6Addresses=false -jar fabric-server-launch.jar nogui &
+    java -Xms128M -Xmx512M -Djava.net.preferIPv6Addresses=false -jar fabric-server-launch.jar nogui &
     local server_pid=$!
     cd "$ROOT_DIR"
 
@@ -449,89 +599,409 @@ stop_servers() {
     done
 }
 
-# Trap to stop background servers on exit
-trap stop_servers EXIT
+stop_server_in_run_dir() {
+    local run_dir="$1"
+    local pid_file="$run_dir/server.pid"
+    local lock_file="$run_dir/world/session.lock"
+    local pid
+
+    if [[ -f "$pid_file" ]]; then
+        pid="$(cat "$pid_file" 2>/dev/null || true)"
+        if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then
+            echo "    Stopping existing server for $run_dir (PID: $pid)..."
+            kill "$pid" 2>/dev/null || true
+            wait_for_pid_exit "$pid"
+        fi
+        rm -f "$pid_file"
+    fi
+
+    if [[ -e "$lock_file" ]] && command -v lsof >/dev/null 2>&1; then
+        while IFS= read -r pid; do
+            if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then
+                echo "    Stopping server holding $lock_file (PID: $pid)..."
+                kill "$pid" 2>/dev/null || true
+                wait_for_pid_exit "$pid"
+            fi
+        done < <(lsof -t "$lock_file" 2>/dev/null || true)
+    fi
+}
+
+wait_for_pid_exit() {
+    local pid="$1"
+    local i
+
+    for i in {1..50}; do
+        if ! kill -0 "$pid" 2>/dev/null; then
+            return 0
+        fi
+        sleep 0.1
+    done
+
+    kill -9 "$pid" 2>/dev/null || true
+}
+
+stop_clients() {
+    if [[ ${#STARTED_CLIENT_PIDS[@]} -eq 0 ]]; then
+        return
+    fi
+
+    for pid in "${STARTED_CLIENT_PIDS[@]}"; do
+        if kill -0 "$pid" 2>/dev/null; then
+            kill "$pid" 2>/dev/null || true
+        fi
+    done
+}
+
+cleanup() {
+    local status=$?
+    trap - EXIT
+    stop_clients
+    stop_servers
+    echo
+    echo "Finished: $(date -Is)"
+    echo "Exit status: $status"
+    echo "Run log saved to: $ROOT_DIR/$RUN_AXION_LOG_FILE"
+    exit "$status"
+}
+
+# Trap to stop background clients and servers on exit
+trap cleanup EXIT
 
 # IAS version IDs per Minecraft version (Modrinth)
 declare -A IAS_VERSION
 IAS_VERSION["1.21.5"]="Rqmwlwr6"
 IAS_VERSION["1.21.7"]="Fs2YTzMh"
+IAS_VERSION["1.21.8"]="OqjOUdNs"
+IAS_VERSION["1.21.10"]="fgPKk2RF"
 IAS_VERSION["1.21.11"]="YUbSyjUy"
 IAS_VERSION["26.1.2"]="2ea1OpDg"
 
-# Download Ingame Account Switcher mod for a specific MC version if not present
-ensure_ias() {
-    local mc_version="$1"
-    local version_id="${IAS_VERSION[$mc_version]:-}"
-    [[ -z "$version_id" ]] && return 0
+declare -A AUTHME_VERSION
+AUTHME_VERSION["1.21.6"]="CvPwgFbQ"
+AUTHME_VERSION["1.21.9"]="VDR6iBtH"
 
-    local mods_dir="run/mods"
-    local target_file="$mods_dir/IAS-${mc_version}.jar"
-    mkdir -p "$mods_dir"
+download_modrinth_version() {
+    local version_id="$1"
+    local target_file="$2"
+    local label="$3"
 
-    [[ -f "$target_file" ]] && return 0
-
-    echo "  Downloading Ingame Account Switcher for $mc_version..."
+    echo "  Downloading $label..."
     local meta
     meta="$(curl -sf "https://api.modrinth.com/v2/version/${version_id}")" || {
-        echo "  WARNING: Failed to fetch IAS version info" >&2
-        return 0
+        echo "  WARNING: Failed to fetch $label version info" >&2
+        return 1
     }
 
     local url
-    url="$(echo "$meta" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['files'][0]['url'])" 2>/dev/null)" || return 0
+    url="$(echo "$meta" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['files'][0]['url'])" 2>/dev/null)" || return 1
 
     if command -v wget &>/dev/null; then
         wget -q -O "$target_file" "$url"
     elif command -v curl &>/dev/null; then
         curl -sL -o "$target_file" "$url"
     else
-        echo "  WARNING: Neither wget nor curl found, cannot download IAS" >&2
-        return 0
+        echo "  WARNING: Neither wget nor curl found, cannot download $label" >&2
+        return 1
     fi
-    echo "  Downloaded IAS-${mc_version}.jar"
 }
 
-# Run
-echo
-echo "==> Running Minecraft version: $VERSIONS"
+install_cached_client_mod() {
+    local mc_version="$1"
+    local mod_name="$2"
+    local version_id="$3"
+    local mods_dir="$4"
+    local cache_dir=".cache/client-mods"
+    local cached_file="$cache_dir/${mod_name}-${mc_version}.jar"
+    local target_file="$mods_dir/${mod_name}-${mc_version}.jar"
 
-# Start Paper or Fabric server if requested
-if [[ "$WITH_FABRIC" == "true" ]]; then
-    start_fabric_server "$VERSIONS"
-elif [[ "$WITH_PAPER" == "true" ]]; then
-    start_paper_server "$VERSIONS"
-fi
+    mkdir -p "$cache_dir"
+    if [[ ! -f "$cached_file" ]]; then
+        download_modrinth_version "$version_id" "$cached_file" "${mod_name} for Minecraft ${mc_version}" || return 0
+    fi
 
-# Run client
-mc_version="$(resolve_mc_version "$VERSIONS")"
+    cp "$cached_file" "$target_file"
+}
 
-if [[ -n "$mc_version" ]]; then
-    echo "  Running Minecraft $mc_version client..."
-    ensure_ias "$mc_version"
-    
-    # Resolve all properties for this version
+# Install a compatible client auth helper for the selected MC version, if one exists.
+ensure_client_auth_mod() {
+    local mc_version="$1"
+    local client_run_dir="${2:-run}"
+    local mods_dir="$client_run_dir/mods"
+    mkdir -p "$mods_dir"
+
+    # Each client run directory gets exactly one compatible auth helper.
+    # Stale auth jars for other MC versions make Fabric reject the launch.
+    find "$mods_dir" -maxdepth 1 -type f \
+        \( -iname '*ias*.jar' -o -iname '*account*switcher*.jar' -o -iname '*authme*.jar' -o -iname '*auth-me*.jar' \) \
+        -delete
+
+    local ias_version_id="${IAS_VERSION[$mc_version]:-}"
+    if [[ -n "$ias_version_id" ]]; then
+        install_cached_client_mod "$mc_version" "IAS" "$ias_version_id" "$mods_dir"
+        return 0
+    fi
+
+    local authme_version_id="${AUTHME_VERSION[$mc_version]:-}"
+    if [[ -n "$authme_version_id" ]]; then
+        install_cached_client_mod "$mc_version" "AuthMe" "$authme_version_id" "$mods_dir"
+        return 0
+    fi
+
+    echo "  No compatible IAS/Auth Me release for Minecraft $mc_version; launching without an auth helper."
+}
+
+client_run_dir_for() {
+    local version="$1"
+    if [[ ${#VERSIONS[@]} -gt 1 ]]; then
+        echo "$ROOT_DIR/run/clients/${version}"
+    else
+        echo "$ROOT_DIR/run"
+    fi
+}
+
+prepare_client_run_dir() {
+    local client_run_dir="$1"
+
+    mkdir -p "$client_run_dir"
+    mkdir -p "$ROOT_DIR/run"
+
+    install_servers_dat "$client_run_dir"
+    configure_client_options "$client_run_dir/options.txt"
+}
+
+configure_client_options() {
+    local options_file="$1"
+    mkdir -p "$(dirname "$options_file")"
+
+    python3 - "$options_file" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+desired = {
+    "fullscreen": "false",
+    "narrator": "0",
+    "onboardAccessibility": "false",
+    "tutorialStep": "none",
+}
+
+lines = []
+seen = set()
+if path.exists():
+    for raw in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        key = raw.split(":", 1)[0] if ":" in raw else raw
+        if key in desired:
+            lines.append(f"{key}:{desired[key]}")
+            seen.add(key)
+        else:
+            lines.append(raw)
+
+for key, value in desired.items():
+    if key not in seen:
+        lines.append(f"{key}:{value}")
+
+path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+PY
+}
+
+install_servers_dat() {
+    local client_run_dir="$1"
+    local server_list_source="$ROOT_DIR/run/servers.dat"
+
+    generate_servers_dat "$server_list_source"
+
+    rm -f "$client_run_dir/servers.dat" "$client_run_dir/servers.dat_old"
+    if [[ -f "$server_list_source" ]]; then
+        cp "$server_list_source" "$client_run_dir/servers.dat"
+        cp "$server_list_source" "$client_run_dir/servers.dat_old"
+    else
+        echo "Warning: servers.dat not generated, skipping server list copy"
+    fi
+}
+
+generate_servers_dat() {
+    local target="$1"
+    local fabric_port=""
+
+    if [[ "$WITH_FABRIC" == "true" ]]; then
+        if [[ "$WITH_PAPER" == "true" ]]; then
+            fabric_port="25575"
+        else
+            fabric_port="25573"
+        fi
+    fi
+
+    mkdir -p "$(dirname "$target")"
+    python3 - "$target" "$fabric_port" <<'PY'
+import struct
+import sys
+
+target = sys.argv[1]
+fabric_port = sys.argv[2]
+
+servers = [
+    ("1.21.5", "127.0.0.1:25567"),
+    ("1.21.6", "127.0.0.1:25568"),
+    ("1.21.7", "127.0.0.1:25569"),
+    ("1.21.8", "127.0.0.1:25570"),
+    ("1.21.9", "127.0.0.1:25571"),
+    ("1.21.10", "127.0.0.1:25572"),
+    ("1.21.11 Paper", "127.0.0.1:25573"),
+    ("26.1.x", "127.0.0.1:25574"),
+]
+if fabric_port:
+    servers.append(("1.21.11 Fabric", f"127.0.0.1:{fabric_port}"))
+
+def utf(value):
+    data = value.encode("utf-8")
+    return struct.pack(">H", len(data)) + data
+
+out = bytearray()
+out += b"\x0a\x00\x00"
+out += b"\x09" + utf("servers")
+out += b"\x0a" + struct.pack(">i", len(servers))
+
+for name, address in servers:
+    out += b"\x01" + utf("hidden") + b"\x00"
+    out += b"\x08" + utf("ip") + utf(address)
+    out += b"\x08" + utf("name") + utf(name)
+    out += b"\x00"
+
+out += b"\x00"
+
+with open(target, "wb") as f:
+    f.write(out)
+PY
+}
+
+prepare_client_workspace() {
+    local version="$1"
+    local workspace="$ROOT_DIR/.run-workspaces/$version"
+
+    if [[ ${#VERSIONS[@]} -eq 1 ]]; then
+        echo "$ROOT_DIR"
+        return 0
+    fi
+
+    echo "  Preparing isolated Gradle workspace for $version..." >&2
+    mkdir -p "$workspace"
+    rsync -a --delete \
+        --exclude='.git/' \
+        --exclude='.gradle/' \
+        --exclude='build/' \
+        --exclude='run/' \
+        --exclude='.logs/' \
+        --exclude='.run-workspaces/' \
+        --exclude='.cache/' \
+        --exclude='paper-plugin/build/' \
+        --exclude='fabric-server/build/' \
+        --exclude='paper-plugin/bin/' \
+        --exclude='fabric-server/bin/' \
+        "$ROOT_DIR/" "$workspace/" >&2
+    echo "$workspace"
+}
+
+relative_path() {
+    local from_dir="$1"
+    local to_path="$2"
+
+    python3 - "$from_dir" "$to_path" <<'PY'
+import os
+import sys
+
+print(os.path.relpath(os.path.abspath(sys.argv[2]), os.path.abspath(sys.argv[1])))
+PY
+}
+
+start_client() {
+    local version="$1"
+    local mc_version
+    local client_run_dir
+    local gradle_dir
+    local gradle_run_dir
+    local yarn_mappings
+    local loader_version
+    local fabric_version
+    local fabric_kotlin_version
+    local modmenu_version
+    local loom_version
+
+    mc_version="$(resolve_mc_version "$version")"
+    if [[ -z "$mc_version" ]]; then
+        echo "  ERROR: Unknown version: $version" >&2
+        echo "  Supported versions: 1.21.5, 1.21.6, 1.21.7, 1.21.8, 1.21.9, 1.21.10, 1.21.11, 26.1" >&2
+        exit 1
+    fi
+
+    client_run_dir="$(client_run_dir_for "$version")"
+    prepare_client_run_dir "$client_run_dir"
+    gradle_dir="$(prepare_client_workspace "$version")"
+    gradle_run_dir="$(relative_path "$gradle_dir" "$client_run_dir")"
+
+    echo "  Launching Minecraft $mc_version client (run dir: $client_run_dir, workspace: $gradle_dir, gradle runDir: $gradle_run_dir)..."
+    ensure_client_auth_mod "$mc_version" "$client_run_dir"
+
     yarn_mappings="$(resolve_yarn_mappings "$mc_version")"
     loader_version="$(resolve_loader_version "$mc_version")"
     fabric_version="$(resolve_fabric_version "$mc_version")"
     fabric_kotlin_version="$(resolve_fabric_kotlin_version "$mc_version")"
     modmenu_version="$(resolve_modmenu_version "$mc_version")"
     loom_version="$(resolve_loom_version "$mc_version")"
-    
-    # Run client with version properties passed directly as -P flags.
-    ./gradlew :runClient \
-        -Pminecraft_version="$mc_version" \
-        -Pyarn_mappings="$yarn_mappings" \
-        -Ploader_version="$loader_version" \
-        -Pfabric_version="$fabric_version" \
-        -Pfabric_kotlin_version="$fabric_kotlin_version" \
-        -Pmodmenu_version="$modmenu_version" \
-        -Ploom_version="$loom_version"
-else
-    echo "  ERROR: Unknown version: $VERSIONS" >&2
-    echo "  Supported versions: 1.21.5, 1.21.7, 1.21.11, 26.1" >&2
-    exit 1
+
+    (
+        cd "$gradle_dir"
+        ./gradlew --no-daemon :runClient \
+            -Pminecraft_version="$mc_version" \
+            -Pyarn_mappings="$yarn_mappings" \
+            -Ploader_version="$loader_version" \
+            -Pfabric_version="$fabric_version" \
+            -Pfabric_kotlin_version="$fabric_kotlin_version" \
+            -Pmodmenu_version="$modmenu_version" \
+            -Ploom_version="$loom_version" \
+            -Paxion_run_dir="$gradle_run_dir"
+    ) &
+
+    local client_pid=$!
+    STARTED_CLIENT_PIDS+=("$client_pid")
+    echo "  Client for $mc_version started with PID: $client_pid"
+}
+
+# Run
+echo
+echo "==> Running Minecraft versions: ${VERSIONS[*]}"
+
+echo "Building jars..."
+for version in "${VERSIONS[@]}"; do
+    build_version "$version"
+done
+
+# Start Paper or Fabric server if requested
+if [[ "$WITH_PAPER" == "true" ]]; then
+    for version in "${VERSIONS[@]}"; do
+        start_paper_server "$version"
+    done
 fi
+
+if [[ "$WITH_FABRIC" == "true" ]]; then
+    for version in "${VERSIONS[@]}"; do
+        start_fabric_server "$version"
+    done
+fi
+
+for version in "${VERSIONS[@]}"; do
+    start_client "$version"
+    if [[ ${#VERSIONS[@]} -gt 1 ]]; then
+        sleep 3
+    fi
+done
+
+client_status=0
+for pid in "${STARTED_CLIENT_PIDS[@]}"; do
+    if ! wait "$pid"; then
+        client_status=1
+    fi
+done
 
 echo
 echo "==> All done"
+exit "$client_status"

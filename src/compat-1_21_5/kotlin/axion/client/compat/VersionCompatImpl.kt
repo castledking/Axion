@@ -252,4 +252,34 @@ object VersionCompatImpl : VersionCompat {
     override fun blockArgumentParserBlock(registry: Any, state: String): Any = BlockArgumentParser.block((registry as DynamicRegistryManager).getOrThrow(RegistryKeys.BLOCK), state, false)
     override fun itemStackEncode(registryManager: Any, stack: Any): ByteArray? = null
     override fun itemStackDecode(registryManager: Any, bytes: ByteArray): Any? = null
+
+    override fun createAxionPluginPayloadCodec(): Any {
+        // 1.21.5 PacketCodec API uses ofStatic with 2 parameters
+        val codecClass = PacketCodec::class.java
+        val method = codecClass.methods.first { it.name == "ofStatic" && it.parameterCount == 2 }
+        val encoderType = method.parameterTypes[0]
+        val decoderType = method.parameterTypes[1]
+
+        val encoder = java.lang.reflect.Proxy.newProxyInstance(encoderType.classLoader, arrayOf(encoderType)) { _, method, args ->
+            if (method.name == "encode" && args != null && args.size == 2) {
+                val buf = args[0] as RegistryByteBuf
+                val payload = args[1] as AxionPluginPayload
+                buf.writeBytes(payload.bytes)
+            }
+            null
+        }
+
+        val decoder = java.lang.reflect.Proxy.newProxyInstance(decoderType.classLoader, arrayOf(decoderType)) { _, method, args ->
+            if (method.name == "decode" && args != null && args.size == 1) {
+                val buf = args[0] as RegistryByteBuf
+                val bytes = ByteArray(buf.readableBytes())
+                buf.readBytes(bytes)
+                AxionPluginPayload(bytes)
+            } else {
+                null
+            }
+        }
+
+        return method.invoke(null, encoder, decoder)
+    }
 }

@@ -17,6 +17,11 @@ class AxionFabricServerMod : DedicatedServerModInitializer {
         LOGGER.info("Initializing Axion Fabric server support")
         noClipService.initialize()
         networking.initialize()
+        ServerLifecycleEvents.SERVER_STARTED.register(ServerLifecycleEvents.ServerStarted { server ->
+            if (AxionFabricDevMode.isEnabled(server)) {
+                LOGGER.warn("Axion dev mode enabled by .axiondev marker on an offline-mode server; permission checks are bypassed.")
+            }
+        })
         ServerLifecycleEvents.SERVER_STOPPING.register(ServerLifecycleEvents.ServerStopping { server ->
             networking.stop(server)
         })

@@ -11,8 +11,13 @@ This document maps API differences across supported Minecraft versions and docum
 ## VersionCompat Interface Methods
 
 The `VersionCompat` interface provides a common abstraction for operations that differ between Minecraft versions. Implementations exist in:
-- `src/compat-1_21_5/kotlin/axion/client/compat/VersionCompatImpl.kt` (1.21.5 - 1.21.7)
-- `src/compat-1_21_11/kotlin/axion/client/compat/VersionCompatImpl.kt` (1.21.8 - 1.21.11)
+- `src/compat-1_21_5/kotlin/axion/client/compat/VersionCompatImpl.kt` (1.21.5)
+- `src/compat-1_21_6/kotlin/axion/client/compat/VersionCompatImpl.kt` (1.21.6 exact test/build target)
+- `src/compat-1_21_7/kotlin/axion/client/compat/VersionCompatImpl.kt` (1.21.6 - 1.21.8 release range base)
+- `src/compat-1_21_8/kotlin/axion/client/compat/VersionCompatImpl.kt` (1.21.8 exact test/build target)
+- `src/compat-1_21_9/kotlin/axion/client/compat/VersionCompatImpl.kt` (1.21.9 exact test/build target)
+- `src/compat-1_21_10/kotlin/axion/client/compat/VersionCompatImpl.kt` (1.21.10 exact test/build target)
+- `src/compat-1_21_11/kotlin/axion/client/compat/VersionCompatImpl.kt` (1.21.9 - 1.21.11 release range base)
 - `src/compat-26_1/kotlin/axion/client/compat/VersionCompatImpl.kt` (26.1.x)
 
 ### API Area: Registry Operations
@@ -177,15 +182,16 @@ The `VersionCompat` interface provides a common abstraction for operations that 
 - `AxionPreviewBlockDrawer` uses a manual per-section loop: write dynamic uniforms, set `DynamicTransforms`, draw the section buffer.
 - Build verification: `./build-axion.sh legacy` passes with the chunked GPU preview path enabled.
 
-#### GPU Rendering (1.21.11)
-- `supportsChunkedPreview()`: Returns `true`
+#### GPU Rendering (1.21.9 - 1.21.11, compiled against 1.21.11)
+- `supportsChunkedPreview()`: Returns `true` when at least one texture-binding method is detected
 - `renderChunkedPreview()`: Full implementation using `ChunkedPreviewLifecycle`
-- `drawMultipleIndexedPreview()`: Full implementation with `RenderPass.RenderObject`
-- `getBlockAtlasTextureView()`: Uses `client.atlasManager?.getAtlasTexture()`
-- `bindTextureToRenderPass()`: Uses `pass.bindTexture(samplerName, textureView, sampler)`
+- `drawMultipleIndexedPreview()`: Uses `RenderPass.RenderObject` (1.21.11); catches `NoClassDefFoundError` on 1.21.9/1.21.10 and falls back to per-section `setUniform` + `drawIndexed` loop
+- `getBlockAtlasTextureView()`: Uses `client.atlasManager?.getAtlasTexture()`; atlas sampler is detected reflectively via `getSampler()`
+- `bindTextureToRenderPass()`: Runtime-adapts between `pass.bindSampler(name, GpuTextureView)` on 1.21.9/1.21.10 and `pass.bindTexture(name, GpuTextureView, GpuSampler)` on 1.21.11
 - `getRenderPipeline()`: Uses `layer.renderPipeline`
 - `getPreviewShellPipeline()`: Custom pipeline builder with shaders
-- `writeDynamicUniforms()`: Uses `dynamicUniforms.write(mvMatrix, colorTint, zeroVec, normalMatrix)` (4 params)
+- `writeDynamicUniforms()`: Runtime-adapts between the 1.21.9/1.21.10 five-argument `DynamicUniforms.write(..., lineWidth)` and the 1.21.11 four-argument form
+- **Reflection strategy:** All GPU method lookups use name + arity matching (`methods.firstOrNull { name == X && parameterTypes.size == N }`) instead of `getMethod()` with exact parameter types. This is required because the compat module is compiled against 1.21.11, and `getMethod()` fails on 1.21.9/1.21.10 when runtime parameter types don't match the compile-time class identity (e.g., `GpuTextureView` class loaded at runtime vs compiled against)
 
 #### GPU Rendering (26.1.x)
 - `supportsChunkedPreview()`: Returns `true`

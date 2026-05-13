@@ -151,10 +151,11 @@ object ClonePlacementService {
         val ax = kotlin.math.abs(look.x)
         val ay = kotlin.math.abs(look.y)
         val az = kotlin.math.abs(look.z)
+        // Match the guide arrow logic: whichever axis has the largest component wins
         return when {
-            ay >= ax && ay >= az -> PlacementMirrorAxis.Y
-            ax >= az -> PlacementMirrorAxis.X
-            else -> PlacementMirrorAxis.Z
+            ay >= ax && ay >= az -> PlacementMirrorAxis.Y  // Looking up/down
+            ax >= ay && ax >= az -> PlacementMirrorAxis.X  // Facing E/W
+            else -> PlacementMirrorAxis.Z  // Facing N/S
         }
     }
 }

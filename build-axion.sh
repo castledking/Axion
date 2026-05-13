@@ -23,7 +23,11 @@ SUPPORTED_RANGES=(
 resolve_compile_version() {
   case "$1" in
     "mc1_21_5") echo "1.21.5" ;;
+    "mc1_21_6") echo "1.21.6" ;;
     "legacy") echo "1.21.7" ;;
+    "mc1_21_8") echo "1.21.8" ;;
+    "mc1_21_9") echo "1.21.9" ;;
+    "mc1_21_10") echo "1.21.10" ;;
     "modern") echo "1.21.11" ;;
     "mc26_1_x") echo "26.1" ;;
     *) return 1 ;;
@@ -33,7 +37,11 @@ resolve_compile_version() {
 resolve_yarn_mappings() {
   case "$1" in
     "1.21.5") echo "1.21.5+build.1" ;;
+    "1.21.6") echo "1.21.6+build.1" ;;
     "1.21.7") echo "1.21.7+build.1" ;;
+    "1.21.8") echo "1.21.8+build.1" ;;
+    "1.21.9") echo "1.21.9+build.1" ;;
+    "1.21.10") echo "1.21.10+build.3" ;;
     "1.21.11") echo "1.21.11+build.4" ;;
     "26.1") echo "" ;;
     *) return 1 ;;
@@ -43,7 +51,11 @@ resolve_yarn_mappings() {
 resolve_loader_version() {
   case "$1" in
     "1.21.5") echo "0.16.12" ;;
+    "1.21.6") echo "0.16.13" ;;
     "1.21.7") echo "0.16.13" ;;
+    "1.21.8") echo "0.16.14" ;;
+    "1.21.9") echo "0.17.3" ;;
+    "1.21.10") echo "0.17.3" ;;
     "1.21.11") echo "0.18.4" ;;
     "26.1") echo "0.19.2" ;;
     *) return 1 ;;
@@ -53,7 +65,11 @@ resolve_loader_version() {
 resolve_fabric_version() {
   case "$1" in
     "1.21.5") echo "0.119.5+1.21.5" ;;
+    "1.21.6") echo "0.128.2+1.21.6" ;;
     "1.21.7") echo "0.129.0+1.21.7" ;;
+    "1.21.8") echo "0.131.0+1.21.8" ;;
+    "1.21.9") echo "0.134.1+1.21.9" ;;
+    "1.21.10") echo "0.138.4+1.21.10" ;;
     "1.21.11") echo "0.141.3+1.21.11" ;;
     "26.1") echo "0.145.1+26.1" ;;
     *) return 1 ;;
@@ -63,7 +79,11 @@ resolve_fabric_version() {
 resolve_fabric_kotlin_version() {
   case "$1" in
     "1.21.5") echo "1.13.0+kotlin.2.1.0" ;;
+    "1.21.6") echo "1.13.0+kotlin.2.1.0" ;;
     "1.21.7") echo "1.13.0+kotlin.2.1.0" ;;
+    "1.21.8") echo "1.13.0+kotlin.2.1.0" ;;
+    "1.21.9") echo "1.13.9+kotlin.2.3.10" ;;
+    "1.21.10") echo "1.13.9+kotlin.2.3.10" ;;
     "1.21.11") echo "1.13.9+kotlin.2.3.10" ;;
     "26.1") echo "1.13.11+kotlin.2.3.21" ;;
     *) return 1 ;;
@@ -73,7 +93,11 @@ resolve_fabric_kotlin_version() {
 resolve_modmenu_version() {
   case "$1" in
     "1.21.5") echo "14.0.0" ;;
+    "1.21.6") echo "15.0.2" ;;
     "1.21.7") echo "15.0.2" ;;
+    "1.21.8") echo "15.0.2" ;;
+    "1.21.9") echo "16.0.0" ;;
+    "1.21.10") echo "17.0.0-alpha.1" ;;
     "1.21.11") echo "17.0.0-beta.2" ;;
     "26.1") echo "18.0.0-beta.1" ;;
     *) return 1 ;;
@@ -83,7 +107,11 @@ resolve_modmenu_version() {
 resolve_paper_version() {
   case "$1" in
     "1.21.5") echo "1.21.5-R0.1-SNAPSHOT" ;;
+    "1.21.6") echo "1.21.6-R0.1-SNAPSHOT" ;;
     "1.21.7") echo "1.21.7-R0.1-SNAPSHOT" ;;
+    "1.21.8") echo "1.21.8-R0.1-SNAPSHOT" ;;
+    "1.21.9") echo "1.21.9-R0.1-SNAPSHOT" ;;
+    "1.21.10") echo "1.21.10-R0.1-SNAPSHOT" ;;
     "1.21.11") echo "1.21.11-R0.1-SNAPSHOT" ;;
     "26.1") echo "26.1.2.build.63-stable" ;;
     *) return 1 ;;
@@ -107,9 +135,27 @@ resolve_paperweight_version() {
 resolve_range_tag() {
   case "$1" in
     "mc1_21_5") echo "mc1.21.5" ;;
+    "mc1_21_6") echo "mc1.21.6" ;;
     "legacy") echo "mc1.21.6-1.21.8" ;;
+    "mc1_21_8") echo "mc1.21.8" ;;
+    "mc1_21_9") echo "mc1.21.9" ;;
+    "mc1_21_10") echo "mc1.21.10" ;;
     "modern") echo "mc1.21.9-1.21.11" ;;
     "mc26_1_x") echo "mc26.1.x" ;;
+    *) return 1 ;;
+  esac
+}
+
+resolve_metadata_version_range() {
+  case "$1" in
+    "mc1_21_5") echo "1.21.5" ;;
+    "mc1_21_6") echo "1.21.6" ;;
+    "legacy") echo ">=1.21.6 <=1.21.8" ;;
+    "mc1_21_8") echo "1.21.8" ;;
+    "mc1_21_9") echo "1.21.9" ;;
+    "mc1_21_10") echo "1.21.10" ;;
+    "modern") echo ">=1.21.9 <=1.21.11" ;;
+    "mc26_1_x") echo ">=26.1 <=26.1.2" ;;
     *) return 1 ;;
   esac
 }
@@ -147,6 +193,7 @@ build_range() {
   local loom_version
   local paperweight_version
   local range_tag
+  local metadata_version_range
   local mod_jar
   local paper_jar
   local mod_output_dir
@@ -162,6 +209,7 @@ build_range() {
   loom_version="$(resolve_loom_version "$compile_version")"
   paperweight_version="$(resolve_paperweight_version "$compile_version")"
   range_tag="$(resolve_range_tag "$range")"
+  metadata_version_range="$(resolve_metadata_version_range "$range")"
   mod_jar="Axion-v${MOD_VERSION}-${range_tag}.jar"
   paper_jar="AxionPaper-v${MOD_VERSION}-${range_tag}.jar"
   local output_dir_tag="${range_tag}"
@@ -189,14 +237,16 @@ build_range() {
     -Pmodmenu_version="${modmenu_version}" \
     -Ppaper_version="${paper_version}" \
     -Ploom_version="${loom_version}" \
-    -Ppaperweight_version="${paperweight_version}"
+    -Ppaperweight_version="${paperweight_version}" \
+    -Paxion_artifact_tag="${range_tag}" \
+    -Paxion_minecraft_version_range="${metadata_version_range}"
 
   if [[ -f "build/libs/${mod_jar}" ]]; then
     mv -f "build/libs/${mod_jar}" "${mod_output_dir}/${mod_jar}"
   fi
   # Paper plugin emits a single-version filename; rename to range-style for output
   local actual_paper_jar
-  actual_paper_jar="$(ls -1 paper-plugin/build/libs/AxionPaper-*.jar 2>/dev/null | head -1)"
+  actual_paper_jar="$(find paper-plugin/build/libs -maxdepth 1 -type f -name 'AxionPaper-*.jar' -print -quit 2>/dev/null)"
   if [[ -n "${actual_paper_jar}" ]]; then
     mv -f "${actual_paper_jar}" "${paper_output_dir}/${paper_jar}"
   fi
@@ -230,6 +280,10 @@ print_menu() {
   echo "  3) Both ranges"
   echo "  4) Minecraft 1.21.5"
   echo "  5) Minecraft 26.1.x"
+  echo "  6) Exact Minecraft 1.21.6"
+  echo "  7) Exact Minecraft 1.21.8"
+  echo "  8) Exact Minecraft 1.21.9"
+  echo "  9) Exact Minecraft 1.21.10"
   echo "  q) Cancel"
 }
 
@@ -259,6 +313,18 @@ case "$choice" in
     ;;
   5|26.1|26.1.x|mc26.1.x|mc26_1_x|MC26_1_X)
     build_range "mc26_1_x"
+    ;;
+  6|1.21.6|mc1.21.6|mc1_21_6|MC1_21_6)
+    build_range "mc1_21_6"
+    ;;
+  7|1.21.8|mc1.21.8|mc1_21_8|MC1_21_8)
+    build_range "mc1_21_8"
+    ;;
+  8|1.21.9|mc1.21.9|mc1_21_9|MC1_21_9)
+    build_range "mc1_21_9"
+    ;;
+  9|1.21.10|mc1.21.10|mc1_21_10|MC1_21_10)
+    build_range "mc1_21_10"
     ;;
   q|Q|quit|QUIT)
     echo "Cancelled."

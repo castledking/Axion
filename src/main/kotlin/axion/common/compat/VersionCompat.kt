@@ -90,4 +90,7 @@ interface VersionCompat {
     // ItemStack codec helpers for hotbar save/load
     fun itemStackEncode(registryManager: Any, stack: Any): ByteArray?
     fun itemStackDecode(registryManager: Any, bytes: ByteArray): Any?
+
+    // PacketCodec creation for network payloads (version-specific API)
+    fun createAxionPluginPayloadCodec(): Any
 }

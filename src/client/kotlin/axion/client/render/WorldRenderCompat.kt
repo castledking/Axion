@@ -89,15 +89,12 @@ object WorldRenderCompat {
 
     fun registerEndMain(callback: (AxionWorldRenderContext) -> Unit) {
         endMainCallbacks += callback
-        logger.info("[Axion/Render] registerEndMain called, {} callbacks total", endMainCallbacks.size)
         if (!tryRegisterEndMainListener()) {
-            logger.warn(
-                "[Axion/Render] Fabric END_MAIN event unavailable — using fallback mixin path",
-            )
-        } else {
-            logger.info("[Axion/Render] END_MAIN event registered successfully")
+            ensureFabricBeforeDebugListener()
         }
     }
+
+    private var loggedFallbackDispatch = false
 
     fun dispatchFallbackCallbacks(
         consumers: Immediate,
@@ -109,6 +106,14 @@ object WorldRenderCompat {
         val client = MinecraftClient.getInstance()
         if (client.world == null || client.gameRenderer.camera == null) {
             return
+        }
+        if (!loggedFallbackDispatch) {
+            loggedFallbackDispatch = true
+            logger.info(
+                "[Axion/Render] Mixin fallback dispatching {} endMain + {} beforeDebug callbacks",
+                endMainCallbacks.size,
+                beforeDebugRenderCallbacks.size,
+            )
         }
         val context = AxionWorldRenderContext(consumers, matrices)
         endMainCallbacks.forEach { it(context) }
@@ -124,12 +129,10 @@ object WorldRenderCompat {
 
     private fun ensureFabricBeforeDebugListener() {
         if (fabricBeforeDebugRegistered) return
-        // Try multiple field names for cross-version compatibility
         val fieldNames = listOf("BEFORE_GIZMOS", "BEFORE_DEBUG_RENDER", "BEFORE_BLOCK_OUTLINE", "END_EXTRACTION")
         val nestedInterfaceNames = listOf("BeforeGizmos", "DebugRender", "BeforeBlockOutline", "EndExtraction")
-        var registered = false
         for (i in fieldNames.indices) {
-            registered = registerBatchedListener(fieldNames[i], nestedInterfaceNames[i]) { rawContext ->
+            val registered = registerBatchedListener(fieldNames[i], nestedInterfaceNames[i]) { rawContext ->
                 val ctx = AxionWorldRenderContext(rawContext)
                 if (!fabricEndMainAvailable) {
                     for (cb in endMainCallbacks) cb(ctx)
@@ -138,17 +141,11 @@ object WorldRenderCompat {
                 ctx.drawConsumers()
             }
             if (registered) {
-                logger.info("Fabric rendering event registered: ${fieldNames[i]}")
-                break
+                fabricBeforeDebugRegistered = true
+                return
             }
         }
-        if (registered) {
-            fabricBeforeDebugRegistered = true
-        } else {
-            logger.warn(
-                "Fabric before-debug-render event unavailable — using fallback mixin path",
-            )
-        }
+        logger.warn("[Axion/Render] No Fabric render event available — using mixin fallback path")
     }
 
     private fun tryRegisterEndMainListener(): Boolean {
@@ -164,9 +161,6 @@ object WorldRenderCompat {
         }
         if (registered) {
             fabricEndMainAvailable = true
-            logger.info("[Axion/Render] tryRegisterEndMainListener succeeded")
-        } else {
-            logger.warn("[Axion/Render] tryRegisterEndMainListener FAILED")
         }
         return registered
     }
@@ -176,26 +170,10 @@ object WorldRenderCompat {
         nestedInterfaceName: String,
         dispatch: (Any) -> Unit,
     ): Boolean {
-        val eventsClass = eventsClass()
-        if (eventsClass == null) {
-            logger.warn("[Axion/Render] registerBatchedListener($fieldName): eventsClass() returned null")
-            return false
-        }
-        logger.info("[Axion/Render] registerBatchedListener($fieldName): eventsClass={}", eventsClass.name)
-        val eventField = runCatching { eventsClass.getField(fieldName) }.getOrNull()
-        if (eventField == null) {
-            logger.warn("[Axion/Render] registerBatchedListener($fieldName): field not found in {}", eventsClass.name)
-            return false
-        }
+        val eventsClass = eventsClass() ?: return false
+        val eventField = runCatching { eventsClass.getField(fieldName) }.getOrNull() ?: return false
         val fqCallbackName = "${eventsClass.name}\$$nestedInterfaceName"
-        val callbackType = runCatching {
-            Class.forName(fqCallbackName)
-        }.getOrNull()
-        if (callbackType == null) {
-            logger.warn("[Axion/Render] registerBatchedListener($fieldName): callback class not found: {}", fqCallbackName)
-            return false
-        }
-        logger.info("[Axion/Render] registerBatchedListener($fieldName): callbackType={}", callbackType.name)
+        val callbackType = runCatching { Class.forName(fqCallbackName) }.getOrNull() ?: return false
         val listener = Proxy.newProxyInstance(callbackType.classLoader, arrayOf(callbackType)) { _, method, args ->
             when (method.name) {
                 "equals" -> false
@@ -211,7 +189,7 @@ object WorldRenderCompat {
         val event = eventField.get(null) as? Event<Any>
             ?: error("Unexpected Fabric event type for $fieldName")
         event.register(listener)
-        logger.info("[Axion/Render] registerBatchedListener($fieldName): registered successfully")
+        logger.info("[Axion/Render] Registered via {}.{}", eventsClass.simpleName, fieldName)
         return true
     }
 

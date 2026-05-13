@@ -587,4 +587,41 @@ object VersionCompatImpl : VersionCompat {
     private fun itemStackStreamCodec(): StreamCodec<RegistryByteBuf, ItemStack> {
         return ItemStack.STREAM_CODEC as StreamCodec<RegistryByteBuf, ItemStack>
     }
+
+    override fun createAxionPluginPayloadCodec(): Any {
+        // 26.1.x aliases PacketCodec to StreamCodec, whose factory is named of().
+        val codecClass = PacketCodec::class.java
+        val method = codecClass.methods.firstOrNull { it.name == "ofStatic" && it.parameterCount == 2 }
+            ?: codecClass.methods.firstOrNull { it.name == "of" && it.parameterCount == 2 }
+            ?: codecClass.methods.firstOrNull {
+                it.parameterCount == 2 &&
+                    it.returnType == codecClass &&
+                    java.lang.reflect.Modifier.isStatic(it.modifiers)
+            }
+            ?: throw NoSuchMethodError("No compatible PacketCodec/StreamCodec factory method found in 26.1.x")
+        val encoderType = method.parameterTypes[0]
+        val decoderType = method.parameterTypes[1]
+
+        val encoder = java.lang.reflect.Proxy.newProxyInstance(encoderType.classLoader, arrayOf(encoderType)) { _, method, args ->
+            if (method.name == "encode" && args != null && args.size == 2) {
+                val buf = args[0] as RegistryByteBuf
+                val payload = args[1] as AxionPluginPayload
+                buf.writeBytes(payload.bytes)
+            }
+            null
+        }
+
+        val decoder = java.lang.reflect.Proxy.newProxyInstance(decoderType.classLoader, arrayOf(decoderType)) { _, method, args ->
+            if (method.name == "decode" && args != null && args.size == 1) {
+                val buf = args[0] as RegistryByteBuf
+                val bytes = ByteArray(buf.readableBytes())
+                buf.readBytes(bytes)
+                AxionPluginPayload(bytes)
+            } else {
+                null
+            }
+        }
+
+        return method.invoke(null, encoder, decoder)
+    }
 }

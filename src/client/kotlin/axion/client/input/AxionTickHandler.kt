@@ -61,17 +61,13 @@ object AxionTickHandler {
             // keys directly from GLFW and edge-detects the combo, bypassing both issues.
             if (KeyBindingHandler.wasCtrlComboPressed(AxionKeybindings.symmetryToggleRotation, allowShift = false)) {
                 if (!PlacementToolController.handleRotateAction()) {
-                    if (!StackToolController.handleRotateAction()) {
-                        SymmetryController.toggleRotational()
-                    }
+                    SymmetryController.toggleRotational()
                 }
             }
 
             if (KeyBindingHandler.wasCtrlComboPressed(AxionKeybindings.symmetryToggleMirror, allowShift = false)) {
                 if (!PlacementToolController.handleMirrorAction(client)) {
-                    if (!StackToolController.handleMirrorAction(client)) {
-                        SymmetryController.toggleMirror(client)
-                    }
+                    SymmetryController.toggleMirror(client)
                 }
             }
 

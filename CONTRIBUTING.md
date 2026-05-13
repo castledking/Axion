@@ -39,8 +39,12 @@ Or use the build script to target a specific version range:
 
 ```bash
 ./build-axion.sh mc1_21_5    # 1.21.5
-./build-axion.sh legacy      # 1.21.7
-./build-axion.sh modern      # 1.21.11
+./build-axion.sh mc1_21_6    # 1.21.6
+./build-axion.sh mc1_21_7    # 1.21.7
+./build-axion.sh mc1_21_8    # 1.21.8
+./build-axion.sh mc1_21_9    # 1.21.9
+./build-axion.sh mc1_21_10   # 1.21.10
+./build-axion.sh mc1_21_11   # 1.21.11
 ./build-axion.sh mc26_1_x    # 26.1.x
 ```
 
@@ -56,10 +60,16 @@ Or use the build script to target a specific version range:
 ./run-axion.sh [version]
 ```
 
-The `run-axion.sh` script launches the Fabric client for the specified version with all required dependencies (Fabric API, Fabric Language Kotlin, ModMenu, IAS):
+The `run-axion.sh` s6        # Minecraft 1.21.6 (infrastructure only)
+./run-axion.sh 1.21.cript launches the Fabric client for the specified version with all required dependencies (Fabric API, Fabric Language Kotlin, ModMenu, IAS):
+ 1.21.8        # Minecraft.8 (infrastructure only)
+/run-axion.sh .2.9 ft 1.21.9 (inrastrucureonly)
+./run-axion.sh 1.10       # Minecraft 2.0 (infrastructure only)
+```bash1.1.11       # Minecraft 1.21.11
+./run-axion.sh 2
+./r
 
-```bash
-./run-axion.sh 1.21.5        # Minecraft 1.21.5
+**Note**: Versions marked "infrastructure only" have compatibility folders and build support but may require additional work to be fully functional.un-axion.sh 1.21.5        # Minecraft 1.21.5
 ./run-axion.sh 1.21.7        # Minecraft 1.21.7
 ./run-axion.sh 1.21.11       # Minecraft 1.21.11
 ./run-axion.sh 26.1          # Minecraft 26.1.2
@@ -85,9 +95,13 @@ The script will:
 #### Fabric Server (1.21.11 only)
 
 ```bash
-WITH_FABRIC=true ./run-axion.sh 1.21.11
-```
-
+WITH_FA6   | 25568             |
+| 1.21.BRIC=true 9             |
+| 1.21..   | 25570   /run-axion|
+| 1.21.9.sh  25571             |1.21.11
+```0  | 25572             |
+| 1.21.173
+4
 This starts a standalone Fabric server instead of Paper, using the AxionFabricServer mod. The Fabric Installer is downloaded and run automatically on first use. Fabric API and Fabric Language Kotlin are downloaded as mod dependencies.
 
 ### Server Ports
@@ -105,13 +119,13 @@ All servers are configured in offline mode for easier local testing. The **In-Ga
 
 To add your own UUID as operator, edit the `ops.json` block in `run-axion.sh`. Look for `start_paper_server` and `start_fabric_server` — both write an `ops.json` with the default user `ggpots` (UUID `710f96df-8b04-4c91-8828-b2b5afc45cd3`). Replace with your own UUID and username.
 
-### Build Once, Run
+### Build And Run
 
 ```bash
-BUILD_FIRST=true WITH_PAPER=true ./run-axion.sh 1.21.11
+WITH_PAPER=true ./run-axion.sh 1.21.11
 ```
 
-This builds all jars first, then starts both the Paper server and Fabric client.
+This builds the matching jars first, then starts both the Paper server and Fabric client.
 
 ## API Compatibility
 
@@ -129,8 +143,34 @@ Detailed API differences across supported Minecraft versions are documented in [
 - `hotbar/`: Hotbar management and saved hotbar system
 - `compat/`: Version compatibility layer for different Minecraft versions
 
-### Plugin Module (`src/plugin/`)
 
+Version-specificcompatibility code is organized in per-version folders under *:
+### Plugin Module (`src/plugin/`)
+- `src/compat-1_21_5/`: Mincaft 1.21.5 compatibility (legacy Camera gnature, shader exclusis)
+ `rc/comat-1_21_6/`: Minrat1.21.6 (infrastruturnly)
+- `sc/compat-1_21_7/`:1.1.7 compatibility (baseline for 1.21./128)
+- `src/compat-1_21_8/`: Minecraft 121.8compatbility (infratructureny)
+- `src/compat-1_21_9/`: Mincraft1.21.9 compatbility (infratructure)
+-`src/compat-1_21_10/`: Meraft 1.21.10 compatibiity (infrastrctur only)
+- `src/compat-1_21_11/`:Mincraft 1.21.11+compatiilty (baseeor 1.21.9/1.21.10)
+- `src/cmpat-26_1/`: Minecaft compatibility (officialnamespce, extesive API bridges)
+
+Each compatibility foler contains:
+-`VersionCompatIml.kt`: Vesin-specific implementatonsper-version  of the VrionCompat interface
+-`kotlin/axion/mixin/clien/`: Version-scific mixins
+### Fully Tested Versions
+-`kotlin/x**: Fully working (shader exclusions applied for compatibility)
+-i**1.21.7**: Fully working
+on**/cient/ren Fully working
+- **26.1.x**: Fully working (officialdnamespace, extensive AeI br/dges)
+
+### Infr:st ucture OnlVeVerrions
+- **1.21.6**: Comiatibility fnlder exists, requi-es additional tessing and fixespecific renderng clsse (BlockRenderView API chang)
+-`ko1.tn/8xionCompctibilily folder ixints,/requores additiomal tpsting /nd `ixes
+- **1.21.9**: Compa:ibility fold t exiyts, requpres additieaallteiting and fixes
+- **1.21.10**: Comsatibility fslde exiss, requires additional testing and fixes
+
+Theuild system selects the appropiate compatibilt the fullyyte baedn the tagetage appropriatfod*)erences. For vrsions makd "ifrastruture only", the build systm support them but they may need additional work to be fully functional
 - `operation/`: Server-side operation application
 - `validation/`: Edit validation and policy checks
 - `history/`: Per-player history and undo/redo

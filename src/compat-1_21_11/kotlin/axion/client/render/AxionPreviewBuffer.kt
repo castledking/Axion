@@ -69,7 +69,7 @@ class AxionPreviewBuffer : AutoCloseable {
         // frame 2+). The flag has no overhead when the buffer is fresh —
         // it just marks the underlying GL buffer as a valid copy target.
         val existingVb = vertexBuffer
-        if (existingVb == null || existingVb.isClosed || existingVb.size() < vertexData.remaining().toLong()) {
+        if (existingVb == null || existingVb.isClosed || getBufferSize(existingVb) < vertexData.remaining().toLong()) {
             vertexBuffer?.close()
             vertexBuffer = device.createBuffer(
                 LABEL_VERTEX,
@@ -83,7 +83,7 @@ class AxionPreviewBuffer : AutoCloseable {
         // Upload index buffer
         if (indexData != null) {
             val existingIb = indexBuffer
-            if (existingIb == null || existingIb.isClosed || existingIb.size() < indexData.remaining().toLong()) {
+            if (existingIb == null || existingIb.isClosed || getBufferSize(existingIb) < indexData.remaining().toLong()) {
                 indexBuffer?.close()
                 indexBuffer = device.createBuffer(
                     LABEL_INDEX,
@@ -145,5 +145,28 @@ class AxionPreviewBuffer : AutoCloseable {
     companion object {
         private val LABEL_VERTEX: Supplier<String> = Supplier { "Axion Preview VB" }
         private val LABEL_INDEX: Supplier<String> = Supplier { "Axion Preview IB" }
+
+        private val gpuBufferSizeMethod by lazy {
+            GpuBuffer::class.java.methods.firstOrNull {
+                it.parameterCount == 0 && (it.returnType == Long::class.javaPrimitiveType || it.returnType == Int::class.javaPrimitiveType)
+                    && it.name in setOf("size", "getSize", "capacity", "getCapacity")
+            } ?: GpuBuffer::class.java.methods.firstOrNull {
+                it.parameterCount == 0 && (it.returnType == Long::class.javaPrimitiveType || it.returnType == Int::class.javaPrimitiveType)
+                    && it.name !in setOf("hashCode", "getUsage")
+            }
+        }
+
+        /** Safe size query — returns 0 if the method isn't available (forces buffer recreation). */
+        private fun getBufferSize(buffer: GpuBuffer): Long {
+            return try {
+                buffer.size()
+            } catch (_: NoSuchMethodError) {
+                gpuBufferSizeMethod?.let {
+                    try {
+                        (it.invoke(buffer) as Number).toLong()
+                    } catch (_: Exception) { 0L }
+                } ?: 0L
+            }
+        }
     }
 }

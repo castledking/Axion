@@ -32,6 +32,11 @@ val rangeMc1215 = minecraftVersion == "1.21.5"
 val rangeLegacy = minecraftVersion.startsWith("1.21.") && minecraftPatch in 6..8
 val rangeModern = minecraftVersion.startsWith("1.21.") && minecraftPatch >= 9
 val rangeMc261x = minecraftVersion.startsWith("26.1")
+val exactMc1216 = minecraftVersion == "1.21.6"
+val exactMc1217 = minecraftVersion == "1.21.7"
+val exactMc1218 = minecraftVersion == "1.21.8"
+val exactMc1219 = minecraftVersion == "1.21.9"
+val exactMc12110 = minecraftVersion == "1.21.10"
 val javaTargetVersion = if (rangeMc261x) 25 else 21
 
 if (rangeMc261x) {
@@ -44,8 +49,10 @@ val needsLegacyMouseInputStub = rangeMc1215 || rangeLegacy
 val needsLegacyWorldRenderStateStub = rangeMc1215 || rangeLegacy
 val supportsFabricDedicatedServer = minecraftVersion == "1.21.11"
 
-// Define Minecraft version range for fabric.mod.json
-val minecraftVersionRange = when {
+// Define Minecraft version range for fabric.mod.json.
+// build-axion.sh can override this for exact-version test artifacts while the
+// release range artifacts keep their advertised multi-version metadata.
+val minecraftVersionRange = (findProperty("axion_minecraft_version_range") as String?)?.trim()?.takeIf { it.isNotEmpty() } ?: when {
     rangeMc1215 -> "1.21.5"
     rangeLegacy -> ">=1.21.6 <=1.21.8"
     rangeModern -> ">=1.21.9 <=1.21.11"
@@ -83,7 +90,7 @@ extensions.configure<LoomGradleExtensionAPI>("loom") {
     runs {
         named("client") {
             configName = "Axion Client"
-            runDir = "run"
+            runDir = (findProperty("axion_run_dir") as String?) ?: "run"
         }
     }
 }
@@ -105,9 +112,16 @@ if (needsLegacyWorldRenderStateStub) {
 sourceSets.named("client") {
     if (rangeMc1215) {
         kotlin.srcDir("src/compat-1_21_5/kotlin")
-    } else if (rangeLegacy) {
-        // 1.21.5 .. 1.21.8: Codec-based NBT serialization, no MouseInput / WorldRenderState
+    } else if (exactMc1216) {
+        kotlin.srcDir("src/compat-1_21_6/kotlin")
+    } else if (exactMc1217) {
         kotlin.srcDir("src/compat-1_21_7/kotlin")
+    } else if (exactMc1218) {
+        kotlin.srcDir("src/compat-1_21_8/kotlin")
+    } else if (exactMc1219) {
+        kotlin.srcDir("src/compat-1_21_9/kotlin")
+    } else if (exactMc12110) {
+        kotlin.srcDir("src/compat-1_21_10/kotlin")
     } else if (rangeMc261x) {
         // 26.1.x Fabric builds in the official namespace and uses the
         // compatibility aliases in src/compat-26_1.
@@ -188,6 +202,10 @@ tasks.processResources {
     inputs.property("java_target_version", javaTargetVersion)
     inputs.property("fabric_kotlin_version", project.property("fabric_kotlin_version") as String)
 
+    if (rangeMc1215) {
+        exclude("assets/axion/shaders/core/preview_shell.*")
+    }
+
     filesMatching("fabric.mod.json") {
         expand(
             "version" to modVersion,
@@ -203,6 +221,21 @@ tasks.processResources {
 tasks.named<ProcessResources>("processClientResources") {
     doFirst {
         delete(layout.buildDirectory.dir("resources/client"))
+        // Copy version-specific mixin config
+        val mixinConfigSource = when {
+            rangeMc1215 -> "axion.client.mixins-1.21.5.json"
+            else -> null
+        }
+        if (mixinConfigSource != null) {
+            val sourceFile = file("src/client/resources/$mixinConfigSource")
+            if (sourceFile.exists()) {
+                copy {
+                    from(sourceFile)
+                    into(layout.buildDirectory.dir("resources/client"))
+                    rename { "axion.client.mixins.json" }
+                }
+            }
+        }
     }
     if (rangeMc261x) {
         filesMatching("axion.client.mixins.json") {
@@ -236,7 +269,7 @@ tasks.test {
 }
 
 // Range-style filename matching Axiom's release pattern, e.g. "mc1.21.9-1.21.11"
-val rangeFileTag = when {
+val rangeFileTag = (findProperty("axion_artifact_tag") as String?)?.trim()?.takeIf { it.isNotEmpty() } ?: when {
     rangeMc1215 -> "mc1.21.5"
     rangeLegacy -> "mc1.21.6-1.21.8"
     rangeModern -> "mc1.21.9-1.21.11"
