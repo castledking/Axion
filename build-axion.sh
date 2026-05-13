@@ -73,7 +73,7 @@ resolve_fabric_kotlin_version() {
 resolve_modmenu_version() {
   case "$1" in
     "1.21.5") echo "14.0.0" ;;
-    "1.21.7") echo "16.0.0" ;;
+    "1.21.7") echo "15.0.2" ;;
     "1.21.11") echo "17.0.0-beta.2" ;;
     "26.1") echo "18.0.0-beta.1" ;;
     *) return 1 ;;
