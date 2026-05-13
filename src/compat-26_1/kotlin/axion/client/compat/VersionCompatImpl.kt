@@ -11,6 +11,7 @@ import com.mojang.blaze3d.systems.RenderPass
 import com.mojang.blaze3d.textures.GpuTextureView
 import com.mojang.blaze3d.vertex.VertexFormat
 import net.minecraft.block.Block
+import net.minecraft.commands.arguments.blocks.BlockStateParser
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.render.Camera
 import net.minecraft.client.render.RenderLayer
@@ -23,6 +24,7 @@ import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
 import net.fabricmc.loader.api.FabricLoader
+import com.mojang.brigadier.StringReader
 import net.minecraft.text.Text
 import net.minecraft.text.MutableText
 import net.minecraft.util.Formatting
@@ -43,10 +45,15 @@ import net.minecraft.network.RegistryByteBuf
 import net.minecraft.network.codec.StreamCodec
 import net.minecraft.registry.DynamicRegistryManager
 import net.minecraft.registry.Registries
+import net.minecraft.registry.RegistryKeys
 import net.minecraft.util.Identifier
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Vec3d
 import net.minecraft.client.renderer.texture.TextureAtlas
+import net.minecraft.util.ProblemReporter
+import net.minecraft.world.entity.EntityProcessor
+import net.minecraft.world.level.storage.TagValueInput
+import net.minecraft.world.level.storage.TagValueOutput
 import org.lwjgl.glfw.GLFW
 import axion.common.compat.VersionCompat
 
@@ -84,11 +91,20 @@ object VersionCompatImpl : VersionCompat {
     }
 
     override fun blockStateToString(state: BlockState): String {
-        return state.toString()
+        return BlockStateParser.serialize(state)
     }
 
     override fun stringToBlockState(str: String): BlockState? {
-        return null
+        val world = MinecraftClient.getInstance().level ?: return null
+        return try {
+            BlockStateParser.parseForBlock(
+                world.registryAccess().lookupOrThrow(RegistryKeys.BLOCK),
+                StringReader(str),
+                true,
+            ).blockState()
+        } catch (_: Exception) {
+            null
+        }
     }
 
     override fun itemStackToNbt(stack: ItemStack): NbtCompound {
@@ -274,37 +290,61 @@ object VersionCompatImpl : VersionCompat {
         blockEntity.setChanged()
     }
 
-    // Rendering helpers for 26.1.2 - using stubs due to major API changes
     override fun getBlockRenderManager(client: Any): Any {
-        return client // Stub - actual implementation needs 26.1.2 specific API
+        val minecraft = client as MinecraftClient
+        return net.minecraft.client.render.BlockRenderManager(true, true, minecraft.blockColors)
     }
 
     override fun getBlockRenderType(state: BlockState): Any {
-        return state // Stub - actual implementation needs 26.1.2 specific API
+        return state.renderShape
     }
 
     override fun getRenderingSeed(state: BlockState, pos: Any): Long {
-        return 0L // Stub - actual implementation needs 26.1.2 specific API
+        return state.getSeed(pos as BlockPos)
     }
 
     override fun matrixStackPush(stack: Any): Any {
-        return stack // Stub - actual implementation needs 26.1.2 specific API
+        (stack as com.mojang.blaze3d.vertex.PoseStack).pushPose()
+        return stack
     }
 
     override fun matrixStackPop(stack: Any) {
-        // Stub - actual implementation needs 26.1.2 specific API
+        (stack as com.mojang.blaze3d.vertex.PoseStack).popPose()
     }
 
     override fun blockRenderManagerGetModel(manager: Any, state: BlockState): Any {
-        return manager // Stub
+        return MinecraftClient.getInstance().modelManager.blockStateModelSet.get(state)
     }
 
     override fun blockRenderManagerRenderBlock(manager: Any, state: BlockState, pos: Any, world: Any, matrixStack: Any, consumer: Any, checkSides: Boolean, parts: List<Any>): Boolean {
-        return false // Stub
+        val blockPos = pos as BlockPos
+        val renderer = manager as net.minecraft.client.render.BlockRenderManager
+        val model = MinecraftClient.getInstance().modelManager.blockStateModelSet.get(state)
+        val output = net.minecraft.client.renderer.block.BlockQuadOutput {
+                x: Float,
+                y: Float,
+                z: Float,
+                quad: net.minecraft.client.resources.model.geometry.BakedQuad,
+                quadInstance: com.mojang.blaze3d.vertex.QuadInstance,
+            ->
+            (consumer as com.mojang.blaze3d.vertex.VertexConsumer).putBlockBakedQuad(x, y, z, quad, quadInstance)
+        }
+        renderer.tesselateBlock(
+            output,
+            blockPos.x.toFloat(),
+            blockPos.y.toFloat(),
+            blockPos.z.toFloat(),
+            world as net.minecraft.client.renderer.block.BlockAndTintGetter,
+            blockPos,
+            state,
+            model,
+            state.getSeed(blockPos),
+        )
+        return true
     }
 
     override fun blockRenderManagerRenderFluid(manager: Any, pos: Any, world: Any, consumer: Any, state: BlockState, fluidState: Any): Boolean {
-        return false // Stub
+        return false
     }
 
     // Entity API helpers for 26.1.2
@@ -348,6 +388,14 @@ object VersionCompatImpl : VersionCompat {
         (entity as net.minecraft.world.entity.Entity).setUUID(uuid)
     }
 
+    override fun entitySetPositionAndAngles(entity: Any, x: Double, y: Double, z: Double, yaw: Float, pitch: Float) {
+        val e = entity as net.minecraft.world.entity.Entity
+        e.setPos(x, y, z)
+        e.setYRot(yaw)
+        e.setXRot(pitch)
+        e.setOldPosAndRot()
+    }
+
     override fun entityRefreshPositionAndAngles(entity: Any) {
         val e = entity as net.minecraft.world.entity.Entity
         e.setPosRaw(e.x, e.y, e.z)
@@ -362,9 +410,14 @@ object VersionCompatImpl : VersionCompat {
     }
 
     override fun entityTypeLoadEntityWithPassengers(tag: NbtCompound, world: Any, spawnReason: Any, entityProcessor: (Any) -> Any): Any? {
-        // 26.1.2 API for loading entities with passengers is different
-        // Return null for now - actual implementation needs 26.1.2 specific API
-        return null
+        val level = world as net.minecraft.server.level.ServerLevel
+        val input = TagValueInput.create(ProblemReporter.DISCARDING, level.registryAccess(), tag)
+        return EntityType.loadEntityRecursive(
+            input,
+            level,
+            spawnReason as net.minecraft.world.entity.EntitySpawnReason,
+            EntityProcessor { entity -> entityProcessor(entity) as net.minecraft.world.entity.Entity },
+        )
     }
 
     override fun worldSpawnNewEntityAndPassengers(world: Any, entity: Any): Boolean {
@@ -421,20 +474,24 @@ object VersionCompatImpl : VersionCompat {
     }
 
     override fun blockStateStringify(state: BlockState): String {
-        return state.toString()
+        return BlockStateParser.serialize(state)
+    }
+
+    fun rawBlockStateId(state: BlockState): Int {
+        return net.minecraft.world.level.block.Block.getId(state)
     }
 
     // Registry/BlockArgumentParser API helpers for 26.1.2
     override fun worldGetRegistryManager(world: Any): Any {
-        // 26.1.2 API for registry manager is different
-        // Stub - actual implementation needs 26.1.2 specific API
         return (world as net.minecraft.world.level.Level).registryAccess()
     }
 
     override fun blockArgumentParserBlock(registry: Any, state: String): Any {
-        // 26.1.2 API for BlockArgumentParser.block is different
-        // Return a stub placeholder - actual implementation needs 26.1.2 specific API
-        return net.minecraft.world.level.block.Blocks.AIR
+        return BlockStateParser.parseForBlock(
+            registry as net.minecraft.core.HolderLookup<net.minecraft.world.level.block.Block>,
+            StringReader(state),
+            true,
+        )
     }
 
     fun registerAxionPayloadChannel(
@@ -484,7 +541,14 @@ object VersionCompatImpl : VersionCompat {
         )
     }
 
-    fun captureEntityData(entity: Entity): NbtCompound? = null
+    fun captureEntityData(entity: Entity): NbtCompound? {
+        val output = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, entity.level().registryAccess())
+        return if (entity.save(output)) {
+            output.buildResult()
+        } else {
+            null
+        }
+    }
 
     fun drawGuiTexture(
         context: DrawContext,

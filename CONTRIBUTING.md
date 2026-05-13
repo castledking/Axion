@@ -25,7 +25,7 @@ The project consists of three main components:
 
 ### Prerequisites
 
-- JDK 21 or later
+- JDK 21 or later (JDK 25+ for 26.1.x)
 - IntelliJ IDEA or another Kotlin-compatible IDE
 - Git
 
@@ -33,6 +33,15 @@ The project consists of three main components:
 
 ```bash
 ./gradlew build
+```
+
+Or use the build script to target a specific version range:
+
+```bash
+./build-axion.sh mc1_21_5    # 1.21.5
+./build-axion.sh legacy      # 1.21.7
+./build-axion.sh modern      # 1.21.11
+./build-axion.sh mc26_1_x    # 26.1.x
 ```
 
 ### Running Tests
@@ -44,8 +53,69 @@ The project consists of three main components:
 ### Running Client (Development)
 
 ```bash
-./gradlew runClient
+./run-axion.sh [version]
 ```
+
+The `run-axion.sh` script launches the Fabric client for the specified version with all required dependencies (Fabric API, Fabric Language Kotlin, ModMenu, IAS):
+
+```bash
+./run-axion.sh 1.21.5        # Minecraft 1.21.5
+./run-axion.sh 1.21.7        # Minecraft 1.21.7
+./run-axion.sh 1.21.11       # Minecraft 1.21.11
+./run-axion.sh 26.1          # Minecraft 26.1.2
+```
+
+### Testing with Servers
+
+#### Paper Server
+
+Start a Paper server alongside the client:
+
+```bash
+WITH_PAPER=true ./run-axion.sh 1.21.11
+```
+
+The script will:
+1. Download and configure a Paper server for that version
+2. Build and install the AxionPaper plugin
+3. Accept the EULA and pre-authorize your user as operator
+4. Start the Paper server in the background on its default port
+5. Launch the Fabric client connected to the offline server
+
+#### Fabric Server (1.21.11 only)
+
+```bash
+WITH_FABRIC=true ./run-axion.sh 1.21.11
+```
+
+This starts a standalone Fabric server instead of Paper, using the AxionFabricServer mod. The Fabric Installer is downloaded and run automatically on first use. Fabric API and Fabric Language Kotlin are downloaded as mod dependencies.
+
+### Server Ports
+
+| Version  | Paper/Fabric Port |
+|----------|-------------------|
+| 1.21.5   | 25567             |
+| 1.21.7   | 25568             |
+| 1.21.11  | 25569             |
+| 26.1.x   | 25570             |
+
+### Offline Mode & Operator Access
+
+All servers are configured in offline mode for easier local testing. The **In-Game Account Switcher (IAS)** mod is automatically downloaded and installed by `run-axion.sh`. This lets you connect with any username without Mojang authentication — useful when joining an offline-mode server with the `ggpots` account.
+
+To add your own UUID as operator, edit the `ops.json` block in `run-axion.sh`. Look for `start_paper_server` and `start_fabric_server` — both write an `ops.json` with the default user `ggpots` (UUID `710f96df-8b04-4c91-8828-b2b5afc45cd3`). Replace with your own UUID and username.
+
+### Build Once, Run
+
+```bash
+BUILD_FIRST=true WITH_PAPER=true ./run-axion.sh 1.21.11
+```
+
+This builds all jars first, then starts both the Paper server and Fabric client.
+
+## API Compatibility
+
+Detailed API differences across supported Minecraft versions are documented in [API_COMPATIBILITY.md](API_COMPATIBILITY.md). When adding features that touch version-specific code, consult this document and add entries for any new APIs introduced.
 
 ## Code Organization
 

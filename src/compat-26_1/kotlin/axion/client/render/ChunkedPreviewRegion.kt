@@ -7,8 +7,8 @@ import net.minecraft.util.math.BlockPos
 import net.minecraft.core.Vec3i
 import net.minecraft.util.shape.VoxelShape
 import net.minecraft.util.shape.VoxelShapes
-import net.minecraft.util.math.add
-import net.minecraft.util.math.blockPosFromLong
+import axion.client.compat.add
+import axion.client.compat.blockPosFromLong
 import java.util.LinkedHashMap
 
 data class ChunkedPreviewRegion(

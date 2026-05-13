@@ -80,8 +80,10 @@ object LocalEntityCloneService {
             VersionCompat.INSTANCE.entitySetUuid(entity, clone.entityId)
             entity
         } ?: return null
-        VersionCompat.INSTANCE.worldSpawnNewEntityAndPassengers(world, entity)
-        return entity as? Entity
+        val cloneEntity = entity as? Entity ?: return null
+        LocalEntityPositioning.apply(cloneEntity, clone.pos, clone.yaw, clone.pitch)
+        VersionCompat.INSTANCE.worldSpawnNewEntityAndPassengers(world, cloneEntity)
+        return cloneEntity
     }
 
     private fun capture(entity: Entity): NbtCompound? {

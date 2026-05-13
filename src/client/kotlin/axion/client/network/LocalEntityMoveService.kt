@@ -29,7 +29,7 @@ object LocalEntityMoveService {
             sourceMax.z + 1.0,
         )
         val seen = linkedSetOf<UUID>()
-        val dummyEntity = serverWorld.getEntitiesOfClass(Entity::class.java, queryBox).firstOrNull()
+        val dummyEntity = serverWorld.getEntitiesByClass(Entity::class.java, queryBox) { true }.firstOrNull()
         return VersionCompat.INSTANCE.worldGetOtherEntities(serverWorld, dummyEntity ?: return emptyList(), queryBox)
             .asSequence()
             .mapNotNull { it as? Entity }
@@ -66,7 +66,7 @@ object LocalEntityMoveService {
             val targetPos = if (reverse) move.fromPos else move.toPos
             val yaw = if (reverse) move.fromYaw else move.toYaw
             val pitch = if (reverse) move.fromPitch else move.toPitch
-            VersionCompat.INSTANCE.entityRefreshPositionAndAngles(entity)
+            LocalEntityPositioning.apply(entity, targetPos, yaw, pitch)
             refreshPassengerPositions(entity)
         }
     }

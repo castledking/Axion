@@ -20,7 +20,7 @@ import net.minecraft.client.util.BufferAllocator
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Vec3d
 import net.minecraft.util.math.Vec3i
-import net.minecraft.util.math.blockPosFromLong
+import axion.client.compat.blockPosFromLong
 import net.minecraft.world.BlockRenderView
 import net.minecraft.world.LightType
 import net.minecraft.world.biome.ColorResolver

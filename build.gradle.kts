@@ -2,6 +2,8 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.gradle.api.tasks.bundling.AbstractArchiveTask
 import org.gradle.language.jvm.tasks.ProcessResources
 import net.fabricmc.loom.api.LoomGradleExtensionAPI
+import java.net.HttpURLConnection
+import java.net.URL
 
 plugins {
     id("fabric-loom") apply false
@@ -76,6 +78,14 @@ extensions.configure<LoomGradleExtensionAPI>("loom") {
             sourceSet(sourceSets["client"])
         }
     }
+
+    // Custom run configurations
+    runs {
+        named("client") {
+            configName = "Axion Client"
+            runDir = "run"
+        }
+    }
 }
 
 if (needsLegacyMouseInputStub) {
@@ -95,8 +105,6 @@ if (needsLegacyWorldRenderStateStub) {
 sourceSets.named("client") {
     if (rangeMc1215) {
         kotlin.srcDir("src/compat-1_21_5/kotlin")
-        kotlin.exclude("axion/client/render/gpu/**")
-        kotlin.exclude("axion/client/render/AxionPreviewBuffer.kt")
     } else if (rangeLegacy) {
         // 1.21.5 .. 1.21.8: Codec-based NBT serialization, no MouseInput / WorldRenderState
         kotlin.srcDir("src/compat-1_21_7/kotlin")
@@ -152,6 +160,13 @@ dependencies {
         implementation("net.fabricmc:fabric-language-kotlin:${property("fabric_kotlin_version")}")
         compileOnly("com.terraformersmc:modmenu:${property("modmenu_version")}")
         runtimeOnly("com.terraformersmc:modmenu:${property("modmenu_version")}")
+        // Force lifecycle-events to a version that includes EntityLoadData interface
+        // (needed for Loom's interface injection in 26.1.2+)
+        constraints {
+            implementation("net.fabricmc.fabric-api:fabric-lifecycle-events-v1:4.1.0+6d50a0854c") {
+                because("EntityLoadData was removed in 4.0.6 builds but is required for 26.1.2 interface injection")
+            }
+        }
     } else {
         add("modImplementation", "net.fabricmc:fabric-loader:${property("loader_version")}")
         add("modImplementation", "net.fabricmc.fabric-api:fabric-api:${property("fabric_version")}")
@@ -183,14 +198,18 @@ tasks.processResources {
             "fabric_kotlin_version" to project.property("fabric_kotlin_version") as String,
         )
     }
-    if (rangeMc1215) {
-        exclude("assets/axion/shaders/core/preview_shell.*")
-    }
 }
 
 tasks.named<ProcessResources>("processClientResources") {
     doFirst {
         delete(layout.buildDirectory.dir("resources/client"))
+    }
+    if (rangeMc261x) {
+        filesMatching("axion.client.mixins.json") {
+            filter { line ->
+                if (line.contains("\"WorldRendererFallbackMixin\"")) null else line
+            }
+        }
     }
 }
 
@@ -258,4 +277,165 @@ if (!rangeMc261x) {
 tasks.named<AbstractArchiveTask>("sourcesJar") {
     archiveFileName.set("Axion-v${modVersion}-${rangeFileTag}-sources.jar")
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+// Create run tasks for each supported version
+tasks.register("runClient1215") {
+    group = "axion"
+    description = "Run Minecraft 1.21.5 client with Axion"
+    doLast {
+        logger.lifecycle("Use Loom's generated runClient task with -Pminecraft_version=1.21.5.")
+    }
+}
+
+tasks.register("runClient1217") {
+    group = "axion"
+    description = "Run Minecraft 1.21.7 client with Axion (legacy range)"
+    doLast {
+        logger.lifecycle("Use Loom's generated runClient task with -Pminecraft_version=1.21.7.")
+    }
+}
+
+tasks.register("runClient12111") {
+    group = "axion"
+    description = "Run Minecraft 1.21.11 client with Axion (modern range)"
+    doLast {
+        logger.lifecycle("Use Loom's generated runClient task with -Pminecraft_version=1.21.11.")
+    }
+}
+
+tasks.register("runClient261") {
+    group = "axion"
+    description = "Run Minecraft 26.1.x client with Axion"
+    doLast {
+        logger.lifecycle("Use Loom's generated runClient task with -Pminecraft_version=26.1.")
+    }
+}
+
+// Unified run task that accepts a target version.
+// Use -PtargetVersion=1.21.5 (NOT -Pversion, which clashes with Gradle's project.version).
+tasks.register("runClientVersion") {
+    group = "axion"
+    description = "Run client for specified version (use -PtargetVersion=1.21.5,1.21.7,1.21.11,26.1)"
+    val target = project.findProperty("targetVersion") as String? ?: "26.1"
+
+    dependsOn(
+        when (target) {
+            "1.21.5" -> "runClient1215"
+            "1.21.7" -> "runClient1217"
+            "1.21.11" -> "runClient12111"
+            "26.1" -> "runClient261"
+            else -> throw IllegalArgumentException("Unsupported version: $target. Use 1.21.5, 1.21.7, 1.21.11, or 26.1")
+        },
+    )
+    doLast {
+        // The selected run task is wired through dependsOn above.
+    }
+}
+
+// Paper server integration task
+tasks.register("setupPaperServer") {
+    group = "axion"
+    description = "Setup Paper server for current Minecraft version"
+    val version = project.findProperty("version") as String? ?: minecraftVersion
+    val paperVersion = when (version) {
+        "1.21.5" -> "1.21.5-R0.1-SNAPSHOT"
+        "1.21.7" -> "1.21.7-R0.1-SNAPSHOT"
+        "1.21.11" -> "1.21.11-R0.1-SNAPSHOT"
+        "26.1" -> property("paper_version") as String
+        else -> property("paper_version") as String
+    }
+    val rangeTag = when {
+        version == "1.21.5" -> "mc1.21.5"
+        version == "1.21.7" -> "mc1.21.6-1.21.8"
+        version == "1.21.11" -> "mc1.21.9-1.21.11"
+        version.startsWith("26.1") -> "mc26.1.x"
+        else -> "mc${version}"
+    }
+    val runDir = file("run/paper/$version")
+    val paperJar = runDir.resolve("paper-server.jar")
+    val pluginsDir = runDir.resolve("plugins")
+
+    doLast {
+        println("Setting up Paper server for Minecraft $version (Paper $paperVersion)")
+
+        // Create directories
+        runDir.mkdirs()
+        pluginsDir.mkdirs()
+
+        // Download Paper server if not present
+        if (!paperJar.exists()) {
+            println("Downloading Paper server $paperVersion...")
+            val paperUrl = when (version) {
+                "1.21.5" -> "https://fill-data.papermc.io/v1/objects/2ae6ae22adf417699746e0f89fc2ef6cb6ee050a5f6608cee58f0535d60b509e/paper-1.21.5-114.jar"
+                "1.21.7" -> "https://fill-data.papermc.io/v1/objects/83838188699cb2837e55b890fb1a1d39ad0710285ed633fbf9fc14e9f47ce078/paper-1.21.7-32.jar"
+                "1.21.11" -> "https://fill-data.papermc.io/v1/objects/e708e8c132dc143ffd73528cccb9532e2eb17628b1a0eee74469bf466c7003f8/paper-1.21.11-116.jar"
+                "26.1" -> "https://fill-data.papermc.io/v1/objects/b51d49a5f62446b7cfc01e6c29e48e0ce6abd35a783134aace1047b839b178ef/paper-26.1.2-63.jar"
+                else -> throw IllegalArgumentException("Unknown version: $version")
+            }
+
+            paperJar.parentFile.mkdirs()
+            paperJar.downloadTo(paperJar, paperUrl)
+        } else {
+            println("Paper server already downloaded: $paperJar")
+        }
+
+        // Copy AxionPaper plugin if built
+        val pluginJar = file("paper-plugin/build/libs/${rangeTag}/AxionPaper-v${modVersion}-${rangeTag}.jar")
+        if (pluginJar.exists()) {
+            println("Copying AxionPaper plugin...")
+            copy {
+                from(pluginJar)
+                into(pluginsDir)
+            }
+        } else {
+            println("Warning: AxionPaper jar not found at $pluginJar")
+            println("Run ./build-axion.sh to build the plugin first.")
+        }
+
+        // Create server.properties if not present
+        val serverProps = runDir.resolve("server.properties")
+        if (!serverProps.exists()) {
+            val port = when (version) {
+                "1.21.5" -> 25567
+                "1.21.7" -> 25568
+                "1.21.11" -> 25569
+                "26.1" -> 25570
+                else -> 25565
+            }
+            println("Creating server.properties (port $port)...")
+            serverProps.writeText("""
+                server-port=$port
+                enable-rcon=false
+                enable-command-block=true
+                spawn-protection=0
+                gamemode=creative
+                difficulty=peaceful
+                level-seed=axiontest
+                max-players=10
+                online-mode=false
+            """.trimIndent())
+        }
+
+        // Create eula.txt if not present
+        val eulaFile = runDir.resolve("eula.txt")
+        if (!eulaFile.exists()) {
+            println("Creating eula.txt (accepting EULA)...")
+            eulaFile.writeText("eula=true")
+        }
+
+        println()
+        println("Paper server setup complete!")
+        println("Server directory: $runDir")
+        println("To start the server, run: java -jar $paperJar nogui")
+    }
+}
+
+// Helper function to download file
+fun java.io.File.downloadTo(target: java.io.File, url: String) {
+    target.outputStream().use { output ->
+        URL(url).openStream().use { input ->
+            input.copyTo(output)
+        }
+    }
 }

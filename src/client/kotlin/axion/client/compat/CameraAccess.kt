@@ -3,6 +3,7 @@ package axion.client.compat
 import net.minecraft.client.render.Camera
 import net.minecraft.util.math.Vec3d
 import java.lang.reflect.Field
+import java.lang.reflect.Method
 
 /**
  * Helper object to access Camera position in a version-compatible way.
@@ -17,12 +18,17 @@ object CameraAccess {
         }
     }
 
+    private val positionMethod: Method? by lazy {
+        Camera::class.java.methods.firstOrNull { it.name == "position" && it.parameterCount == 0 }
+    }
+
     fun getPos(camera: Camera): Vec3d {
-        // Try the public position() method first (26.1.2+)
-        try {
-            return camera.position()
-        } catch (_: NoSuchMethodException) {
-            // Fall back to field access (1.21.11)
+        positionMethod?.let { method ->
+            try {
+                return method.invoke(camera) as Vec3d
+            } catch (_: Exception) {
+                // Fall back to field access.
+            }
         }
 
         // Fall back to reflection on pos field

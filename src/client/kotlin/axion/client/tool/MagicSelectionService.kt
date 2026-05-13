@@ -149,7 +149,7 @@ object MagicSelectionService {
             selected += pos
 
             Direction.entries.forEach { direction ->
-                val next = pos.offset(direction.vector).toImmutable()
+                val next = pos.add(direction.vector).toImmutable()
                 if (next in visited || !withinRadius(centerPos, next, radiusSquared)) {
                     return@forEach
                 }

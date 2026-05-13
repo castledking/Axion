@@ -11,16 +11,6 @@ import net.minecraft.core.Vec3i
 import net.minecraft.world.level.block.Block
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.phys.shapes.VoxelShape
-import net.minecraft.world.level.Level
-import net.minecraft.world.level.block.entity.BlockEntity
-// Stub for 26.1.2 - LightLayer may have changed or been removed
-// import net.minecraft.world.level.lighting.LevelLightEngine
-// import net.minecraft.world.level.lighting.LightLayer
-import net.minecraft.world.level.block.state.properties.NoteBlockInstrument
-// Stub for 26.1.2 - BlockRenderDispatcher may have changed or been removed
-// import net.minecraft.client.renderer.block.BlockRenderDispatcher
-import net.minecraft.client.renderer.texture.OverlayTexture
-// import net.minecraft.client.resources.model.ModelBakery
 
 // --- MinecraftClient / Minecraft ---
 val Minecraft.world get() = level
@@ -104,65 +94,6 @@ object VertexRendering {
     }
 }
 
-// --- 26.1.2 BlockRenderView bridge extensions ---
-// These extensions bridge the 26.1.2 BlockRenderView interface to the 1.21.11 API
-// for classes that implement BlockRenderView (like PreviewBlockRenderView)
-
-fun Level.getBlockEntityCompat(pos: net.minecraft.core.BlockPos): BlockEntity? = getBlockEntity(pos)
-
-fun Level.getBlockStateCompat(pos: net.minecraft.core.BlockPos): BlockState = getBlockState(pos)
-
-fun Level.getFluidStateCompat(pos: net.minecraft.core.BlockPos): net.minecraft.world.level.material.FluidState = getFluidState(pos)
-
-fun Level.getHeightCompat(): Int = getHeight()
-
-fun Level.getBottomYCompat(): Int = getMinY()
-
-// Stub for 26.1.2 - getShade may have changed or been removed
-// fun Level.getBrightnessCompat(direction: Direction, shaded: Boolean): Float = getShade(direction, shaded)
-fun Level.getBrightnessCompat(direction: Direction, shaded: Boolean): Float = 1.0f
-
-// Stub for 26.1.2 - LevelLightEngine may have changed
-// fun Level.getLightingProviderCompat(): LevelLightEngine = getLightEngine()
-fun Level.getLightingProviderCompat(): Any = this
-
-// Stub for 26.1.2 - LightLayer may have changed or been removed
-// fun Level.getLightLevelCompat(type: net.minecraft.world.level.LightLayer, pos: net.minecraft.core.BlockPos): Int = getLightEngine().getLayerListener(type).getLightValue(pos)
-fun Level.getLightLevelCompat(type: Any, pos: net.minecraft.core.BlockPos): Int = 15
-
-fun Level.getBaseLightLevelCompat(pos: net.minecraft.core.BlockPos, ambientDarkness: Int): Int = 15
-
-fun Level.isSkyVisibleCompat(pos: net.minecraft.core.BlockPos): Boolean = canSeeSky(pos)
-
-// Stub for 26.1.2 - getSkyColor may have changed or been removed
-// fun Level.getColorCompat(pos: net.minecraft.core.BlockPos, colorResolver: net.minecraft.world.level.biome.Biome): Int = getBiome(pos).value().getSkyColor(colorResolver)
-fun Level.getColorCompat(pos: net.minecraft.core.BlockPos, colorResolver: Any): Int = 0xFFFFFF
-
-// --- 26.1.2 new BlockRenderView methods (stub implementations) ---
-// These are stubs for the new 26.1.2 interface methods that don't exist in 1.21.11
-
-fun Level.cardinalLightingCompat(): Any = this // Stub - return world itself
-
-// Stub for 26.1.2 - getGrassColor may have changed
-// fun Level.getBlockTintCompat(pos: net.minecraft.core.BlockPos, colorResolver: net.minecraft.world.level.biome.Biome): Int = getBiome(pos).value().getGrassColor(colorResolver)
-fun Level.getBlockTintCompat(pos: net.minecraft.core.BlockPos, colorResolver: Any): Int = 0xFFFFFF
-
-// Stub for 26.1.2 - LevelLightEngine may have changed
-// fun Level.getLightEngineCompat(): LevelLightEngine = getLightEngine()
-fun Level.getLightEngineCompat(): Any = this
-
-fun Level.getMinYCompat(): Int = getMinY()
-
-// Stub for 26.1.2 - LightLayer may have changed or been removed
-// fun Level.getBrightnessCompat(layer: LightLayer, pos: net.minecraft.core.BlockPos): Int = getLightEngine().getLayerListener(layer).getLightValue(pos)
-fun Level.getBrightnessCompat(layer: Any, pos: net.minecraft.core.BlockPos): Int = 15
-
-// --- MinecraftClient rendering API bridges ---
-// Stub for 26.1.2 - BlockRenderDispatcher may have changed or been removed
-// val Minecraft.blockRenderManagerCompat: BlockRenderDispatcher get() = blockRenderer
-val Minecraft.blockRenderManagerCompat: Any get() = this
-
 val BlockState.renderTypeCompat: net.minecraft.world.level.block.RenderShape get() = getRenderShape()
 
 fun BlockState.getRenderingSeedCompat(pos: net.minecraft.core.BlockPos): Long = getSeed(pos)
-

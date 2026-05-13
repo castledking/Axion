@@ -171,6 +171,7 @@ build_range() {
   echo
   echo "==> Building Axion v${MOD_VERSION} for range ${range_tag} (compiled against MC ${compile_version})"
   cleanup_range_jars "${range_tag}"
+  wipe_kotlin_caches
 
   local gradle_tasks=(remapJar :paper-plugin:jar)
   if [[ "$range" == "mc26_1_x" ]]; then
@@ -209,6 +210,19 @@ build_range() {
   fi
 }
 
+# Wipe Kotlin incremental compilation caches so new source files are
+# detected.  Avoids full `clean` which would delete output directories
+# needed for jar gathering in the release workflow.
+wipe_kotlin_caches() {
+  rm -rf \
+    build/tmp/compileClientKotlin \
+    build/tmp/compileKotlin \
+    build/tmp/kotlin-classes \
+    build/tmp/kotlinClientClasses \
+    build/classes/kotlin \
+    build/classes/kotlinClient
+}
+
 print_menu() {
   echo "Select a build target:"
   echo "  1) Legacy range (Minecraft 1.21.6 - 1.21.8)"
@@ -218,6 +232,8 @@ print_menu() {
   echo "  5) Minecraft 26.1.x"
   echo "  q) Cancel"
 }
+
+wipe_kotlin_caches
 
 if [[ $# -gt 0 ]]; then
   choice="$1"

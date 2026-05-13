@@ -54,15 +54,15 @@ class SymmetryAwareOperationDispatcher(
                 return@serverExecute
             }
 
-            val plan = planner.plan(targetWorld as net.minecraft.world.level.Level, expandedOperation)
+            val plan = planner.plan(targetWorld as net.minecraft.world.World, expandedOperation)
             if (plan.writes.isEmpty() && plan.entityMoves.isEmpty() && plan.entityClones.isEmpty() && plan.entityDeletes.isEmpty()) {
                 return@serverExecute
             }
 
             if (recordHistory) {
-                HistoryManager.record(targetWorld as net.minecraft.world.level.Level, plan)
+                HistoryManager.record(targetWorld as net.minecraft.world.World, plan)
             }
-            applier.apply(targetWorld as net.minecraft.world.level.Level, plan)
+            applier.apply(targetWorld as net.minecraft.world.World, plan)
         }
     }
 }

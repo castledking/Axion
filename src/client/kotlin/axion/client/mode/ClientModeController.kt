@@ -22,7 +22,7 @@ import net.minecraft.block.Block
 import net.minecraft.util.math.Direction
 import net.minecraft.util.math.Vec3d
 import net.minecraft.util.math.Vec3i
-import axion.client.hotbar.blockPosOfFloored
+import axion.client.compat.blockPosOfFloored
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.util.InputUtil
 import net.minecraft.client.toast.SystemToast
@@ -42,6 +42,7 @@ import net.minecraft.world.WorldEvents
 object ClientModeController {
     private const val NO_CLIP_ESCAPE_TICKS: Int = 8
     private const val MULTI_SAMPLE_COUNT: Int = 50
+    private const val HOTBAR_SIZE: Int = 9
     private val dispatcher = SymmetryAwareOperationDispatcher(recordHistory = false)
     private var suppressPrimaryUntilRelease: Boolean = false
     private var suppressSecondaryUntilRelease: Boolean = false
@@ -682,7 +683,7 @@ object ClientModeController {
         val cameraEntity = client.cameraEntity ?: player
         val origin = cameraEntity.getCameraPosVec(1.0f)
         val direction = cameraEntity.getRotationVec(1.0f)
-        val maxDistance = if (state.infiniteReachEnabled) AxionTargeting.DEFAULT_REACH else player.blockInteractionRange()
+        val maxDistance = if (state.infiniteReachEnabled) AxionTargeting.DEFAULT_REACH else blockInteractionRangeOf(player)
 
         // For infinite reach placement:
         // - Within vanilla range: use interactBlock for client prediction
@@ -701,7 +702,7 @@ object ClientModeController {
 
             if (hit.type.name == "BLOCK") {
                 val blockHit = hit as BlockHitResult
-                val beyondVanillaReach = origin.squaredDistanceTo(hit.pos) > (player.blockInteractionRange() * player.blockInteractionRange())
+                val beyondVanillaReach = origin.squaredDistanceTo(hit.pos) > (blockInteractionRangeOf(player) * blockInteractionRangeOf(player))
 
                 bypassItemUseCooldown(client)
 
@@ -752,7 +753,7 @@ object ClientModeController {
         }
 
         val blockHit = hit as BlockHitResult
-        val beyondVanillaReach = origin.squaredDistanceTo(hit.pos) > (player.blockInteractionRange() * player.blockInteractionRange())
+        val beyondVanillaReach = origin.squaredDistanceTo(hit.pos) > (blockInteractionRangeOf(player) * blockInteractionRangeOf(player))
 
         if (!state.infiniteReachEnabled && beyondVanillaReach) {
             return false
@@ -922,7 +923,7 @@ object ClientModeController {
     ) {
         val world = client.world ?: return
         val player = client.player
-        world.syncWorldEvent(player, WorldEvents.PARTICLES_DESTROY_BLOCK, pos, Block.getId(state))
+        world.syncWorldEvent(player, 2001, pos, VersionCompatImpl.rawBlockStateId(state))
     }
 
     private fun playPlacementEffects(
@@ -971,13 +972,13 @@ object ClientModeController {
 
         val inventory = player.inventory
         if (player.isInCreativeMode) {
-            val hotbarSlot = findInventorySlot(inventory, pickedItem, 0 until net.minecraft.world.entity.player.Inventory.getSelectionSize())
+            val hotbarSlot = findInventorySlot(inventory, pickedItem, 0 until HOTBAR_SIZE)
             if (hotbarSlot >= 0) {
                 inventory.setSelectedSlot(hotbarSlot)
                 return true
             }
 
-            val inventorySlot = findInventorySlot(inventory, pickedItem, net.minecraft.world.entity.player.Inventory.getSelectionSize() until VersionCompatImpl.getMainInventoryStacks(inventory).size)
+            val inventorySlot = findInventorySlot(inventory, pickedItem, HOTBAR_SIZE until VersionCompatImpl.getMainInventoryStacks(inventory).size)
             if (inventorySlot >= 0) {
                 client.interactionManager?.clickSlot(
                     player.currentScreenHandler.syncId,
@@ -993,13 +994,13 @@ object ClientModeController {
             return clonePickedItemIntoHand(client, player, inventory, pickedItem.getDefaultStack())
         }
 
-        val hotbarSlot = findInventorySlot(inventory, pickedItem, 0 until net.minecraft.world.entity.player.Inventory.getSelectionSize())
+        val hotbarSlot = findInventorySlot(inventory, pickedItem, 0 until HOTBAR_SIZE)
         if (hotbarSlot >= 0) {
             inventory.setSelectedSlot(hotbarSlot)
             return true
         }
 
-        val inventorySlot = findInventorySlot(inventory, pickedItem, net.minecraft.world.entity.player.Inventory.getSelectionSize() until inventory.mainStacks.size)
+        val inventorySlot = findInventorySlot(inventory, pickedItem, HOTBAR_SIZE until inventory.mainStacks.size)
         if (inventorySlot < 0) {
             return clonePickedItemIntoHand(client, player, inventory, pickedItem.getDefaultStack())
         }
@@ -1059,7 +1060,7 @@ object ClientModeController {
     }
 
     private fun inventorySlotToScreenSlot(inventorySlot: Int): Int {
-        return if (inventorySlot < net.minecraft.world.entity.player.Inventory.getSelectionSize()) {
+        return if (inventorySlot < HOTBAR_SIZE) {
             36 + inventorySlot
         } else {
             inventorySlot
@@ -1082,14 +1083,14 @@ object ClientModeController {
         val state = AxionClientState.globalModeState
         val origin = cameraEntity.getCameraPosVec(1.0f)
         val direction = cameraEntity.getRotationVec(1.0f)
-        val maxDistance = if (state.infiniteReachEnabled) AxionTargeting.DEFAULT_REACH else player.blockInteractionRange()
+        val maxDistance = if (state.infiniteReachEnabled) AxionTargeting.DEFAULT_REACH else blockInteractionRangeOf(player)
 
         // For infinite reach, use ray marching to find multiple blocks along the ray
         if (state.infiniteReachEnabled) {
             val seenTargets = linkedSetOf<PlacementSampleTarget>()
             val withinRangeOperations = mutableListOf<BlockHitResult>()
             val beyondRangeOperations = mutableListOf<axion.common.operation.EditOperation>()
-            val vanillaReachSq = player.blockInteractionRange() * player.blockInteractionRange()
+            val vanillaReachSq = blockInteractionRangeOf(player) * blockInteractionRangeOf(player)
 
             // Ray marching to find blocks along the line
             val stepSize = 0.3
@@ -1229,7 +1230,7 @@ object ClientModeController {
                 val blockTarget = ModeTargeting.BlockTarget(
                     hitResult = blockHit,
                     squaredDistance = origin.squaredDistanceTo(hit.pos),
-                    beyondVanillaReach = origin.squaredDistanceTo(hit.pos) > (player.blockInteractionRange() * player.blockInteractionRange()),
+                    beyondVanillaReach = origin.squaredDistanceTo(hit.pos) > (blockInteractionRangeOf(player) * blockInteractionRangeOf(player)),
                 )
 
                 val operation = BuildPlacementService.createPlacementOperation(
@@ -1270,7 +1271,7 @@ object ClientModeController {
                     val blockTarget = ModeTargeting.BlockTarget(
                         hitResult = blockHit,
                         squaredDistance = origin.squaredDistanceTo(hit.pos),
-                        beyondVanillaReach = origin.squaredDistanceTo(hit.pos) > (player.blockInteractionRange() * player.blockInteractionRange()),
+                        beyondVanillaReach = origin.squaredDistanceTo(hit.pos) > (blockInteractionRangeOf(player) * blockInteractionRangeOf(player)),
                     )
 
                     val operation = BuildPlacementService.createPlacementOperation(
@@ -1307,7 +1308,7 @@ object ClientModeController {
         val state = AxionClientState.globalModeState
         val origin = cameraEntity.getCameraPosVec(1.0f)
         val direction = cameraEntity.getRotationVec(1.0f)
-        val vanillaReach = player.blockInteractionRange()
+        val vanillaReach = blockInteractionRangeOf(player)
         val maxDistance = if (state.infiniteReachEnabled) AxionTargeting.DEFAULT_REACH else vanillaReach
 
         bypassItemUseCooldown(client)
@@ -1376,7 +1377,7 @@ object ClientModeController {
         val cameraEntity = client.cameraEntity ?: player
         val origin = cameraEntity.getCameraPosVec(1.0f)
         val direction = cameraEntity.getRotationVec(1.0f)
-        val vanillaReach = player.blockInteractionRange()
+        val vanillaReach = blockInteractionRangeOf(player)
         val maxDistance = if (infiniteReach) AxionTargeting.DEFAULT_REACH else vanillaReach
 
         // Raycast to find target block

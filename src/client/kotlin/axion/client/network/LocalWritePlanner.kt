@@ -21,7 +21,7 @@ import net.minecraft.block.BlockState
 import net.minecraft.block.Blocks
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Vec3i
-import axion.client.hotbar.blockPosIterate
+import axion.client.compat.blockPosIterate
 import axion.client.compat.toImmutable
 import axion.client.compat.add
 import net.minecraft.world.World
@@ -211,7 +211,7 @@ class LocalWritePlanner {
                     }
 
                     appendWrite(
-                        pos = sourcePos.add(VersionCompat.INSTANCE.directionGetVector(operation.direction) as net.minecraft.core.Vec3i),
+                        pos = sourcePos.add(VersionCompat.INSTANCE.directionGetVector(operation.direction) as Vec3i),
                         state = operation.sourceState,
                         blockEntityData = currentBlockEntityAt(world, overlay, sourcePos),
                         overlay = overlay,

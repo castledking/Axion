@@ -58,7 +58,7 @@ object StackToolController {
             StackToolState.Idle -> false
             is StackToolState.FirstCornerSet -> setSecondCorner()
             is StackToolState.RegionDefined -> setSecondCorner()
-            is StackToolState.PreviewingStack -> confirm(state.preview)
+            is StackToolState.PreviewingStack -> confirm(state.preview, client)
         }
     }
 
@@ -201,8 +201,8 @@ object StackToolController {
         syncSelectionState(nextState)
     }
 
-    private fun confirm(preview: StackPreviewState): Boolean {
-        dispatcher.dispatch(StackPlacementService.toOperation(preview))
+    private fun confirm(preview: StackPreviewState, client: MinecraftClient): Boolean {
+        dispatcher.dispatch(StackPlacementService.toOperation(preview, client))
         reset()
         return true
     }

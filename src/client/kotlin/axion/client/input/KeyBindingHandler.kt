@@ -1,7 +1,6 @@
 package axion.client.input
 
 import axion.common.compat.VersionCompat
-import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.option.KeyBinding
 import org.lwjgl.glfw.GLFW
@@ -28,9 +27,9 @@ object KeyBindingHandler {
                 it.isAccessible = true
             }
         }.getOrElse {
-            // Fallback: search for InputUtil.Key typed non-static mutable fields
+            // Fallback: search for InputUtil/InputConstants.Key typed non-static mutable fields
             KeyBinding::class.java.declaredFields.firstOrNull { f ->
-                f.type == InputConstants.Key::class.java && !java.lang.reflect.Modifier.isStatic(f.modifiers)
+                isInputKeyClass(f.type) && !java.lang.reflect.Modifier.isStatic(f.modifiers)
                     && !java.lang.reflect.Modifier.isFinal(f.modifiers)
             }?.also { it.isAccessible = true }
         }
@@ -107,10 +106,27 @@ object KeyBindingHandler {
     private fun getBoundKeyCode(keyBinding: KeyBinding): Int? {
         return runCatching {
             val field = boundKeyField ?: return null
-            val key = field.get(keyBinding) as? InputConstants.Key ?: return null
-            key.javaClass.methods.firstOrNull { it.name == "getValue" && it.parameterCount == 0 }
-                ?.invoke(key) as? Int
-                ?: key.javaClass.fields.firstOrNull { it.name == "code" }?.get(key) as? Int
+            val key = field.get(keyBinding) ?: return null
+            val keyClass = key.javaClass
+
+            // Try common method names (getCode in Yarn, getValue in Mojang)
+            keyClass.methods.firstOrNull { m ->
+                m.parameterCount == 0 && m.returnType.name == "int"
+                    && m.name in setOf("getCode", "getValue")
+            }?.invoke(key) as? Int
+                ?: // Try common field names (code in Mojang, keyCode in older Yarn)
+                keyClass.fields.firstOrNull { f ->
+                    f.type.name == "int" && f.name in setOf("code", "keyCode")
+                }?.get(key) as? Int
+                ?: // Last resort: first non-static int field (works for unmapped intermediaries)
+                keyClass.fields.firstOrNull { f ->
+                    f.type.name == "int" && !java.lang.reflect.Modifier.isStatic(f.modifiers)
+                }?.get(key) as? Int
         }.getOrNull()
+    }
+
+    private fun isInputKeyClass(type: Class<*>): Boolean {
+        return type.simpleName == "Key" &&
+            (type.enclosingClass?.simpleName == "InputUtil" || type.enclosingClass?.simpleName == "InputConstants")
     }
 }

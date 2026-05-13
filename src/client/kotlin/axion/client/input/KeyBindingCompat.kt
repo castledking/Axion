@@ -1,7 +1,6 @@
 package axion.client.input
 
 import axion.common.compat.VersionCompat
-import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.option.KeyBinding
 import net.minecraft.util.Identifier
 import java.lang.reflect.Constructor
@@ -36,8 +35,8 @@ object KeyBindingCompat {
             return constructor.newInstance(translationKey, code, categoryKey) as KeyBinding
         }
 
-        val inputUtilType = InputConstants.Type::class.java
-        val keySym = InputConstants.Type.KEYSYM
+        val inputUtilType = resolveInputTypeClass() ?: error("Unsupported KeyBinding constructor shape")
+        val keySym = keySymValue(inputUtilType) ?: error("Unsupported KeyBinding input type")
         findConstructor(
             String::class.java,
             inputUtilType,
@@ -97,7 +96,7 @@ object KeyBindingCompat {
 
                 parameterTypes.size >= 4 &&
                     parameterTypes[0] == String::class.java &&
-                    parameterTypes[1] == InputConstants.Type::class.java &&
+                    parameterTypes[1] == resolveInputTypeClass() &&
                     parameterTypes[2] == primitiveInt &&
                     parameterTypes[3] != String::class.java -> parameterTypes[3]
 
@@ -121,5 +120,21 @@ object KeyBindingCompat {
                 method.parameterTypes[0] == Identifier::class.java &&
                 method.returnType == categoryClass
         }
+    }
+
+    private fun resolveInputTypeClass(): Class<*>? {
+        return KeyBinding::class.java.constructors
+            .asSequence()
+            .flatMap { constructor -> constructor.parameterTypes.asSequence() }
+            .firstOrNull { type ->
+                type.simpleName == "Type" &&
+                    (type.enclosingClass?.simpleName == "InputUtil" || type.enclosingClass?.simpleName == "InputConstants")
+            }
+    }
+
+    private fun keySymValue(inputTypeClass: Class<*>): Any? {
+        return inputTypeClass.enumConstants
+            ?.filterIsInstance<Enum<*>>()
+            ?.firstOrNull { it.name == "KEYSYM" }
     }
 }

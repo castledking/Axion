@@ -8,6 +8,7 @@ import net.minecraft.util.Hand
 import net.minecraft.util.hit.BlockHitResult
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Vec3d
+import axion.client.compat.add
 
 object SymmetryPlacementService {
     fun createPlacementResult(
@@ -22,7 +23,7 @@ object SymmetryPlacementService {
         val blockItem = stack.item as? BlockItem ?: return null
 
         val rawContext = ItemPlacementContext(player, hand, stack, hitResult)
-        val placementContext = rawContext // Stub for 26.1.2 - getPlacementContext API changed
+        val placementContext = rawContext
         if (!placementContext.canPlace()) {
             return null
         }
@@ -32,7 +33,7 @@ object SymmetryPlacementService {
             return null
         }
 
-        val placementState = blockItem.block.defaultBlockState() // Stub for 26.1.2 - getPlacementState API changed
+        val placementState = blockItem.block.defaultState
         val derivedPlacements = SymmetryTransformService.activeTransforms(config)
             .asSequence()
             .filterNot { transform ->
@@ -76,7 +77,7 @@ object SymmetryPlacementService {
         val supportPos = if (originalContext.canReplaceExisting()) {
             derivedPos
         } else {
-            derivedPos.offset(derivedSide.opposite.vector)
+            derivedPos.add(derivedSide.opposite.vector)
         }
         val hitPos = Vec3d(supportPos.x + 0.5, supportPos.y + 0.5, supportPos.z + 0.5).add(
             derivedSide.offsetX * 0.5,
@@ -85,14 +86,14 @@ object SymmetryPlacementService {
         )
         val derivedHit = BlockHitResult(hitPos, derivedSide, supportPos, false)
         val rawContext = ItemPlacementContext(player, hand, stack, derivedHit)
-        val placementContext = rawContext // Stub for 26.1.2 - getPlacementContext API changed
+        val placementContext = rawContext
         if (derivedHit.blockPos != derivedPos || !placementContext.canPlace()) {
             return null
         }
 
         return SymmetryPlacementResult.Placement(
             derivedPos,
-            blockItem.block.defaultBlockState(), // Stub for 26.1.2 - getPlacementState API changed
+            blockItem.block.defaultState,
         )
     }
 }

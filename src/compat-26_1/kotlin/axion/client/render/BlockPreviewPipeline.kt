@@ -3,7 +3,7 @@ package axion.client.render
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Box
 import net.minecraft.core.Vec3i
-import net.minecraft.util.math.add
+import axion.client.compat.add
 
 object BlockPreviewPipeline {
     private const val SPARSE_OUTLINE_BUDGET: Int = 8192

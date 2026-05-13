@@ -148,6 +148,8 @@ val PlayerEntity.isInCreativeMode: Boolean
 val PlayerEntity.blockInteractionRange: Double
     get() = blockInteractionRange()
 
+fun blockInteractionRangeOf(player: PlayerEntity): Double = player.blockInteractionRange()
+
 val BlockHitResult.side: Direction
     get() = direction
 

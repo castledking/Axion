@@ -19,7 +19,8 @@ abstract class ClientPlayerEntityMixin {
             return
         }
 
-        // Stub for 26.1.2 - noClip property may have changed
+        // 26.1.x removed the mapped noClip setter this mixin used; push-out suppression
+        // still handles client-side collision nudging until the movement hook is ported.
         // player.noClip = true
     }
 

@@ -140,9 +140,8 @@ class ChunkedStateMap {
     val size: Int get() = states.size
 
     /**
-     * Read-only view as a `Map<Long, BlockState>`, suitable for passing to
-     * [axion.client.render.AxionBlockTessellator.PreviewBlockRenderView].
-     * Backed by the underlying fastutil map; no copy.
+     * Read-only view as a `Map<Long, BlockState>`, backed by the underlying
+     * fastutil map; no copy.
      */
     fun asMap(): Map<Long, BlockState> = states
 }

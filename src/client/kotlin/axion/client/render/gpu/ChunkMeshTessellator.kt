@@ -13,10 +13,9 @@ import net.minecraft.util.math.BlockPos
  * non-opaque (e.g. short_grass, flowers, crops).
  *
  * The output is a `LongArray` of packed `BlockPos` values. Cell positions
- * (not faces) are returned because the consumer ([axion.client.render.AxionBlockTessellator])
+ * (not faces) are returned because the version-specific preview renderer
  * needs the cell to look up the block model. Hidden-face culling at the
- * face level then happens automatically inside the block tessellator's
- * `checkSides` path.
+ * face level then happens automatically inside the block tessellator path.
  *
  * Cross-section neighbor lookups pre-fetch the 6 adjacent section arrays
  * once, so each cell's face checks are pure bit math. When a neighbor IS

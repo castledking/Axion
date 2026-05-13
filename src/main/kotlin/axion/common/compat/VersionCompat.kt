@@ -65,6 +65,7 @@ interface VersionCompat {
     fun entityGetPitch(entity: Any): Float
     fun entityGetPassengerList(entity: Any): List<Any>
     fun entitySetUuid(entity: Any, uuid: java.util.UUID)
+    fun entitySetPositionAndAngles(entity: Any, x: Double, y: Double, z: Double, yaw: Float, pitch: Float)
     fun entityRefreshPositionAndAngles(entity: Any)
     fun entityUpdatePassengerPosition(entity: Any, passenger: Any)
     fun entityTypeLoadEntityWithPassengers(tag: NbtCompound, world: Any, spawnReason: Any, entityProcessor: (Any) -> Any): Any?

@@ -1,0 +1,16 @@
+{
+  "required": true,
+  "package": "axion.mixin.client",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "ClientPlayerEntityMixin",
+    "EntityMixin",
+    "MinecraftClientMixin",
+    "MouseMixin",
+    "PlayerEntityPoseMixin",
+    "WorldRendererFallbackMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

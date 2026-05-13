@@ -4,8 +4,10 @@ import axion.client.render.AxionWorldRenderContext
 import axion.client.render.gpu.ChunkedPreviewLifecycle
 import axion.client.render.gpu.SectionDrawEntry
 import axion.client.network.AxionPluginPayload
+import axion.client.network.BlockWrite
 import axion.common.compat.VersionCompat
 import java.lang.reflect.Field
+import axion.common.model.BlockEntityDataSnapshot
 import axion.common.model.ClipboardBuffer
 import com.mojang.blaze3d.pipeline.BlendFunction
 import com.mojang.blaze3d.pipeline.RenderPipeline
@@ -23,12 +25,18 @@ import net.minecraft.client.render.Camera
 import net.minecraft.client.render.RenderLayer
 import net.minecraft.client.render.RenderTickCounter
 import net.minecraft.command.argument.BlockArgumentParser
+import net.minecraft.entity.Entity
 import net.minecraft.item.Item
 import net.minecraft.item.ItemStack
 import net.minecraft.nbt.NbtCompound
+import net.minecraft.nbt.NbtElement
+import net.minecraft.nbt.NbtOps
 import net.minecraft.registry.DynamicRegistryManager
 import net.minecraft.registry.Registries
 import net.minecraft.registry.RegistryKeys
+import net.minecraft.registry.RegistryOps
+import net.minecraft.storage.NbtWriteView
+import net.minecraft.util.ErrorReporter
 import net.minecraft.util.Identifier
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Vec3d
@@ -57,6 +65,11 @@ object VersionCompatImpl : VersionCompat {
 
     private fun getRegistryManager(): DynamicRegistryManager? {
         return MinecraftClient.getInstance().world?.registryManager
+    }
+
+    private fun getRegistryOps(): com.mojang.serialization.DynamicOps<NbtElement>? {
+        val registryManager = getRegistryManager() ?: return null
+        return RegistryOps.of(NbtOps.INSTANCE, registryManager)
     }
 
     private fun registryManagerOrThrow(): DynamicRegistryManager {
@@ -129,13 +142,15 @@ object VersionCompatImpl : VersionCompat {
     }
 
     override fun itemStackToNbt(stack: ItemStack): NbtCompound {
-        // TODO: Implement proper NBT serialization for 1.21.11
-        return NbtCompound()
+        val nbt = NbtCompound()
+        val ops = getRegistryOps() ?: return nbt
+        nbt.copyFromCodec(ItemStack.MAP_CODEC, ops, stack)
+        return nbt
     }
 
     override fun nbtToItemStack(nbt: NbtCompound): ItemStack {
-        // TODO: Implement proper NBT deserialization for 1.21.11
-        return ItemStack.EMPTY
+        val ops = getRegistryOps() ?: return ItemStack.EMPTY
+        return nbt.decode(ItemStack.MAP_CODEC, ops).orElse(ItemStack.EMPTY)
     }
 
     override fun shouldUseNonConsumingKeybind(): Boolean {
@@ -174,9 +189,37 @@ object VersionCompatImpl : VersionCompat {
         client.execute(task)
     }
 
-    fun createLiteral(text: String): Text = Text.literal(text)
+    fun createLiteral(text: String): MutableText = Text.literal(text)
 
     fun formatText(text: MutableText, formatting: Formatting): MutableText = text.formatted(formatting)
+
+    fun captureBlockEntity(world: net.minecraft.world.World, pos: BlockPos): BlockEntityDataSnapshot? {
+        val blockEntity = world.getBlockEntity(pos) ?: return null
+        return BlockEntityDataSnapshot(blockEntity.createNbtWithIdentifyingData(world.registryManager).copy())
+    }
+
+    fun applyBlockEntity(world: net.minecraft.world.World, write: BlockWrite) {
+        world.setBlockState(write.pos, write.state, 3)
+        val payload = write.blockEntityData
+        if (payload == null) {
+            world.removeBlockEntity(write.pos)
+            val provider = write.state.block as? net.minecraft.block.BlockEntityProvider ?: return
+            val blockEntity = provider.createBlockEntity(write.pos, write.state) ?: return
+            world.getChunk(write.pos.x shr 4, write.pos.z shr 4).setBlockEntity(blockEntity)
+            blockEntity.markDirty()
+            return
+        }
+
+        val restored = payload.nbt.copy()
+        restored.putInt("x", write.pos.x)
+        restored.putInt("y", write.pos.y)
+        restored.putInt("z", write.pos.z)
+        val blockEntity = net.minecraft.block.entity.BlockEntity.createFromNbt(write.pos, write.state, restored, world.registryManager)
+            ?: return
+        world.removeBlockEntity(write.pos)
+        world.getChunk(write.pos.x shr 4, write.pos.z shr 4).setBlockEntity(blockEntity)
+        blockEntity.markDirty()
+    }
 
     fun registerAxionPayloadChannel(
         id: CustomPayload.Id<AxionPluginPayload>,
@@ -244,7 +287,7 @@ object VersionCompatImpl : VersionCompat {
     }
 
     override fun blockRenderManagerRenderBlock(manager: Any, state: BlockState, pos: Any, world: Any, matrixStack: Any, consumer: Any, checkSides: Boolean, parts: List<Any>): Boolean {
-        return (manager as net.minecraft.client.render.block.BlockRenderManager).renderBlock(
+        (manager as net.minecraft.client.render.block.BlockRenderManager).renderBlock(
             state,
             pos as net.minecraft.util.math.BlockPos,
             world as net.minecraft.world.BlockRenderView,
@@ -253,16 +296,18 @@ object VersionCompatImpl : VersionCompat {
             checkSides,
             parts as List<net.minecraft.client.render.model.BlockModelPart>
         )
+        return true
     }
 
     override fun blockRenderManagerRenderFluid(manager: Any, pos: Any, world: Any, consumer: Any, state: BlockState, fluidState: Any): Boolean {
-        return (manager as net.minecraft.client.render.block.BlockRenderManager).renderFluid(
+        (manager as net.minecraft.client.render.block.BlockRenderManager).renderFluid(
             pos as net.minecraft.util.math.BlockPos,
             world as net.minecraft.world.BlockRenderView,
             consumer as net.minecraft.client.render.VertexConsumer,
             state,
             fluidState as net.minecraft.fluid.FluidState
         )
+        return true
     }
 
     // Entity API helpers for 1.21.11
@@ -306,8 +351,13 @@ object VersionCompatImpl : VersionCompat {
         (entity as net.minecraft.entity.Entity).setUuid(uuid)
     }
 
+    override fun entitySetPositionAndAngles(entity: Any, x: Double, y: Double, z: Double, yaw: Float, pitch: Float) {
+        (entity as net.minecraft.entity.Entity).refreshPositionAndAngles(x, y, z, yaw, pitch)
+    }
+
     override fun entityRefreshPositionAndAngles(entity: Any) {
-        (entity as net.minecraft.entity.Entity).refreshPositionAndAngles()
+        val e = entity as net.minecraft.entity.Entity
+        e.refreshPositionAndAngles(e.x, e.y, e.z, e.yaw, e.pitch)
     }
 
     override fun entityUpdatePassengerPosition(entity: Any, passenger: Any) {
@@ -319,7 +369,9 @@ object VersionCompatImpl : VersionCompat {
             tag,
             world as net.minecraft.server.world.ServerWorld,
             spawnReason as net.minecraft.entity.SpawnReason,
-            entityProcessor
+            net.minecraft.entity.LoadedEntityProcessor { entity ->
+                entityProcessor(entity) as? net.minecraft.entity.Entity
+            },
         )
     }
 
@@ -364,6 +416,10 @@ object VersionCompatImpl : VersionCompat {
         return state.toString()
     }
 
+    fun rawBlockStateId(state: BlockState): Int {
+        return Block.getRawIdFromState(state)
+    }
+
     // Registry/BlockArgumentParser API helpers for 1.21.11
     override fun worldGetRegistryManager(world: Any): Any {
         return (world as net.minecraft.world.World).registryManager
@@ -371,7 +427,7 @@ object VersionCompatImpl : VersionCompat {
 
     override fun blockArgumentParserBlock(registry: Any, state: String): Any {
         return net.minecraft.command.argument.BlockArgumentParser.block(
-            registry as net.minecraft.registry.RegistryManager,
+            (registry as DynamicRegistryManager).getOrThrow(RegistryKeys.BLOCK),
             state,
             false
         )
@@ -500,9 +556,8 @@ object VersionCompatImpl : VersionCompat {
     }
 
     fun captureEntityData(entity: Entity): NbtCompound? {
-        // 1.21.11 - provide stub implementation
-        // TODO: Implement properly when API is understood
-        return null
+        val output = NbtWriteView.create(ErrorReporter.EMPTY, entity.getEntityWorld().registryManager)
+        return if (entity.saveSelfData(output)) output.nbt else null
     }
 
     fun drawGuiTexture(
@@ -533,12 +588,7 @@ object VersionCompatImpl : VersionCompat {
                 // Fall through
             }
         }
-        // Last resort: try the position() method (might exist in some versions)
-        try {
-            return camera.position()
-        } catch (_: NoSuchMethodException) {
-            throw IllegalStateException("Cannot access camera position")
-        }
+        throw IllegalStateException("Cannot access camera position")
     }
 
     // ItemStack codec helpers for hotbar save/load (1.21.11 uses reflection directly)

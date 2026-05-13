@@ -26,7 +26,7 @@ object LocalEntityDeleteService {
             sourceMax.z + 1.0,
         )
         val seen = linkedSetOf<java.util.UUID>()
-        val dummyEntity = serverWorld.getEntitiesOfClass(Entity::class.java, queryBox).firstOrNull()
+        val dummyEntity = serverWorld.getEntitiesByClass(Entity::class.java, queryBox) { true }.firstOrNull()
         return VersionCompat.INSTANCE.worldGetOtherEntities(serverWorld, dummyEntity ?: return emptyList(), queryBox)
             .asSequence()
             .mapNotNull { it as? Entity }

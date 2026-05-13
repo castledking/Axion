@@ -187,7 +187,7 @@ class NetworkOperationDispatcher(
 
             is ExtrudeOperation -> ExtrudeRequest(
                 origin = operation.origin.toProtocolVector(),
-                direction = (VersionCompat.INSTANCE.directionGetVector(operation.direction) as net.minecraft.core.Vec3i).toProtocolVector(),
+                direction = (VersionCompat.INSTANCE.directionGetVector(operation.direction) as net.minecraft.util.math.Vec3i).toProtocolVector(),
                 expectedState = VersionCompat.INSTANCE.blockStateStringify(operation.sourceState),
                 mode = when (operation.mode) {
                     axion.common.operation.ExtrudeMode.EXTEND -> AxionExtrudeMode.EXTEND
@@ -211,11 +211,11 @@ class NetworkOperationDispatcher(
     }
 }
 
-private fun net.minecraft.core.BlockPos.toProtocolVector(): IntVector3 {
+private fun net.minecraft.util.math.BlockPos.toProtocolVector(): IntVector3 {
     return IntVector3(x, y, z)
 }
 
-private fun net.minecraft.core.Vec3i.toProtocolVector(): IntVector3 {
+private fun net.minecraft.util.math.Vec3i.toProtocolVector(): IntVector3 {
     return IntVector3(x, y, z)
 }
 

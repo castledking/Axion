@@ -1,6 +1,8 @@
 package axion.client.selection
 
 import net.minecraft.client.MinecraftClient
+import net.minecraft.util.hit.BlockHitResult
+import net.minecraft.util.hit.HitResult
 import net.minecraft.world.RaycastContext
 
 object SelectionRaycast {
@@ -23,8 +25,8 @@ object SelectionRaycast {
             ),
         )
 
-        return if (hit.type == net.minecraft.world.phys.HitResult.Type.BLOCK) {
-            AxionTargeting.fromBlockHit(origin, hit as net.minecraft.world.phys.BlockHitResult)
+        return if (isBlockHit(hit)) {
+            AxionTargeting.fromBlockHit(origin, hit as BlockHitResult)
         } else {
             AxionTarget.MissTarget
         }

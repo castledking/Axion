@@ -1,5 +1,6 @@
 package axion.common.model
 
+import axion.common.compat.offset
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Box
 import net.minecraft.util.math.Vec3i

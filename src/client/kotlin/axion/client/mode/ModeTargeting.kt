@@ -20,7 +20,7 @@ object ModeTargeting {
         val player = client.player ?: return null
         val cameraEntity = client.cameraEntity ?: player
         val origin = cameraEntity.getCameraPosVec(1.0f)
-        val vanillaReach = player.blockInteractionRange()
+        val vanillaReach = blockInteractionRangeOf(player)
         val vanillaCrosshair = currentVanillaCrosshairBlock(client)
         val hitResult = if (vanillaCrosshair != null) {
             vanillaCrosshair

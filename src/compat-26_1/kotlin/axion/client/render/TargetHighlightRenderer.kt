@@ -9,7 +9,7 @@ import axion.client.selection.blockPosOrNull
 import axion.client.tool.AxionToolSelectionController
 import net.minecraft.client.MinecraftClient
 import net.minecraft.util.shape.VoxelShapes
-import net.minecraft.util.math.toImmutable
+import axion.client.compat.toImmutable
 
 object TargetHighlightRenderer {
     private const val TARGET_COLOR: Int = 0xFF000000.toInt()

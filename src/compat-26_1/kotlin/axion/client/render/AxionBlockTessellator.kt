@@ -5,16 +5,17 @@ import net.minecraft.world.level.Level
 import net.minecraft.world.level.block.state.BlockState
 
 /**
- * 26.1.2 specific stub implementation of AxionBlockTessellator
- * GPU rendering API has changed significantly in 26.1.2
- * This is a stub to allow compilation - full implementation needed
+ * Legacy tessellator adapter retained for older preview call sites.
+ *
+ * The 26.1.x renderer builds chunked GPU preview sessions directly, so this
+ * adapter reports unsupported instead of attempting immediate-mode tessellation.
  */
 
 object AxionBlockTessellator {
     fun clearCache() {
-        // Stub - rendering implementation needed
     }
 
+    @Suppress("UNUSED_PARAMETER")
     fun tessellateBlock(
         state: BlockState,
         pos: BlockPos,
@@ -27,17 +28,16 @@ object AxionBlockTessellator {
         cameraZ: Double = 0.0,
         scale: Float = 1.0f,
     ): Boolean {
-        // Stub - rendering implementation needed
         return false
     }
 
+    @Suppress("UNUSED_PARAMETER")
     fun tessellateRegion(
         statesByPosition: Map<Long, BlockState>,
         world: Level,
         matrixStack: Any,
         consumer: Any,
     ): Boolean {
-        // Stub - rendering implementation needed
         return false
     }
 }

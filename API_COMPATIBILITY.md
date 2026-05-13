@@ -35,8 +35,8 @@ The `VersionCompat` interface provides a common abstraction for operations that 
 
 | Method | 1.21.5-1.21.7 | 1.21.11 | 26.1.x | Notes |
 |--------|---------------|---------|--------|-------|
-| `blockStateToString(state)` | `BlockArgumentParser.stringifyBlockState(state)` | `BlockArgumentParser.stringifyBlockState(state)` | `state.toString()` | 26.1.x simplified |
-| `stringToBlockState(str)` | `BlockArgumentParser.block(...).blockState()` | `BlockArgumentParser.block(...).blockState()` | `null` (stub) | 26.1.x API changed significantly |
+| `blockStateToString(state)` | `BlockArgumentParser.stringifyBlockState(state)` | `BlockArgumentParser.stringifyBlockState(state)` | `BlockStateParser.serialize(state)` | 26.1.x moved to command block-state parser |
+| `stringToBlockState(str)` | `BlockArgumentParser.block(...).blockState()` | `BlockArgumentParser.block(...).blockState()` | `BlockStateParser.parseForBlock(...).blockState()` | 26.1.x requires a block `HolderLookup` and `StringReader` |
 
 ### API Area: NBT Serialization
 
@@ -83,7 +83,7 @@ The `VersionCompat` interface provides a common abstraction for operations that 
 | `entitySetUuid(entity, uuid)` | `entity.setUuid(uuid)` | `entity.setUuid(uuid)` | `entity.setUUID(uuid)` | 26.1.x renamed |
 | `entityRefreshPositionAndAngles(entity)` | Not implemented | `entity.refreshPositionAndAngles()` | Manual implementation | 26.1.x method removed |
 | `entityUpdatePassengerPosition(entity, passenger)` | Not implemented | `entity.updatePassengerPosition(passenger)` | Manual implementation | 26.1.x method removed |
-| `entityTypeLoadEntityWithPassengers(...)` | Not implemented | `EntityType.loadEntityWithPassengers(...)` | `null` (stub) | 26.1.x API changed |
+| `entityTypeLoadEntityWithPassengers(...)` | Not implemented | `EntityType.loadEntityWithPassengers(...)` | `EntityType.loadEntityRecursive(...)` with `TagValueInput` | 26.1.x API changed |
 | `worldSpawnNewEntityAndPassengers(...)` | Not implemented | `world.spawnNewEntityAndPassengers(entity)` | `world.addFreshEntityWithPassengers(entity)` | 26.1.x renamed |
 | `worldGetOtherEntities(...)` | Not implemented | `world.getOtherEntities(entity, box)` | `world.getEntitiesOfClass(Entity::class, box)` | 26.1.x API changed |
 
@@ -102,14 +102,21 @@ The `VersionCompat` interface provides a common abstraction for operations that 
 | Method | 1.21.5-1.21.7 | 1.21.11 | 26.1.x | Notes |
 |--------|---------------|---------|--------|-------|
 | `directionGetVector(direction)` | Not implemented | `direction.vector` | `Vec3i(d.step().x.toInt(), ...)` | 26.1.x API changed significantly |
-| `blockStateStringify(state)` | Not implemented | `state.toString()` | `state.toString()` | Same |
+| `blockStateStringify(state)` | Not implemented | `state.toString()` | `BlockStateParser.serialize(state)` | 26.1.x must emit command-parseable block-state strings |
 
 ### API Area: Registry/BlockArgumentParser
 
 | Method | 1.21.5-1.21.7 | 1.21.11 | 26.1.x | Notes |
 |--------|---------------|---------|--------|-------|
 | `worldGetRegistryManager(world)` | Not implemented | `world.registryManager` | `world.registryAccess()` | 26.1.x renamed |
-| `blockArgumentParserBlock(registry, state)` | Not implemented | `BlockArgumentParser.block(registry, state, false)` | `Blocks.AIR` (stub) | 26.1.x API changed |
+| `blockArgumentParserBlock(registry, state)` | Not implemented | `BlockArgumentParser.block(registry, state, false)` | `BlockStateParser.parseForBlock(registry, StringReader(state), true)` | 26.1.x parser takes `HolderLookup<Block>` |
+
+#### 26.1.x Block State Parser
+- Class moved from Yarn-style `BlockArgumentParser` usage to official `net.minecraft.commands.arguments.blocks.BlockStateParser`.
+- Serialization must use `BlockStateParser.serialize(state)`. `state.toString()` is not the correct protocol format for round-tripping through command parsing.
+- Parsing uses `BlockStateParser.parseForBlock(holderLookup, StringReader(state), true).blockState()`.
+- Client holder lookup can come from `MinecraftClient.getInstance().level?.registryAccess()?.lookupOrThrow(RegistryKeys.BLOCK)`.
+- `ProtocolBlockStateCodec.decode(...)` delegates to `VersionCompat.INSTANCE.stringToBlockState(...)`, so remote history block changes can decode on 26.1.x.
 
 ## Additional Version-Specific Methods
 
@@ -151,7 +158,26 @@ The `VersionCompat` interface provides a common abstraction for operations that 
 - Using `blitSprite(...)` for that icon renders Minecraft's purple/black missing texture.
 - Fixed in `src/compat-26_1/kotlin/net/minecraft/client/gui/DrawContext.kt` and `src/compat-26_1/kotlin/axion/client/compat/VersionCompatImpl.kt`.
 
-#### GPU Rendering (1.21.11 only)
+#### GPU Rendering (1.21.5)
+- `supportsChunkedPreview()`: Returns `true`
+- `renderChunkedPreview()`: Uses `ChunkedPreviewLifecycle.acquire(...)`
+- 1.21.5 does not expose the newer `DynamicUniforms`/`GpuBufferSlice` API shape used by 1.21.7+.
+- `AxionPreviewBuffer` uses the older enum-style `GpuBuffer` construction and 2-argument indexed draw calls.
+- `AxionPreviewBlockDrawer` sets shader uniforms directly with names such as `ModelViewMat` and `ColorModulator`.
+- Texture binding uses `pass.bindSampler(name, GpuTexture)`, not the later `GpuTextureView`/sampler pair.
+- Multi-draw batching is not used for 1.21.5; the version keeps a manual section draw path with CPU fallback.
+
+#### GPU Rendering (1.21.6 - 1.21.8 / compiled against 1.21.7)
+- `supportsChunkedPreview()`: Returns `true`
+- `renderChunkedPreview()`: Uses `ChunkedPreviewLifecycle.acquire(...)`
+- `AxionPreviewBuffer` persists uploaded `BuiltBuffer` vertex/index data in GPU buffers and reuses dirty section buffers.
+- `DynamicUniforms.write(...)` takes five parameters, including `lineWidth`.
+- Texture binding uses `pass.bindSampler(name, GpuTextureView)`.
+- `drawMultipleIndexedPreview()`: Intentionally returns `false`; 1.21.7 lacks the compatible per-object uniform upload path used by 1.21.11.
+- `AxionPreviewBlockDrawer` uses a manual per-section loop: write dynamic uniforms, set `DynamicTransforms`, draw the section buffer.
+- Build verification: `./build-axion.sh legacy` passes with the chunked GPU preview path enabled.
+
+#### GPU Rendering (1.21.11)
 - `supportsChunkedPreview()`: Returns `true`
 - `renderChunkedPreview()`: Full implementation using `ChunkedPreviewLifecycle`
 - `drawMultipleIndexedPreview()`: Full implementation with `RenderPass.RenderObject`
@@ -183,6 +209,12 @@ The `VersionCompat` interface provides a common abstraction for operations that 
 - Move-source glass overlays now force the chunked GPU preview path via `BlockPreviewPipeline.OverlayScene.forceChunked`.
 - `PlacementPreviewRenderer` should set `forceChunked = true` for move-source overlays.
 - Large overlays still use the same textured block preview route, so the glass overlay depends on the 26.1.x block atlas texture binding described above.
+- Preview cache invalidation for 26.1.x is routed through `ChunkedPreviewLifecycle.closeAll()` so disconnect/reload paths release active GPU buffers.
+
+#### 26.1.x Entity Serialization
+- Entity capture uses `TagValueOutput.createWithContext(ProblemReporter.DISCARDING, entity.level().registryAccess())` and `entity.save(output)`.
+- Entity recreation uses `TagValueInput.create(...)` plus `EntityType.loadEntityRecursive(...)` with an `EntityProcessor`.
+- This restores local singleplayer entity clone/stack behavior when Copy Entities is enabled.
 
 ## Mixin Injection Points
 
@@ -214,6 +246,7 @@ Located in `src/compat-26_1/kotlin/net/minecraft/util/math/Aliases.kt` and `src/
 - `ORIGIN`: Constant for `BlockPos(0, 0, 0)` (replaces `BlockPos.ORIGIN`)
 
 **Reason:** Kotlin typealias limitations prevent companion object method bridging, so top-level functions are used instead.
+The 26.1 alias surface is intentionally kept compact: prefer typealiases in `net.minecraft.*` shims and place helper/extension behavior in `axion.client.compat`.
 
 ## Known Issues and TODO
 
@@ -227,14 +260,12 @@ Located in `src/compat-26_1/kotlin/net/minecraft/util/math/Aliases.kt` and `src/
 - **Remaining Risk:** Fabric dedicated server support for 26.1.x is still planned work, and several older compatibility stubs remain outside the client preview path.
 
 ### 26.1.x BlockState Parsing
-- **Status:** Stubbed
-- **Issue:** `BlockArgumentParser.block()` API changed significantly
-- **Workaround:** Returns `null` for now
+- **Status:** Implemented for the Fabric client.
+- **Remaining Risk:** Server-side Fabric 26.1.x support is still planned, but its operation service already uses the same `BlockStateParser.parseForBlock(...)` API shape.
 
 ### 26.1.x Entity Loading
-- **Status:** Partially implemented
-- **Issue:** `entityTypeLoadEntityWithPassengers()` API changed
-- **Workaround:** Returns `null` for now
+- **Status:** Implemented for Fabric client singleplayer clone/stack operations
+- **Remaining Risk:** Dedicated Fabric server support for 26.1.x is still planned work
 
 ## Paper Plugin Compatibility
 

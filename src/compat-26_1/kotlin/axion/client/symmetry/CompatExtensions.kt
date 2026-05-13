@@ -1,6 +1,7 @@
 package axion.client.symmetry
 
 import net.minecraft.client.Minecraft
+import net.minecraft.world.level.block.Block
 import net.minecraft.core.Direction
 import net.minecraft.core.Vec3i
 import net.minecraft.world.InteractionHand
@@ -24,6 +25,9 @@ val Direction.offsetZ: Int get() = stepZ
 val Entity.rotationVecClient: Vec3 get() = getViewVector(1.0f)
 
 fun directionGetFacing(vec: Vec3): Direction = Direction.getApproximateNearest(vec)
+
+val Block.defaultState: BlockState
+    get() = defaultBlockState()
 
 fun Player.sendMessage(message: net.minecraft.network.chat.Component, actionBar: Boolean) {
     if (actionBar) (this as? net.minecraft.client.player.LocalPlayer)?.sendOverlayMessage(message) ?: sendSystemMessage(message)

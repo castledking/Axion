@@ -8,7 +8,7 @@ import net.minecraft.client.MinecraftClient
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Box
 import net.minecraft.util.math.Vec3d
-import net.minecraft.util.math.add
+import axion.client.compat.add
 
 object GhostBlockPreviewRenderer {
     private const val MAX_GHOST_BLOCKS: Int = 65536

@@ -9,7 +9,7 @@ import axion.common.operation.SmearRegionOperation
 import axion.common.operation.StackRegionOperation
 import axion.client.tool.directionGetFacing
 import axion.client.tool.floorMod
-import axion.client.hotbar.blockPosIterate
+import axion.client.compat.blockPosIterate
 import axion.client.compat.add
 import axion.client.compat.toImmutable
 import axion.client.compat.ORIGIN
