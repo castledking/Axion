@@ -471,7 +471,7 @@ object ClientModeController {
             // Check if item has a use action (food, potions, shields, etc.)
             // Items with maxUseTime > 0 are usable (food, potions, shields, bows, etc.)
             // player is non-null transitively: item != null implies heldStack != null implies player != null.
-            if (item.getMaxUseTime(heldStack, player!!) > 0) {
+            if (item.getMaxUseTime(heldStack, player) > 0) {
                 // Let vanilla handle items with right-click actions (potions, shields, etc.)
                 return false
             }

@@ -1,5 +1,6 @@
 package axion.client.mode
 
+import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.entity.Entity
 import java.lang.reflect.Method
 
@@ -22,15 +23,38 @@ object EntityNoClipSupport {
             Double::class.javaPrimitiveType,
             Double::class.javaPrimitiveType,
         )
-        sequenceOf("setPos", "setPosition")
-            .mapNotNull { name ->
-                try {
-                    entityClass.getMethod(name, *parameters)
-                } catch (_: NoSuchMethodException) {
-                    null
-                }
+
+        // Build candidate list:
+        //  * Compile-time names (work in IDE dev environments where the
+        //    runtime namespace matches the dev namespace).
+        //  * Intermediary name (production 1.21.x runtime is intermediary).
+        //  * MappingResolver: translate the compile-time named symbol to
+        //    whatever the current runtime namespace actually uses.
+        // The first reflection lookup that succeeds wins.
+        val candidates = linkedSetOf(
+            "setPos",         // Mojang official (26.1 dev + production)
+            "setPosition",    // Yarn (1.21.x dev)
+            "method_5814",    // Intermediary (1.21.x production)
+        )
+
+        runCatching {
+            val resolver = FabricLoader.getInstance().mappingResolver
+            listOf(
+                "net.minecraft.world.entity.Entity" to "setPos",
+                "net.minecraft.entity.Entity" to "setPosition",
+            ).forEach { (className, methodName) ->
+                resolver.mapMethodName("named", className, methodName, "(DDD)V")
+                    ?.let(candidates::add)
             }
-            .firstOrNull()
+        }
+
+        candidates.firstNotNullOfOrNull { name ->
+            try {
+                entityClass.getMethod(name, *parameters)
+            } catch (_: NoSuchMethodException) {
+                null
+            }
+        }
     }
 
     private val collisionFieldNames = listOf(
