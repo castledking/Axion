@@ -143,16 +143,13 @@ sourceSets.named("client") {
         kotlin.exclude("axion/client/render/gpu/ChunkedPreviewSession.kt")
         kotlin.exclude("axion/client/render/gpu/ChunkedStateMap.kt")
         kotlin.exclude("axion/client/render/gpu/SectionDrawList.kt")
-    } else if (exactMc1216) {
-        kotlin.srcDir("src/compat-1_21_6/kotlin")
-    } else if (exactMc1217) {
-        kotlin.srcDir("src/compat-1_21_7/kotlin")
-    } else if (exactMc1218) {
-        kotlin.srcDir("src/compat-1_21_8/kotlin")
-    } else if (exactMc1219) {
-        kotlin.srcDir("src/compat-1_21_9/kotlin")
-    } else if (exactMc12110) {
-        kotlin.srcDir("src/compat-1_21_10/kotlin")
+    } else if (exactMc1216 || exactMc1217 || exactMc1218) {
+        // 1.21.6, 1.21.7, 1.21.8 are byte-identical at the source level —
+        // single shared compat folder, separate builds per MC version.
+        kotlin.srcDir("src/compat-1_21_6_8/kotlin")
+    } else if (exactMc1219 || exactMc12110) {
+        // 1.21.9 and 1.21.10 are byte-identical at the source level.
+        kotlin.srcDir("src/compat-1_21_9_10/kotlin")
     } else if (rangeMc261x) {
         // 26.1.x Fabric builds in the official namespace and uses the
         // compatibility aliases in src/compat-26_1.
