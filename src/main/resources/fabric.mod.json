@@ -33,11 +33,11 @@
     "axion.client.mixins.json"
   ],
   "depends": {
-    "fabricloader": ">=${loader_version}",
+    "fabricloader": "${loader_version_range}",
     "minecraft": "${minecraft_version_range}",
     "java": ">=${java_target_version}",
-    "fabric-api": "*",
-    "fabric-language-kotlin": ">=${fabric_kotlin_version}"
+    "fabric-api": "${fabric_api_version_range}",
+    "fabric-language-kotlin": "${fabric_kotlin_version_range}"
   },
   "suggests": {
     "modmenu": "*"

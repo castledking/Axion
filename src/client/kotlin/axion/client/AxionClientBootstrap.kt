@@ -22,15 +22,23 @@ object AxionClientBootstrap {
     private val failedRenderers = linkedSetOf<String>()
 
     fun initialize() {
+        logger.info("[Axion/Bootstrap] Client init starting")
         VersionCompatInit.init()
+        logger.info("[Axion/Bootstrap] Version compat initialized")
         AxionClientConfig.initialize()
+        logger.info("[Axion/Bootstrap] Client config initialized")
         AxionServerConnection.initialize()
+        logger.info("[Axion/Bootstrap] Server connection initialized")
         AxionKeybindings.register()
+        logger.info("[Axion/Bootstrap] Keybindings registered")
         VersionCompatImpl.registerHudElements(hudId, hintHudId, AxionHotbarHud::render, AxionToolHintHud::render)
+        logger.info("[Axion/Bootstrap] HUD elements registered")
         ClientTickEvents.END_CLIENT_TICK.register(AxionTickHandler::onEndTick)
+        logger.info("[Axion/Bootstrap] Client tick handler registered")
 
         // Register renderers directly
         registerRenderers()
+        logger.info("[Axion/Bootstrap] Client init complete")
     }
 
     private fun registerRenderers() {

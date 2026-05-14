@@ -16,6 +16,7 @@ import com.mojang.blaze3d.buffers.GpuBufferSlice
 import com.mojang.blaze3d.systems.RenderPass
 import com.mojang.blaze3d.vertex.VertexFormat
 import com.mojang.blaze3d.textures.GpuTextureView
+import io.netty.buffer.Unpooled
 import net.minecraft.block.Block
 import net.minecraft.block.BlockState
 import net.minecraft.client.MinecraftClient
@@ -528,9 +529,11 @@ object VersionCompatImpl : VersionCompat {
         if (drawList.isEmpty()) return false
         return try {
             doDrawMultipleIndexed(pass, drawList, uniformSlices)
-        } catch (_: NoClassDefFoundError) {
-            // RenderPass.RenderObject doesn't exist on 1.21.9/1.21.10 — fall back to manual loop
-            logger.info("[Axion GPU] drawMultipleIndexed not available (missing RenderObject class), using per-section draw loop")
+        } catch (_: LinkageError) {
+            logger.info("[Axion GPU] drawMultipleIndexed not available (API mismatch), using per-section draw loop")
+            false
+        } catch (e: Exception) {
+            logger.warn("[Axion GPU] drawMultipleIndexed failed at runtime, using per-section draw loop", e)
             false
         }
     }
@@ -766,31 +769,31 @@ object VersionCompatImpl : VersionCompat {
     }
 
     fun getCameraPos(camera: Camera): Vec3d {
-        // Try mixin accessor (correctly remapped)
-        try {
-            return (camera as axion.mixin.client.CameraAccessor).axionGetPos()
-        } catch (_: Throwable) {}
-
-        // Try method reflection
         cameraPosMethod?.let { m ->
             try { return m.invoke(camera) as Vec3d } catch (_: Exception) {}
         }
 
-        // Try field reflection
         cameraPosField?.let { f ->
             try { return f.get(camera) as Vec3d } catch (_: Exception) {}
         }
 
-        throw IllegalStateException("Cannot access camera position — no accessor, method, or field found on Camera class")
+        throw IllegalStateException("Cannot access camera position — no method or field found on Camera class")
     }
 
     // ItemStack codec helpers for hotbar save/load (1.21.11 uses reflection directly)
     override fun itemStackEncode(registryManager: Any, stack: Any): ByteArray? {
-        return null // Not used in 1.21.11, SavedHotbarController uses its own reflection
+        return runCatching {
+            val buf = RegistryByteBuf(Unpooled.buffer(), registryManager as DynamicRegistryManager)
+            ItemStack.PACKET_CODEC.encode(buf, stack as ItemStack)
+            ByteArray(buf.readableBytes()).also { buf.getBytes(0, it) }
+        }.getOrNull()
     }
 
     override fun itemStackDecode(registryManager: Any, bytes: ByteArray): Any? {
-        return null // Not used in 1.21.11, SavedHotbarController uses its own reflection
+        return runCatching {
+            val buf = RegistryByteBuf(Unpooled.wrappedBuffer(bytes), registryManager as DynamicRegistryManager)
+            ItemStack.PACKET_CODEC.decode(buf)
+        }.getOrNull()
     }
 
     override fun createAxionPluginPayloadCodec(): Any {

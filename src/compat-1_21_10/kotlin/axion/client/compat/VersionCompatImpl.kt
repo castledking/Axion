@@ -16,6 +16,7 @@ import com.mojang.blaze3d.buffers.GpuBufferSlice
 import com.mojang.blaze3d.systems.RenderPass
 import com.mojang.blaze3d.vertex.VertexFormat
 import com.mojang.blaze3d.textures.GpuTextureView
+import io.netty.buffer.Unpooled
 import net.minecraft.block.Block
 import net.minecraft.block.BlockState
 import net.minecraft.client.MinecraftClient
@@ -786,11 +787,18 @@ object VersionCompatImpl : VersionCompat {
 
     // ItemStack codec helpers for hotbar save/load (1.21.11 uses reflection directly)
     override fun itemStackEncode(registryManager: Any, stack: Any): ByteArray? {
-        return null // Not used in 1.21.11, SavedHotbarController uses its own reflection
+        return runCatching {
+            val buf = RegistryByteBuf(Unpooled.buffer(), registryManager as DynamicRegistryManager)
+            ItemStack.PACKET_CODEC.encode(buf, stack as ItemStack)
+            ByteArray(buf.readableBytes()).also { buf.getBytes(0, it) }
+        }.getOrNull()
     }
 
     override fun itemStackDecode(registryManager: Any, bytes: ByteArray): Any? {
-        return null // Not used in 1.21.11, SavedHotbarController uses its own reflection
+        return runCatching {
+            val buf = RegistryByteBuf(Unpooled.wrappedBuffer(bytes), registryManager as DynamicRegistryManager)
+            ItemStack.PACKET_CODEC.decode(buf)
+        }.getOrNull()
     }
 
     override fun createAxionPluginPayloadCodec(): Any {

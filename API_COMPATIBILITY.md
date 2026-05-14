@@ -152,6 +152,13 @@ The `VersionCompat` interface provides a common abstraction for operations that 
 - **1.21.11**: `context.drawTexture(RenderPipelines.GUI_TEXTURED, texture, x, y, 0.0f, 0.0f, width, height, width, height)`
 - **26.1.x**: `context.delegate.blit(RenderPipelines.GUI_TEXTURED, texture, x, y, 0.0f, 0.0f, width, height, width, height)` - use raw texture blitting for `assets/.../textures/...` resources
 
+#### HUD Matrix Stack / GUI Transform Compatibility
+- **1.21.5**: `DrawContext.matrices` exposes the older matrix stack API with `push()`, `pop()`, and three-argument `translate(...)`.
+- **1.21.6 - 1.21.8**: `DrawContext.matrices` can expose JOML's 2D GUI stack API with `pushMatrix()`, `popMatrix()`, and two-argument `translate(Float, Float)`.
+- **1.21.9 - 1.21.11**: Keep HUD code compatible with both matrix shapes; common HUD code should not directly assume only `push()`/`pop()`.
+- **26.1.x**: `net.minecraft.client.gui.DrawContext` is an Axion shim over `GuiGraphicsExtractor`; its `matrices` property returns a small adapter that maps common HUD calls to the 26.1.x `Matrix3x2fStack`.
+- `AxionHotbarHud` uses local matrix helpers (`pushMatrices`, `popMatrices`, `translateMatrices`) so saved-hotbar overlay z ordering compiles across both the old `PoseStack`-style API and the newer 2D JOML stack.
+
 #### Camera Position
 - **1.21.5-1.21.7**: `camera.pos`
 - **1.21.11**: Reflection-based fallback to `camera.pos` or `camera.position()`
@@ -181,6 +188,7 @@ The `VersionCompat` interface provides a common abstraction for operations that 
 - `drawMultipleIndexedPreview()`: Intentionally returns `false`; 1.21.7 lacks the compatible per-object uniform upload path used by 1.21.11.
 - `AxionPreviewBlockDrawer` uses a manual per-section loop: write dynamic uniforms, set `DynamicTransforms`, draw the section buffer.
 - Build verification: `./build-axion.sh legacy` passes with the chunked GPU preview path enabled.
+- Build verification: `./build-axion.sh all` passes after adding common HUD matrix compatibility for the 1.21.6 - 1.21.8 range.
 
 #### GPU Rendering (1.21.9 - 1.21.11, compiled against 1.21.11)
 - `supportsChunkedPreview()`: Returns `true` when at least one texture-binding method is detected
@@ -216,6 +224,7 @@ The `VersionCompat` interface provides a common abstraction for operations that 
 - `PlacementPreviewRenderer` should set `forceChunked = true` for move-source overlays.
 - Large overlays still use the same textured block preview route, so the glass overlay depends on the 26.1.x block atlas texture binding described above.
 - Preview cache invalidation for 26.1.x is routed through `ChunkedPreviewLifecycle.closeAll()` so disconnect/reload paths release active GPU buffers.
+- The 26.1.x `DrawContext` shim includes a `MatrixStackAdapter` for HUD overlays because `GuiGraphicsExtractor.pose()` returns `Matrix3x2fStack`, not the older 3D matrix stack.
 
 #### 26.1.x Entity Serialization
 - Entity capture uses `TagValueOutput.createWithContext(ProblemReporter.DISCARDING, entity.level().registryAccess())` and `entity.save(output)`.
@@ -263,6 +272,7 @@ The 26.1 alias surface is intentionally kept compact: prefer typealiases in `net
   - Use `RenderSystem.getModelViewMatrix()` in 26.1.x GPU preview draw code to avoid world-space offset/camera culling issues.
   - Use `BlockAndTintGetter` implementations that return air outside preview state maps and brightness `15`.
   - Force large move-source glass overlays through the chunked GPU path.
+  - GUI/HUD transforms are 2D `Matrix3x2fStack`-based; expose adapter methods in shims rather than leaking official 26.1.x GUI types into common HUD code.
 - **Remaining Risk:** Fabric dedicated server support for 26.1.x is still planned work, and several older compatibility stubs remain outside the client preview path.
 
 ### 26.1.x BlockState Parsing

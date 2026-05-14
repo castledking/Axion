@@ -1,5 +1,6 @@
 package axion.client.render
 
+import axion.client.render.gpu.ChunkedPreviewLifecycle
 import net.fabricmc.fabric.api.event.Event
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.render.Immediate
@@ -118,6 +119,8 @@ object WorldRenderCompat {
         val context = AxionWorldRenderContext(consumers, matrices)
         endMainCallbacks.forEach { it(context) }
         beforeDebugRenderCallbacks.forEach { it(context) }
+        // Flush deferred draws with no parameters - use internal defaults
+        ChunkedPreviewLifecycle.flushDeferredDraws()
         consumers.draw()
     }
 
@@ -138,6 +141,8 @@ object WorldRenderCompat {
                     for (cb in endMainCallbacks) cb(ctx)
                 }
                 for (cb in beforeDebugRenderCallbacks) cb(ctx)
+                // Flush deferred draws with no parameters - use internal defaults
+                ChunkedPreviewLifecycle.flushDeferredDraws()
                 ctx.drawConsumers()
             }
             if (registered) {
@@ -154,6 +159,8 @@ object WorldRenderCompat {
             val ctx = AxionWorldRenderContext(rawContext)
             try {
                 for (cb in endMainCallbacks) cb(ctx)
+                // Flush deferred draws with no parameters - use internal defaults
+                ChunkedPreviewLifecycle.flushDeferredDraws()
                 ctx.drawConsumers()
             } catch (e: Throwable) {
                 logger.error("[Axion/Render] END_MAIN dispatch error", e)

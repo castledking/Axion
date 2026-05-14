@@ -71,7 +71,7 @@ object AxionPreviewBlockDrawer {
      * large previews: looking away should produce an empty draw list instead
      * of still submitting every cached section.
      */
-    private const val USE_SECTION_FRUSTUM_CULLING: Boolean = true
+    private const val USE_SECTION_FRUSTUM_CULLING: Boolean = false
 
     /**
      * Force all sections to draw at a fixed camera-relative offset (0, 0, -8)
@@ -131,6 +131,8 @@ object AxionPreviewBlockDrawer {
                 cullingModelView,
                 projectionMatrix,
             )
+            // Flush any deferred draws immediately after drawing
+            ChunkedPreviewLifecycle.flushDeferredDraws(cullingModelView, projectionMatrix)
             if (result == ChunkedDrawResult.DREW && !loggedFirstSuccess) {
                 loggedFirstSuccess = true
                 logger.info(
@@ -186,7 +188,7 @@ object AxionPreviewBlockDrawer {
         val frameStartNs = if (DEBUG_LOG) System.nanoTime() else 0L
 
         // --- Phase 1: build the draw list ----------------------------------
-        val useSectionFrustumCulling = USE_SECTION_FRUSTUM_CULLING && !USE_CUSTOM_PREVIEW_PIPELINE
+        val useSectionFrustumCulling = USE_SECTION_FRUSTUM_CULLING
         val drawList = if (useSectionFrustumCulling) {
             val proj = Matrix4f(projectionMatrix ?: client.gameRenderer?.getBasicProjectionMatrix(1.0f) ?: Matrix4f())
             val frustum = Frustum(Matrix4f(cullingModelView ?: baseMv), proj)

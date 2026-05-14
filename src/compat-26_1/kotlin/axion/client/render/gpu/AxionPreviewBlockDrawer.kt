@@ -124,7 +124,7 @@ object AxionPreviewBlockDrawer {
             OptionalDouble.empty(),
         )
         try {
-            val renderLayer = RenderLayerCompat.blockTranslucentCull()
+            val renderLayer = RenderLayerCompat.translucentMovingBlock()
             pass.setPipeline(VersionCompatImpl.getRenderPipeline(renderLayer))
             RenderSystem.bindDefaultUniforms(pass)
 

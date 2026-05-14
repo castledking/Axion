@@ -8,6 +8,7 @@ import axion.client.selection.SelectionController
 import axion.client.selection.blockPosOrNull
 import axion.client.tool.AxionToolSelectionController
 import net.minecraft.client.MinecraftClient
+import net.minecraft.client.render.RenderLayer
 import net.minecraft.util.shape.VoxelShapes
 
 object TargetHighlightRenderer {
@@ -20,7 +21,13 @@ object TargetHighlightRenderer {
         val camera = client.gameRenderer.camera ?: return
         val cameraPos = CameraAccess.getPos(camera)
         val consumers = context.consumers()
-        val consumer = consumers.getBuffer(RenderLayerCompat.lines())
+        val renderLayer = try {
+            RenderLayerCompat.lines()
+        } catch (e: Exception) {
+            // Silently skip rendering if RenderLayerCompat fails
+            return
+        }
+        val consumer = consumers.getBuffer(renderLayer)
         val matrixStack = context.matrices()
         val box = SelectionBounds.outlineBox(SelectionBounds.blockBox(blockPos))
 

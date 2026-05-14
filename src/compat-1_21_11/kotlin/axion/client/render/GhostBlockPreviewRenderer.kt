@@ -55,6 +55,7 @@ object GhostBlockPreviewRenderer {
         scale: Float = 1.0f,
         sessionTag: String = "default",
         forceChunked: Boolean = false,
+        allowChunked: Boolean = true,
     ) {
         if (origins.isEmpty()) {
             return
@@ -78,7 +79,7 @@ object GhostBlockPreviewRenderer {
         // shares one slot for "the active textured ghost preview".
         if (textured) {
             val totalCells = allOccupiedCells.size.toLong() * origins.size.toLong()
-            if (forceChunked || FORCE_CHUNKED_PREVIEW || totalCells > CHUNKED_PATH_CELL_THRESHOLD) {
+            if (allowChunked && (forceChunked || FORCE_CHUNKED_PREVIEW || totalCells > CHUNKED_PATH_CELL_THRESHOLD)) {
                 val handled = VersionCompatImpl.renderChunkedPreview("ghost:$sessionTag", context, clipboard, origins, color, alpha)
                 if (DEBUG_LOG) {
                     val now = System.currentTimeMillis()
@@ -119,7 +120,11 @@ object GhostBlockPreviewRenderer {
         val world = client.world ?: return
         val camera = client.gameRenderer.camera ?: return
         val consumers = context.consumers()
-        val fillLayer = RenderLayerCompat.debugQuads()
+        val fillLayer = try {
+            RenderLayerCompat.debugQuads()
+        } catch (e: Exception) {
+            return
+        }
         val consumer = consumers.getBuffer(fillLayer)
         val cameraPos = CameraAccess.getPos(camera)
         val matrixStack = context.matrices()
@@ -168,7 +173,11 @@ object GhostBlockPreviewRenderer {
         val world = client.world ?: return
         val camera = client.gameRenderer.camera ?: return
         val consumers = context.consumers()
-        val fillLayer = RenderLayerCompat.debugQuads()
+        val fillLayer = try {
+            RenderLayerCompat.debugQuads()
+        } catch (e: Exception) {
+            return
+        }
         val consumer = consumers.getBuffer(fillLayer)
         val cameraPos = CameraAccess.getPos(camera)
         val matrixStack = context.matrices()
@@ -210,8 +219,13 @@ object GhostBlockPreviewRenderer {
 
         if (cachedMesh != null && cachedMesh.blocks.isNotEmpty()) {
             val previewView = AxionBlockTessellator.TemplateBlockRenderView(world, cachedMesh.statesByPosition)
+            val renderLayer = try {
+                RenderLayerCompat.blockTranslucentCull()
+            } catch (e: Exception) {
+                return
+            }
             val consumer = TintedAlphaVertexConsumer(
-                context.consumers().getBuffer(RenderLayerCompat.blockTranslucentCull()),
+                context.consumers().getBuffer(renderLayer),
                 alphaScale,
                 color,
             )
@@ -280,8 +294,13 @@ object GhostBlockPreviewRenderer {
 
         if (cachedMesh.blocks.isNotEmpty()) {
             val previewView = AxionBlockTessellator.TemplateBlockRenderView(world, cachedMesh.statesByPosition)
+            val renderLayer = try {
+                RenderLayerCompat.blockTranslucentCull()
+            } catch (e: Exception) {
+                return
+            }
             val consumer = TintedAlphaVertexConsumer(
-                context.consumers().getBuffer(RenderLayerCompat.blockTranslucentCull()),
+                context.consumers().getBuffer(renderLayer),
                 alphaScale,
                 color,
             )

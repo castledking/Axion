@@ -94,7 +94,7 @@ object AxionPreviewBlockDrawer {
         val camera = client.gameRenderer?.camera ?: return ChunkedDrawResult.FAILED
         val cameraPos = cameraPosOverride ?: CameraAccess.getPos(camera)
 
-        val baseMv = Matrix4f(RenderSystem.getModelViewMatrix())
+        val baseMv = Matrix4f(baseModelView ?: RenderSystem.getModelViewMatrix())
 
         val drawList = SectionDrawList.buildAll(sectionBuffers)
         if (drawList.isEmpty()) return ChunkedDrawResult.NO_BUFFERS

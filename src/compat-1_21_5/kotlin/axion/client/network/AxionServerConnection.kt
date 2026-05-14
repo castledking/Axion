@@ -16,8 +16,11 @@ import axion.protocol.ServerHello
 import axion.protocol.UndoRequest
 import net.minecraft.client.MinecraftClient
 import net.minecraft.util.Formatting
+import org.slf4j.LoggerFactory
 
 object AxionServerConnection {
+    private val logger = LoggerFactory.getLogger(AxionServerConnection::class.java)
+
     sealed interface State {
         data object Disconnected : State
         data object AwaitingHello : State
@@ -36,11 +39,16 @@ object AxionServerConnection {
     private var lastSentNoClipArmed: Boolean? = null
 
     fun initialize() {
+        logger.info("[Axion/Network] Registering payload channel")
         VersionCompatImpl.registerAxionPayloadChannel(AxionPluginPayload.ID, AxionPluginPayload.CODEC)
+        logger.info("[Axion/Network] Payload channel registered")
+        logger.info("[Axion/Network] Registering payload receiver")
         VersionCompatImpl.registerAxionReceiver(AxionPluginPayload.ID) { payload ->
             AxionServerMessageAssembler.consume(payload.bytes)?.let(::handleServerMessage)
         }
+        logger.info("[Axion/Network] Payload receiver registered")
 
+        logger.info("[Axion/Network] Registering play join handler")
         VersionCompatImpl.onPlayJoin { client, _ ->
             if (VersionCompatImpl.hasLocalServer(client)) {
                 state = State.Disconnected
@@ -59,7 +67,9 @@ object AxionServerConnection {
                 ),
             )
         }
+        logger.info("[Axion/Network] Play join handler registered")
 
+        logger.info("[Axion/Network] Registering play disconnect handler")
         VersionCompatImpl.onPlayDisconnect { client ->
             state = State.Disconnected
             lastStatusMessage = null
@@ -71,6 +81,7 @@ object AxionServerConnection {
             axion.client.render.AxionPreviewTemplateCache.invalidate()
             VersionCompatImpl.runOnRenderThread(client) { }
         }
+        logger.info("[Axion/Network] Play disconnect handler registered")
     }
 
     fun state(): State = state

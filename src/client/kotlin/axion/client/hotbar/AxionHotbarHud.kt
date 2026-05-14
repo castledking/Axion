@@ -132,34 +132,66 @@ object AxionHotbarHud {
         context: DrawContext,
         client: MinecraftClient,
     ) {
-        val page = SavedHotbarController.selectedPage()
-        val displayRows = SavedHotbarController.displayHotbarsForSelectedPage(client)
-        val rowBounds = AxionHudLayout.savedHotbarRows(context.scaledWindowWidth, context.scaledWindowHeight, page)
+        val matrices = context.matrices
+        pushMatrices(matrices)
+        translateMatrices(matrices, 0.0, 0.0, 200.0)
+        try {
+            val page = SavedHotbarController.selectedPage()
+            val displayRows = SavedHotbarController.displayHotbarsForSelectedPage(client)
+            val rowBounds = AxionHudLayout.savedHotbarRows(context.scaledWindowWidth, context.scaledWindowHeight, page)
 
-        rowBounds.zip(displayRows).forEach { (bounds, display) ->
-            val borderColor = when {
-                display.selected -> BORDER_SELECTED
-                display.active -> TEXT_IDLE
-                else -> BORDER_NEUTRAL
+            rowBounds.zip(displayRows).forEach { (bounds, display) ->
+                val borderColor = when {
+                    display.selected -> BORDER_SELECTED
+                    display.active -> TEXT_IDLE
+                    else -> BORDER_NEUTRAL
+                }
+
+                context.fill(bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + bounds.height, OUTER_BACKGROUND)
+                context.fill(bounds.x + 1, bounds.y + 1, bounds.x + bounds.width - 1, bounds.y + bounds.height - 1, INNER_BACKGROUND)
+                renderSavedHotbarItems(context, bounds.x + 1, bounds.y + 1, display.stacks)
+                context.drawStrokedRectangleCompat(bounds.x, bounds.y, bounds.width, bounds.height, borderColor)
             }
 
-            context.fill(bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + bounds.height, OUTER_BACKGROUND)
-            context.fill(bounds.x + 1, bounds.y + 1, bounds.x + bounds.width - 1, bounds.y + bounds.height - 1, INNER_BACKGROUND)
-            renderSavedHotbarItems(context, bounds.x + 1, bounds.y + 1, display.stacks)
-            context.drawStrokedRectangleCompat(bounds.x, bounds.y, bounds.width, bounds.height, borderColor)
+            val topBounds = rowBounds.last()
+            context.drawTextWithShadow(
+                client.textRenderer,
+                "Page ${page + 1}",
+                topBounds.x + topBounds.width + 8,
+                topBounds.y + 2,
+                TEXT_SELECTED,
+            )
+            renderSavedHotbarPageButtons(context, client, page)
+            renderFlyingSpeedSlider(context, client, page)
+            renderToolboxButton(context, client)
+        } finally {
+            popMatrices(matrices)
         }
+    }
 
-        val topBounds = rowBounds.last()
-        context.drawTextWithShadow(
-            client.textRenderer,
-            "Page ${page + 1}",
-            topBounds.x + topBounds.width + 8,
-            topBounds.y + 2,
-            TEXT_SELECTED,
-        )
-        renderSavedHotbarPageButtons(context, client, page)
-        renderFlyingSpeedSlider(context, client, page)
-        renderToolboxButton(context, client)
+    private fun pushMatrices(matrices: Any) {
+        invokeNoArg(matrices, "push") ?: invokeNoArg(matrices, "pushMatrix")
+    }
+
+    private fun popMatrices(matrices: Any) {
+        invokeNoArg(matrices, "pop") ?: invokeNoArg(matrices, "popMatrix")
+    }
+
+    private fun translateMatrices(matrices: Any, x: Double, y: Double, z: Double) {
+        matrices.javaClass.methods.firstOrNull {
+            it.name == "translate" && it.parameterCount == 3 &&
+                it.parameterTypes[0] == Double::class.javaPrimitiveType &&
+                it.parameterTypes[1] == Double::class.javaPrimitiveType &&
+                it.parameterTypes[2] == Double::class.javaPrimitiveType
+        }?.invoke(matrices, x, y, z) ?: matrices.javaClass.methods.firstOrNull {
+            it.name == "translate" && it.parameterCount == 2 &&
+                it.parameterTypes[0] == Float::class.javaPrimitiveType &&
+                it.parameterTypes[1] == Float::class.javaPrimitiveType
+        }?.invoke(matrices, x.toFloat(), y.toFloat())
+    }
+
+    private fun invokeNoArg(target: Any, name: String): Any? {
+        return target.javaClass.methods.firstOrNull { it.name == name && it.parameterCount == 0 }?.invoke(target)
     }
 
     private fun renderFlyingSpeedSlider(

@@ -59,6 +59,15 @@ val minecraftVersionRange = (findProperty("axion_minecraft_version_range") as St
     rangeMc261x -> ">=26.1 <=26.1.2"
     else -> ">=1.21.5"
 }
+val loaderVersionRange = when {
+    else -> ">=${project.property("loader_version")}"
+}
+val fabricApiVersionRange = when {
+    else -> "*"
+}
+val fabricKotlinVersionRange = when {
+    else -> ">=${project.property("fabric_kotlin_version")}"
+}
 val fabricServerEntrypoint = if (supportsFabricDedicatedServer) {
     "axion.server.fabric.AxionFabricServerMod"
 } else {
@@ -91,6 +100,17 @@ extensions.configure<LoomGradleExtensionAPI>("loom") {
         named("client") {
             configName = "Axion Client"
             runDir = (findProperty("axion_run_dir") as String?) ?: "run"
+            
+            // Quickplay support
+            val mcServer = findProperty("mc_server") as String?
+            val mcWorld = findProperty("mc_world") as String?
+            
+            if (mcServer != null) {
+                programArgs("--server", mcServer)
+            }
+            if (mcWorld != null) {
+                programArgs("--world", mcWorld)
+            }
         }
     }
 }
@@ -112,6 +132,17 @@ if (needsLegacyWorldRenderStateStub) {
 sourceSets.named("client") {
     if (rangeMc1215) {
         kotlin.srcDir("src/compat-1_21_5/kotlin")
+        // 1.21.5 stays on the CPU preview path. Do not ship dormant GPU
+        // uploader/drawer classes that touch RenderSystem.getDevice().
+        kotlin.exclude("axion/client/render/AxionPreviewBuffer.kt")
+        kotlin.exclude("axion/client/render/gpu/AxionPreviewBlockDrawer.kt")
+        kotlin.exclude("axion/client/render/gpu/ChunkMeshTessellator.kt")
+        kotlin.exclude("axion/client/render/gpu/ChunkPreviewMeshCache.kt")
+        kotlin.exclude("axion/client/render/gpu/ChunkedBooleanStore.kt")
+        kotlin.exclude("axion/client/render/gpu/ChunkedDrawResult.kt")
+        kotlin.exclude("axion/client/render/gpu/ChunkedPreviewSession.kt")
+        kotlin.exclude("axion/client/render/gpu/ChunkedStateMap.kt")
+        kotlin.exclude("axion/client/render/gpu/SectionDrawList.kt")
     } else if (exactMc1216) {
         kotlin.srcDir("src/compat-1_21_6/kotlin")
     } else if (exactMc1217) {
@@ -198,9 +229,10 @@ tasks.processResources {
     inputs.property("version", modVersion)
     inputs.property("fabric_server_entrypoint", fabricServerEntrypoint)
     inputs.property("minecraft_version_range", minecraftVersionRange)
-    inputs.property("loader_version", project.property("loader_version") as String)
+    inputs.property("loader_version_range", loaderVersionRange)
     inputs.property("java_target_version", javaTargetVersion)
-    inputs.property("fabric_kotlin_version", project.property("fabric_kotlin_version") as String)
+    inputs.property("fabric_api_version_range", fabricApiVersionRange)
+    inputs.property("fabric_kotlin_version_range", fabricKotlinVersionRange)
 
     if (rangeMc1215) {
         exclude("assets/axion/shaders/core/preview_shell.*")
@@ -211,9 +243,10 @@ tasks.processResources {
             "version" to modVersion,
             "fabric_server_entrypoint" to fabricServerEntrypoint,
             "minecraft_version_range" to minecraftVersionRange,
-            "loader_version" to project.property("loader_version") as String,
+            "loader_version_range" to loaderVersionRange,
             "java_target_version" to javaTargetVersion,
-            "fabric_kotlin_version" to project.property("fabric_kotlin_version") as String,
+            "fabric_api_version_range" to fabricApiVersionRange,
+            "fabric_kotlin_version_range" to fabricKotlinVersionRange,
         )
     }
 }

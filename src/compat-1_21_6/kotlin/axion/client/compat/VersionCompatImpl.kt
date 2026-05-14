@@ -13,6 +13,7 @@ import com.mojang.blaze3d.systems.RenderPass
 import com.mojang.blaze3d.vertex.VertexFormat
 import com.mojang.blaze3d.textures.GpuTextureView
 import com.mojang.serialization.DynamicOps
+import io.netty.buffer.Unpooled
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
@@ -493,38 +494,29 @@ object VersionCompatImpl : VersionCompat {
             false,
         )
 
-    override fun itemStackEncode(registryManager: Any, stack: Any): ByteArray? = null
+    override fun itemStackEncode(registryManager: Any, stack: Any): ByteArray? {
+        return runCatching {
+            val buf = RegistryByteBuf(Unpooled.buffer(), registryManager as DynamicRegistryManager)
+            ItemStack.PACKET_CODEC.encode(buf, stack as ItemStack)
+            ByteArray(buf.readableBytes()).also { buf.getBytes(0, it) }
+        }.getOrNull()
+    }
 
-    override fun itemStackDecode(registryManager: Any, bytes: ByteArray): Any? = null
+    override fun itemStackDecode(registryManager: Any, bytes: ByteArray): Any? {
+        return runCatching {
+            val buf = RegistryByteBuf(Unpooled.wrappedBuffer(bytes), registryManager as DynamicRegistryManager)
+            ItemStack.PACKET_CODEC.decode(buf)
+        }.getOrNull()
+    }
 
     override fun createAxionPluginPayloadCodec(): Any {
-        // 1.21.6-1.21.7 PacketCodec API - try ofStatic like other versions
-        val codecClass = PacketCodec::class.java
-        val method = codecClass.methods.firstOrNull { it.name == "ofStatic" && it.parameterCount == 2 }
-            ?: throw NoSuchMethodError("PacketCodec.ofStatic not found in 1.21.6-1.21.7")
-        val encoderType = method.parameterTypes[0]
-        val decoderType = method.parameterTypes[1]
-
-        val encoder = java.lang.reflect.Proxy.newProxyInstance(encoderType.classLoader, arrayOf(encoderType)) { _, method, args ->
-            if (method.name == "encode" && args != null && args.size == 2) {
-                val buf = args[0] as RegistryByteBuf
-                val payload = args[1] as AxionPluginPayload
-                buf.writeBytes(payload.bytes)
-            }
-            null
-        }
-
-        val decoder = java.lang.reflect.Proxy.newProxyInstance(decoderType.classLoader, arrayOf(decoderType)) { _, method, args ->
-            if (method.name == "decode" && args != null && args.size == 1) {
-                val buf = args[0] as RegistryByteBuf
+        return PacketCodec.of(
+            { value: AxionPluginPayload, buf: RegistryByteBuf -> buf.writeBytes(value.bytes) },
+            { buf: RegistryByteBuf ->
                 val bytes = ByteArray(buf.readableBytes())
                 buf.readBytes(bytes)
                 AxionPluginPayload(bytes)
-            } else {
-                null
-            }
-        }
-
-        return method.invoke(null, encoder, decoder)
+            },
+        )
     }
 }

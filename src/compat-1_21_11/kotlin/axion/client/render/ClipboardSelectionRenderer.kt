@@ -35,9 +35,15 @@ object ClipboardSelectionRenderer {
     private val blueGlassClipboardCache = WeakHashMap<ClipboardBuffer, ClipboardBuffer>()
     private val grayGlassClipboardCache = WeakHashMap<ClipboardBuffer, ClipboardBuffer>()
     private val surfaceCellCache = WeakHashMap<ClipboardBuffer, List<ClipboardCell>>()
-    private val lineWidthMethod: java.lang.reflect.Method? = runCatching {
-        VertexConsumer::class.java.getMethod("lineWidth", Float::class.javaPrimitiveType)
-    }.getOrNull()
+    private val lineWidthMethod: java.lang.reflect.Method? by lazy {
+        VertexConsumer::class.java.methods.firstOrNull { m ->
+            (m.name == "lineWidth" || m.name == "setLineWidth") &&
+                m.parameterCount == 1 && m.parameterTypes[0] == Float::class.javaPrimitiveType
+        } ?: VertexConsumer::class.java.methods.firstOrNull { m ->
+            m.parameterCount == 1 && m.parameterTypes[0] == Float::class.javaPrimitiveType &&
+                m.returnType == VertexConsumer::class.java
+        }
+    }
 
     // VoxelShapes.union becomes very expensive when magic-select accumulates
     // separated blobs. Keep the single-shape path small, then switch to a

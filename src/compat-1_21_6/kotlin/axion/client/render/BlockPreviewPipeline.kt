@@ -34,6 +34,7 @@ object BlockPreviewPipeline {
         val alpha: Int,
         val scale: Float,
         val textured: Boolean = true,
+        val allowChunked: Boolean = true,
         // Stable session slot for chunked GPU caching. Distinct slots prevent
         // sessions from leaking GPU buffers when the clipboard rebuilds.
         val sessionTag: String = "overlay",
@@ -89,6 +90,7 @@ object BlockPreviewPipeline {
             textured = scene.textured,
             scale = scene.scale,
             sessionTag = scene.sessionTag,
+            allowChunked = scene.allowChunked,
         )
         return true
     }

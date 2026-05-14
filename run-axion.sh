@@ -15,6 +15,7 @@ fi
 
 WITH_PAPER="${WITH_PAPER:-false}"
 WITH_FABRIC="${WITH_FABRIC:-false}"
+QUICKPLAY="${QUICKPLAY:-false}"
 STARTED_SERVER_PIDS=()
 STARTED_CLIENT_PIDS=()
 
@@ -25,6 +26,9 @@ while [[ $# -gt 0 ]]; do
             ;;
         fabric|with-fabric|with_fabric|--fabric)
             WITH_FABRIC=true
+            ;;
+        quickplay|--quickplay)
+            QUICKPLAY=true
             ;;
         with)
             ;;
@@ -50,14 +54,16 @@ if [[ "$VERSION_ARG" == "-h" || "$VERSION_ARG" == "--help" ]]; then
     echo "OPTIONS:"
     echo "  paper, --paper      Also start Paper server(s)"
     echo "  fabric, --fabric    Start Fabric server for 1.21.11"
+    echo "  quickplay, --quickplay Auto-join server or latest world"
     echo "  WITH_PAPER=true     Environment equivalent for paper"
     echo "  WITH_FABRIC=true    Environment equivalent for fabric"
+    echo "  QUICKPLAY=true      Environment equivalent for quickplay"
     echo ""
     echo "Examples:"
     echo "  ./run-axion.sh 26.1"
     echo "  ./run-axion.sh 1.21.6,1.21.7 paper"
-    echo "  ./run-axion.sh all paper fabric"
-    echo "  WITH_PAPER=true ./run-axion.sh 26.1"
+    echo "  ./run-axion.sh all paper fabric quickplay"
+    echo "  WITH_PAPER=true QUICKPLAY=true ./run-axion.sh 26.1"
     exit 0
 fi
 
@@ -913,6 +919,51 @@ print(os.path.relpath(os.path.abspath(sys.argv[2]), os.path.abspath(sys.argv[1])
 PY
 }
 
+# Function to get server port for a version
+get_port() {
+    local version="$1"
+    case "$version" in
+        1.21.5) echo "25567" ;;
+        1.21.6) echo "25568" ;;
+        1.21.7) echo "25569" ;;
+        1.21.8) echo "25570" ;;
+        1.21.9) echo "25571" ;;
+        1.21.10) echo "25572" ;;
+        1.21.11) echo "25573" ;;
+        26.1|26.1.x) echo "25574" ;;
+        *) echo "25565" ;;
+    esac
+}
+
+# Function to find or create a world for quickplay
+get_or_create_world() {
+    local version="$1"
+    local client_run_dir
+    local saves_dir
+    local latest_world
+    local new_world_name
+
+    client_run_dir="$(client_run_dir_for "$version")"
+    saves_dir="$client_run_dir/saves"
+
+    # Check if saves directory exists and has worlds
+    if [[ -d "$saves_dir" ]]; then
+        # Find the most recently modified world
+        latest_world=$(find "$saves_dir" -maxdepth 1 -type d -name "New World*" -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)
+        
+        if [[ -n "$latest_world" && -d "$latest_world" ]]; then
+            local world_name
+            world_name=$(basename "$latest_world")
+            echo "$world_name"
+            return
+        fi
+    fi
+
+    # Create a new world name with timestamp
+    new_world_name="New World $(date +%Y%m%d-%H%M%S)"
+    echo "$new_world_name"
+}
+
 start_client() {
     local version="$1"
     local mc_version
@@ -925,6 +976,7 @@ start_client() {
     local fabric_kotlin_version
     local modmenu_version
     local loom_version
+    local quickplay_args=()
 
     mc_version="$(resolve_mc_version "$version")"
     if [[ -z "$mc_version" ]]; then
@@ -937,6 +989,23 @@ start_client() {
     prepare_client_run_dir "$client_run_dir"
     gradle_dir="$(prepare_client_workspace "$version")"
     gradle_run_dir="$(relative_path "$gradle_dir" "$client_run_dir")"
+
+    # Handle quickplay
+    if [[ "$QUICKPLAY" == "true" ]]; then
+        if [[ "$WITH_PAPER" == "true" || "$WITH_FABRIC" == "true" ]]; then
+            # Auto-join server
+            local port
+            port="$(get_port "$version")"
+            quickplay_args+=("-Pmc_server=localhost:$port")
+            echo "  Quickplay: Auto-joining server at localhost:$port"
+        else
+            # Use latest world or create new one
+            local world_name
+            world_name="$(get_or_create_world "$version")"
+            quickplay_args+=("-Pmc_world=\"$world_name\"")
+            echo "  Quickplay: Using world '$world_name'"
+        fi
+    fi
 
     echo "  Launching Minecraft $mc_version client (run dir: $client_run_dir, workspace: $gradle_dir, gradle runDir: $gradle_run_dir)..."
     ensure_client_auth_mod "$mc_version" "$client_run_dir"
@@ -958,7 +1027,8 @@ start_client() {
             -Pfabric_kotlin_version="$fabric_kotlin_version" \
             -Pmodmenu_version="$modmenu_version" \
             -Ploom_version="$loom_version" \
-            -Paxion_run_dir="$gradle_run_dir"
+            -Paxion_run_dir="$gradle_run_dir" \
+            "${quickplay_args[@]}"
     ) &
 
     local client_pid=$!

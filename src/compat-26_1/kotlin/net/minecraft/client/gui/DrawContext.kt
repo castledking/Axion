@@ -4,15 +4,25 @@ import net.minecraft.client.gl.RenderPipelines
 import net.minecraft.item.ItemStack
 import net.minecraft.text.Text
 import net.minecraft.util.Identifier
+import org.joml.Matrix3x2fStack
 
 class DrawContext(
     internal val delegate: GuiGraphicsExtractor,
 ) {
+    class MatrixStackAdapter(private val delegate: Matrix3x2fStack) {
+        fun push() = delegate.pushMatrix()
+        fun pop() = delegate.popMatrix()
+        fun translate(x: Double, y: Double, z: Double) = delegate.translate(x.toFloat(), y.toFloat())
+    }
+
     val scaledWindowWidth: Int
         get() = delegate.guiWidth()
 
     val scaledWindowHeight: Int
         get() = delegate.guiHeight()
+
+    val matrices: MatrixStackAdapter
+        get() = MatrixStackAdapter(delegate.pose())
 
     fun fill(x1: Int, y1: Int, x2: Int, y2: Int, color: Int) {
         delegate.fill(x1, y1, x2, y2, color)

@@ -8,6 +8,7 @@ import axion.common.compat.VersionCompat
 import axion.common.model.BlockEntityDataSnapshot
 import axion.common.model.ClipboardBuffer
 import com.mojang.serialization.DynamicOps
+import io.netty.buffer.Unpooled
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback
@@ -19,6 +20,7 @@ import net.minecraft.block.BlockState
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.gui.DrawContext
 import net.minecraft.client.render.Camera
+import net.minecraft.client.render.RenderLayer
 import net.minecraft.client.render.RenderTickCounter
 import net.minecraft.client.world.ClientWorld
 import net.minecraft.command.argument.BlockArgumentParser
@@ -158,12 +160,10 @@ object VersionCompatImpl : VersionCompat {
     }
 
     fun sendAxionPayload(payload: AxionPluginPayload) = ClientPlayNetworking.send(payload)
-    fun supportsChunkedPreview(): Boolean = true
+    fun supportsChunkedPreview(): Boolean = false
 
     fun renderChunkedPreview(sessionId: String, context: AxionWorldRenderContext, clipboard: ClipboardBuffer, origins: Collection<BlockPos>, color: Int, alpha: Int): Boolean {
-        val session = ChunkedPreviewLifecycle.acquire(sessionId)
-        session.setFromClipboard(clipboard, origins)
-        return session.render(context, color, alpha).handled
+        return false
     }
 
     fun closeChunkedPreviews() {
@@ -188,7 +188,9 @@ object VersionCompatImpl : VersionCompat {
         val tag = NbtCompound()
         return if (entity.saveSelfNbt(tag)) tag else null
     }
-    fun drawGuiTexture(context: DrawContext, texture: Identifier, x: Int, y: Int, width: Int, height: Int) {}
+    fun drawGuiTexture(context: DrawContext, texture: Identifier, x: Int, y: Int, width: Int, height: Int) {
+        context.drawTexture(RenderLayer::getGuiTextured, texture, x, y, 0f, 0f, width, height, width, height)
+    }
     fun getCameraPos(camera: Camera): Vec3d = camera.pos
     fun rawBlockStateId(state: BlockState): Int = Block.getRawIdFromState(state)
 
@@ -250,36 +252,29 @@ object VersionCompatImpl : VersionCompat {
     override fun blockStateStringify(state: BlockState): String = state.toString()
     override fun worldGetRegistryManager(world: Any): Any = (world as net.minecraft.world.World).registryManager
     override fun blockArgumentParserBlock(registry: Any, state: String): Any = BlockArgumentParser.block((registry as DynamicRegistryManager).getOrThrow(RegistryKeys.BLOCK), state, false)
-    override fun itemStackEncode(registryManager: Any, stack: Any): ByteArray? = null
-    override fun itemStackDecode(registryManager: Any, bytes: ByteArray): Any? = null
+    override fun itemStackEncode(registryManager: Any, stack: Any): ByteArray? {
+        return runCatching {
+            val buf = RegistryByteBuf(Unpooled.buffer(), registryManager as DynamicRegistryManager)
+            ItemStack.PACKET_CODEC.encode(buf, stack as ItemStack)
+            ByteArray(buf.readableBytes()).also { buf.getBytes(0, it) }
+        }.getOrNull()
+    }
+
+    override fun itemStackDecode(registryManager: Any, bytes: ByteArray): Any? {
+        return runCatching {
+            val buf = RegistryByteBuf(Unpooled.wrappedBuffer(bytes), registryManager as DynamicRegistryManager)
+            ItemStack.PACKET_CODEC.decode(buf)
+        }.getOrNull()
+    }
 
     override fun createAxionPluginPayloadCodec(): Any {
-        // 1.21.5 PacketCodec API uses ofStatic with 2 parameters
-        val codecClass = PacketCodec::class.java
-        val method = codecClass.methods.first { it.name == "ofStatic" && it.parameterCount == 2 }
-        val encoderType = method.parameterTypes[0]
-        val decoderType = method.parameterTypes[1]
-
-        val encoder = java.lang.reflect.Proxy.newProxyInstance(encoderType.classLoader, arrayOf(encoderType)) { _, method, args ->
-            if (method.name == "encode" && args != null && args.size == 2) {
-                val buf = args[0] as RegistryByteBuf
-                val payload = args[1] as AxionPluginPayload
-                buf.writeBytes(payload.bytes)
-            }
-            null
-        }
-
-        val decoder = java.lang.reflect.Proxy.newProxyInstance(decoderType.classLoader, arrayOf(decoderType)) { _, method, args ->
-            if (method.name == "decode" && args != null && args.size == 1) {
-                val buf = args[0] as RegistryByteBuf
+        return PacketCodec.of(
+            { value: AxionPluginPayload, buf: RegistryByteBuf -> buf.writeBytes(value.bytes) },
+            { buf: RegistryByteBuf ->
                 val bytes = ByteArray(buf.readableBytes())
                 buf.readBytes(bytes)
                 AxionPluginPayload(bytes)
-            } else {
-                null
-            }
-        }
-
-        return method.invoke(null, encoder, decoder)
+            },
+        )
     }
 }

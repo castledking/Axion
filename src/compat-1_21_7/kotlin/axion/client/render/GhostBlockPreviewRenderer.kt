@@ -55,6 +55,7 @@ object GhostBlockPreviewRenderer {
         scale: Float = 1.0f,
         sessionTag: String = "default",
         forceChunked: Boolean = false,
+        allowChunked: Boolean = true,
     ) {
         if (origins.isEmpty()) {
             return
@@ -78,7 +79,7 @@ object GhostBlockPreviewRenderer {
         // shares one slot for "the active textured ghost preview".
         if (textured) {
             val totalCells = allOccupiedCells.size.toLong() * origins.size.toLong()
-            if (forceChunked || FORCE_CHUNKED_PREVIEW || totalCells > CHUNKED_PATH_CELL_THRESHOLD) {
+            if (allowChunked && (forceChunked || FORCE_CHUNKED_PREVIEW || totalCells > CHUNKED_PATH_CELL_THRESHOLD)) {
                 val handled = VersionCompatImpl.renderChunkedPreview("ghost:$sessionTag", context, clipboard, origins, color, alpha)
                 if (DEBUG_LOG) {
                     val now = System.currentTimeMillis()

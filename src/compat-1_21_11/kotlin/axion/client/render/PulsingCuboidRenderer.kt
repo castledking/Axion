@@ -32,7 +32,11 @@ object PulsingCuboidRenderer {
         val consumers = context.consumers()
         val cameraPos = CameraAccess.getPos(camera)
         val matrixStack = context.matrices()
-        val fillLayer = RenderLayerCompat.debugQuads()
+        val fillLayer = try {
+            RenderLayerCompat.debugQuads()
+        } catch (e: Exception) {
+            return
+        }
 
         renderFilledBox(
             matrixStack = matrixStack,
@@ -69,7 +73,11 @@ object PulsingCuboidRenderer {
         val cameraPos = CameraAccess.getPos(camera)
         val matrixStack = context.matrices()
         val alpha = pulsingAlpha(minAlpha, maxAlpha)
-        val fillLayer = RenderLayerCompat.lightning()
+        val fillLayer = try {
+            RenderLayerCompat.lightning()
+        } catch (e: Exception) {
+            return
+        }
         val consumer = consumers.getBuffer(fillLayer)
 
         renderFilledBox(
@@ -111,7 +119,11 @@ object PulsingCuboidRenderer {
         val cameraPos = CameraAccess.getPos(camera)
         val matrixStack = context.matrices()
         val outlinedBox = SelectionBounds.outlineBox(box)
-        val fillLayer = RenderLayerCompat.debugQuads()
+        val fillLayer = try {
+            RenderLayerCompat.debugQuads()
+        } catch (e: Exception) {
+            return
+        }
         val filledConsumer = consumers.getBuffer(fillLayer)
 
         renderFilledBox(

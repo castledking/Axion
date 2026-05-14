@@ -108,9 +108,14 @@ class TintedAlphaVertexConsumer(
         /** Packed max light value for the 11-arg vertex() method: both components at 0xF0. */
         private const val MAX_LIGHT_PACKED: Int = 0x00F000F0
 
-        /** lineWidth was added to VertexConsumer in 1.21.11 — resolved via reflection for cross-version compat. */
-        private val lineWidthMethod: java.lang.reflect.Method? = runCatching {
-            VertexConsumer::class.java.getMethod("lineWidth", Float::class.javaPrimitiveType)
-        }.getOrNull()
+        private val lineWidthMethod: java.lang.reflect.Method? by lazy {
+            VertexConsumer::class.java.methods.firstOrNull { m ->
+                (m.name == "lineWidth" || m.name == "setLineWidth") &&
+                    m.parameterCount == 1 && m.parameterTypes[0] == Float::class.javaPrimitiveType
+            } ?: VertexConsumer::class.java.methods.firstOrNull { m ->
+                m.parameterCount == 1 && m.parameterTypes[0] == Float::class.javaPrimitiveType &&
+                    m.returnType == VertexConsumer::class.java
+            }
+        }
     }
 }

@@ -327,9 +327,15 @@ object AxionBlockTessellator {
         }
 
         companion object {
-            private val lineWidthMethod: java.lang.reflect.Method? = runCatching {
-                VertexConsumer::class.java.getMethod("lineWidth", Float::class.javaPrimitiveType)
-            }.getOrNull()
+            private val lineWidthMethod: java.lang.reflect.Method? by lazy {
+                VertexConsumer::class.java.methods.firstOrNull { m ->
+                    (m.name == "lineWidth" || m.name == "setLineWidth") &&
+                        m.parameterCount == 1 && m.parameterTypes[0] == Float::class.javaPrimitiveType
+                } ?: VertexConsumer::class.java.methods.firstOrNull { m ->
+                    m.parameterCount == 1 && m.parameterTypes[0] == Float::class.javaPrimitiveType &&
+                        m.returnType == VertexConsumer::class.java
+                }
+            }
         }
     }
 }

@@ -33,6 +33,7 @@ object GhostBlockPreviewRenderer {
         scale: Float = 1.0f,
         sessionTag: String = "default",
         forceChunked: Boolean = false,
+        allowChunked: Boolean = true,
     ) {
         val cells = clipboard.nonAirCells()
         if (origins.isEmpty() || cells.isEmpty()) {
@@ -41,7 +42,7 @@ object GhostBlockPreviewRenderer {
 
         if (textured) {
             val totalCells = cells.size.toLong() * origins.size.toLong()
-            if (forceChunked || totalCells > CHUNKED_PATH_CELL_THRESHOLD) {
+            if (allowChunked && (forceChunked || totalCells > CHUNKED_PATH_CELL_THRESHOLD)) {
                 val handled = VersionCompatImpl.renderChunkedPreview(
                     "ghost:$sessionTag",
                     context,
