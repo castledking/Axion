@@ -11,8 +11,8 @@ import axion.client.tool.AxionToolSelectionController
 import axion.common.model.BlockRegion
 import axion.common.operation.ClearRegionOperation
 import axion.AxionMod
-import axion.mixin.compat.ClientPlayerInteractionManagerAccess
-import axion.mixin.compat.MinecraftClientAccess
+import axion.client.compat.ClientPlayerInteractionManagerAccess
+import axion.client.compat.MinecraftClientAccess
 import net.minecraft.block.BlockState
 import net.minecraft.item.BlockItem
 import net.minecraft.item.ItemPlacementContext
