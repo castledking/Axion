@@ -5,7 +5,7 @@
   "name": "Axion Fabric Server",
   "description": "Authoritative Axion server support for Fabric dedicated servers.",
   "authors": [
-    "Towkio"
+    "castledking"
   ],
   "license": "All Rights Reserved",
   "contact": {

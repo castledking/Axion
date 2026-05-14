@@ -249,6 +249,8 @@ tasks.processResources {
 }
 
 tasks.named<ProcessResources>("processClientResources") {
+    inputs.property("minecraft_version", minecraftVersion)
+
     doFirst {
         delete(layout.buildDirectory.dir("resources/client"))
         // Copy version-specific mixin config
@@ -267,10 +269,21 @@ tasks.named<ProcessResources>("processClientResources") {
             }
         }
     }
+    if (minecraftVersion != "1.21.11") {
+        filesMatching("axion.client.mixins.json") {
+            filter { line ->
+                if (line.contains("\"ServerEntityMixin\"")) null else line
+            }
+        }
+    }
     if (rangeMc261x) {
         filesMatching("axion.client.mixins.json") {
             filter { line ->
-                if (line.contains("\"WorldRendererFallbackMixin\"")) null else line
+                when {
+                    line.contains("\"WorldRendererFallbackMixin\"") -> null
+                    line.contains("\"PlayerEntityPoseMixin\",") -> line.replace("\"PlayerEntityPoseMixin\",", "\"PlayerEntityPoseMixin\"")
+                    else -> line
+                }
             }
         }
     }

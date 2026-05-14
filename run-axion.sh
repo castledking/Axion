@@ -270,6 +270,11 @@ configure_server_properties() {
     set_server_property "$file" "server-port" "$port"
     set_server_property "$file" "online-mode" "false"
     set_server_property "$file" "enforce-secure-profile" "false"
+    set_server_property "$file" "view-distance" "2"
+    set_server_property "$file" "simulation-distance" "2"
+    set_server_property "$file" "spawn-protection" "0"
+    set_server_property "$file" "max-players" "2"
+    set_server_property "$file" "sync-chunk-writes" "false"
 }
 
 write_axion_dev_marker() {
@@ -891,13 +896,24 @@ prepare_client_workspace() {
 
     echo "  Preparing isolated Gradle workspace for $version..." >&2
     mkdir -p "$workspace"
-    rsync -a --delete \
+    rsync -a --delete --delete-excluded \
+        --exclude='.agents/' \
+        --exclude='.codex/' \
+        --exclude='.factory/' \
         --exclude='.git/' \
+        --exclude='.github/' \
         --exclude='.gradle/' \
+        --exclude='.idea/' \
+        --exclude='.kotlin/' \
         --exclude='build/' \
-        --exclude='run/' \
+        --exclude='bin/' \
+        --exclude='docs/' \
+        --exclude='wiki/' \
+        --exclude='.modrinth/' \
+        --exclude='.vscode/' \
         --exclude='.logs/' \
         --exclude='.run-workspaces/' \
+        --exclude='run/' \
         --exclude='.cache/' \
         --exclude='paper-plugin/build/' \
         --exclude='fabric-server/build/' \
