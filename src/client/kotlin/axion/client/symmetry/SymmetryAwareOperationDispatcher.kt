@@ -60,9 +60,9 @@ class SymmetryAwareOperationDispatcher(
             }
 
             if (recordHistory) {
-                HistoryManager.record(targetWorld as net.minecraft.world.World, plan)
+                HistoryManager.record(targetWorld, plan)
             }
-            applier.apply(targetWorld as net.minecraft.world.World, plan)
+            applier.apply(targetWorld, plan)
         }
     }
 }
