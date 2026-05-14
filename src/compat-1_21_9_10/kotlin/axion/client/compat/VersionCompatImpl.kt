@@ -370,6 +370,7 @@ object VersionCompatImpl : VersionCompat {
         return (manager as net.minecraft.client.render.block.BlockRenderManager).getModel(state)
     }
 
+    @Suppress("UNCHECKED_CAST")
     override fun blockRenderManagerRenderBlock(manager: Any, state: BlockState, pos: Any, world: Any, matrixStack: Any, consumer: Any, checkSides: Boolean, parts: List<Any>): Boolean {
         (manager as net.minecraft.client.render.block.BlockRenderManager).renderBlock(
             state,
@@ -483,6 +484,7 @@ object VersionCompatImpl : VersionCompat {
         (server as net.minecraft.server.integrated.IntegratedServer).execute(task)
     }
 
+    @Suppress("UNCHECKED_CAST")
     override fun serverGetWorld(server: Any, registryKey: Any): Any? {
         return (server as net.minecraft.server.integrated.IntegratedServer).getWorld(registryKey as net.minecraft.registry.RegistryKey<net.minecraft.world.World>)
     }

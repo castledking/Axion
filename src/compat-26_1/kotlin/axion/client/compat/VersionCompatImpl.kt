@@ -486,6 +486,7 @@ object VersionCompatImpl : VersionCompat {
         return (world as net.minecraft.world.level.Level).registryAccess()
     }
 
+    @Suppress("UNCHECKED_CAST")
     override fun blockArgumentParserBlock(registry: Any, state: String): Any {
         return BlockStateParser.parseForBlock(
             registry as net.minecraft.core.HolderLookup<net.minecraft.world.level.block.Block>,

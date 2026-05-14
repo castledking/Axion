@@ -172,6 +172,7 @@ object WorldRenderCompat {
         return registered
     }
 
+    @Suppress("UNCHECKED_CAST")
     private fun registerBatchedListener(
         fieldName: String,
         nestedInterfaceName: String,

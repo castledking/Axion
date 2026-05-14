@@ -201,6 +201,7 @@ object VersionCompatImpl : VersionCompat {
     override fun matrixStackPop(stack: Any) = (stack as net.minecraft.client.util.math.MatrixStack).pop()
     override fun blockRenderManagerGetModel(manager: Any, state: BlockState): Any = (manager as net.minecraft.client.render.block.BlockRenderManager).getModel(state)
 
+    @Suppress("UNCHECKED_CAST")
     override fun blockRenderManagerRenderBlock(manager: Any, state: BlockState, pos: Any, world: Any, matrixStack: Any, consumer: Any, checkSides: Boolean, parts: List<Any>): Boolean {
         (manager as net.minecraft.client.render.block.BlockRenderManager).renderBlock(state, pos as BlockPos, world as net.minecraft.world.BlockRenderView, matrixStack as net.minecraft.client.util.math.MatrixStack, consumer as net.minecraft.client.render.VertexConsumer, checkSides, parts as List<net.minecraft.client.render.model.BlockModelPart>)
         return true
@@ -246,6 +247,7 @@ object VersionCompatImpl : VersionCompat {
     override fun clientGetServer(client: Any): Any? = (client as MinecraftClient).server
     override fun clientGetWorldRegistryKey(client: Any): Any? = (client as MinecraftClient).world?.registryKey
     override fun serverExecute(server: Any, task: Runnable) = (server as net.minecraft.server.integrated.IntegratedServer).execute(task)
+    @Suppress("UNCHECKED_CAST")
     override fun serverGetWorld(server: Any, registryKey: Any): Any? = (server as net.minecraft.server.integrated.IntegratedServer).getWorld(registryKey as net.minecraft.registry.RegistryKey<net.minecraft.world.World>)
     override fun playerSendMessage(player: Any, message: Any, overlay: Boolean) = (player as net.minecraft.entity.player.PlayerEntity).sendMessage(message as Text, overlay)
     override fun directionGetVector(direction: Any): Any = (direction as net.minecraft.util.math.Direction).vector
