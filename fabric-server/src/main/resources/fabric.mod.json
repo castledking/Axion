@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "axion-fabric-server",
+  "version": "${version}",
+  "name": "Axion Fabric Server",
+  "description": "Authoritative Axion server support for Fabric dedicated servers.",
+  "authors": [
+    "Towkio"
+  ],
+  "license": "All Rights Reserved",
+  "contact": {
+    "homepage": "https://castled.codes",
+    "issues": "https://github.com/castledking/Axion/issues",
+    "sources": "https://github.com/castledking/Axion"
+  },
+  "environment": "server",
+  "entrypoints": {
+    "server": [
+      "axion.server.fabric.AxionFabricServerMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.18.4",
+    "minecraft": "=1.21.11",
+    "java": ">=21",
+    "fabric-api": "*",
+    "fabric-language-kotlin": ">=1.13.9+kotlin.2.3.10"
+  }
+}

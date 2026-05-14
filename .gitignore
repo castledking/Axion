@@ -28,6 +28,7 @@ MANIFEST.MF
 !gradle.properties
 !src/main/resources/**
 !src/client/resources/**
+!fabric-server/src/main/resources/**
 !paper-plugin/src/main/resources/**
 RELEASE-*.md
 PLAN-*.md

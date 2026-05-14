@@ -1,4 +1,4 @@
-package axion.server.fabric
+package axion.client.compat
 
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
@@ -6,14 +6,24 @@ import net.minecraft.server.MinecraftServer
 import net.minecraft.server.network.ServerPlayerEntity
 import java.util.UUID
 
-class AxionFabricNoClipService {
+/**
+ * Service to track no-clip state for players.
+ * Used by the server-side mixin to cancel movement when no-clip is active.
+ * In singleplayer, this runs in the client JVM as part of the integrated server.
+ */
+object NoClipService {
     private val armedPlayers: MutableSet<UUID> = linkedSetOf()
 
-    fun initialize() {
-        ServerTickEvents.END_SERVER_TICK.register(ServerTickEvents.EndTick(::onEndTick))
-        ServerPlayerEvents.AFTER_RESPAWN.register(ServerPlayerEvents.AfterRespawn { _, newPlayer, _ ->
-            applyState(newPlayer)
-        })
+    fun isEnabled(uuid: UUID): Boolean {
+        return armedPlayers.contains(uuid)
+    }
+
+    fun setArmed(uuid: UUID, armed: Boolean) {
+        if (armed) {
+            armedPlayers += uuid
+        } else {
+            armedPlayers -= uuid
+        }
     }
 
     fun setArmed(player: ServerPlayerEntity, armed: Boolean) {
@@ -32,6 +42,13 @@ class AxionFabricNoClipService {
 
     fun isEnabled(player: ServerPlayerEntity): Boolean {
         return armedPlayers.contains(player.uuid)
+    }
+
+    fun initialize() {
+        ServerTickEvents.END_SERVER_TICK.register(ServerTickEvents.EndTick(::onEndTick))
+        ServerPlayerEvents.AFTER_RESPAWN.register(ServerPlayerEvents.AfterRespawn { _, newPlayer, _ ->
+            applyState(newPlayer)
+        })
     }
 
     fun stop(server: MinecraftServer) {

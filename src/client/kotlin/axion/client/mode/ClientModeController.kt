@@ -882,11 +882,30 @@ object ClientModeController {
     }
 
     private fun syncRemoteNoClip(client: MinecraftClient) {
+        val armed = canUseModes(client) && AxionClientState.globalModeState.noClipEnabled
+
+        // In singleplayer (integrated server), call the service directly via UUID
+        // This is only available in 1.21.9+ where the compat module includes server-side classes
         if (client.server != null) {
+            val clientPlayer = client.player ?: return
+            val serverPlayer = client.server?.playerManager?.getPlayer(clientPlayer.uuid)
+            if (serverPlayer != null) {
+                try {
+                    // Use reflection to call NoClipService.setArmed(uuid, armed)
+                    val noClipServiceClass = Class.forName("axion.client.compat.NoClipService")
+                    val setArmedMethod = noClipServiceClass.getMethod("setArmed", java.util.UUID::class.java, Boolean::class.javaPrimitiveType)
+                    val serviceInstance = noClipServiceClass.getDeclaredField("INSTANCE").get(null)
+                    setArmedMethod.invoke(serviceInstance, clientPlayer.uuid, armed)
+                } catch (e: Exception) {
+                    // NoClipService not available in this version (e.g., 1.21.5-1.21.8)
+                    // Fall back to network message
+                    AxionServerConnection.syncNoClipState(armed)
+                }
+            }
             return
         }
 
-        val armed = canUseModes(client) && AxionClientState.globalModeState.noClipEnabled
+        // In multiplayer, send network message to remote server
         AxionServerConnection.syncNoClipState(armed)
     }
 

@@ -29,6 +29,16 @@ object AxionClientBootstrap {
         logger.info("[Axion/Bootstrap] Client config initialized")
         AxionServerConnection.initialize()
         logger.info("[Axion/Bootstrap] Server connection initialized")
+        // Initialize NoClipService from compat module if available (1.21.9-1.21.11)
+        try {
+            val noClipServiceClass = Class.forName("axion.client.compat.NoClipService")
+            val initializeMethod = noClipServiceClass.getMethod("initialize")
+            val serviceInstance = noClipServiceClass.getDeclaredField("INSTANCE").get(null)
+            initializeMethod.invoke(serviceInstance)
+            logger.info("[Axion/Bootstrap] NoClip service initialized")
+        } catch (e: Exception) {
+            logger.debug("[Axion/Bootstrap] NoClip service not available in this version")
+        }
         AxionKeybindings.register()
         logger.info("[Axion/Bootstrap] Keybindings registered")
         VersionCompatImpl.registerHudElements(hudId, hintHudId, AxionHotbarHud::render, AxionToolHintHud::render)
