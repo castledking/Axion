@@ -80,7 +80,7 @@ object GhostBlockPreviewRenderer {
         }
 
         val client = MinecraftClient.getInstance()
-        val camera = client.gameRenderer.camera ?: return
+        val camera = client.gameRenderer.camera
         val cameraPos = CameraAccess.getPos(camera)
         val offset = if (context.needsCameraOffset()) cameraPos else Vec3d(0.0, 0.0, 0.0)
         val matrices = context.matrices()

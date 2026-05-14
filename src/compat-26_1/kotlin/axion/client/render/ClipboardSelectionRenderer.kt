@@ -222,7 +222,7 @@ object ClipboardSelectionRenderer {
         }
 
         val client = MinecraftClient.getInstance()
-        val camera = client.gameRenderer.camera ?: return false
+        val camera = client.gameRenderer.camera
         val cameraPos = CameraAccess.getPos(camera)
         val consumers = context.consumers()
         val matrixStack = context.matrices()
@@ -330,7 +330,7 @@ object ClipboardSelectionRenderer {
         val matrixStack = context.matrices()
         val consumers = context.consumers()
         val client = MinecraftClient.getInstance()
-        val camera = client.gameRenderer.camera ?: return false
+        val camera = client.gameRenderer.camera
         val cameraPos = CameraAccess.getPos(camera)
         val overlayCellCount = geometry.boxes.size.toLong() * origins.size.toLong()
         val renderBaseOverlay = overlayCellCount <= MAX_BASE_OVERLAY_CELLS.toLong()

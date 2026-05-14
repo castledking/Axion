@@ -81,10 +81,10 @@ object AxionPreviewBlockDrawer {
     ): ChunkedDrawResult {
         val client = MinecraftClient.getInstance()
         val device = RenderSystem.getDevice()
-        val mainTarget = client.framebuffer ?: return ChunkedDrawResult.FAILED
+        val mainTarget = client.framebuffer
         val colorView = mainTarget.colorTextureView ?: return ChunkedDrawResult.FAILED
         val depthView = mainTarget.depthTextureView ?: return ChunkedDrawResult.FAILED
-        val camera = client.gameRenderer?.camera ?: return ChunkedDrawResult.FAILED
+        val camera = client.gameRenderer.camera
         val cameraPos = cameraPosOverride ?: CameraAccess.getPos(camera)
         val baseMv = Matrix4f(RenderSystem.getModelViewMatrix())
         val normalMatrix = Matrix4f(baseMv).invert().transpose()
@@ -131,9 +131,8 @@ object AxionPreviewBlockDrawer {
             VersionCompatImpl.getBlockAtlasTextureView(client)?.let { atlasView ->
                 VersionCompatImpl.bindTextureToRenderPass(pass, "Sampler0", atlasView)
             }
-            client.gameRenderer?.levelLightmap()?.let { lightmapView ->
-                VersionCompatImpl.bindTextureToRenderPass(pass, "Sampler2", lightmapView)
-            }
+            val lightmapView = client.gameRenderer.levelLightmap()
+            VersionCompatImpl.bindTextureToRenderPass(pass, "Sampler2", lightmapView)
 
             val batched = VersionCompatImpl.drawMultipleIndexedPreview(pass, drawList, uniformSlices)
             if (!batched) {

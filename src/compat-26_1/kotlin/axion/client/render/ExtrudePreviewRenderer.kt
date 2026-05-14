@@ -17,7 +17,7 @@ object ExtrudePreviewRenderer {
     fun render(context: AxionWorldRenderContext) {
         val preview = ExtrudeToolController.currentPreview() ?: return
         val client = MinecraftClient.getInstance()
-        val camera = client.gameRenderer.camera ?: return
+        val camera = client.gameRenderer.camera
         val cameraPos = CameraAccess.getPos(camera)
         val consumers = context.consumers()
         val consumer = consumers.getBuffer(RenderLayerCompat.lines())

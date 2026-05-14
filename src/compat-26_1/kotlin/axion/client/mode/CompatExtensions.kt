@@ -124,17 +124,8 @@ fun PlayerEntity.setOnGround(onGround: Boolean) {
     (this as Entity).setOnGround(onGround)
 }
 
-var PlayerEntity.horizontalCollision: Boolean
-    get() = (this as Entity).horizontalCollision
-    set(value) {
-        (this as Entity).horizontalCollision = value
-    }
-
-var PlayerEntity.verticalCollision: Boolean
-    get() = (this as Entity).verticalCollision
-    set(value) {
-        (this as Entity).verticalCollision = value
-    }
+// horizontalCollision/verticalCollision: members exist directly on Entity in 26.1.
+// (Extensions removed — they were shadowed by the inherited members.)
 
 var Abilities.flySpeed: Float
     get() = flyingSpeed
@@ -159,7 +150,8 @@ val BlockHitResult.blockPos: BlockPos
 val ItemPlacementContext.blockPos: BlockPos
     get() = BlockPos(clickedPos)
 
-fun ItemPlacementContext.canReplaceExisting(): Boolean = replacingClickedOnBlock()
+// canReplaceExisting(): exists as a member on ItemPlacementContext in 26.1.
+// (Extension removed — it was shadowed by the member.)
 
 fun BlockItem.getPlacementContext(context: ItemPlacementContext): ItemPlacementContext? {
     val result = updatePlacementContext(context) ?: return null

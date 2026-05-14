@@ -28,7 +28,7 @@ object PulsingCuboidRenderer {
         maxAlpha: Int = DEFAULT_MAX_ALPHA,
     ) {
         val client = MinecraftClient.getInstance()
-        val camera = client.gameRenderer.camera ?: return
+        val camera = client.gameRenderer.camera
         val consumers = context.consumers()
         val cameraPos = CameraAccess.getPos(camera)
         val matrixStack = context.matrices()
@@ -66,7 +66,7 @@ object PulsingCuboidRenderer {
         fillColor: Int = 0xFFFFFFFF.toInt(),
     ) {
         val client = MinecraftClient.getInstance()
-        val camera = client.gameRenderer.camera ?: return
+        val camera = client.gameRenderer.camera
         val consumers = context.consumers()
         val cameraPos = CameraAccess.getPos(camera)
         val matrixStack = context.matrices()
@@ -110,7 +110,7 @@ object PulsingCuboidRenderer {
         pulseMaxAlpha: Int,
     ) {
         val client = MinecraftClient.getInstance()
-        val camera = client.gameRenderer.camera ?: return
+        val camera = client.gameRenderer.camera
         val consumers = context.consumers()
         val cameraPos = CameraAccess.getPos(camera)
         val matrixStack = context.matrices()
@@ -161,7 +161,7 @@ object PulsingCuboidRenderer {
         lineWidth: Float,
     ) {
         val client = MinecraftClient.getInstance()
-        val camera = client.gameRenderer.camera ?: return
+        val camera = client.gameRenderer.camera
         val consumers = context.consumers()
         val cameraPos = CameraAccess.getPos(camera)
 

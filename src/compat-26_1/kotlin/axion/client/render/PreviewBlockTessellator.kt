@@ -30,7 +30,7 @@ object PreviewBlockTessellator {
 
         val client = MinecraftClient.getInstance()
         val world = client.world ?: return false
-        val camera = client.gameRenderer.camera ?: return false
+        val camera = client.gameRenderer.camera
         val blockRenderer = BlockRenderManager(true, true, client.blockColors)
         val modelSet = client.modelManager.blockStateModelSet
         val cameraPos = CameraAccess.getPos(camera)

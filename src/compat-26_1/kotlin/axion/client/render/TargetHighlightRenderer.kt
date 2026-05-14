@@ -18,7 +18,7 @@ object TargetHighlightRenderer {
     fun render(context: AxionWorldRenderContext) {
         val blockPos = currentTargetForRender() ?: return
         val client = MinecraftClient.getInstance()
-        val camera = client.gameRenderer.camera ?: return
+        val camera = client.gameRenderer.camera
         val cameraPos = CameraAccess.getPos(camera)
         val consumers = context.consumers()
         val consumer = consumers.getBuffer(RenderLayerCompat.lines())

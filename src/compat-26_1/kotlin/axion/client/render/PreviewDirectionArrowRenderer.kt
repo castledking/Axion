@@ -32,7 +32,7 @@ object PreviewDirectionArrowRenderer {
     fun render(context: AxionWorldRenderContext, region: BlockRegion, direction: Vec3i) {
         val axis = dominantAxis(direction) ?: return
         val client = MinecraftClient.getInstance()
-        val camera = client.gameRenderer.camera ?: return
+        val camera = client.gameRenderer.camera
         val consumers = context.consumers()
         val entry = context.matrices().peek()
         val cameraPos = CameraAccess.getPos(camera)

@@ -508,7 +508,7 @@ object VersionCompatImpl : VersionCompat {
     ) {
         ClientPlayNetworking.registerGlobalReceiver(id.delegate) { payload, context ->
             context.client().execute {
-                handler(payload as AxionPluginPayload)
+                handler(payload)
             }
         }
     }
@@ -583,9 +583,8 @@ object VersionCompatImpl : VersionCompat {
         }.getOrNull()
     }
 
-    @Suppress("UNCHECKED_CAST")
     private fun itemStackStreamCodec(): StreamCodec<RegistryByteBuf, ItemStack> {
-        return ItemStack.STREAM_CODEC as StreamCodec<RegistryByteBuf, ItemStack>
+        return ItemStack.STREAM_CODEC
     }
 
     override fun createAxionPluginPayloadCodec(): Any {

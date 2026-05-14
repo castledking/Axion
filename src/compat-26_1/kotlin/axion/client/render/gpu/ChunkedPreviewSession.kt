@@ -89,7 +89,7 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
         refreshDirtyBuffers(world)
         if (chunkBuffers.isEmpty()) return ChunkedDrawResult.NO_BUFFERS
 
-        val camera = client.gameRenderer.camera ?: return ChunkedDrawResult.FAILED
+        val camera = client.gameRenderer.camera
         val cameraPos = CameraAccess.getPos(camera)
         val baseModelView = Matrix4f(context.matrices().peek().pose())
         return drawDeferred(color, alpha, translationDelta, baseModelView, cameraPos)
