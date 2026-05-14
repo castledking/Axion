@@ -97,6 +97,7 @@ object WorldRenderCompat {
 
     private var loggedFallbackDispatch = false
 
+    @Suppress("SENSELESS_COMPARISON") // Camera became non-null in 26.1; check is still required on 1.21.x.
     fun dispatchFallbackCallbacks(
         consumers: Immediate,
         matrices: MatrixStack,

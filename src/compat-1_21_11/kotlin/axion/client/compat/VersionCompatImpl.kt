@@ -697,7 +697,7 @@ object VersionCompatImpl : VersionCompat {
             }
         }
 
-        throw NoSuchMethodError("No compatible DynamicUniforms.write overload found (checked write4=${write4 != null}, write5=${write5 != null}, candidates=${candidates.size})")
+        throw NoSuchMethodError("No compatible DynamicUniforms.write overload found (write4 and write5 both null, candidates=${candidates.size})")
     }
 
     fun playSoundClient(
