@@ -203,6 +203,25 @@ Axion supports multiple Minecraft versions through a compatibility layer:
 
 When adding new features, ensure they work across supported versions. Use the compatibility layer (`src/compat-26_1/`) to handle version-specific differences.
 
+### Compat Folder Discipline
+
+The compat source sets exist to isolate **bytecode-level differences** between Minecraft versions, not to hold copies of version-agnostic logic. To prevent the duplication problem from coming back, follow these rules:
+
+1. **Files in `src/main/` and `src/client/` must not reference Minecraft classes whose signatures differ between supported versions.** Per-version API divergence goes through the `VersionCompat` interface. If you find yourself wanting to copy the same file into multiple compat folders, that file belongs in `src/client/` with the divergent calls extracted into new `VersionCompat` methods.
+
+2. **Never create a new compat folder preemptively.** A separate compat folder is only justified when the bytecode produced against that MC version genuinely differs from the next — typically because of a yarn rename, a class that doesn't exist, or a mixin target signature change. If the source is byte-identical to an existing compat folder, it shares that folder.
+
+3. **Current layout:**
+   - `src/compat-1_21_5/` — 1.21.5 only (CPU preview path, shader exclusions)
+   - `src/compat-1_21_6_8/` — 1.21.6, 1.21.7, 1.21.8 (shared, byte-identical)
+   - `src/compat-1_21_9_10/` — 1.21.9, 1.21.10 (shared, byte-identical)
+   - `src/compat-1_21_11/` — 1.21.11 only (renderer + mixin signatures diverge)
+   - `src/compat-26_1/` — 26.1.x (official namespace, extensive API bridges)
+
+4. **When fixing a bug,** prefer adding a `VersionCompat` method over duplicating a fix across compat folders. If a fix to one compat folder requires a parallel shim in another, that's a signal the affected code should move into `src/client/` behind `VersionCompat`.
+
+5. **When a future MC release diverges** inside one of the merged folders, branch the folder back out at that point — not earlier.
+
 ## Submitting Changes
 
 1. Fork the repository
