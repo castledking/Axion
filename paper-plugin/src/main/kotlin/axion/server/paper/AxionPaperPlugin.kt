@@ -41,6 +41,7 @@ class AxionPaperPlugin : JavaPlugin() {
         )
         server.pluginManager.registerEvents(AxionNoClipListener(noClipService), this)
         server.pluginManager.registerEvents(flightSpeedService, this)
+        server.pluginManager.registerEvents(AxionDevModeListener(this), this)
         server.messenger.registerIncomingPluginChannel(this, AxionProtocol.CHANNEL_ID, messaging)
         server.messenger.registerOutgoingPluginChannel(this, AxionProtocol.CHANNEL_ID)
         noClipService.start()

@@ -115,9 +115,9 @@ This starts a standalone Fabric server instead of Paper, using the AxionFabricSe
 
 ### Offline Mode & Operator Access
 
-All servers are configured in offline mode for easier local testing. The **In-Game Account Switcher (IAS)** mod is automatically downloaded and installed by `run-axion.sh`. This lets you connect with any username without Mojang authentication — useful when joining an offline-mode server with the `ggpots` account.
+All servers are configured in offline mode for easier local testing. The **In-Game Account Switcher (IAS)** mod is automatically downloaded and installed by `run-axion.sh`. This lets you connect with any username without Mojang authentication.
 
-To add your own UUID as operator, edit the `ops.json` block in `run-axion.sh`. Look for `start_paper_server` and `start_fabric_server` — both write an `ops.json` with the default user `ggpots` (UUID `710f96df-8b04-4c91-8828-b2b5afc45cd3`). Replace with your own UUID and username.
+When the `.axiondev` marker file is present in the server run directory, the Axion server plugin/mod automatically promotes any player that joins to operator level (op 4). This is enabled by default for local development servers started via `run-axion.sh`.
 
 ### Build And Run
 

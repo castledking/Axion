@@ -7,6 +7,9 @@ object AxionDevMode {
         if (isOnlineMode(plugin)) {
             return false
         }
+        if (!isLocalhost(plugin)) {
+            return false
+        }
         return markerFiles(plugin).any { it.isFile }
     }
 
@@ -24,5 +27,10 @@ object AxionDevMode {
         } catch (_: Exception) {
             true
         }
+    }
+
+    private fun isLocalhost(plugin: AxionPaperPlugin): Boolean {
+        val serverIp = plugin.server.ip ?: ""
+        return serverIp.isEmpty() || serverIp == "127.0.0.1" || serverIp == "0.0.0.0" || serverIp == "::1"
     }
 }

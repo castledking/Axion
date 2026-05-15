@@ -282,7 +282,7 @@ write_axion_dev_marker() {
     mkdir -p "$(dirname "$marker")"
     cat > "$marker" << 'EOF'
 # Created by ./run-axion.sh for local Axion offline-mode testing.
-# Axion server integrations only honor this marker when online-mode=false.
+# Axion server integrations only honor this marker when online-mode=false and server is on localhost.
 EOF
 }
 
@@ -384,28 +384,12 @@ level-seed=axiontest
 EOF
     fi
 
-    # Create ops.json with pre-authorized users
-    if [[ ! -f "$run_dir/ops.json" ]] || ! grep -q "ggpots" "$run_dir/ops.json" 2>/dev/null; then
-        echo "    Adding ggpots as operator..."
-        cat > "$run_dir/ops.json" << EOF
-[
-  {
-    "uuid": "710f96df-8b04-4c91-8828-b2b5afc45cd3",
-    "name": "ggpots",
-    "level": 4,
-    "bypassesPlayerLimit": false
-  }
-]
-EOF
-    fi
-
     configure_server_properties "$run_dir/server.properties" "$port"
     write_axion_dev_marker "$run_dir/.axiondev"
     write_axion_dev_marker "$plugins_dir/Axion/.axiondev"
     stop_server_in_run_dir "$run_dir"
 
     # Disable spark profiler (crashes on JDK 26+)
-    local paper_global="$run_dir/config/paper-global.yml"
     if [[ ! -f "$paper_global" ]]; then
         mkdir -p "$run_dir/config"
         cat > "$paper_global" << 'EOF'
@@ -559,21 +543,6 @@ EOF
     write_axion_dev_marker "$run_dir/.axiondev"
     write_axion_dev_marker "$run_dir/config/axion/.axiondev"
     stop_server_in_run_dir "$run_dir"
-
-    # Create ops.json with pre-authorized users
-    if [[ ! -f "$run_dir/ops.json" ]] || ! grep -q "ggpots" "$run_dir/ops.json" 2>/dev/null; then
-        echo "    Adding ggpots as operator..."
-        cat > "$run_dir/ops.json" << EOF
-[
-  {
-    "uuid": "710f96df-8b04-4c91-8828-b2b5afc45cd3",
-    "name": "ggpots",
-    "level": 4,
-    "bypassesPlayerLimit": false
-  }
-]
-EOF
-    fi
 
     # Start Fabric server in background
     echo "    Starting Fabric server in background..."
