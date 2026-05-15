@@ -7,15 +7,19 @@ cd "$ROOT_DIR"
 SUPPORTED_VERSION_LIST=("1.21.5" "1.21.6" "1.21.7" "1.21.8" "1.21.9" "1.21.10" "1.21.11" "26.1")
 
 # Parse command line arguments
-VERSION_ARG="26.1"
+VERSION_ARG=""
+ARGS_PROVIDED=false
 if [[ $# -gt 0 && "$1" != -* && "$1" != "paper" && "$1" != "fabric" && "$1" != "with" ]]; then
     VERSION_ARG="$1"
+    ARGS_PROVIDED=true
     shift
 fi
 
 WITH_PAPER="${WITH_PAPER:-false}"
 WITH_FABRIC="${WITH_FABRIC:-false}"
 QUICKPLAY="${QUICKPLAY:-false}"
+BUILD_FIRST="${BUILD_FIRST:-false}"
+BUILD_ONLY="${BUILD_ONLY:-false}"
 STARTED_SERVER_PIDS=()
 STARTED_CLIENT_PIDS=()
 
@@ -30,6 +34,10 @@ while [[ $# -gt 0 ]]; do
         quickplay|--quickplay)
             QUICKPLAY=true
             ;;
+        build|--build)
+            # Just build, don't launch
+            BUILD_ONLY=true
+            ;;
         with)
             ;;
         -h|--help)
@@ -43,6 +51,101 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
+# Interactive prompt when no arguments provided
+if [[ "$ARGS_PROVIDED" == "false" && $# -eq 0 ]]; then
+    echo "Axion Development Launcher"
+    echo "=========================="
+    echo ""
+    echo "Select Minecraft version (comma-separated for multiple, e.g., '1,2,3,4'):"
+    echo "  1) 1.21.5"
+    echo "  2) 1.21.6"
+    echo "  3) 1.21.7"
+    echo "  4) 1.21.8"
+    echo "  5) 1.21.9"
+    echo "  6) 1.21.10"
+    echo "  7) 1.21.11"
+    echo "  8) 26.1 (default)"
+    echo "  9) All versions"
+    read -p "Enter choice [1-9 or comma-separated]: " version_choice
+
+    # Convert comma-separated choices to version list
+    if [[ "$version_choice" == *,* ]]; then
+        IFS=',' read -r -a choices <<< "$version_choice"
+        selected_versions=()
+        for choice in "${choices[@]}"; do
+            case "$choice" in
+                1) selected_versions+=("1.21.5") ;;
+                2) selected_versions+=("1.21.6") ;;
+                3) selected_versions+=("1.21.7") ;;
+                4) selected_versions+=("1.21.8") ;;
+                5) selected_versions+=("1.21.9") ;;
+                6) selected_versions+=("1.21.10") ;;
+                7) selected_versions+=("1.21.11") ;;
+                8) selected_versions+=("26.1") ;;
+                9) selected_versions+=("all") ;;
+                *) ;;
+            esac
+        done
+        VERSION_ARG="${selected_versions[*]}"
+        VERSION_ARG="${VERSION_ARG// /,}"
+    else
+        case "$version_choice" in
+            1) VERSION_ARG="1.21.5" ;;
+            2) VERSION_ARG="1.21.6" ;;
+            3) VERSION_ARG="1.21.7" ;;
+            4) VERSION_ARG="1.21.8" ;;
+            5) VERSION_ARG="1.21.9" ;;
+            6) VERSION_ARG="1.21.10" ;;
+            7) VERSION_ARG="1.21.11" ;;
+            8) VERSION_ARG="26.1" ;;
+            9) VERSION_ARG="all" ;;
+            *) VERSION_ARG="26.1" ;;
+        esac
+    fi
+
+    echo ""
+    read -p "Start Paper server? [y/N]: " paper_choice
+    if [[ "$paper_choice" =~ ^[Yy]$ ]]; then
+        WITH_PAPER=true
+    fi
+
+    read -p "Start Fabric server? [y/N]: " fabric_choice
+    if [[ "$fabric_choice" =~ ^[Yy]$ ]]; then
+        WITH_FABRIC=true
+    fi
+
+    read -p "Enable quickplay? [y/N]: " quickplay_choice
+    if [[ "$quickplay_choice" =~ ^[Yy]$ ]]; then
+        QUICKPLAY=true
+    fi
+
+    read -p "Build before launching? [y/N]: " build_choice
+    if [[ "$build_choice" =~ ^[Yy]$ ]]; then
+        BUILD_FIRST=true
+    fi
+
+    read -p "Build only (don't launch)? [y/N]: " build_only_choice
+    if [[ "$build_only_choice" =~ ^[Yy]$ ]]; then
+        BUILD_ONLY=true
+        BUILD_FIRST=true
+    fi
+
+    echo ""
+    echo "Configuration:"
+    echo "  Version: $VERSION_ARG"
+    echo "  Paper: $WITH_PAPER"
+    echo "  Fabric: $WITH_FABRIC"
+    echo "  Quickplay: $QUICKPLAY"
+    echo "  Build: $BUILD_FIRST"
+    echo "  Build-only: $BUILD_ONLY"
+    echo ""
+fi
+
+# Default to 26.1 if no version specified
+if [[ -z "$VERSION_ARG" ]]; then
+    VERSION_ARG="26.1"
+fi
+
 # Display usage
 if [[ "$VERSION_ARG" == "-h" || "$VERSION_ARG" == "--help" ]]; then
     echo "Usage: ./run-axion.sh [VERSIONS] [OPTIONS]"
@@ -55,15 +158,25 @@ if [[ "$VERSION_ARG" == "-h" || "$VERSION_ARG" == "--help" ]]; then
     echo "  paper, --paper      Also start Paper server(s)"
     echo "  fabric, --fabric    Start Fabric server for 1.21.11"
     echo "  quickplay, --quickplay Auto-join server or latest world"
-    echo "  WITH_PAPER=true     Environment equivalent for paper"
-    echo "  WITH_FABRIC=true    Environment equivalent for fabric"
-    echo "  QUICKPLAY=true      Environment equivalent for quickplay"
+    echo "  build, --build      Build only, don't launch clients"
+    echo ""
+    echo "ENVIRONMENT VARIABLES:"
+    echo "  WITH_PAPER=true     Also start Paper server(s)"
+    echo "  WITH_FABRIC=true    Start Fabric server for 1.21.11"
+    echo "  QUICKPLAY=true      Auto-join server or latest world"
+    echo "  BUILD_FIRST=true    Build before launching (default: false)"
+    echo "  BUILD_ONLY=true     Build only, don't launch clients"
+    echo ""
+    echo "INTERACTIVE MODE:"
+    echo "  Running ./run-axion.sh without arguments shows an interactive prompt"
     echo ""
     echo "Examples:"
     echo "  ./run-axion.sh 26.1"
     echo "  ./run-axion.sh 1.21.6,1.21.7 paper"
     echo "  ./run-axion.sh all paper fabric quickplay"
+    echo "  ./run-axion.sh all build"
     echo "  WITH_PAPER=true QUICKPLAY=true ./run-axion.sh 26.1"
+    echo "  BUILD_FIRST=true ./run-axion.sh 26.1"
     exit 0
 fi
 
@@ -660,6 +773,42 @@ declare -A AUTHME_VERSION
 AUTHME_VERSION["1.21.6"]="CvPwgFbQ"
 AUTHME_VERSION["1.21.9"]="VDR6iBtH"
 
+declare -A SODIUM_VERSION
+SODIUM_VERSION["1.21.5"]="DA250htH"
+SODIUM_VERSION["1.21.6"]="7pwil2dy"
+SODIUM_VERSION["1.21.7"]="7pwil2dy"
+SODIUM_VERSION["1.21.8"]="7pwil2dy"
+SODIUM_VERSION["1.21.9"]="sFfidWgd"
+SODIUM_VERSION["1.21.10"]="sFfidWgd"
+SODIUM_VERSION["1.21.11"]="x0XUezGL"
+SODIUM_VERSION["26.1.2"]="8l4Yx5Q1"
+
+declare -A FERRITECORE_VERSION
+FERRITECORE_VERSION["1.21.5"]="LdlksamY"
+FERRITECORE_VERSION["1.21.6"]="LdlksamY"
+FERRITECORE_VERSION["1.21.7"]="LdlksamY"
+FERRITECORE_VERSION["1.21.8"]="LdlksamY"
+FERRITECORE_VERSION["1.21.9"]="bPLllEgi"
+FERRITECORE_VERSION["1.21.10"]="bPLllEgi"
+FERRITECORE_VERSION["1.21.11"]="Ii0gP3D8"
+FERRITECORE_VERSION["26.1.2"]="d5ddUdiB"
+
+declare -A LITHIUM_VERSION
+# No compatible Lithium release for 1.21.5-1.21.7
+LITHIUM_VERSION["1.21.8"]="qxIL7Kb8"
+LITHIUM_VERSION["1.21.9"]="L1sSIxFm"
+LITHIUM_VERSION["1.21.10"]="NsswKiwi"
+LITHIUM_VERSION["1.21.11"]="Ow7wA0kG"
+LITHIUM_VERSION["26.1.2"]="R7MxYvuW"
+
+declare -A IMMEDIATELYFAST_VERSION
+# No compatible ImmediatelyFast release for 1.21.5-1.21.7
+IMMEDIATELYFAST_VERSION["1.21.8"]="iNldtLH8"
+IMMEDIATELYFAST_VERSION["1.21.9"]="ntac1Na0"
+IMMEDIATELYFAST_VERSION["1.21.10"]="ntac1Na0"
+IMMEDIATELYFAST_VERSION["1.21.11"]="QwkfUKSj"
+IMMEDIATELYFAST_VERSION["26.1.2"]="lRuSLf0Y"
+
 download_modrinth_version() {
     local version_id="$1"
     local target_file="$2"
@@ -695,7 +844,20 @@ install_cached_client_mod() {
     local target_file="$mods_dir/${mod_name}-${mc_version}.jar"
 
     mkdir -p "$cache_dir"
+    local should_download=false
     if [[ ! -f "$cached_file" ]]; then
+        should_download=true
+    else
+        # Re-download if cached file is older than 7 days
+        local file_age
+        file_age=$(find "$cached_file" -mtime +7 -print 2>/dev/null)
+        if [[ -n "$file_age" ]]; then
+            should_download=true
+            echo "  Cached $mod_name is older than 7 days, updating..."
+        fi
+    fi
+
+    if [[ "$should_download" == true ]]; then
         download_modrinth_version "$version_id" "$cached_file" "${mod_name} for Minecraft ${mc_version}" || return 0
     fi
 
@@ -728,6 +890,78 @@ ensure_client_auth_mod() {
     fi
 
     echo "  No compatible IAS/Auth Me release for Minecraft $mc_version; launching without an auth helper."
+}
+
+ensure_sodium_mod() {
+    local mc_version="$1"
+    local client_run_dir="${2:-run}"
+    local mods_dir="$client_run_dir/mods"
+    mkdir -p "$mods_dir"
+
+    # Remove old Sodium jars for this MC version
+    find "$mods_dir" -maxdepth 1 -type f -iname '*sodium*.jar' -delete
+
+    local sodium_version_id="${SODIUM_VERSION[$mc_version]:-}"
+    if [[ -n "$sodium_version_id" ]]; then
+        install_cached_client_mod "$mc_version" "Sodium" "$sodium_version_id" "$mods_dir"
+        echo "  Installed Sodium for Minecraft $mc_version"
+    else
+        echo "  No compatible Sodium release for Minecraft $mc_version"
+    fi
+}
+
+ensure_ferritecore_mod() {
+    local mc_version="$1"
+    local client_run_dir="${2:-run}"
+    local mods_dir="$client_run_dir/mods"
+    mkdir -p "$mods_dir"
+
+    # Remove old FerriteCore jars for this MC version
+    find "$mods_dir" -maxdepth 1 -type f -iname '*ferritecore*.jar' -delete
+
+    local ferritecore_version_id="${FERRITECORE_VERSION[$mc_version]:-}"
+    if [[ -n "$ferritecore_version_id" ]]; then
+        install_cached_client_mod "$mc_version" "FerriteCore" "$ferritecore_version_id" "$mods_dir"
+        echo "  Installed FerriteCore for Minecraft $mc_version"
+    else
+        echo "  No compatible FerriteCore release for Minecraft $mc_version"
+    fi
+}
+
+ensure_lithium_mod() {
+    local mc_version="$1"
+    local client_run_dir="${2:-run}"
+    local mods_dir="$client_run_dir/mods"
+    mkdir -p "$mods_dir"
+
+    # Remove old Lithium jars for this MC version
+    find "$mods_dir" -maxdepth 1 -type f -iname '*lithium*.jar' -delete
+
+    local lithium_version_id="${LITHIUM_VERSION[$mc_version]:-}"
+    if [[ -n "$lithium_version_id" ]]; then
+        install_cached_client_mod "$mc_version" "Lithium" "$lithium_version_id" "$mods_dir"
+        echo "  Installed Lithium for Minecraft $mc_version"
+    else
+        echo "  No compatible Lithium release for Minecraft $mc_version"
+    fi
+}
+
+ensure_immediatelyfast_mod() {
+    local mc_version="$1"
+    local client_run_dir="${2:-run}"
+    local mods_dir="$client_run_dir/mods"
+    mkdir -p "$mods_dir"
+
+    # Remove old ImmediatelyFast jars for this MC version
+    find "$mods_dir" -maxdepth 1 -type f -iname '*immediatelyfast*.jar' -delete
+
+    local immediatelyfast_version_id="${IMMEDIATELYFAST_VERSION[$mc_version]:-}"
+    if [[ -n "$immediatelyfast_version_id" ]]; then
+        install_cached_client_mod "$mc_version" "ImmediatelyFast" "$immediatelyfast_version_id" "$mods_dir"
+        echo "  Installed ImmediatelyFast for Minecraft $mc_version"
+    else
+        echo "  No compatible ImmediatelyFast release for Minecraft $mc_version"
+    fi
 }
 
 client_run_dir_for() {
@@ -975,25 +1209,12 @@ start_client() {
     gradle_dir="$(prepare_client_workspace "$version")"
     gradle_run_dir="$(relative_path "$gradle_dir" "$client_run_dir")"
 
-    # Handle quickplay
-    if [[ "$QUICKPLAY" == "true" ]]; then
-        if [[ "$WITH_PAPER" == "true" || "$WITH_FABRIC" == "true" ]]; then
-            # Auto-join server
-            local port
-            port="$(get_port "$version")"
-            quickplay_args+=("-Pmc_server=localhost:$port")
-            echo "  Quickplay: Auto-joining server at localhost:$port"
-        else
-            # Use latest world or create new one
-            local world_name
-            world_name="$(get_or_create_world "$version")"
-            quickplay_args+=("-Pmc_world=\"$world_name\"")
-            echo "  Quickplay: Using world '$world_name'"
-        fi
-    fi
-
     echo "  Launching Minecraft $mc_version client (run dir: $client_run_dir, workspace: $gradle_dir, gradle runDir: $gradle_run_dir)..."
     ensure_client_auth_mod "$mc_version" "$client_run_dir"
+    ensure_sodium_mod "$mc_version" "$client_run_dir"
+    ensure_ferritecore_mod "$mc_version" "$client_run_dir"
+    ensure_lithium_mod "$mc_version" "$client_run_dir"
+    ensure_immediatelyfast_mod "$mc_version" "$client_run_dir"
 
     yarn_mappings="$(resolve_yarn_mappings "$mc_version")"
     loader_version="$(resolve_loader_version "$mc_version")"
@@ -1025,10 +1246,24 @@ start_client() {
 echo
 echo "==> Running Minecraft versions: ${VERSIONS[*]}"
 
-echo "Building jars..."
-for version in "${VERSIONS[@]}"; do
-    build_version "$version"
-done
+if [[ "$BUILD_ONLY" == "true" ]]; then
+    echo "==> Build-only mode: building jars without launching"
+fi
+
+if [[ "$BUILD_FIRST" == "true" || "$BUILD_ONLY" == "true" ]]; then
+    echo "Building jars..."
+    for version in "${VERSIONS[@]}"; do
+        build_version "$version"
+    done
+else
+    echo "Skipping build (BUILD_FIRST=false)"
+fi
+
+# Exit early if build-only mode
+if [[ "$BUILD_ONLY" == "true" ]]; then
+    echo "==> Build complete"
+    exit 0
+fi
 
 # Start Paper or Fabric server if requested
 if [[ "$WITH_PAPER" == "true" ]]; then

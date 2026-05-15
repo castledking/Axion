@@ -100,17 +100,6 @@ extensions.configure<LoomGradleExtensionAPI>("loom") {
         named("client") {
             configName = "Axion Client"
             runDir = (findProperty("axion_run_dir") as String?) ?: "run"
-            
-            // Quickplay support
-            val mcServer = findProperty("mc_server") as String?
-            val mcWorld = findProperty("mc_world") as String?
-            
-            if (mcServer != null) {
-                programArgs("--server", mcServer)
-            }
-            if (mcWorld != null) {
-                programArgs("--world", mcWorld)
-            }
         }
     }
 }
