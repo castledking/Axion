@@ -10,12 +10,14 @@ import axion.common.model.AxionSubtool
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.gui.DrawContext
 import net.minecraft.item.ItemStack
-import net.minecraft.util.Formatting
 import net.minecraft.util.Identifier
 
 object AxionHotbarHud {
     private val TOOLBOX_TEXTURE: Identifier by lazy {
         VersionCompat.INSTANCE.identifierOf("axion", "textures/gui/toolbox.png")
+    }
+    private val TOOL_SWAPPER_TEXTURE: Identifier by lazy {
+        VersionCompat.INSTANCE.identifierOf("axion", "gui/tool_swapper.png")
     }
     private const val OUTER_BACKGROUND: Int = 0xB0101010.toInt()
     private const val INNER_BACKGROUND: Int = 0xAA1E1E1E.toInt()
@@ -24,6 +26,13 @@ object AxionHotbarHud {
     private const val BORDER_SELECTED: Int = 0xFFFFFFFF.toInt()
     private const val TEXT_SELECTED: Int = 0xFFFFFFFF.toInt()
     private const val TEXT_IDLE: Int = 0xFFE2C884.toInt()
+    private const val TOOL_SWAPPER_ATLAS_SIZE: Int = 256
+    private const val TOOL_STACK_WIDTH: Int = 22
+    private const val TOOL_STACK_ROW_HEIGHT: Int = 20
+    private const val TOOL_STACK_BASE_HEIGHT: Int = 2
+    private const val TOOL_SELECTED_WIDTH: Int = 24
+    private const val TOOL_SELECTED_HEIGHT: Int = 24
+    private const val TOOL_ICON_SIZE: Int = 16
 
     fun render(context: DrawContext, tickCounter: net.minecraft.client.render.RenderTickCounter) {
         val client = MinecraftClient.getInstance()
@@ -47,23 +56,21 @@ object AxionHotbarHud {
 
         val axionSelected = AxionToolSelectionController.isAxionSelected()
         val activeSubtool = AxionToolSelectionController.selectedSubtool()
-        renderSlot(
+        val expandedTools = axionSelected && AxionModifierKeys.isAltDown(client)
+        renderToolStack(
             context = context,
-            x = sideSlot.x,
-            y = sideSlot.y,
-            size = sideSlot.size,
+            sideSlot = sideSlot,
+            activeSubtool = activeSubtool,
+            hovered = if (expandedTools) {
+                AxionAltMenuController.hoveredSubtool(client, context.scaledWindowWidth, context.scaledWindowHeight)
+            } else {
+                null
+            },
             selected = axionSelected,
-            label = if (axionSelected) activeSubtool.shortLabel else "Ax",
+            expanded = expandedTools,
         )
 
-        if (axionSelected && AxionModifierKeys.isAltDown(client)) {
-            renderSubtoolStrip(
-                context = context,
-                sideSlot = sideSlot,
-                selected = activeSubtool,
-                hovered = AxionAltMenuController.hoveredSubtool(client, context.scaledWindowWidth, context.scaledWindowHeight),
-                textRenderer = client.textRenderer,
-            )
+        if (expandedTools) {
             renderMiddleClickToggle(
                 context = context,
                 sideSlot = sideSlot,
@@ -107,24 +114,97 @@ object AxionHotbarHud {
         }
     }
 
-    private fun renderSlot(
+    private fun renderToolStack(
+        context: DrawContext,
+        sideSlot: AxionHudLayout.SlotBounds,
+        activeSubtool: AxionSubtool,
+        hovered: AxionSubtool?,
+        selected: Boolean,
+        expanded: Boolean,
+    ) {
+        val entries = AxionHudLayout.stripEntries(sideSlot)
+        val visibleEntries = if (expanded) {
+            entries
+        } else {
+            val collapsedSubtool = if (selected) activeSubtool else AxionSubtool.MOVE
+            listOf(
+                AxionHudLayout.StripEntryBounds(
+                    x = sideSlot.x,
+                    y = sideSlot.y + 3,
+                    width = TOOL_STACK_WIDTH,
+                    height = TOOL_STACK_ROW_HEIGHT,
+                    subtool = collapsedSubtool,
+                ),
+            )
+        }
+        val backgroundHeight = TOOL_STACK_BASE_HEIGHT + (visibleEntries.size * TOOL_STACK_ROW_HEIGHT)
+        val backgroundY = sideSlot.y + 23 - (visibleEntries.size * TOOL_STACK_ROW_HEIGHT)
+
+        drawToolSwapperRegion(
+            context = context,
+            x = sideSlot.x,
+            y = backgroundY,
+            u = 0,
+            v = 0,
+            width = TOOL_STACK_WIDTH,
+            height = backgroundHeight,
+        )
+
+        visibleEntries.forEach { entry ->
+            val toolIndex = AxionHudLayout.TOOL_STACK_ORDER.indexOf(entry.subtool).coerceAtLeast(0)
+            drawToolSwapperRegion(
+                context = context,
+                x = entry.x + 3,
+                y = entry.y + 3,
+                u = 46 + (TOOL_ICON_SIZE * toolIndex),
+                v = 0,
+                width = TOOL_ICON_SIZE,
+                height = TOOL_ICON_SIZE,
+            )
+        }
+
+        if (selected) {
+            val selectedEntry = visibleEntries.firstOrNull { it.subtool == activeSubtool }
+            selectedEntry?.let { entry ->
+                drawToolSwapperRegion(
+                    context = context,
+                    x = sideSlot.x - 1,
+                    y = entry.y - 1,
+                    u = 22,
+                    v = 0,
+                    width = TOOL_SELECTED_WIDTH,
+                    height = TOOL_SELECTED_HEIGHT,
+                )
+            }
+        }
+
+        if (hovered != null) {
+            visibleEntries.firstOrNull { it.subtool == hovered }?.let { entry ->
+                context.fill(entry.x + 3, entry.y + 3, entry.x + 19, entry.y + 19, 0x44FFFFFF)
+            }
+        }
+    }
+
+    private fun drawToolSwapperRegion(
         context: DrawContext,
         x: Int,
         y: Int,
-        size: Int,
-        selected: Boolean,
-        label: String,
+        u: Int,
+        v: Int,
+        width: Int,
+        height: Int,
     ) {
-        val borderColor = if (selected) BORDER_SELECTED else BORDER_NEUTRAL
-        context.fill(x, y, x + size, y + size, OUTER_BACKGROUND)
-        context.fill(x + 2, y + 2, x + size - 2, y + size - 2, INNER_BACKGROUND)
-        context.drawStrokedRectangleCompat(x, y, size, size, borderColor)
-        context.drawCenteredTextWithShadow(
-            MinecraftClient.getInstance().textRenderer,
-            label,
-            x + (size / 2),
-            y + 8,
-            if (selected) TEXT_SELECTED else TEXT_IDLE,
+        VersionCompatImpl.drawGuiTextureRegion(
+            context = context,
+            texture = TOOL_SWAPPER_TEXTURE,
+            x = x,
+            y = y,
+            u = u,
+            v = v,
+            width = width,
+            height = height,
+            textureWidth = TOOL_SWAPPER_ATLAS_SIZE,
+            textureHeight = TOOL_SWAPPER_ATLAS_SIZE,
         )
     }
 
@@ -378,42 +458,6 @@ object AxionHotbarHud {
                 button.x + (button.width / 2),
                 button.y + 2,
                 if (isHovered) TEXT_SELECTED else TEXT_IDLE,
-            )
-        }
-    }
-
-    private fun renderSubtoolStrip(
-        context: DrawContext,
-        sideSlot: AxionHudLayout.SlotBounds,
-        selected: AxionSubtool,
-        hovered: AxionSubtool?,
-        textRenderer: net.minecraft.client.font.TextRenderer,
-    ) {
-        AxionHudLayout.stripEntries(sideSlot).forEach { entry ->
-            val highlighted = entry.subtool == selected
-            val hover = entry.subtool == hovered
-            val borderColor = when {
-                highlighted -> BORDER_SELECTED
-                hover -> BORDER_HOVER
-                else -> BORDER_NEUTRAL
-            }
-            val textColor = if (highlighted || hover) TEXT_SELECTED else TEXT_IDLE
-
-            context.fill(entry.x, entry.y, entry.x + entry.width, entry.y + entry.height, OUTER_BACKGROUND)
-            context.drawStrokedRectangleCompat(entry.x, entry.y, entry.width, entry.height, borderColor)
-            context.drawTextWithShadow(
-                textRenderer,
-                entry.subtool.shortLabel,
-                entry.x + 4,
-                entry.y + 5,
-                textColor,
-            )
-            context.drawTextWithShadow(
-                textRenderer,
-                Formatting.GRAY.toString() + entry.subtool.displayName,
-                entry.x + 18,
-                entry.y + 5,
-                textColor,
             )
         }
     }

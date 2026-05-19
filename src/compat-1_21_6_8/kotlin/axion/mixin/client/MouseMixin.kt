@@ -5,6 +5,7 @@ import axion.client.hotbar.AxionAltMenuController
 import axion.client.input.AxionInteractionRouter
 import axion.client.input.AxionModifierKeys
 import axion.client.mode.ClientModeController
+import axion.mixin.compat.currentScreenOf
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.Mouse
 import org.spongepowered.asm.mixin.Mixin
@@ -32,7 +33,7 @@ abstract class MouseMixin {
             return
         }
 
-        if (hasCurrentScreen(client) || action != GLFW.GLFW_PRESS) {
+        if (currentScreenOf(client) != null || action != GLFW.GLFW_PRESS) {
             return
         }
 
@@ -76,7 +77,7 @@ abstract class MouseMixin {
     @Inject(method = ["onMouseScroll"], at = [At("HEAD")], cancellable = true)
     private fun axionHandleScroll(window: Long, horizontal: Double, vertical: Double, ci: CallbackInfo) {
         val client = getClient()
-        if (hasCurrentScreen(client)) {
+        if (currentScreenOf(client) != null) {
             return
         }
 
@@ -103,10 +104,4 @@ abstract class MouseMixin {
         }
     }
 
-    private fun hasCurrentScreen(client: MinecraftClient): Boolean {
-        val screenField = client.javaClass.fields.firstOrNull { it.name == "currentScreen" || it.name == "screen" }
-            ?: client.javaClass.declaredFields.firstOrNull { it.name == "currentScreen" || it.name == "screen" }?.also { it.isAccessible = true }
-            ?: return false
-        return runCatching { screenField.get(client) != null }.getOrDefault(false)
-    }
 }

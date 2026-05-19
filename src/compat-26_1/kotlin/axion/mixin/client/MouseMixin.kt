@@ -3,6 +3,7 @@ package axion.mixin.client
 import axion.client.compat.LitematicaCompat
 import axion.client.input.AxionInteractionRouter
 import axion.client.input.AxionModifierKeys
+import axion.mixin.compat.currentScreenOf
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.MouseHandler
 import org.spongepowered.asm.mixin.Mixin
@@ -21,7 +22,7 @@ abstract class MouseMixin {
     @Inject(method = ["onScroll(JDD)V"], at = [At("HEAD")], cancellable = true)
     private fun axionHandleScroll(window: Long, horizontal: Double, vertical: Double, ci: CallbackInfo) {
         val client = getClient()
-        if (hasCurrentScreen(client)) {
+        if (currentScreenOf(client) != null) {
             return
         }
 
@@ -48,10 +49,4 @@ abstract class MouseMixin {
         }
     }
 
-    private fun hasCurrentScreen(client: MinecraftClient): Boolean {
-        val screenField = client.javaClass.fields.firstOrNull { it.name == "currentScreen" || it.name == "screen" }
-            ?: client.javaClass.declaredFields.firstOrNull { it.name == "currentScreen" || it.name == "screen" }?.also { it.isAccessible = true }
-            ?: return false
-        return runCatching { screenField.get(client) != null }.getOrDefault(false)
-    }
 }

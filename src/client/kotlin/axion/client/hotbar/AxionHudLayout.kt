@@ -16,6 +16,10 @@ object AxionHudLayout {
     const val STRIP_ENTRY_HEIGHT: Int = 18
     const val STRIP_ENTRY_WIDTH: Int = 42
     const val STRIP_ENTRY_GAP: Int = 2
+    private const val TOOL_STACK_ENTRY_WIDTH: Int = 22
+    private const val TOOL_STACK_ENTRY_HEIGHT: Int = 20
+
+    val TOOL_STACK_ORDER: List<AxionSubtool> = AxionSubtool.toolbarOrder
 
     data class SlotBounds(
         val x: Int,
@@ -85,15 +89,13 @@ object AxionHudLayout {
     }
 
     fun stripEntries(sideSlot: SlotBounds): List<StripEntryBounds> {
-        val (originX, originBottom) = stripOrigin(sideSlot)
-        val stripX = originX - (STRIP_ENTRY_WIDTH - sideSlot.size)
-        return AxionSubtool.entries.mapIndexed { index, subtool ->
-            val boxY = originBottom - ((index + 1) * (STRIP_ENTRY_HEIGHT + STRIP_ENTRY_GAP))
+        return TOOL_STACK_ORDER.mapIndexed { index, subtool ->
+            val boxY = sideSlot.y + 3 - (index * TOOL_STACK_ENTRY_HEIGHT)
             StripEntryBounds(
-                x = stripX,
+                x = sideSlot.x,
                 y = boxY,
-                width = STRIP_ENTRY_WIDTH,
-                height = STRIP_ENTRY_HEIGHT,
+                width = TOOL_STACK_ENTRY_WIDTH,
+                height = TOOL_STACK_ENTRY_HEIGHT,
                 subtool = subtool,
             )
         }

@@ -11,6 +11,7 @@ object SymmetryGizmoRenderer {
     private const val GIZMO_COLOR: Int = 0xFFF2C94C.toInt()
     private const val HALF_SIZE: Double = 2.0 / 16.0
     private const val LINE_WIDTH: Float = 1.5f
+    private const val FILL_ALPHA: Int = 130
 
     fun render(context: AxionWorldRenderContext) {
         val state = AxionClientState.symmetryState
@@ -25,16 +26,31 @@ object SymmetryGizmoRenderer {
         val consumers = context.consumers()
         val matrixStack = context.matrices()
         val box = gizmoBox(config.anchor.position)
-        VertexRenderingCompat.drawOutline(
-            matrixStack,
-            consumers.getBuffer(RenderLayerCompat.lines()),
-            VoxelShapes.cuboid(box),
-            -cameraPos.x,
-            -cameraPos.y,
-            -cameraPos.z,
-            GIZMO_COLOR,
-            LINE_WIDTH,
-        )
+
+        val fillLayer = RenderLayerCompat.xrayQuads()
+        val lineLayer = RenderLayerCompat.lines()
+        DepthRenderCompat.renderThroughBlocks(consumers, fillLayer, lineLayer) {
+            PulsingCuboidRenderer.renderFilledBox(
+                matrixStack = matrixStack,
+                consumer = consumers.getBuffer(fillLayer),
+                layer = fillLayer,
+                cameraPos = cameraPos,
+                box = box,
+                alpha = FILL_ALPHA,
+                color = GIZMO_COLOR,
+            )
+
+            VertexRenderingCompat.drawOutline(
+                matrixStack,
+                consumers.getBuffer(lineLayer),
+                VoxelShapes.cuboid(box),
+                -cameraPos.x,
+                -cameraPos.y,
+                -cameraPos.z,
+                GIZMO_COLOR,
+                LINE_WIDTH,
+            )
+        }
     }
 
     private fun gizmoBox(anchor: net.minecraft.util.math.Vec3d): Box {

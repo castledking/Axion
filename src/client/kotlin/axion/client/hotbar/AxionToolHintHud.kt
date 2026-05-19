@@ -1,32 +1,41 @@
 package axion.client.hotbar
 
+import axion.client.compat.VersionCompatImpl
 import axion.client.config.AxionConfigScreen
 import axion.client.config.MagicSelectCustomMaskScreen
 import axion.client.config.MagicSelectMaskConfigScreen
 import axion.client.config.MagicSelectTemplateEditScreen
 import axion.client.ui.drawStrokedRectangleCompat
+import axion.common.compat.VersionCompat
 import net.minecraft.client.MinecraftClient
-import net.minecraft.client.gui.DrawContext
 import net.minecraft.client.font.TextRenderer
-import net.minecraft.util.Formatting
+import net.minecraft.client.gui.DrawContext
+import net.minecraft.util.Identifier
 
 object AxionToolHintHud {
-    private const val PANEL_BACKGROUND: Int = 0xAA111111.toInt()
-    private const val PANEL_BORDER: Int = 0xFF5A5A5A.toInt()
-    private const val TITLE_COLOR: Int = 0xFFFFFFFF.toInt()
-    private const val SUBTITLE_COLOR: Int = 0xFFE7D39B.toInt()
+    private const val PANEL_BACKGROUND: Int = 0x8A0D0F10.toInt()
+    private const val PANEL_BORDER: Int = 0x885F686D.toInt()
+    private const val TEXT_COLOR: Int = 0xFFFFFFFF.toInt()
     private const val INPUT_COLOR: Int = 0xFFBDEFFF.toInt()
-    private const val ACTION_COLOR: Int = 0xFFFFFFFF.toInt()
-    private const val STATUS_COLOR: Int = 0xFFD2E2E8.toInt()
-    private const val TARGET_STATUS_COLOR: Int = 0xFF8C9498.toInt()
-    private const val FOOTER_COLOR: Int = 0xFFB7B7B7.toInt()
-    private const val PANEL_X: Int = 8
-    private const val PANEL_BOTTOM_MARGIN: Int = 72
-    private const val PADDING: Int = 6
-    private const val ENTRY_GAP: Int = 2
-    private const val SECTION_GAP: Int = 5
-    private const val INPUT_ACTION_GAP: Int = 12
-    private const val MIN_WIDTH: Int = 176
+    private const val HOTBAR_STATUS_COLOR: Int = 0xFFE7D39B.toInt()
+    private const val ICON_SIZE: Int = 16
+    private const val ICON_TEXT_GAP: Int = 4
+    private const val CROSSHAIR_ROW_GAP: Int = 2
+    private const val CROSSHAIR_TOP_OFFSET: Int = 18
+    private const val PANEL_PADDING_X: Int = 6
+    private const val PANEL_PADDING_Y: Int = 5
+    private const val KEY_LINE_GAP: Int = 2
+    private const val RIGHT_MARGIN: Int = 8
+    private const val BOTTOM_MARGIN: Int = 72
+
+    private val mouseTextures: Map<MouseHintIcon, Identifier> by lazy {
+        mapOf(
+            MouseHintIcon.LEFT to VersionCompat.INSTANCE.identifierOf("axion", "mouse/left.png"),
+            MouseHintIcon.RIGHT to VersionCompat.INSTANCE.identifierOf("axion", "mouse/right.png"),
+            MouseHintIcon.SCROLL to VersionCompat.INSTANCE.identifierOf("axion", "mouse/scroll.png"),
+            MouseHintIcon.NEUTRAL to VersionCompat.INSTANCE.identifierOf("axion", "mouse/neutral.png"),
+        )
+    }
 
     fun render(context: DrawContext, tickCounter: net.minecraft.client.render.RenderTickCounter) {
         val client = MinecraftClient.getInstance()
@@ -35,23 +44,12 @@ object AxionToolHintHud {
             return
         }
 
-        val panel = AxionToolHintProvider.currentPanel() ?: return
+        val hints = AxionToolHintProvider.currentCompactHints() ?: return
         val textRenderer = client.textRenderer
-        val lineHeight = textRenderer.fontHeight
-        val layout = computeLayout(textRenderer, panel)
-        val height = computeHeight(panel, lineHeight)
-        val width = layout.contentWidth + (PADDING * 2)
-        val x = PANEL_X
-        val y = context.scaledWindowHeight - PANEL_BOTTOM_MARGIN - height
 
-        context.fill(x, y, x + width, y + height, PANEL_BACKGROUND)
-        context.drawStrokedRectangleCompat(x, y, width, height, PANEL_BORDER)
-
-        var cursorY = y + PADDING
-        cursorY = drawHeader(context, textRenderer, panel, x, cursorY, lineHeight)
-        cursorY = drawEntries(context, textRenderer, panel, x, cursorY, lineHeight, layout)
-        cursorY = drawStatusLines(context, textRenderer, panel, x, cursorY, lineHeight)
-        drawFooter(context, textRenderer, panel, x, cursorY)
+        renderCrosshairHints(context, textRenderer, hints.crosshairHints)
+        renderHotbarStatus(context, textRenderer, hints.hotbarStatus)
+        renderKeyHints(context, textRenderer, hints.keyHints)
     }
 
     private fun shouldSuppressForScreen(screen: net.minecraft.client.gui.screen.Screen?): Boolean {
@@ -61,124 +59,107 @@ object AxionToolHintHud {
             screen is MagicSelectCustomMaskScreen
     }
 
-    private fun computeLayout(textRenderer: TextRenderer, panel: ToolHintPanel): HintLayout {
-        var maxWidth = MIN_WIDTH
-        var maxInputWidth = 0
-        maxWidth = maxOf(maxWidth, textRenderer.getWidth(panel.title))
-        panel.subtitle?.let { maxWidth = maxOf(maxWidth, textRenderer.getWidth(it)) }
-        panel.footer?.let { maxWidth = maxOf(maxWidth, textRenderer.getWidth(it)) }
-        panel.statusLines.forEach { statusLine ->
-            maxWidth = maxOf(maxWidth, textRenderer.getWidth(statusLine))
-        }
-        panel.entries.forEach { entry ->
-            val inputWidth = textRenderer.getWidth(entry.input)
-            val entryWidth = inputWidth + INPUT_ACTION_GAP + textRenderer.getWidth(entry.action)
-            maxWidth = maxOf(maxWidth, entryWidth)
-            if (!entry.inline) {
-                maxInputWidth = maxOf(maxInputWidth, inputWidth)
-            }
-        }
-        return HintLayout(
-            contentWidth = maxWidth,
-            actionOffset = maxInputWidth + INPUT_ACTION_GAP,
-        )
-    }
-
-    private fun computeHeight(panel: ToolHintPanel, lineHeight: Int): Int {
-        var height = PADDING * 2
-        height += lineHeight
-        if (panel.subtitle != null) {
-            height += ENTRY_GAP + lineHeight
-        }
-        if (panel.entries.isNotEmpty()) {
-            height += ENTRY_GAP + (panel.entries.size * lineHeight) + ((panel.entries.size - 1) * ENTRY_GAP)
-        }
-        if (panel.statusLines.isNotEmpty()) {
-            height += SECTION_GAP + (panel.statusLines.size * lineHeight) + ((panel.statusLines.size - 1) * ENTRY_GAP)
-        }
-        if (panel.footer != null) {
-            height += SECTION_GAP + lineHeight
-        }
-        return height
-    }
-
-    private fun drawHeader(
+    private fun renderCrosshairHints(
         context: DrawContext,
         textRenderer: TextRenderer,
-        panel: ToolHintPanel,
-        x: Int,
-        startY: Int,
-        lineHeight: Int,
-    ): Int {
-        var cursorY = startY
-        context.drawTextWithShadow(textRenderer, panel.title, x + PADDING, cursorY, TITLE_COLOR)
-        cursorY += lineHeight + ENTRY_GAP
-        panel.subtitle?.let { subtitle ->
-            context.drawTextWithShadow(textRenderer, subtitle, x + PADDING, cursorY, SUBTITLE_COLOR)
-            cursorY += lineHeight + ENTRY_GAP
-        }
-        return cursorY
-    }
-
-    private fun drawEntries(
-        context: DrawContext,
-        textRenderer: TextRenderer,
-        panel: ToolHintPanel,
-        x: Int,
-        startY: Int,
-        lineHeight: Int,
-        layout: HintLayout,
-    ): Int {
-        var cursorY = startY
-        panel.entries.forEach { entry ->
-            val inputX = x + PADDING
-            context.drawTextWithShadow(textRenderer, Formatting.AQUA.toString() + entry.input, inputX, cursorY, INPUT_COLOR)
-            val actionX = if (entry.inline) {
-                inputX + textRenderer.getWidth(entry.input) + INPUT_ACTION_GAP
-            } else {
-                inputX + layout.actionOffset
-            }
-            context.drawTextWithShadow(textRenderer, entry.action, actionX, cursorY, ACTION_COLOR)
-            cursorY += lineHeight + ENTRY_GAP
-        }
-        return cursorY
-    }
-
-    private fun drawStatusLines(
-        context: DrawContext,
-        textRenderer: TextRenderer,
-        panel: ToolHintPanel,
-        x: Int,
-        startY: Int,
-        lineHeight: Int,
-    ): Int {
-        var cursorY = startY
-        if (panel.statusLines.isNotEmpty()) {
-            cursorY += SECTION_GAP - ENTRY_GAP
-        }
-        panel.statusLines.forEach { statusLine ->
-            val color = if (statusLine.string.startsWith("Target:")) TARGET_STATUS_COLOR else STATUS_COLOR
-            context.drawTextWithShadow(textRenderer, statusLine, x + PADDING, cursorY, color)
-            cursorY += lineHeight + ENTRY_GAP
-        }
-        return cursorY
-    }
-
-    private fun drawFooter(
-        context: DrawContext,
-        textRenderer: TextRenderer,
-        panel: ToolHintPanel,
-        x: Int,
-        cursorY: Int,
+        hints: List<CrosshairHint>,
     ) {
-        panel.footer?.let { footer ->
-            val footerY = if (panel.statusLines.isNotEmpty()) cursorY + (SECTION_GAP - ENTRY_GAP) else cursorY
-            context.drawTextWithShadow(textRenderer, footer, x + PADDING, footerY, FOOTER_COLOR)
+        if (hints.isEmpty()) {
+            return
+        }
+
+        val centerX = context.scaledWindowWidth / 2
+        val rowHeight = ICON_SIZE + CROSSHAIR_ROW_GAP
+        var y = (context.scaledWindowHeight / 2) + CROSSHAIR_TOP_OFFSET
+
+        hints.forEach { hint ->
+            when (hint) {
+                is CrosshairHint.Mouse -> {
+                    val actionWidth = textRenderer.getWidth(hint.action)
+                    val totalWidth = ICON_SIZE + ICON_TEXT_GAP + actionWidth
+                    val x = centerX - totalWidth / 2
+                    mouseTextures[hint.icon]?.let { texture ->
+                        VersionCompatImpl.drawGuiTexture(context, texture, x, y, ICON_SIZE, ICON_SIZE)
+                    }
+                    val textY = y + (ICON_SIZE - textRenderer.fontHeight) / 2 + 1
+                    context.drawTextWithShadow(
+                        textRenderer,
+                        hint.action,
+                        x + ICON_SIZE + ICON_TEXT_GAP,
+                        textY,
+                        TEXT_COLOR,
+                    )
+                }
+                is CrosshairHint.Key -> {
+                    val separator = " - "
+                    val keyWidth = textRenderer.getWidth(hint.key)
+                    val sepWidth = textRenderer.getWidth(separator)
+                    val actionWidth = textRenderer.getWidth(hint.action)
+                    val totalWidth = keyWidth + sepWidth + actionWidth
+                    val x = centerX - totalWidth / 2
+                    val textY = y + (ICON_SIZE - textRenderer.fontHeight) / 2 + 1
+                    context.drawTextWithShadow(textRenderer, hint.key, x, textY, INPUT_COLOR)
+                    context.drawTextWithShadow(textRenderer, separator, x + keyWidth, textY, TEXT_COLOR)
+                    context.drawTextWithShadow(textRenderer, hint.action, x + keyWidth + sepWidth, textY, TEXT_COLOR)
+                }
+            }
+            y += rowHeight
         }
     }
 
-    private data class HintLayout(
-        val contentWidth: Int,
-        val actionOffset: Int,
-    )
+    private fun renderHotbarStatus(
+        context: DrawContext,
+        textRenderer: TextRenderer,
+        status: String?,
+    ) {
+        if (status == null) {
+            return
+        }
+
+        val width = textRenderer.getWidth(status)
+        val x = (context.scaledWindowWidth - width) / 2
+        val y = context.scaledWindowHeight - 48
+        context.fill(
+            x - PANEL_PADDING_X,
+            y - PANEL_PADDING_Y,
+            x + width + PANEL_PADDING_X,
+            y + textRenderer.fontHeight + PANEL_PADDING_Y,
+            PANEL_BACKGROUND,
+        )
+        context.drawTextWithShadow(textRenderer, status, x, y, HOTBAR_STATUS_COLOR)
+    }
+
+    private fun renderKeyHints(
+        context: DrawContext,
+        textRenderer: TextRenderer,
+        hints: List<ToolHintEntry>,
+    ) {
+        if (hints.isEmpty()) {
+            return
+        }
+
+        val lines = hints.map { "${it.input} - ${it.action}" }
+        val contentWidth = lines.maxOf(textRenderer::getWidth)
+        val lineHeight = textRenderer.fontHeight
+        val panelWidth = contentWidth + (PANEL_PADDING_X * 2)
+        val panelHeight = (lineHeight * lines.size) + (KEY_LINE_GAP * (lines.size - 1)) + (PANEL_PADDING_Y * 2)
+        val x = context.scaledWindowWidth - RIGHT_MARGIN - panelWidth
+        val y = context.scaledWindowHeight - BOTTOM_MARGIN - panelHeight
+
+        context.fill(x, y, x + panelWidth, y + panelHeight, PANEL_BACKGROUND)
+        context.drawStrokedRectangleCompat(x, y, panelWidth, panelHeight, PANEL_BORDER)
+
+        var cursorY = y + PANEL_PADDING_Y
+        hints.forEach { hint ->
+            val input = hint.input
+            val separator = " - "
+            val action = hint.action
+            val textX = x + PANEL_PADDING_X
+            context.drawTextWithShadow(textRenderer, input, textX, cursorY, INPUT_COLOR)
+            val actionX = textX + textRenderer.getWidth(input + separator)
+            context.drawTextWithShadow(textRenderer, separator, textX + textRenderer.getWidth(input), cursorY, TEXT_COLOR)
+            context.drawTextWithShadow(textRenderer, action, actionX, cursorY, TEXT_COLOR)
+            cursorY += lineHeight + KEY_LINE_GAP
+        }
+    }
 }

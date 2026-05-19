@@ -1,6 +1,7 @@
 package axion.client.compat
 
 import axion.client.render.AxionWorldRenderContext
+import axion.client.render.ShaderPackCompat
 import axion.client.render.gpu.ChunkedPreviewLifecycle
 import axion.client.render.gpu.SectionDrawEntry
 import axion.client.network.AxionPluginPayload
@@ -315,6 +316,10 @@ object VersionCompatImpl : VersionCompat {
     }
 
     fun supportsChunkedPreview(): Boolean {
+        if (ShaderPackCompat.shouldDisableDirectGpuPreview()) {
+            logger.info("[Axion GPU] supportsChunkedPreview=false (shader-pack fallback)")
+            return false
+        }
         val hasBindTexture = renderPassBindTexture != null
         val hasBindSampler = renderPassBindSampler != null
         val hasWrite4 = dynamicUniformsWrite4 != null
@@ -499,7 +504,7 @@ object VersionCompatImpl : VersionCompat {
     }
 
     override fun blockStateStringify(state: BlockState): String {
-        return state.toString()
+        return BlockArgumentParser.stringifyBlockState(state)
     }
 
     fun rawBlockStateId(state: BlockState): Int {
@@ -750,6 +755,21 @@ object VersionCompatImpl : VersionCompat {
         height: Int,
     ) {
         context.drawTexture(RenderPipelines.GUI_TEXTURED, texture, x, y, 0.0f, 0.0f, width, height, width, height)
+    }
+
+    fun drawGuiTextureRegion(
+        context: DrawContext,
+        texture: Identifier,
+        x: Int,
+        y: Int,
+        u: Int,
+        v: Int,
+        width: Int,
+        height: Int,
+        textureWidth: Int,
+        textureHeight: Int,
+    ) {
+        context.drawTexture(RenderPipelines.GUI_TEXTURED, texture, x, y, u.toFloat(), v.toFloat(), width, height, textureWidth, textureHeight)
     }
 
     private val cameraPosField: Field? by lazy {

@@ -2,6 +2,7 @@ package axion.client.compat
 
 import axion.common.compat.VersionCompat
 import axion.client.render.AxionWorldRenderContext
+import axion.client.render.ShaderPackCompat
 import axion.client.render.gpu.ChunkedPreviewLifecycle
 import axion.client.network.AxionPluginPayload
 import axion.client.network.BlockWrite
@@ -278,7 +279,7 @@ object VersionCompatImpl : VersionCompat {
     }
 
     fun supportsChunkedPreview(): Boolean {
-        return true
+        return !ShaderPackCompat.shouldDisableDirectGpuPreview()
     }
 
     fun renderChunkedPreview(
@@ -335,6 +336,21 @@ object VersionCompatImpl : VersionCompat {
         height: Int,
     ) {
         context.drawTexture(RenderPipelines.GUI_TEXTURED, texture, x, y, 0.0f, 0.0f, width, height, width, height)
+    }
+
+    fun drawGuiTextureRegion(
+        context: DrawContext,
+        texture: Identifier,
+        x: Int,
+        y: Int,
+        u: Int,
+        v: Int,
+        width: Int,
+        height: Int,
+        textureWidth: Int,
+        textureHeight: Int,
+    ) {
+        context.drawTexture(RenderPipelines.GUI_TEXTURED, texture, x, y, u.toFloat(), v.toFloat(), width, height, textureWidth, textureHeight)
     }
 
     fun getCameraPos(camera: Camera): Vec3d {
@@ -484,7 +500,7 @@ object VersionCompatImpl : VersionCompat {
     override fun directionGetVector(direction: Any): Any =
         (direction as net.minecraft.util.math.Direction).vector
 
-    override fun blockStateStringify(state: BlockState): String = state.toString()
+    override fun blockStateStringify(state: BlockState): String = BlockArgumentParser.stringifyBlockState(state)
 
     override fun worldGetRegistryManager(world: Any): Any =
         (world as net.minecraft.world.World).registryManager

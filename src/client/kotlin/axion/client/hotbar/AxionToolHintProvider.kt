@@ -1,433 +1,194 @@
 package axion.client.hotbar
 
 import axion.client.AxionClientState
-import axion.client.config.AxionClientConfig
-import axion.client.selection.AxionTarget
-import axion.client.selection.SelectionController
-import axion.client.selection.blockPosOrNull
-import axion.client.symmetry.ActiveSymmetryConfig
 import axion.client.tool.AxionToolSelectionController
 import axion.client.tool.CloneToolState
 import axion.client.tool.EraseToolState
 import axion.client.tool.ExtrudeToolState
 import axion.client.tool.PlacementToolMode
-import axion.client.tool.PlacementMirrorAxis
-import axion.client.tool.RepeatRegionPreview
 import axion.client.tool.SmearToolState
 import axion.client.tool.StackToolState
-import axion.client.tool.MagicSelectionService
-import axion.client.ui.FormattedNameText
 import axion.common.model.AxionSubtool
-import axion.common.model.BlockRegion
-import axion.common.model.SelectionState
-import axion.common.model.SymmetryMirrorAxis
-import axion.common.model.SymmetryState
-import net.minecraft.text.Text
-import net.minecraft.util.math.BlockPos
-import net.minecraft.util.math.Vec3i
-import kotlin.math.abs
 
 object AxionToolHintProvider {
-    private fun middleClickLabel(): String {
-        return if (AxionClientState.middleClickMagicSelectEnabled) "Magic select" else "Expand nearest face"
-    }
-
-    private fun magicConfigHintEntries(): List<ToolHintEntry> {
-        return if (AxionClientState.middleClickMagicSelectEnabled) {
-            listOf(
-                ToolHintEntry("Main Mod + MMB", "Configure templates", inline = true),
-                ToolHintEntry("Main Mod + Scroll", "Adjust brush size", inline = true),
-            )
-        } else {
-            emptyList()
-        }
-    }
-
-    private fun appendMagicSelectInfo(lines: MutableList<Text>) {
-        if (!AxionClientState.middleClickMagicSelectEnabled) {
-            return
-        }
-        lines += Text.literal("Magic Select Info:")
-        val templateLine = Text.literal("Template: ").append(FormattedNameText.parse(AxionClientConfig.magicSelectTemplateSummary()))
-        lines += templateLine
-        lines += Text.literal("Brush Size: ${MagicSelectionService.defaultBrushSize()}")
-    }
-
-    fun currentPanel(): ToolHintPanel? {
+    fun currentCompactHints(): CompactToolHints? {
         if (!AxionToolSelectionController.isAxionSlotActive()) {
             return null
         }
 
-        return when (val subtool = AxionToolSelectionController.selectedSubtool()) {
-            AxionSubtool.MOVE -> placementPanel(PlacementToolMode.MOVE)
-            AxionSubtool.CLONE -> placementPanel(PlacementToolMode.CLONE)
-            AxionSubtool.STACK -> stackPanel()
-            AxionSubtool.SMEAR -> smearPanel()
-            AxionSubtool.ERASE -> erasePanel()
-            AxionSubtool.EXTRUDE -> extrudePanel()
-            AxionSubtool.SETUP_SYMMETRY -> symmetryPanel()
+        return when (AxionToolSelectionController.selectedSubtool()) {
+            AxionSubtool.MOVE -> placementCompactHints(PlacementToolMode.MOVE)
+            AxionSubtool.CLONE -> placementCompactHints(PlacementToolMode.CLONE)
+            AxionSubtool.STACK -> stackCompactHints()
+            AxionSubtool.SMEAR -> smearCompactHints()
+            AxionSubtool.ERASE -> eraseCompactHints()
+            AxionSubtool.EXTRUDE -> extrudeCompactHints()
+            AxionSubtool.SETUP_SYMMETRY -> symmetryCompactHints()
         }
     }
 
-    private fun placementPanel(mode: PlacementToolMode): ToolHintPanel {
+    private fun placementCompactHints(mode: PlacementToolMode): CompactToolHints {
         val state = AxionClientState.placementToolState
-        val preview = when (state) {
-            is CloneToolState.PreviewingOffset -> state.preview
-            is CloneToolState.AwaitingConfirm -> state.preview
-            else -> null
-        }
-        val title = if (mode == PlacementToolMode.MOVE) "AXION - Move" else "AXION - Clone"
-        val subtitle = when (state) {
-            CloneToolState.Idle -> "Selecting source"
-            is CloneToolState.FirstCornerSet -> "First corner set"
-            is CloneToolState.RegionDefined -> "Selection ready"
-            is CloneToolState.PreviewingOffset,
-            is CloneToolState.AwaitingConfirm,
-                -> "Previewing destination"
-        }
-        val entries = when (state) {
-            CloneToolState.Idle -> listOf(
-                ToolHintEntry("LMB", "Set first corner"),
-                ToolHintEntry("RMB", "Set second corner"),
-                ToolHintEntry("MMB", if (AxionClientState.middleClickMagicSelectEnabled) "Magic select" else "Disabled until region exists"),
-                ToolHintEntry("Scroll", "Start preview"),
-            ) + magicConfigHintEntries()
-
-            is CloneToolState.FirstCornerSet -> listOf(
-                ToolHintEntry("LMB", "Reset first corner"),
-                ToolHintEntry("RMB", "Set second corner"),
-                ToolHintEntry("MMB", if (AxionClientState.middleClickMagicSelectEnabled) "Magic select" else "Disabled until region exists"),
-                ToolHintEntry("Scroll", "Disabled until region exists"),
-            ) + magicConfigHintEntries()
-
-            is CloneToolState.RegionDefined -> listOf(
-                ToolHintEntry("MMB", middleClickLabel()),
-                ToolHintEntry("Scroll", "Move preview"),
-                ToolHintEntry("LMB", "Restart source selection"),
-                ToolHintEntry("RMB", "Set second corner again"),
-            ) + magicConfigHintEntries()
-
-            is CloneToolState.PreviewingOffset,
-            is CloneToolState.AwaitingConfirm,
-                -> listOf(
-                    ToolHintEntry("Scroll", "Adjust preview offset"),
-                    ToolHintEntry("Main Mod + R", "Rotate 90 degrees"),
-                    ToolHintEntry("Main Mod + F", "Mirror preview"),
-                    ToolHintEntry("RMB", "Confirm placement"),
-                    ToolHintEntry("LMB", "Cancel preview"),
-                    ToolHintEntry("MMB", "Reanchor preview"),
-                )
-        }
-
-        return ToolHintPanel(
-            title = title,
-            subtitle = subtitle,
-            entries = entries,
-            statusLines = buildList {
-                currentSelectionSize()?.let { add(Text.literal("Selection: $it")) }
-                preview?.let {
-                    add(Text.literal("Offset: ${formatAxis(it.offset)} x ${formatStepLength(it.offset)}"))
-                    add(Text.literal("Destination: ${formatRegionSize(it.destinationRegion)}"))
-                    add(Text.literal("Rotation: ${it.transform.normalizedRotationQuarterTurns * 90}deg"))
-                    add(Text.literal("Mirror: ${formatMirrorAxis(it.transform.mirrorAxis)}"))
+        val scrollAction = if (mode == PlacementToolMode.MOVE) "Scroll to move" else "Scroll to clone"
+        val previewing = state is CloneToolState.PreviewingOffset || state is CloneToolState.AwaitingConfirm
+        return CompactToolHints(
+            crosshairHints = buildList {
+                when (state) {
+                    CloneToolState.Idle -> add(left("First Point"))
+                    is CloneToolState.FirstCornerSet -> addAll(selectionPointHints())
+                    is CloneToolState.RegionDefined -> {
+                        addAll(selectionPointHints())
+                        add(scroll(scrollAction))
+                    }
+                    is CloneToolState.PreviewingOffset,
+                    is CloneToolState.AwaitingConfirm,
+                        -> {
+                        addAll(confirmPreviewHints())
+                        add(middle("Reanchor preview"))
+                    }
                 }
-                appendMagicSelectInfo(this)
-                targetSummary()?.let { add(Text.literal(it)) }
+                addMagicSelectCrosshair()
             },
-            footer = symmetrySummary(),
+            keyHints = buildList {
+                if (previewing) {
+                    add(ToolHintEntry("Ctrl + R", "Rotate preview"))
+                    add(ToolHintEntry("Ctrl + F", "Flip preview"))
+                }
+                addMagicSelectKeyHints()
+            },
         )
     }
 
-    private fun stackPanel(): ToolHintPanel {
+    private fun stackCompactHints(): CompactToolHints {
         val state = AxionClientState.stackToolState
-        val preview = (state as? StackToolState.PreviewingStack)?.preview
-        val subtitle = when (state) {
-            StackToolState.Idle -> "Selecting source"
-            is StackToolState.FirstCornerSet -> "First corner set"
-            is StackToolState.RegionDefined -> "Selection ready"
-            is StackToolState.PreviewingStack -> "Previewing repeats"
-        }
-        val entries = when (state) {
-            StackToolState.Idle -> listOf(
-                ToolHintEntry("LMB", "Set first corner"),
-                ToolHintEntry("RMB", "Set second corner"),
-                ToolHintEntry("MMB", if (AxionClientState.middleClickMagicSelectEnabled) "Magic select" else "Disabled until region exists"),
-                ToolHintEntry("Scroll", "Pick axis and repeat"),
-            ) + magicConfigHintEntries()
-
-            is StackToolState.FirstCornerSet -> listOf(
-                ToolHintEntry("LMB", "Reset first corner"),
-                ToolHintEntry("RMB", "Set second corner"),
-                ToolHintEntry("MMB", if (AxionClientState.middleClickMagicSelectEnabled) "Magic select" else "Disabled until region exists"),
-            ) + magicConfigHintEntries()
-
-            is StackToolState.RegionDefined -> listOf(
-                ToolHintEntry("MMB", middleClickLabel()),
-                ToolHintEntry("Scroll", "Start stack preview"),
-                ToolHintEntry("LMB", "Restart selection"),
-                ToolHintEntry("RMB", "Set second corner again"),
-            ) + magicConfigHintEntries()
-
-            is StackToolState.PreviewingStack -> listOf(
-                ToolHintEntry("Scroll", "Adjust repeat count"),
-                ToolHintEntry("RMB", "Confirm stack"),
-                ToolHintEntry("LMB", "Cancel preview"),
-            )
-        }
-
-        return ToolHintPanel(
-            title = "AXION - Stack",
-            subtitle = subtitle,
-            entries = entries,
-            statusLines = repeatStatusLines(preview, "Mode: Replace-all"),
-            footer = symmetrySummary(),
+        return CompactToolHints(
+            crosshairHints = buildList {
+                when (state) {
+                    StackToolState.Idle -> add(left("First Point"))
+                    is StackToolState.FirstCornerSet -> addAll(selectionPointHints())
+                    is StackToolState.RegionDefined -> {
+                        addAll(selectionPointHints())
+                        add(scroll("Scroll to stack"))
+                    }
+                    is StackToolState.PreviewingStack -> addAll(confirmPreviewHints())
+                }
+                addMagicSelectCrosshair()
+            },
+            keyHints = buildList {
+                addMagicSelectKeyHints()
+            },
         )
     }
 
-    private fun smearPanel(): ToolHintPanel {
+    private fun smearCompactHints(): CompactToolHints {
         val state = AxionClientState.smearToolState
         val preview = (state as? SmearToolState.PreviewingSmear)?.preview
-        val subtitle = when (state) {
-            SmearToolState.Idle -> "Selecting source"
-            is SmearToolState.FirstCornerSet -> "First corner set"
-            is SmearToolState.RegionDefined -> "Selection ready"
-            is SmearToolState.PreviewingSmear -> "Previewing air-only smear"
-        }
-        val entries = when (state) {
-            SmearToolState.Idle -> listOf(
-                ToolHintEntry("LMB", "Set first corner"),
-                ToolHintEntry("RMB", "Set second corner"),
-                ToolHintEntry("MMB", if (AxionClientState.middleClickMagicSelectEnabled) "Magic select" else "Disabled until region exists"),
-                ToolHintEntry("Scroll", "Pick axis and repeat"),
-            ) + magicConfigHintEntries()
-
-            is SmearToolState.FirstCornerSet -> listOf(
-                ToolHintEntry("LMB", "Reset first corner"),
-                ToolHintEntry("RMB", "Set second corner"),
-                ToolHintEntry("MMB", if (AxionClientState.middleClickMagicSelectEnabled) "Magic select" else "Disabled until region exists"),
-            ) + magicConfigHintEntries()
-
-            is SmearToolState.RegionDefined -> listOf(
-                ToolHintEntry("MMB", middleClickLabel()),
-                ToolHintEntry("Scroll", "Move smear node"),
-                ToolHintEntry("LMB", "Restart selection"),
-                ToolHintEntry("RMB", "Set second corner again"),
-            ) + magicConfigHintEntries()
-
-            is SmearToolState.PreviewingSmear -> listOf(
-                ToolHintEntry("Scroll", "Move smear node"),
-                ToolHintEntry("RMB", "Confirm smear"),
-                ToolHintEntry("LMB", "Cancel preview"),
-            )
-        }
-
-        return ToolHintPanel(
-            title = "AXION - Smear",
-            subtitle = subtitle,
-            entries = entries,
-            statusLines = smearStatusLines(preview),
-            footer = symmetrySummary(),
+        return CompactToolHints(
+            crosshairHints = buildList {
+                when (state) {
+                    SmearToolState.Idle -> add(left("First Point"))
+                    is SmearToolState.FirstCornerSet -> addAll(selectionPointHints())
+                    is SmearToolState.RegionDefined -> {
+                        addAll(selectionPointHints())
+                        add(scroll("Scroll to smear"))
+                    }
+                    is SmearToolState.PreviewingSmear -> addAll(confirmPreviewHints())
+                }
+                addMagicSelectCrosshair()
+            },
+            keyHints = buildList {
+                addMagicSelectKeyHints()
+            },
+            hotbarStatus = preview?.let {
+                "Node offset: ${formatSigned(it.step.x)}, ${formatSigned(it.step.y)}, ${formatSigned(it.step.z)}"
+            },
         )
     }
 
-    private fun erasePanel(): ToolHintPanel {
+    private fun eraseCompactHints(): CompactToolHints {
         val state = AxionClientState.eraseToolState
-        val subtitle = when (state) {
-            EraseToolState.Idle -> "Selecting region"
-            is EraseToolState.FirstCornerSet -> "First corner set"
-            is EraseToolState.RegionDefined -> "Selection ready"
-        }
-        val entries = when (state) {
-            EraseToolState.Idle -> listOf(
-                ToolHintEntry("LMB", "Set first corner"),
-                ToolHintEntry("RMB", "Set second corner"),
-                ToolHintEntry("MMB", if (AxionClientState.middleClickMagicSelectEnabled) "Magic select" else "Disabled until region exists"),
-            ) + magicConfigHintEntries()
-
-            is EraseToolState.FirstCornerSet -> listOf(
-                ToolHintEntry("LMB", "Reset first corner"),
-                ToolHintEntry("RMB", "Set second corner"),
-                ToolHintEntry("MMB", if (AxionClientState.middleClickMagicSelectEnabled) "Magic select" else "Disabled until region exists"),
-            ) + magicConfigHintEntries()
-
-            is EraseToolState.RegionDefined -> listOf(
-                ToolHintEntry("Del", "Erase selection"),
-                ToolHintEntry("MMB", middleClickLabel()),
-                ToolHintEntry("LMB", "Reset first corner"),
-                ToolHintEntry("RMB", "Reset second corner"),
-            ) + magicConfigHintEntries()
-        }
-        return ToolHintPanel(
-            title = "AXION - Erase",
-            subtitle = subtitle,
-            entries = entries,
-            statusLines = buildList {
-                currentSelectionSize()?.let { add(Text.literal("Selection: $it")) }
-                currentSelectionCorners()?.let { add(Text.literal(it)) }
-                appendMagicSelectInfo(this)
-                targetSummary()?.let { add(Text.literal(it)) }
-            },
-        )
-    }
-
-    private fun extrudePanel(): ToolHintPanel {
-        val preview = when (val state = AxionClientState.extrudeToolState) {
-            ExtrudeToolState.Idle -> null
-            is ExtrudeToolState.Previewing -> state.preview
-        }
-        return ToolHintPanel(
-            title = "AXION - Extrude",
-            subtitle = if (preview == null) "Aim at a planar surface" else "Topology preview ready",
-            entries = listOf(
-                ToolHintEntry("RMB", "Extrude outward by 1"),
-                ToolHintEntry("LMB", "Shrink by 1"),
-                ToolHintEntry("Face", "Uses clicked face axis"),
-            ),
-            statusLines = buildList {
-                preview?.let {
-                    add(Text.literal("Footprint: ${it.footprint.size}"))
-                    add(Text.literal("Axis: ${formatAxis(it.direction.vector)}"))
+        return CompactToolHints(
+            crosshairHints = buildList {
+                when (state) {
+                    EraseToolState.Idle -> add(left("First Point"))
+                    is EraseToolState.FirstCornerSet -> addAll(selectionPointHints())
+                    is EraseToolState.RegionDefined -> {
+                        addAll(selectionPointHints())
+                        add(key("Del", "Erase selection"))
+                    }
                 }
-                targetSummary()?.let { add(Text.literal(it)) }
+                addMagicSelectCrosshair()
+            },
+            keyHints = buildList {
+                addMagicSelectKeyHints()
             },
         )
     }
 
-    private fun symmetryPanel(): ToolHintPanel {
-        val state = AxionClientState.symmetryState
-        val subtitle = when (state) {
-            SymmetryState.Inactive -> "No anchor set"
-            is SymmetryState.Active -> "Configuring symmetry"
-        }
-        return ToolHintPanel(
-            title = "AXION - Symmetry",
-            subtitle = subtitle,
-            entries = listOf(
-                ToolHintEntry("LMB / RMB", "Place or move anchor"),
-                ToolHintEntry("Ctrl + Scroll", "Nudge anchor"),
-                ToolHintEntry("Main Mod + R", "Toggle rotation"),
-                ToolHintEntry("Main Mod + F", "Toggle mirror"),
-                ToolHintEntry("Main Mod + C", "Toggle construct"),
-                ToolHintEntry("Del", "Clear symmetry"),
+    private fun extrudeCompactHints(): CompactToolHints {
+        return CompactToolHints(
+            crosshairHints = listOf(
+                left("Shrink"),
+                right("Extrude"),
             ),
-            statusLines = when (state) {
-                SymmetryState.Inactive -> listOfNotNull(targetSummary()?.let(Text::literal))
-                is SymmetryState.Active -> buildList {
-                    add(Text.literal("Rot: ${if (state.config.rotationalEnabled) "On" else "Off"}"))
-                    add(Text.literal("Mirror: ${formatSymmetryMirror(state.config)}"))
-                    add(Text.literal("Construct: ${if (state.config.constructEnabled) "On" else "Off"}"))
-                    targetSummary()?.let { add(Text.literal(it)) }
-                }
-            },
         )
     }
 
-    private fun repeatStatusLines(preview: RepeatRegionPreview?, modeText: String): List<Text> {
-        return buildList {
-            currentSelectionSize()?.let { add(Text.literal("Selection: $it")) }
-            currentSelectionCorners()?.let { add(Text.literal(it)) }
-            preview?.let {
-                add(Text.literal("Repeats: ${it.repeatCount}"))
-                add(Text.literal("Step: ${formatAxis(it.step)} x ${formatStepLength(it.step)}"))
-            }
-            add(Text.literal(modeText))
-            appendMagicSelectInfo(this)
-            targetSummary()?.let { add(Text.literal(it)) }
-        }
+    private fun symmetryCompactHints(): CompactToolHints {
+        return CompactToolHints(
+            crosshairHints = listOf(
+                left("Place Symmetry"),
+                right("Move Symmetry"),
+                key("Del", "Clear symmetry"),
+            ),
+            keyHints = listOf(
+                ToolHintEntry("Ctrl + Scroll", "Nudge symmetry"),
+                ToolHintEntry("Ctrl + R", "Rotate symmetry"),
+                ToolHintEntry("Ctrl + F", "Flip symmetry"),
+            ),
+        )
     }
 
-    private fun smearStatusLines(preview: RepeatRegionPreview?): List<Text> {
-        return buildList {
-            currentSelectionSize()?.let { add(Text.literal("Selection: $it")) }
-            currentSelectionCorners()?.let { add(Text.literal(it)) }
-            preview?.let {
-                add(Text.literal("Node: ${it.step.x}, ${it.step.y}, ${it.step.z}"))
-                add(Text.literal("Length: ${it.repeatCount}"))
-            }
-            add(Text.literal("Mode: Air-only"))
-            appendMagicSelectInfo(this)
-            targetSummary()?.let { add(Text.literal(it)) }
+    private fun MutableList<CrosshairHint>.addMagicSelectCrosshair() {
+        if (!AxionClientState.middleClickMagicSelectEnabled) {
+            return
         }
+        add(middle("Magic Select"))
     }
 
-    private fun formatMirrorAxis(axis: PlacementMirrorAxis): String {
-        return when (axis) {
-            PlacementMirrorAxis.NONE -> "Off"
-            PlacementMirrorAxis.X -> "X"
-            PlacementMirrorAxis.Y -> "Y"
-            PlacementMirrorAxis.Z -> "Z"
+    private fun MutableList<ToolHintEntry>.addMagicSelectKeyHints() {
+        if (!AxionClientState.middleClickMagicSelectEnabled) {
+            return
         }
+        add(ToolHintEntry("Ctrl + MMB", "Configure templates"))
+        add(ToolHintEntry("Ctrl + Scroll", "Adjust brush size"))
     }
 
-    private fun currentSelectionSize(): String? {
-        return when (val state = AxionClientState.selectionState) {
-            SelectionState.Idle -> null
-            is SelectionState.FirstCornerSet -> "1 x 1 x 1"
-            is SelectionState.RegionDefined -> formatRegionSize(state.region())
-        }
+    private fun selectionPointHints(): List<CrosshairHint> {
+        return listOf(
+            left("First Point"),
+            right("Second Point"),
+        )
     }
 
-    private fun currentSelectionCorners(): String? {
-        return when (val state = AxionClientState.selectionState) {
-            SelectionState.Idle -> null
-            is SelectionState.FirstCornerSet -> "First: ${formatPos(state.firstCorner)}"
-            is SelectionState.RegionDefined -> "Corners: ${formatPos(state.firstCorner)} -> ${formatPos(state.secondCorner)}"
-        }
+    private fun confirmPreviewHints(): List<CrosshairHint> {
+        return listOf(
+            left("Cancel"),
+            right("Confirm"),
+        )
     }
 
-    private fun formatRegionSize(region: BlockRegion): String {
-        val size = region.normalized().size()
-        return "${size.x} x ${size.y} x ${size.z}"
-    }
+    private fun left(action: String): CrosshairHint = CrosshairHint.Mouse(MouseHintIcon.LEFT, action)
 
-    private fun formatAxis(vector: Vec3i): String {
-        return when {
-            vector.x > 0 -> "+X"
-            vector.x < 0 -> "-X"
-            vector.y > 0 -> "+Y"
-            vector.y < 0 -> "-Y"
-            vector.z > 0 -> "+Z"
-            vector.z < 0 -> "-Z"
-            else -> "None"
-        }
-    }
+    private fun right(action: String): CrosshairHint = CrosshairHint.Mouse(MouseHintIcon.RIGHT, action)
 
-    private fun formatStepLength(vector: Vec3i): Int {
-        return maxOf(abs(vector.x), abs(vector.y), abs(vector.z))
-    }
+    private fun scroll(action: String): CrosshairHint = CrosshairHint.Mouse(MouseHintIcon.SCROLL, action)
 
-    private fun symmetrySummary(): String? {
-        val config = ActiveSymmetryConfig.current()?.takeIf(ActiveSymmetryConfig::hasDerivedTransforms) ?: return null
-        val parts = mutableListOf<String>()
-        if (config.rotationalEnabled) {
-            parts += "Rot"
-        }
-        if (config.mirrorEnabled) {
-            parts += "Mirror ${config.mirrorAxis.name}"
-        }
-        if (config.constructEnabled) {
-            parts += "Construct"
-        }
-        return if (parts.isEmpty()) null else "Sym: ${parts.joinToString("+")}"
-    }
+    private fun middle(action: String): CrosshairHint = CrosshairHint.Mouse(MouseHintIcon.SCROLL, action)
 
-    private fun formatSymmetryMirror(config: axion.common.model.SymmetryConfig): String {
-        return if (!config.mirrorEnabled) {
-            "Off"
-        } else {
-            config.mirrorAxis.name
-        }
-    }
+    private fun key(label: String, action: String): CrosshairHint = CrosshairHint.Key(label, action)
 
-    private fun targetSummary(): String? {
-        return when (val target = SelectionController.currentTarget()) {
-            AxionTarget.MissTarget -> "Target: none"
-            is AxionTarget.BlockTarget -> "Target: block ${formatPos(target.blockPos)}"
-            is AxionTarget.FaceTarget -> "Target: face ${target.face.name.lowercase()} ${formatPos(target.blockPos)}"
-        }
-    }
-
-    private fun formatPos(pos: BlockPos): String {
-        return "${pos.x},${pos.y},${pos.z}"
+    private fun formatSigned(value: Int): String {
+        return if (value > 0) "+$value" else value.toString()
     }
 }

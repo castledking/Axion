@@ -13,9 +13,22 @@ enum class AxionSubtool(
     SMEAR("Smear", "Sm", true),
     ERASE("Erase", "Er", true);
 
+    companion object {
+        val toolbarOrder: List<AxionSubtool> = listOf(
+            MOVE,
+            CLONE,
+            STACK,
+            SMEAR,
+            EXTRUDE,
+            ERASE,
+            SETUP_SYMMETRY,
+        )
+    }
+
     fun cycle(step: Int): AxionSubtool {
-        val size = entries.size
-        val target = Math.floorMod(ordinal + step, size)
-        return entries[target]
+        val order = toolbarOrder
+        val currentIndex = order.indexOf(this).takeIf { it >= 0 } ?: 0
+        val target = Math.floorMod(currentIndex + step, order.size)
+        return order[target]
     }
 }

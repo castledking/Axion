@@ -1,17 +1,26 @@
 package axion.client.hotbar
 
-import net.minecraft.text.Text
-
 data class ToolHintEntry(
     val input: String,
     val action: String,
-    val inline: Boolean = false,
 )
 
-data class ToolHintPanel(
-    val title: String,
-    val subtitle: String? = null,
-    val entries: List<ToolHintEntry>,
-    val statusLines: List<Text> = emptyList(),
-    val footer: String? = null,
+enum class MouseHintIcon {
+    LEFT,
+    RIGHT,
+    SCROLL,
+    NEUTRAL,
+}
+
+sealed interface CrosshairHint {
+    val action: String
+
+    data class Mouse(val icon: MouseHintIcon, override val action: String) : CrosshairHint
+    data class Key(val key: String, override val action: String) : CrosshairHint
+}
+
+data class CompactToolHints(
+    val crosshairHints: List<CrosshairHint> = emptyList(),
+    val keyHints: List<ToolHintEntry> = emptyList(),
+    val hotbarStatus: String? = null,
 )

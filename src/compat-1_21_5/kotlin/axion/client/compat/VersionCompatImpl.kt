@@ -191,6 +191,20 @@ object VersionCompatImpl : VersionCompat {
     fun drawGuiTexture(context: DrawContext, texture: Identifier, x: Int, y: Int, width: Int, height: Int) {
         context.drawTexture(RenderLayer::getGuiTextured, texture, x, y, 0f, 0f, width, height, width, height)
     }
+    fun drawGuiTextureRegion(
+        context: DrawContext,
+        texture: Identifier,
+        x: Int,
+        y: Int,
+        u: Int,
+        v: Int,
+        width: Int,
+        height: Int,
+        textureWidth: Int,
+        textureHeight: Int,
+    ) {
+        context.drawTexture(RenderLayer::getGuiTextured, texture, x, y, u.toFloat(), v.toFloat(), width, height, textureWidth, textureHeight)
+    }
     fun getCameraPos(camera: Camera): Vec3d = camera.pos
     fun rawBlockStateId(state: BlockState): Int = Block.getRawIdFromState(state)
 
@@ -251,7 +265,7 @@ object VersionCompatImpl : VersionCompat {
     override fun serverGetWorld(server: Any, registryKey: Any): Any? = (server as net.minecraft.server.integrated.IntegratedServer).getWorld(registryKey as net.minecraft.registry.RegistryKey<net.minecraft.world.World>)
     override fun playerSendMessage(player: Any, message: Any, overlay: Boolean) = (player as net.minecraft.entity.player.PlayerEntity).sendMessage(message as Text, overlay)
     override fun directionGetVector(direction: Any): Any = (direction as net.minecraft.util.math.Direction).vector
-    override fun blockStateStringify(state: BlockState): String = state.toString()
+    override fun blockStateStringify(state: BlockState): String = BlockArgumentParser.stringifyBlockState(state)
     override fun worldGetRegistryManager(world: Any): Any = (world as net.minecraft.world.World).registryManager
     override fun blockArgumentParserBlock(registry: Any, state: String): Any = BlockArgumentParser.block((registry as DynamicRegistryManager).getOrThrow(RegistryKeys.BLOCK), state, false)
     override fun itemStackEncode(registryManager: Any, stack: Any): ByteArray? {

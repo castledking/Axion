@@ -1,6 +1,7 @@
 package axion.client.compat
 
 import axion.client.render.AxionWorldRenderContext
+import axion.client.render.ShaderPackCompat
 import axion.client.render.gpu.ChunkedPreviewLifecycle
 import axion.client.render.gpu.SectionDrawEntry
 import axion.common.model.ClipboardBuffer
@@ -117,7 +118,7 @@ object VersionCompatImpl : VersionCompat {
 
     override fun shouldUseNonConsumingKeybind(): Boolean = false
 
-    fun supportsChunkedPreview(): Boolean = true
+    fun supportsChunkedPreview(): Boolean = !ShaderPackCompat.shouldDisableDirectGpuPreview()
 
     fun renderChunkedPreview(
         sessionId: String,
@@ -560,6 +561,21 @@ object VersionCompatImpl : VersionCompat {
         height: Int,
     ) {
         context.delegate.blit(RenderPipelines.GUI_TEXTURED, texture, x, y, 0.0f, 0.0f, width, height, width, height)
+    }
+
+    fun drawGuiTextureRegion(
+        context: DrawContext,
+        texture: Identifier,
+        x: Int,
+        y: Int,
+        u: Int,
+        v: Int,
+        width: Int,
+        height: Int,
+        textureWidth: Int,
+        textureHeight: Int,
+    ) {
+        context.delegate.blit(RenderPipelines.GUI_TEXTURED, texture, x, y, u.toFloat(), v.toFloat(), width, height, textureWidth, textureHeight)
     }
 
     fun getCameraPos(camera: Camera): Vec3d {

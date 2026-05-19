@@ -74,6 +74,9 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Download release jars
         uses: actions/download-artifact@v4
         with:
@@ -90,3 +93,56 @@ jobs:
           overwrite_files: true
           files: |
             release-artifacts/*
+
+      - name: Determine version
+        id: version
+        run: |
+          TAG=${{ github.event_name == 'release' && github.event.release.tag_name || github.event.inputs.release_tag }}
+          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+      - name: Copy release notes
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if [ -f ".release/latest/v${VERSION}.md" ]; then
+            mkdir -p /tmp/release-notes
+            cp ".release/latest/v${VERSION}.md" /tmp/release-notes/
+          fi
+
+      - name: Release Axion mod to Modrinth
+        env:
+          MODRINTH_API_KEY: ${{ secrets.MODRINTH_API_KEY }}
+          REPO_NAME: Axion
+          VERSION: ${{ steps.version.outputs.version }}
+          PROJECT_INDEX: 0
+        run: |
+          JARS=$(find release-artifacts -name 'Axion-v*.jar' | paste -sd ',' -)
+          if [ -z "$JARS" ]; then echo "No Axion jars found"; exit 1; fi
+          JAR_PATHS="$JARS" node .release/src/modrinth-release.js
+
+      - name: Release Axion Paper plugin to Modrinth
+        env:
+          MODRINTH_API_KEY: ${{ secrets.MODRINTH_API_KEY }}
+          REPO_NAME: Axion
+          VERSION: ${{ steps.version.outputs.version }}
+          PROJECT_INDEX: 1
+        run: |
+          JARS=$(find release-artifacts -name 'AxionPaper-v*.jar' | paste -sd ',' -)
+          if [ -z "$JARS" ]; then echo "No Axion Paper jars found"; exit 1; fi
+          JAR_PATHS="$JARS" node .release/src/modrinth-release.js
+
+      - name: Discord notification
+        if: always()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          REPO_NAME: Axion
+          REPO_OWNER: castledking
+          VERSION: ${{ steps.version.outputs.version }}
+          DISCORD_CONFIG_PATH: .release/discord-updater-webhook.yml
+        run: |
+          if [ -z "${{ secrets.DISCORD_WEBHOOK_URL }}" ]; then
+            echo "No DISCORD_WEBHOOK_URL set, skipping"
+            exit 0
+          fi
+          pip install pyyaml -q
+          python3 .release/src/discord-notify.py
