@@ -25,8 +25,9 @@ Axion is an open-source Minecraft building toolkit built as a Fabric client mod 
 - **Alt Tool Menu Improvements** — Holding Alt now expands the tool stack with cleaner icon slots and improved hover/selection behavior.
 - **Iris Shader Support** — Added Iris shader-pack detection and shader-aware preview fallback so large previews behave correctly when shaders are enabled or toggled.
 - **Input Fixes** — Improved mouse-scroll handling so Axion does not hijack scrolling while chat, menus, or option screens are open.
+- **Minecraft 1.21.2 - 1.21.3 Support** — Added a single range jar compiled against Minecraft `1.21.3` for the `1.21.2` through `1.21.3` client and Paper plugin line.
 - **Release Automation Update** — Release tags now publish the jars produced by `./build-axion.sh all` to the GitHub release, with release body text loaded from `.release/latest/<tag>.md`.
-- **Supported Versions** — Axion v0.2.8 supports Minecraft `1.21.4` through `1.21.11` and `26.1.x`.
+- **Supported Versions** — Axion v0.2.8 supports Minecraft `1.21.2` through `1.21.11` and `26.1.x`.
 
 ### v0.2.7 (Released)
 
@@ -52,7 +53,7 @@ Axion is an open-source Minecraft building toolkit built as a Fabric client mod 
 ## Next: v0.2.9
 
 - **26.1.x Fabric Dedicated Server Support** — Fabric dedicated server support for the 26.1.x range is planned next in v0.2.9.
-- **1.21.1 - 1.21.3 Support** — Support for Minecraft `1.21.1` through `1.21.3` is coming soon as part of the ongoing 1.21.x backport work.
+- **1.21.1 Support** — Minecraft `1.21.1` remains the next 1.21.x client and Paper plugin backport target.
 
 ## Roadmap & Upcoming
 

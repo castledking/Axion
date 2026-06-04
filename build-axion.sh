@@ -7,6 +7,7 @@ cd "$ROOT_DIR"
 MOD_VERSION="${MOD_VERSION:-$(awk -F= '/^mod_version=/{print $2}' gradle.properties)}"
 
 # Multi-range release strategy:
+#   range "mc1_21_2_3" → covers 1.21.2 .. 1.21.3, compiled against 1.21.3
 #   range "mc1_21_4" → covers 1.21.4, compiled against 1.21.4
 #   range "mc1_21_5" → covers 1.21.5, compiled against 1.21.5
 #   range "legacy"   → covers 1.21.6 .. 1.21.8, compiled against 1.21.7
@@ -15,6 +16,7 @@ MOD_VERSION="${MOD_VERSION:-$(awk -F= '/^mod_version=/{print $2}' gradle.propert
 # Within each range, cross-version mixin compatibility is handled by `require = 0`
 # dual-signature injections.
 SUPPORTED_RANGES=(
+  "mc1_21_2_3"
   "mc1_21_4"
   "mc1_21_5"
   "legacy"
@@ -24,6 +26,7 @@ SUPPORTED_RANGES=(
 
 resolve_compile_version() {
   case "$1" in
+    "mc1_21_2_3") echo "1.21.3" ;;
     "mc1_21_4") echo "1.21.4" ;;
     "mc1_21_5") echo "1.21.5" ;;
     "mc1_21_6") echo "1.21.6" ;;
@@ -39,6 +42,7 @@ resolve_compile_version() {
 
 resolve_yarn_mappings() {
   case "$1" in
+    "1.21.3") echo "1.21.3+build.2" ;;
     "1.21.4") echo "1.21.4+build.8" ;;
     "1.21.5") echo "1.21.5+build.1" ;;
     "1.21.6") echo "1.21.6+build.1" ;;
@@ -54,6 +58,7 @@ resolve_yarn_mappings() {
 
 resolve_loader_version() {
   case "$1" in
+    "1.21.3") echo "0.16.10" ;;
     "1.21.4") echo "0.16.10" ;;
     "1.21.5") echo "0.16.12" ;;
     "1.21.6") echo "0.16.13" ;;
@@ -69,6 +74,7 @@ resolve_loader_version() {
 
 resolve_fabric_version() {
   case "$1" in
+    "1.21.3") echo "0.106.1+1.21.3" ;;
     "1.21.4") echo "0.119.4+1.21.4" ;;
     "1.21.5") echo "0.119.5+1.21.5" ;;
     "1.21.6") echo "0.128.2+1.21.6" ;;
@@ -84,6 +90,7 @@ resolve_fabric_version() {
 
 resolve_fabric_kotlin_version() {
   case "$1" in
+    "1.21.3") echo "1.13.0+kotlin.2.1.0" ;;
     "1.21.4") echo "1.13.0+kotlin.2.1.0" ;;
     "1.21.5") echo "1.13.0+kotlin.2.1.0" ;;
     "1.21.6") echo "1.13.0+kotlin.2.1.0" ;;
@@ -99,6 +106,7 @@ resolve_fabric_kotlin_version() {
 
 resolve_modmenu_version() {
   case "$1" in
+    "1.21.3") echo "13.0.4" ;;
     "1.21.4") echo "13.0.4" ;;
     "1.21.5") echo "14.0.0" ;;
     "1.21.6") echo "15.0.2" ;;
@@ -114,6 +122,7 @@ resolve_modmenu_version() {
 
 resolve_paper_version() {
   case "$1" in
+    "1.21.3") echo "1.21.3-R0.1-SNAPSHOT" ;;
     "1.21.4") echo "1.21.4-R0.1-SNAPSHOT" ;;
     "1.21.5") echo "1.21.5-R0.1-SNAPSHOT" ;;
     "1.21.6") echo "1.21.6-R0.1-SNAPSHOT" ;;
@@ -143,6 +152,7 @@ resolve_paperweight_version() {
 
 resolve_range_tag() {
   case "$1" in
+    "mc1_21_2_3") echo "mc1.21.2-1.21.3" ;;
     "mc1_21_4") echo "mc1.21.4" ;;
     "mc1_21_5") echo "mc1.21.5" ;;
     "mc1_21_6") echo "mc1.21.6" ;;
@@ -158,6 +168,7 @@ resolve_range_tag() {
 
 resolve_metadata_version_range() {
   case "$1" in
+    "mc1_21_2_3") echo ">=1.21.2 <=1.21.3" ;;
     "mc1_21_4") echo "1.21.4" ;;
     "mc1_21_5") echo "1.21.5" ;;
     "mc1_21_6") echo "1.21.6" ;;
@@ -286,16 +297,17 @@ wipe_kotlin_caches() {
 
 print_menu() {
   echo "Select a build target:"
-  echo "  1) Legacy range (Minecraft 1.21.6 - 1.21.8)"
-  echo "  2) Modern range (Minecraft 1.21.9 - 1.21.11)"
-  echo "  3) Both ranges"
-  echo "  4) Minecraft 1.21.5"
-  echo "  5) Minecraft 26.1.x"
-  echo "  6) Exact Minecraft 1.21.6"
-  echo "  7) Exact Minecraft 1.21.8"
-  echo "  8) Exact Minecraft 1.21.9"
-  echo "  9) Exact Minecraft 1.21.10"
-  echo "  10) Minecraft 1.21.4"
+  echo "  1) Minecraft 1.21.2 - 1.21.3"
+  echo "  2) Minecraft 1.21.4"
+  echo "  3) Minecraft 1.21.5"
+  echo "  4) Legacy range (Minecraft 1.21.6 - 1.21.8)"
+  echo "  5) Modern range (Minecraft 1.21.9 - 1.21.11)"
+  echo "  6) Minecraft 26.1.x"
+  echo "  7) Exact Minecraft 1.21.6"
+  echo "  8) Exact Minecraft 1.21.8"
+  echo "  9) Exact Minecraft 1.21.9"
+  echo "  10) Exact Minecraft 1.21.10"
+  echo "  11) All ranges"
   echo "  q) Cancel"
 }
 
@@ -309,37 +321,40 @@ else
 fi
 
 case "$choice" in
-  1|legacy|LEGACY)
+  1|1.21.2-1.21.3|1.21.2-3|1.21.3|mc1.21.2-1.21.3|mc1_21_2_3|MC1_21_2_3)
+    build_range "mc1_21_2_3"
+    ;;
+  2|1.21.4|mc1.21.4|mc1_21_4|MC1_21_4)
+    build_range "mc1_21_4"
+    ;;
+  3|1.21.5|mc1.21.5|mc1_21_5|MC1_21_5)
+    build_range "mc1_21_5"
+    ;;
+  4|legacy|LEGACY)
     build_range "legacy"
     ;;
-  2|modern|MODERN)
+  5|modern|MODERN)
     build_range "modern"
     ;;
-  3|all|ALL|both|BOTH)
+  6|26.1|26.1.x|mc26.1.x|mc26_1_x|MC26_1_X)
+    build_range "mc26_1_x"
+    ;;
+  7|1.21.6|mc1.21.6|mc1_21_6|MC1_21_6)
+    build_range "mc1_21_6"
+    ;;
+  8|1.21.8|mc1.21.8|mc1_21_8|MC1_21_8)
+    build_range "mc1_21_8"
+    ;;
+  9|1.21.9|mc1.21.9|mc1_21_9|MC1_21_9)
+    build_range "mc1_21_9"
+    ;;
+  10|1.21.10|mc1.21.10|mc1_21_10|MC1_21_10)
+    build_range "mc1_21_10"
+    ;;
+  11|all|ALL|both|BOTH)
     for range in "${SUPPORTED_RANGES[@]}"; do
       build_range "$range"
     done
-    ;;
-  4|1.21.5|mc1.21.5|mc1_21_5|MC1_21_5)
-    build_range "mc1_21_5"
-    ;;
-  5|26.1|26.1.x|mc26.1.x|mc26_1_x|MC26_1_X)
-    build_range "mc26_1_x"
-    ;;
-  6|1.21.6|mc1.21.6|mc1_21_6|MC1_21_6)
-    build_range "mc1_21_6"
-    ;;
-  7|1.21.8|mc1.21.8|mc1_21_8|MC1_21_8)
-    build_range "mc1_21_8"
-    ;;
-  8|1.21.9|mc1.21.9|mc1_21_9|MC1_21_9)
-    build_range "mc1_21_9"
-    ;;
-  9|1.21.10|mc1.21.10|mc1_21_10|MC1_21_10)
-    build_range "mc1_21_10"
-    ;;
-  10|1.21.4|mc1.21.4|mc1_21_4|MC1_21_4)
-    build_range "mc1_21_4"
     ;;
   q|Q|quit|QUIT)
     echo "Cancelled."

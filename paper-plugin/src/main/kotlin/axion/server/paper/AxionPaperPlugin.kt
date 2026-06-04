@@ -1,6 +1,7 @@
 package axion.server.paper
 
 import axion.protocol.AxionProtocol
+import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents
 import org.bukkit.plugin.java.JavaPlugin
 
 class AxionPaperPlugin : JavaPlugin() {
@@ -33,12 +34,15 @@ class AxionPaperPlugin : JavaPlugin() {
         }
         installConfiguredProtectionAdapters()
         messaging = AxionPluginMessaging(this, policyService, noClipService, flightSpeedService)
-        registerCommand(
-            "axion",
-            "Axion Paper admin utilities.",
-            listOf("ax"),
-            AxionAdminCommand(this),
-        )
+        lifecycleManager.registerEventHandler(LifecycleEvents.COMMANDS) { event ->
+            event.registrar().register(
+                pluginMeta,
+                "axion",
+                "Axion Paper admin utilities.",
+                listOf("ax"),
+                AxionAdminCommand(this),
+            )
+        }
         server.pluginManager.registerEvents(AxionNoClipListener(noClipService), this)
         server.pluginManager.registerEvents(flightSpeedService, this)
         server.pluginManager.registerEvents(AxionDevModeListener(this), this)

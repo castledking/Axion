@@ -32,7 +32,7 @@ The Fabric mod is the client-side half of Axion. It handles:
 - builder modes like replace mode, infinite reach, and no clip
 - local singleplayer behavior
 
-**Version Support:** Axion currently supports `1.21.5` through `1.21.11` & `26.1.x` for both the Fabric client and the Paper plugin. Fabric dedicated server support is currently only available for `1.21.11`.
+**Version Support:** Axion currently supports `1.21.2` through `1.21.11` & `26.1.x` for both the Fabric client and the Paper plugin. Fabric dedicated server support is currently only available for `1.21.11`.
 
 For multiplayer editing:
 
@@ -103,8 +103,8 @@ For multiplayer editing:
 
 | Component | Version |
 | --- | --- |
-| Fabric Mod (client) | `1.21.5 - 1.21.11 & 26.1.x`  |
-| Paper Plugin | `1.21.5 - 1.21.11 & 26.1.x` |
+| Fabric Mod (client) | `1.21.2 - 1.21.11 & 26.1.x`  |
+| Paper Plugin | `1.21.2 - 1.21.11 & 26.1.x` |
 | Fabric Dedicated Server | `1.21.11` only |
 
 ## Requirements
@@ -148,7 +148,7 @@ For multiplayer editing:
 ## Roadmap
 
 - More "capabilities" like `No Updates`, `Phantom`, `Angel Placement` and `Tinker`
-- Add support for versions `1.20` through `1.21.4` for mod and plugin
+- Add support for Minecraft `1.21.1` and older compatible versions for mod and plugin
 - Add support for other Minecraft versions for the Fabric dedicated server
 - UI improvements and polish
 - 0.3.0 and beyond: Develop the `Editor Mode` for more advanced building workflows (MCEdit-style editor)

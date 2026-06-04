@@ -21,6 +21,7 @@ val minecraftPatch = when {
 }
 
 // Two release ranges:
+//   - rangeMc12123: 1.21.2 .. 1.21.3  (compat-1_21_4, shared pre-1.21.5 client path)
 //   - rangeMc1214:  1.21.4            (compat-1_21_4, isolated exact-version port)
 //   - rangeMc1215:  1.21.5            (compat-1_21_5, isolated exact-version port)
 //   - rangeLegacy:  1.21.6 .. 1.21.8  (compat-1_21_7, no MouseInput / WorldRenderState classes,
@@ -30,6 +31,7 @@ val minecraftPatch = when {
 //
 // Cross-version mixin compatibility within each range is handled by `require = 0`
 // dual-signature injections in MouseMixin and WorldRendererFallbackMixin.
+val rangeMc12123 = minecraftVersion == "1.21.2" || minecraftVersion == "1.21.3"
 val rangeMc1214 = minecraftVersion == "1.21.4"
 val rangeMc1215 = minecraftVersion == "1.21.5"
 val rangeLegacy = minecraftVersion.startsWith("1.21.") && minecraftPatch in 6..8
@@ -48,14 +50,15 @@ if (rangeMc261x) {
     apply(plugin = "fabric-loom")
 }
 
-val needsLegacyMouseInputStub = rangeMc1214 || rangeMc1215 || rangeLegacy
-val needsLegacyWorldRenderStateStub = rangeMc1214 || rangeMc1215 || rangeLegacy
+val needsLegacyMouseInputStub = rangeMc12123 || rangeMc1214 || rangeMc1215 || rangeLegacy
+val needsLegacyWorldRenderStateStub = rangeMc12123 || rangeMc1214 || rangeMc1215 || rangeLegacy
 val supportsFabricDedicatedServer = minecraftVersion == "1.21.11"
 
 // Define Minecraft version range for fabric.mod.json.
 // build-axion.sh can override this for exact-version test artifacts while the
 // release range artifacts keep their advertised multi-version metadata.
 val minecraftVersionRange = (findProperty("axion_minecraft_version_range") as String?)?.trim()?.takeIf { it.isNotEmpty() } ?: when {
+    rangeMc12123 -> ">=1.21.2 <=1.21.3"
     rangeMc1215 -> "1.21.5"
     rangeMc1214 -> "1.21.4"
     rangeLegacy -> ">=1.21.6 <=1.21.8"
@@ -123,7 +126,7 @@ if (needsLegacyWorldRenderStateStub) {
 
 // Two compat source sets corresponding to the two release ranges
 sourceSets.named("client") {
-    if (rangeMc1214) {
+    if (rangeMc12123 || rangeMc1214) {
         kotlin.srcDir("src/compat-1_21_4/kotlin")
     } else if (rangeMc1215) {
         kotlin.srcDir("src/compat-1_21_5/kotlin")
@@ -228,7 +231,7 @@ tasks.processResources {
     inputs.property("fabric_api_version_range", fabricApiVersionRange)
     inputs.property("fabric_kotlin_version_range", fabricKotlinVersionRange)
 
-    if (rangeMc1214 || rangeMc1215) {
+    if (rangeMc12123 || rangeMc1214 || rangeMc1215) {
         exclude("assets/axion/shaders/core/preview_shell.*")
     }
 
@@ -252,7 +255,7 @@ tasks.named<ProcessResources>("processClientResources") {
         delete(layout.buildDirectory.dir("resources/client"))
         // Copy version-specific mixin config
         val mixinConfigSource = when {
-            rangeMc1214 || rangeMc1215 -> "axion.client.mixins-1.21.5.json"
+            rangeMc12123 || rangeMc1214 || rangeMc1215 -> "axion.client.mixins-1.21.5.json"
             else -> null
         }
         if (mixinConfigSource != null) {
@@ -311,6 +314,7 @@ tasks.test {
 
 // Range-style filename, e.g. "mc1.21.9-1.21.11"
 val rangeFileTag = (findProperty("axion_artifact_tag") as String?)?.trim()?.takeIf { it.isNotEmpty() } ?: when {
+    rangeMc12123 -> "mc1.21.2-1.21.3"
     rangeMc1214 -> "mc1.21.4"
     rangeMc1215 -> "mc1.21.5"
     rangeLegacy -> "mc1.21.6-1.21.8"
