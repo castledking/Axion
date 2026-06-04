@@ -6,7 +6,6 @@
     "ClientPlayerEntityMixin",
     "EntityMixin",
     "InGameHudMixin",
-    "LocatorBarMixin",
     "MinecraftClientMixin",
     "MouseMixin",
     "PlayerEntityPoseMixin",

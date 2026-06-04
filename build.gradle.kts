@@ -151,7 +151,6 @@ sourceSets.named("client") {
         kotlin.srcDir("src/compat-26_1/kotlin")
         // InGameHud does not exist in 26.1 (HUD is HudElement-based)
         kotlin.exclude("axion/mixin/client/InGameHudMixin*")
-        kotlin.exclude("axion/mixin/client/LocatorBarMixin*")
     } else {
         // 1.21.9+: registry-manager-based serialization, has MouseInput / WorldRenderState
         kotlin.srcDir("src/compat-1_21_11/kotlin")
@@ -279,7 +278,6 @@ tasks.named<ProcessResources>("processClientResources") {
             filter { line ->
                 when {
                     line.contains("\"InGameHudMixin\"") -> null
-                    line.contains("\"LocatorBarMixin\"") -> null
                     line.contains("\"WorldRendererFallbackMixin\"") -> null
                     line.contains("\"PlayerEntityPoseMixin\",") -> line.replace("\"PlayerEntityPoseMixin\",", "\"PlayerEntityPoseMixin\"")
                     else -> line
