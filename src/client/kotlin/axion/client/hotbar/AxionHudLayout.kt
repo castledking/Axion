@@ -10,9 +10,11 @@ object AxionHudLayout {
     private const val STRIP_GAP: Int = 4
     private const val SAVED_HOTBAR_WIDTH: Int = 182
     private const val SAVED_HOTBAR_HEIGHT: Int = 20
-    private const val SAVED_HOTBAR_GAP: Int = 1
     private const val SAVED_HOTBAR_PAGE_BUTTON_WIDTH: Int = 12
     private const val SAVED_HOTBAR_PAGE_BUTTON_HEIGHT: Int = 12
+    private const val FLY_BUTTON_WIDTH: Int = 16
+    private const val FLY_BUTTON_HEIGHT: Int = 14
+    private const val FLY_TRACK_WIDTH: Int = 16
     const val STRIP_ENTRY_HEIGHT: Int = 18
     const val STRIP_ENTRY_WIDTH: Int = 42
     const val STRIP_ENTRY_GAP: Int = 2
@@ -125,13 +127,12 @@ object AxionHudLayout {
 
     fun savedHotbarRows(screenWidth: Int, screenHeight: Int, page: Int): List<SavedHotbarRowBounds> {
         val x = (screenWidth / 2) - HOTBAR_HALF_WIDTH
-        // Reuse the vanilla hotbar row as the bottom visible saved hotbar entry.
         val bottomY = screenHeight - 22
         val pageStart = page * SavedHotbarController.PAGE_SIZE
         return (0 until SavedHotbarController.PAGE_SIZE).map { row ->
             SavedHotbarRowBounds(
                 x = x,
-                y = bottomY - (row * (SAVED_HOTBAR_HEIGHT + SAVED_HOTBAR_GAP)),
+                y = bottomY - (row * SAVED_HOTBAR_HEIGHT),
                 width = SAVED_HOTBAR_WIDTH,
                 height = SAVED_HOTBAR_HEIGHT,
                 index = pageStart + row,
@@ -167,10 +168,8 @@ object AxionHudLayout {
         val minusButton: ToggleButtonBounds,
     ) {
         fun trackValueFromY(mouseY: Double): Float {
-            // Map Y position to multiplier (top = max, bottom = min)
-            val relativeY = (track.y + track.height - mouseY).coerceIn(0.0, track.height.toDouble())
-            val normalized = relativeY / track.height
-            return 1.0f + (normalized * 8.99f).toFloat()
+            val normalized = (1.0 - (mouseY - track.y) / track.height).coerceIn(0.0, 1.0)
+            return 1.0f + ((normalized * normalized) * 8.99f).toFloat()
         }
     }
 
@@ -180,38 +179,30 @@ object AxionHudLayout {
         val downButton = pageButtons.firstOrNull { it.direction < 0 }
         val buttonBottom = downButton?.let { it.y + it.height } ?: (screenHeight - 22 + 18 + 12)
 
-        // Button dimensions match page buttons
-        val btnWidth = SAVED_HOTBAR_PAGE_BUTTON_WIDTH
-        val btnHeight = SAVED_HOTBAR_PAGE_BUTTON_HEIGHT
+        val btnWidth = FLY_BUTTON_WIDTH
+        val btnHeight = FLY_BUTTON_HEIGHT
         val centerX = buttonX + (SAVED_HOTBAR_PAGE_BUTTON_WIDTH / 2)
 
-        // Calculate positions (top to bottom)
-        val fontHeight = MinecraftClient.getInstance().textRenderer.fontHeight  // typically 9px
-        val plusY = buttonBottom + fontHeight + 6  // label height + 4px gap above label + 2px gap
-        val trackY = plusY + btnHeight + 2  // 2px gap after + button
+        val fontHeight = MinecraftClient.getInstance().textRenderer.fontHeight
+        val plusY = buttonBottom + fontHeight + 6
+        val trackY = plusY + btnHeight
 
-        // Calculate available space for track, reserving room for toolbox slot
         val sideSlot = sideSlot(MinecraftClient.getInstance(), screenWidth, screenHeight)
         val axSlotTop = sideSlot.y
-        val sideSlotSize = sideSlot.size  // = SLOT_SIZE = 24
-        val toolboxReserve = sideSlotSize + 2 + 6  // toolbox height + gap + breathing room
-        val minusHeight = 12
-        val minusGap = 2
+        val toolboxReserve = sideSlot.size + 2 + 6
+        val minusGap = 0
 
-        // Available height = space from trackY down to toolbox slot
-        val availableForTrack = axSlotTop - toolboxReserve - minusHeight - minusGap - trackY
-        val trackHeight = availableForTrack.coerceIn(24, 60)  // min 24px, max 60px
+        val availableForTrack = axSlotTop - toolboxReserve - btnHeight - minusGap - trackY
+        val trackHeight = availableForTrack.coerceIn(24, 64)
 
         val minusY = trackY + trackHeight + minusGap
 
-        // Center the buttons and track on the same x
-        val trackWidth = 12
-        val trackX = centerX - (trackWidth / 2)
+        val trackX = centerX - (FLY_TRACK_WIDTH / 2)
         val btnX = centerX - (btnWidth / 2)
 
         return FlyingSpeedSliderBounds(
             plusButton = ToggleButtonBounds(x = btnX, y = plusY, width = btnWidth, height = btnHeight),
-            track = ToggleButtonBounds(x = trackX, y = trackY, width = trackWidth, height = trackHeight),
+            track = ToggleButtonBounds(x = trackX, y = trackY, width = FLY_TRACK_WIDTH, height = trackHeight),
             minusButton = ToggleButtonBounds(x = btnX, y = minusY, width = btnWidth, height = btnHeight),
         )
     }

@@ -9,6 +9,7 @@ data class StackRegionOperation(
     val clipboardBuffer: ClipboardBuffer,
     val step: Vec3i,
     val repeatCount: Int,
+    val keepExisting: Boolean = false,
 ) : EditOperation {
     override val kind: String = "stack_region"
 }

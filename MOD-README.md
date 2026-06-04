@@ -2,7 +2,7 @@
 
 ## What is it?
 
-Axion is an open-source Fabric building tool for Minecraft, inspired by Axiom. It adds fast in-game editing tools, live previews, symmetry, Magic Select, saved hotbars, and long-range builder utilities.
+Axion is an open-source Fabric building tool for Minecraft. It adds fast in-game editing tools, live previews, symmetry, Magic Select, saved hotbars, and long-range builder utilities.
 
 For multiplayer-safe editing on Paper, pair it with the Axion Paper plugin:
 

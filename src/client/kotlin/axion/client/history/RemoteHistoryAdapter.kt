@@ -35,6 +35,13 @@ object RemoteHistoryAdapter {
     }
 
     private fun parseBlockEntityData(snbt: String): BlockEntityDataSnapshot {
-        return BlockEntityDataSnapshot(StringNbtReader.readCompound(snbt))
+        val parsed = runCatching {
+            StringNbtReader::class.java.getMethod("readCompound", String::class.java)
+                .invoke(null, snbt) as net.minecraft.nbt.NbtCompound
+        }.getOrElse {
+            StringNbtReader::class.java.getMethod("parse", String::class.java)
+                .invoke(null, snbt) as net.minecraft.nbt.NbtCompound
+        }
+        return BlockEntityDataSnapshot(parsed)
     }
 }

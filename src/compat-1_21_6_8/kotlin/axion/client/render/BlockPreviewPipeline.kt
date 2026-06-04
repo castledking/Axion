@@ -5,7 +5,7 @@ import net.minecraft.util.math.Box
 
 object BlockPreviewPipeline {
     // Outline budget for the per-component path. Below this we draw individual
-    // component outlines via ClipboardSelectionRenderer (Axiom-style); above it
+    // component outlines via ClipboardSelectionRenderer; above it
     // we fall back to a single aggregate bounding box.
     //
     // Sized for typical accumulated magic-select selections: a brush-10 sphere

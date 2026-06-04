@@ -1,20 +1,32 @@
 package axion.client.render
 
-import com.mojang.blaze3d.opengl.GlStateManager
 import net.minecraft.client.render.RenderLayer
 
 object DepthRenderCompat {
+    private val glStateManager: Class<*>? by lazy {
+        runCatching { Class.forName("com.mojang.blaze3d.opengl.GlStateManager") }.getOrNull()
+            ?: runCatching { Class.forName("com.mojang.blaze3d.platform.GlStateManager") }.getOrNull()
+    }
+
     fun renderThroughBlocks(
         consumers: Any,
         vararg layers: RenderLayer,
         render: () -> Unit,
     ) {
-        GlStateManager._disableDepthTest()
+        setDepthTest(enabled = false)
         try {
             render()
             layers.forEach { flushLayer(consumers, it) }
         } finally {
-            GlStateManager._enableDepthTest()
+            setDepthTest(enabled = true)
+        }
+    }
+
+    private fun setDepthTest(enabled: Boolean) {
+        val manager = glStateManager ?: return
+        val methodName = if (enabled) "_enableDepthTest" else "_disableDepthTest"
+        runCatching {
+            manager.getDeclaredMethod(methodName).invoke(null)
         }
     }
 

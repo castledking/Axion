@@ -29,6 +29,27 @@ class SymmetryTransformServiceTest {
     }
 
     @Test
+    fun `y mirror transforms vertical placement face`() {
+        val transformed = SymmetryTransformService.transformDirection(
+            direction = Direction.UP,
+            transform = SymmetryTransformSpec(rotationQuarterTurns = 0, mirrorAxis = SymmetryMirrorAxis.Y),
+        )
+
+        assertEquals(Direction.DOWN, transformed)
+    }
+
+    @Test
+    fun `y mirror reflects block across anchor`() {
+        val transformed = SymmetryTransformService.transformBlock(
+            sourceBlock = BlockPos(0, 2, 0),
+            anchor = Vec3d(0.5, 1.5, 0.5),
+            transform = SymmetryTransformSpec(rotationQuarterTurns = 0, mirrorAxis = SymmetryMirrorAxis.Y),
+        )
+
+        assertEquals(BlockPos(0, 0, 0), transformed)
+    }
+
+    @Test
     fun `mixed half-grid anchor normalizes rotational center to block centers`() {
         val transformed = SymmetryTransformService.transformBlock(
             sourceBlock = BlockPos(1, 0, 0),

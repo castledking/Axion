@@ -4,6 +4,9 @@ import axion.client.compat.CameraAccess
 import axion.client.render.AxionPreviewBuffer
 import axion.client.render.AxionWorldRenderContext
 import axion.client.render.RenderLayerCompat
+import axion.client.render.ShaderPackCompat
+import axion.client.render.TintedAlphaVertexConsumer
+import axion.client.render.getBuffer
 import axion.client.render.defaultState
 import axion.client.render.getRenderingSeedCompat
 import axion.client.render.isOpaqueFullCube
@@ -89,10 +92,69 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
         refreshDirtyBuffers(world)
         if (chunkBuffers.isEmpty()) return ChunkedDrawResult.NO_BUFFERS
 
+        if (ShaderPackCompat.shouldDisableDirectGpuPreview()) {
+            renderLegacy(context, world, color, alpha, translationDelta)
+            return ChunkedDrawResult.DREW
+        }
+
         val camera = client.gameRenderer.camera
         val cameraPos = CameraAccess.getPos(camera)
         val baseModelView = Matrix4f(context.matrices().peek().pose())
         return drawDeferred(color, alpha, translationDelta, baseModelView, cameraPos)
+    }
+
+    private fun renderLegacy(
+        context: AxionWorldRenderContext,
+        world: net.minecraft.client.world.ClientWorld,
+        color: Int,
+        alpha: Int,
+        translationDelta: Vec3i,
+    ) {
+        val client = MinecraftClient.getInstance()
+        val camera = client.gameRenderer.camera
+        val cameraPos = CameraAccess.getPos(camera)
+        val blockRenderer = BlockRenderManager(true, true, client.blockColors)
+        val modelSet = client.modelManager.blockStateModelSet
+        val consumer = TintedAlphaVertexConsumer(
+            context.consumers().getBuffer(RenderLayerCompat.blockTranslucentCull()),
+            alpha / 255.0f,
+            color,
+        )
+        val statesView = states.asMap()
+        val cameraX = cameraPos.x - translationDelta.x
+        val cameraY = cameraPos.y - translationDelta.y
+        val cameraZ = cameraPos.z - translationDelta.z
+
+        for (sectionKey in chunkBuffers.keys) {
+            val surface = ChunkMeshTessellator.buildSectionSurface(store, sectionKey, statesView)
+            for (packed in surface) {
+                val state = statesView[packed] ?: continue
+                if (state.isAir || state.renderShape != BlockRenderType.MODEL) continue
+                val pos = blockPosFromLong(packed)
+                val model = modelSet.get(state)
+                val previewView = PreviewBlockRenderView(world, statesView, pos)
+                val output = BlockQuadOutput { x: Float, y: Float, z: Float, quad: BakedQuad, quadInstance: QuadInstance ->
+                    consumer.putBlockBakedQuad(
+                        x - cameraX.toFloat(),
+                        y - cameraY.toFloat(),
+                        z - cameraZ.toFloat(),
+                        quad,
+                        quadInstance,
+                    )
+                }
+                blockRenderer.tesselateBlock(
+                    output,
+                    pos.x.toFloat(),
+                    pos.y.toFloat(),
+                    pos.z.toFloat(),
+                    previewView,
+                    pos,
+                    state,
+                    model,
+                    state.getRenderingSeedCompat(pos),
+                )
+            }
+        }
     }
 
     fun drawDeferred(

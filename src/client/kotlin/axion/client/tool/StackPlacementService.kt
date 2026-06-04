@@ -16,7 +16,11 @@ import java.util.UUID
 
 object StackPlacementService {
     fun toOperation(preview: StackPreviewState, client: MinecraftClient? = null): EditOperation {
-        val blockOperation = RegionRepeatPlacementService.toOperation(preview, repeatMode())
+        val blockOperation = RegionRepeatPlacementService.toOperation(
+            preview = preview,
+            mode = RegionRepeatPlacementService.Mode.STACK,
+            keepExisting = AxionClientState.keepExistingEnabled,
+        )
         if (!AxionClientState.copyEntitiesEnabled) {
             return blockOperation
         }
@@ -51,7 +55,7 @@ object StackPlacementService {
             sourceRegion = sourceRegion,
             clipboardBuffer = clipboardBuffer,
             scrollAmount = scrollAmount,
-            mode = repeatMode(),
+            mode = RegionRepeatPlacementService.Mode.STACK,
         )
     }
 
@@ -60,16 +64,8 @@ object StackPlacementService {
             client = client,
             preview = preview,
             scrollAmount = scrollAmount,
-            mode = repeatMode(),
+            mode = RegionRepeatPlacementService.Mode.STACK,
         )
-    }
-
-    fun repeatMode(): RegionRepeatPlacementService.Mode {
-        return if (AxionClientState.keepExistingEnabled) {
-            RegionRepeatPlacementService.Mode.SMEAR
-        } else {
-            RegionRepeatPlacementService.Mode.STACK
-        }
     }
 
     private fun entityCloneOperationsFor(

@@ -20,7 +20,9 @@ val minecraftPatch = when {
     else -> 0
 }
 
-// Two release ranges, mirroring Axiom's multi-version-jar approach:
+// Two release ranges:
+//   - rangeMc1214:  1.21.4            (compat-1_21_4, isolated exact-version port)
+//   - rangeMc1215:  1.21.5            (compat-1_21_5, isolated exact-version port)
 //   - rangeLegacy:  1.21.6 .. 1.21.8  (compat-1_21_7, no MouseInput / WorldRenderState classes,
 //                                      both stubs required at compile time)
 //   - rangeModern:  1.21.9 .. 1.21.11 (compat-1_21_11, MouseInput + WorldRenderState exist,
@@ -28,6 +30,7 @@ val minecraftPatch = when {
 //
 // Cross-version mixin compatibility within each range is handled by `require = 0`
 // dual-signature injections in MouseMixin and WorldRendererFallbackMixin.
+val rangeMc1214 = minecraftVersion == "1.21.4"
 val rangeMc1215 = minecraftVersion == "1.21.5"
 val rangeLegacy = minecraftVersion.startsWith("1.21.") && minecraftPatch in 6..8
 val rangeModern = minecraftVersion.startsWith("1.21.") && minecraftPatch >= 9
@@ -45,8 +48,8 @@ if (rangeMc261x) {
     apply(plugin = "fabric-loom")
 }
 
-val needsLegacyMouseInputStub = rangeMc1215 || rangeLegacy
-val needsLegacyWorldRenderStateStub = rangeMc1215 || rangeLegacy
+val needsLegacyMouseInputStub = rangeMc1214 || rangeMc1215 || rangeLegacy
+val needsLegacyWorldRenderStateStub = rangeMc1214 || rangeMc1215 || rangeLegacy
 val supportsFabricDedicatedServer = minecraftVersion == "1.21.11"
 
 // Define Minecraft version range for fabric.mod.json.
@@ -54,6 +57,7 @@ val supportsFabricDedicatedServer = minecraftVersion == "1.21.11"
 // release range artifacts keep their advertised multi-version metadata.
 val minecraftVersionRange = (findProperty("axion_minecraft_version_range") as String?)?.trim()?.takeIf { it.isNotEmpty() } ?: when {
     rangeMc1215 -> "1.21.5"
+    rangeMc1214 -> "1.21.4"
     rangeLegacy -> ">=1.21.6 <=1.21.8"
     rangeModern -> ">=1.21.9 <=1.21.11"
     rangeMc261x -> ">=26.1 <=26.1.2"
@@ -119,7 +123,9 @@ if (needsLegacyWorldRenderStateStub) {
 
 // Two compat source sets corresponding to the two release ranges
 sourceSets.named("client") {
-    if (rangeMc1215) {
+    if (rangeMc1214) {
+        kotlin.srcDir("src/compat-1_21_4/kotlin")
+    } else if (rangeMc1215) {
         kotlin.srcDir("src/compat-1_21_5/kotlin")
         // 1.21.5 stays on the CPU preview path. Do not ship dormant GPU
         // uploader/drawer classes that touch RenderSystem.getDevice().
@@ -143,6 +149,9 @@ sourceSets.named("client") {
         // 26.1.x Fabric builds in the official namespace and uses the
         // compatibility aliases in src/compat-26_1.
         kotlin.srcDir("src/compat-26_1/kotlin")
+        // InGameHud does not exist in 26.1 (HUD is HudElement-based)
+        kotlin.exclude("axion/mixin/client/InGameHudMixin*")
+        kotlin.exclude("axion/mixin/client/LocatorBarMixin*")
     } else {
         // 1.21.9+: registry-manager-based serialization, has MouseInput / WorldRenderState
         kotlin.srcDir("src/compat-1_21_11/kotlin")
@@ -220,7 +229,7 @@ tasks.processResources {
     inputs.property("fabric_api_version_range", fabricApiVersionRange)
     inputs.property("fabric_kotlin_version_range", fabricKotlinVersionRange)
 
-    if (rangeMc1215) {
+    if (rangeMc1214 || rangeMc1215) {
         exclude("assets/axion/shaders/core/preview_shell.*")
     }
 
@@ -244,7 +253,7 @@ tasks.named<ProcessResources>("processClientResources") {
         delete(layout.buildDirectory.dir("resources/client"))
         // Copy version-specific mixin config
         val mixinConfigSource = when {
-            rangeMc1215 -> "axion.client.mixins-1.21.5.json"
+            rangeMc1214 || rangeMc1215 -> "axion.client.mixins-1.21.5.json"
             else -> null
         }
         if (mixinConfigSource != null) {
@@ -269,6 +278,8 @@ tasks.named<ProcessResources>("processClientResources") {
         filesMatching("axion.client.mixins.json") {
             filter { line ->
                 when {
+                    line.contains("\"InGameHudMixin\"") -> null
+                    line.contains("\"LocatorBarMixin\"") -> null
                     line.contains("\"WorldRendererFallbackMixin\"") -> null
                     line.contains("\"PlayerEntityPoseMixin\",") -> line.replace("\"PlayerEntityPoseMixin\",", "\"PlayerEntityPoseMixin\"")
                     else -> line
@@ -300,8 +311,9 @@ tasks.test {
     useJUnitPlatform()
 }
 
-// Range-style filename matching Axiom's release pattern, e.g. "mc1.21.9-1.21.11"
+// Range-style filename, e.g. "mc1.21.9-1.21.11"
 val rangeFileTag = (findProperty("axion_artifact_tag") as String?)?.trim()?.takeIf { it.isNotEmpty() } ?: when {
+    rangeMc1214 -> "mc1.21.4"
     rangeMc1215 -> "mc1.21.5"
     rangeLegacy -> "mc1.21.6-1.21.8"
     rangeModern -> "mc1.21.9-1.21.11"

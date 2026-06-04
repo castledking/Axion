@@ -4,7 +4,9 @@ import axion.client.compat.CameraAccess
 import axion.client.compat.VersionCompatImpl
 import axion.client.render.AxionPreviewBuffer
 import axion.client.render.RenderLayerCompat
+import axion.client.render.ShaderPackCompat
 import com.mojang.blaze3d.buffers.GpuBufferSlice
+import com.mojang.blaze3d.opengl.GlStateManager
 import com.mojang.blaze3d.systems.RenderSystem
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap
 import net.minecraft.client.MinecraftClient
@@ -45,6 +47,7 @@ object AxionPreviewBlockDrawer {
         projectionMatrix: Matrix4fc? = null,
     ): ChunkedDrawResult {
         if (disabled || sectionBuffers.isEmpty()) return ChunkedDrawResult.FAILED
+        if (ShaderPackCompat.shouldDisableDirectGpuPreview()) return ChunkedDrawResult.FAILED
 
         return try {
             val result = doDrawChunked(sectionBuffers, color, alpha, translationDelta, baseModelView, cameraPosOverride)
@@ -126,6 +129,8 @@ object AxionPreviewBlockDrawer {
         try {
             val renderLayer = RenderLayerCompat.translucentMovingBlock()
             pass.setPipeline(VersionCompatImpl.getRenderPipeline(renderLayer))
+            GlStateManager._enablePolygonOffset()
+            GlStateManager._polygonOffset(-1.0f, -1.0f)
             RenderSystem.bindDefaultUniforms(pass)
 
             VersionCompatImpl.getBlockAtlasTextureView(client)?.let { atlasView ->

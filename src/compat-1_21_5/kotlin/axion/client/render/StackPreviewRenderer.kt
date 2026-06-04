@@ -1,6 +1,6 @@
 package axion.client.render
 
-import axion.client.tool.StackPlacementService
+import axion.client.tool.RegionRepeatPlacementService
 import axion.client.tool.StackToolController
 
 object StackPreviewRenderer {
@@ -12,7 +12,7 @@ object StackPreviewRenderer {
         RepeatPreviewRenderer.render(
             context = context,
             preview = preview,
-            mode = StackPlacementService.repeatMode(),
+            mode = RegionRepeatPlacementService.Mode.STACK,
             destinationColor = DESTINATION_COLOR,
             lineWidth = LINE_WIDTH,
         )

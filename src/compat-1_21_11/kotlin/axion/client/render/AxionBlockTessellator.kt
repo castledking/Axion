@@ -21,7 +21,7 @@ import net.minecraft.world.chunk.light.LightingProvider
  * the expensive renderBlockAsEntity() path. Caches BakedModel lookups and provides
  * a reusable BlockRenderView for preview regions.
  *
- * Inspired by Axiom's BlockTessellator: avoids entity-rendering overhead,
+ * Avoids entity-rendering overhead,
  * caches model references, and supports ambient occlusion via the block pipeline.
  */
 object AxionBlockTessellator {

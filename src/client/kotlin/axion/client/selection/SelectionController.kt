@@ -73,7 +73,7 @@ object SelectionController {
         if (targetBlock != null && targetHitPos != null) {
             val outwardFace = SelectionBounds.outwardFaceToward(region, targetBlock, targetHitPos)
             if (outwardFace != null) {
-                return region.expandFace(outwardFace, targetBlock)
+                return region.resizeFaceToward(outwardFace, targetBlock)
             }
         }
 
@@ -90,11 +90,9 @@ object SelectionController {
             )
         } ?: return null
 
-        return if (targetBlock != null && isBeyondFace(region, faceHit.face, targetBlock)) {
-            region.expandFace(faceHit.face, targetBlock)
-        } else {
-            region.extendFace(faceHit.face)
-        }
+        return targetBlock
+            ?.let { region.resizeFaceToward(faceHit.face, it) }
+            ?: region.extendFace(faceHit.face)
     }
 
     private fun isRegionSelectionContext(): Boolean {
@@ -102,15 +100,4 @@ object SelectionController {
             AxionToolSelectionController.selectedSubtool().usesRegionSelection
     }
 
-    private fun isBeyondFace(region: BlockRegion, face: axion.common.model.RegionFace, target: BlockPos): Boolean {
-        val normalized = region.normalized()
-        return when (face) {
-            axion.common.model.RegionFace.DOWN -> target.y < normalized.start.y
-            axion.common.model.RegionFace.UP -> target.y > normalized.end.y
-            axion.common.model.RegionFace.NORTH -> target.z < normalized.start.z
-            axion.common.model.RegionFace.SOUTH -> target.z > normalized.end.z
-            axion.common.model.RegionFace.WEST -> target.x < normalized.start.x
-            axion.common.model.RegionFace.EAST -> target.x > normalized.end.x
-        }
-    }
 }

@@ -171,6 +171,7 @@ class NetworkOperationDispatcher(
                     cells = operation.clipboardBuffer.cells.map { it.toPayload() },
                     step = operation.step.toProtocolVector(),
                     repeatCount = operation.repeatCount,
+                    keepExisting = operation.keepExisting,
                 )
             }
 

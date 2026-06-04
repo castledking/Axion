@@ -93,7 +93,7 @@ class AxionFabricOperationService(
                     is DeleteEntitiesRequest -> entityDeletes += AxionFabricEntityDeleteService.delete(world, operation)
                     is MoveEntitiesRequest -> entityMoves += AxionFabricEntityMoveService.move(world, operation)
                     is PlaceBlocksRequest -> applyPlacements(world, operation)
-                    is StackRegionRequest -> applyRepeatedClipboard(world, operation.sourceOrigin, operation.cells, operation.step, operation.repeatCount, airOnly = false)
+                    is StackRegionRequest -> applyRepeatedClipboard(world, operation.sourceOrigin, operation.cells, operation.step, operation.repeatCount, airOnly = operation.keepExisting)
                     is SmearRegionRequest -> applySmearedClipboard(world, operation)
                     is ExtrudeRequest -> applyExtrude(world, plannedExtrudes[operation])
                     else -> Unit

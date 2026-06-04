@@ -125,6 +125,7 @@ object SymmetryOperationExpander {
                     clipboardBuffer = operation.clipboardBuffer,
                     step = SymmetryTransformService.transformVector(operation.step, transform),
                     repeatCount = operation.repeatCount,
+                    keepExisting = operation.keepExisting,
                 )
             }
             .distinct()

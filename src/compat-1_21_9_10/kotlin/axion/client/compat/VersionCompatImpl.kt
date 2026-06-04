@@ -341,6 +341,7 @@ object VersionCompatImpl : VersionCompat {
         alpha: Int,
     ): Boolean {
         return try {
+            if (ShaderPackCompat.shouldDisableDirectGpuPreview()) return false
             val session = ChunkedPreviewLifecycle.acquire(sessionId)
             session.setFromClipboard(clipboard, origins)
             session.render(context, color, alpha).handled

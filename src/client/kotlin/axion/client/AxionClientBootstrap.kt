@@ -4,12 +4,14 @@ import axion.client.compat.VersionCompatInit
 import axion.client.compat.VersionCompatImpl
 import axion.client.config.AxionClientConfig
 import axion.client.hotbar.AxionHotbarHud
+import axion.client.hotbar.SavedHotbarController
 import axion.client.hotbar.AxionToolHintHud
 import axion.client.input.AxionKeybindings
 import axion.client.network.AxionServerConnection
 import axion.client.input.AxionTickHandler
 import axion.common.compat.VersionCompat
 import axion.client.render.WorldRenderCompat
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 import net.minecraft.util.Identifier
 import org.slf4j.LoggerFactory
@@ -45,6 +47,11 @@ object AxionClientBootstrap {
         logger.info("[Axion/Bootstrap] HUD elements registered")
         ClientTickEvents.END_CLIENT_TICK.register(AxionTickHandler::onEndTick)
         logger.info("[Axion/Bootstrap] Client tick handler registered")
+        ClientLifecycleEvents.CLIENT_STOPPING.register(SavedHotbarController::flushActiveHotbar)
+        VersionCompatImpl.onPlayDisconnect { client ->
+            SavedHotbarController.flushActiveHotbar(client)
+        }
+        logger.info("[Axion/Bootstrap] Saved hotbar flush handlers registered")
 
         // Register renderers directly
         registerRenderers()

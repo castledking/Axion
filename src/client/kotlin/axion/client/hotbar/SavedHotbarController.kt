@@ -138,8 +138,22 @@ object SavedHotbarController {
         AxionClientConfig.setActiveSavedHotbarIndex(pendingIndex)
     }
 
+    fun flushActiveHotbar(client: MinecraftClient) {
+        if (!canPersistActiveHotbar(client)) {
+            return
+        }
+        saveCurrentHotbar(client, AxionClientConfig.activeSavedHotbarIndex())
+    }
+
     private fun supportsSavedHotbars(client: MinecraftClient): Boolean {
         return client.currentScreen == null &&
+            AxionToolSelectionController.isCreativeModeAllowed() &&
+            !AxionToolSelectionController.isAxionSlotActive()
+    }
+
+    private fun canPersistActiveHotbar(client: MinecraftClient): Boolean {
+        return client.player != null &&
+            client.world != null &&
             AxionToolSelectionController.isCreativeModeAllowed() &&
             !AxionToolSelectionController.isAxionSlotActive()
     }
@@ -168,6 +182,13 @@ object SavedHotbarController {
         }
     }
 
+    fun deserializeStackForDisplay(
+        registryManager: net.minecraft.registry.DynamicRegistryManager,
+        serialized: String?,
+    ): ItemStack {
+        return deserializeStack(registryManager, serialized)
+    }
+
     private fun stacksForDisplay(
         client: MinecraftClient,
         index: Int,
@@ -183,6 +204,25 @@ object SavedHotbarController {
             List(HOTBAR_SIZE) { slot ->
                 deserializeStack(registryManager, savedHotbar.slots.getOrNull(slot)).copy()
             }
+        }
+    }
+
+    fun clearSlotItem(hotbarIndex: Int, slotIndex: Int) {
+        setSlotItem(hotbarIndex, slotIndex, null)
+    }
+
+    fun setSlotItem(hotbarIndex: Int, slotIndex: Int, serialized: String?) {
+        val config = AxionClientConfig.savedHotbar(hotbarIndex) ?: return
+        val slots = config.slots.toMutableList()
+        while (slots.size <= slotIndex) slots.add(null)
+        slots[slotIndex] = serialized
+        AxionClientConfig.updateSavedHotbar(hotbarIndex, config.copy(slots = slots))
+    }
+
+    fun clearPage(page: Int) {
+        val pageStart = page * PAGE_SIZE
+        for (i in pageStart until pageStart + PAGE_SIZE) {
+            AxionClientConfig.updateSavedHotbar(i, SavedHotbarConfig.empty())
         }
     }
 

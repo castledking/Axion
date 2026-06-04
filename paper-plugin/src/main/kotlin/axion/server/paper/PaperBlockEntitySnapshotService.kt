@@ -2,7 +2,6 @@ package axion.server.paper
 
 import net.minecraft.core.BlockPos
 import net.minecraft.nbt.CompoundTag
-import net.minecraft.nbt.TagParser
 import net.minecraft.world.level.block.entity.BlockEntity
 import org.bukkit.Bukkit
 import org.bukkit.World
@@ -28,7 +27,7 @@ object PaperBlockEntitySnapshotService {
         }
 
         val tag = try {
-            rebase(TagParser.parseCompoundFully(blockEntityPayload), pos)
+            rebase(PaperNbtCompat.parseCompound(blockEntityPayload), pos)
         } catch (_: Exception) {
             return
         }

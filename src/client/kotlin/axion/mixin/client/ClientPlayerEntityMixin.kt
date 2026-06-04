@@ -1,7 +1,10 @@
 package axion.mixin.client
 
 import axion.client.mode.ClientModeController
+import axion.client.mode.EntityNoClipSupport
 import net.minecraft.client.network.ClientPlayerEntity
+import net.minecraft.entity.MovementType
+import net.minecraft.util.math.Vec3d
 import org.spongepowered.asm.mixin.Mixin
 import org.spongepowered.asm.mixin.injection.At
 import org.spongepowered.asm.mixin.injection.Inject
@@ -22,6 +25,23 @@ abstract class ClientPlayerEntityMixin {
         // 26.1.x removed the mapped noClip setter this mixin used; push-out suppression
         // still handles client-side collision nudging until the movement hook is ported.
         // player.noClip = true
+    }
+
+    @Inject(method = ["move"], at = [At("HEAD")], cancellable = true, require = 0)
+    private fun axionApplyNoClipClientMovement(type: MovementType, movement: Vec3d, ci: CallbackInfo) {
+        val player = self()
+        if (!ClientModeController.isNoClipActiveFor(player)) {
+            return
+        }
+
+        EntityNoClipSupport.setPosition(
+            player,
+            player.x + movement.x,
+            player.y + movement.y,
+            player.z + movement.z,
+        )
+        EntityNoClipSupport.clearCollisionFlags(player)
+        ci.cancel()
     }
 
     @Inject(method = ["pushOutOfBlocks"], at = [At("HEAD")], cancellable = true, require = 0)

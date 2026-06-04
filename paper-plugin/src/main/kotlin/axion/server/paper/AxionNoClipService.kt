@@ -73,8 +73,26 @@ class AxionNoClipService(
         handle.noPhysics = active
         if (active) {
             handle.setOnGround(false)
-            handle.fallDistance = 0.0
+            clearNmsFallDistance(handle)
             player.fallDistance = 0f
         }
+    }
+
+    private fun clearNmsFallDistance(handle: ServerPlayer) {
+        val field = handle.javaClass.fields.firstOrNull { it.name == "fallDistance" }
+            ?: handle.javaClass.superclasses().firstNotNullOfOrNull { type ->
+                type.fields.firstOrNull { it.name == "fallDistance" }
+            }
+            ?: return
+
+        when (field.type) {
+            java.lang.Double.TYPE -> field.setDouble(handle, 0.0)
+            java.lang.Float.TYPE -> field.setFloat(handle, 0f)
+            else -> field.set(handle, 0)
+        }
+    }
+
+    private fun Class<*>.superclasses(): Sequence<Class<*>> {
+        return generateSequence(superclass) { it.superclass }
     }
 }

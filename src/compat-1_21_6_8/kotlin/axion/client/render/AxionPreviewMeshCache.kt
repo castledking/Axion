@@ -17,7 +17,7 @@ import java.util.LinkedHashMap
  * 2. Store the built vertex data keyed by preview parameters
  * 3. Re-emit from cache every frame without re-tessellating
  *
- * This is the Axion equivalent of Axiom's ChunkRenderOverrider compilation step.
+ * Compiles reusable preview meshes for chunked preview rendering.
  */
 object AxionPreviewMeshCache {
     private const val MAX_CACHE_SIZE = 32

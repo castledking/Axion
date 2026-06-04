@@ -5,6 +5,7 @@
   "client": [
     "ClientPlayerEntityMixin",
     "EntityMixin",
+    "InGameHudMixin",
     "MinecraftClientMixin",
     "MouseMixin",
     "PlayerEntityPoseMixin",

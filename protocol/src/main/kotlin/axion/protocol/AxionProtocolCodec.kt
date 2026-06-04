@@ -240,6 +240,7 @@ object AxionProtocolCodec {
                 writeClipboardCells(output, operation.cells)
                 writeVector(output, operation.step)
                 output.writeInt(operation.repeatCount)
+                output.writeBoolean(operation.keepExisting)
             }
 
             is SmearRegionRequest -> {
@@ -327,6 +328,7 @@ object AxionProtocolCodec {
                 cells = readClipboardCells(input),
                 step = readVector(input),
                 repeatCount = input.readInt(),
+                keepExisting = input.readBoolean(),
             )
 
             AxionOperationType.SMEAR_REGION -> SmearRegionRequest(

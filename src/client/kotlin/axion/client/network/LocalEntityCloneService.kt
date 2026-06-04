@@ -101,11 +101,10 @@ object LocalEntityCloneService {
 
     private fun stripUuids(tag: NbtCompound) {
         tag.remove("UUID")
-        tag.getList("Passengers").ifPresent { passengers ->
-            passengers.forEach { nested ->
-                val compound = nested.asCompound().orElse(null) ?: return@forEach
-                stripUuids(compound)
-            }
+        val passengers = tag.get("Passengers") as? NbtList ?: return
+        passengers.forEach { nested ->
+            val compound = nested as? NbtCompound ?: return@forEach
+            stripUuids(compound)
         }
     }
 

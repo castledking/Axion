@@ -4,6 +4,7 @@ import axion.protocol.CloneEntitiesRequest
 import axion.protocol.PlacementMirrorAxisPayload
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.ListTag
+import net.minecraft.nbt.Tag
 import net.minecraft.world.entity.EntityType
 import net.minecraft.world.entity.EntitySpawnReason
 import org.bukkit.Location
@@ -50,7 +51,7 @@ object PaperEntityCloneService {
                 )
                 val spawned = linkedMapOf<UUID, net.minecraft.world.entity.Entity>()
                 clones.forEach { clone ->
-                    spawnClone(level, net.minecraft.nbt.TagParser.parseCompoundFully(clone.entityData), clone.spawnLocation, clone.entityId)
+                    spawnClone(level, PaperNbtCompat.parseCompound(clone.entityData), clone.spawnLocation, clone.entityId)
                         ?.let { spawned[clone.entityId] = it }
                 }
                 clones.forEach { clone ->
@@ -77,7 +78,7 @@ object PaperEntityCloneService {
         val level = (world as CraftWorld).handle
         val spawned = linkedMapOf<UUID, net.minecraft.world.entity.Entity>()
         clones.forEach { clone ->
-            spawnClone(level, net.minecraft.nbt.TagParser.parseCompoundFully(clone.entityData), clone.spawnLocation, clone.entityId)
+            spawnClone(level, PaperNbtCompat.parseCompound(clone.entityData), clone.spawnLocation, clone.entityId)
                 ?.let { spawned[clone.entityId] = it }
         }
         clones.forEach { clone ->
@@ -140,7 +141,7 @@ object PaperEntityCloneService {
         stripUuids(tag)
         val entity = EntityType.loadEntityRecursive(tag, level, EntitySpawnReason.COMMAND) { entity ->
             entity.setUUID(entityId)
-            entity.snapTo(location.x, location.y, location.z, location.yaw, location.pitch)
+            snapEntityTo(entity, location)
             entity
         } ?: return null
         level.tryAddFreshEntityWithPassengers(entity)
@@ -149,12 +150,74 @@ object PaperEntityCloneService {
 
     private fun stripUuids(tag: CompoundTag) {
         tag.remove("UUID")
-        tag.getList("Passengers").ifPresent { passengers ->
-            passengers.forEach { nested ->
-                val compound = nested.asCompound().orElse(null) ?: return@forEach
-                stripUuids(compound)
-            }
+        passengerList(tag)?.forEach { nested ->
+            val compound = nested as? CompoundTag ?: return@forEach
+            stripUuids(compound)
         }
+    }
+
+    private fun passengerList(tag: CompoundTag): ListTag? {
+        val modern = runCatching {
+            tag.javaClass.methods
+                .firstOrNull { method ->
+                    method.name == "getList" &&
+                        method.parameterTypes.size == 1 &&
+                        method.parameterTypes[0] == String::class.java
+                }
+                ?.invoke(tag, "Passengers")
+        }.getOrNull()
+        if (modern is ListTag) {
+            return modern
+        }
+        val optionalValue = modern as? java.util.Optional<*>
+        val optionalList = optionalValue?.orElse(null)
+        if (optionalList is ListTag) {
+            return optionalList
+        }
+
+        return runCatching {
+            tag.javaClass.methods
+                .firstOrNull { method ->
+                    method.name == "getList" &&
+                        method.parameterTypes.size == 2 &&
+                        method.parameterTypes[0] == String::class.java &&
+                        method.parameterTypes[1] == Int::class.javaPrimitiveType
+                }
+                ?.invoke(tag, "Passengers", Tag.TAG_COMPOUND.toInt()) as? ListTag
+        }.getOrNull()
+    }
+
+    private fun snapEntityTo(entity: net.minecraft.world.entity.Entity, location: Location) {
+        val yaw = location.yaw
+        val pitch = location.pitch
+        val methods = entity.javaClass.methods
+        methods.firstOrNull { method ->
+            method.name == "snapTo" &&
+                method.parameterTypes.contentEquals(
+                    arrayOf(
+                        Double::class.javaPrimitiveType,
+                        Double::class.javaPrimitiveType,
+                        Double::class.javaPrimitiveType,
+                        Float::class.javaPrimitiveType,
+                        Float::class.javaPrimitiveType,
+                    ),
+                )
+        }?.invoke(entity, location.x, location.y, location.z, yaw, pitch)?.let { return }
+
+        methods.firstOrNull { method ->
+            method.name == "moveTo" &&
+                method.parameterTypes.contentEquals(
+                    arrayOf(
+                        Double::class.javaPrimitiveType,
+                        Double::class.javaPrimitiveType,
+                        Double::class.javaPrimitiveType,
+                        Float::class.javaPrimitiveType,
+                        Float::class.javaPrimitiveType,
+                    ),
+                )
+        }?.invoke(entity, location.x, location.y, location.z, yaw, pitch)?.let { return }
+
+        entity.bukkitEntity.teleport(location)
     }
 
     private fun rootEntity(entity: Entity): Entity {

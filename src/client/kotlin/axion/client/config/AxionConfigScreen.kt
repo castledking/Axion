@@ -67,41 +67,6 @@ class AxionConfigScreen(
         super.render(context, mouseX, mouseY, deltaTicks)
 
         context.drawCenteredTextWithShadow(textRenderer, title, width / 2, 28, 0xFFFFFF)
-        context.drawCenteredTextWithShadow(
-            textRenderer,
-            Text.translatable("axion.config.main_modifier.description"),
-            width / 2,
-            (height / 2) - 64,
-            0xBFBFBF,
-        )
-
-        if (!AxionClientConfig.isMacOs()) {
-            context.drawCenteredTextWithShadow(
-                textRenderer,
-                Text.translatable("axion.config.main_modifier.mac_only"),
-                width / 2,
-                (height / 2) - 52,
-                0x8A8A8A,
-            )
-        }
-
-        if (!AxionClientConfig.isLinux()) {
-            context.drawCenteredTextWithShadow(
-                textRenderer,
-                Text.translatable("axion.config.tool_modifier.linux_only"),
-                width / 2,
-                (height / 2) - 34,
-                0x8A8A8A,
-            )
-        }
-
-        context.drawCenteredTextWithShadow(
-            textRenderer,
-            Text.translatable("axion.config.magic_select.templates.summary"),
-            width / 2,
-            (height / 2) - 8,
-            0xBFBFBF,
-        )
     }
 
     private fun commandToggleLabel(): Text {

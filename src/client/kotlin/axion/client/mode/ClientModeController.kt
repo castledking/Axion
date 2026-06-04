@@ -1020,7 +1020,7 @@ object ClientModeController {
             return true
         }
 
-        val inventorySlot = findInventorySlot(inventory, pickedItem, HOTBAR_SIZE until inventory.mainStacks.size)
+        val inventorySlot = findInventorySlot(inventory, pickedItem, HOTBAR_SIZE until VersionCompatImpl.getMainInventoryStacks(inventory).size)
         if (inventorySlot < 0) {
             return clonePickedItemIntoHand(client, player, inventory, pickedItem.getDefaultStack())
         }

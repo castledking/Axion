@@ -1,5 +1,6 @@
 package axion.client.input
 
+import axion.client.compat.CrowBarCompat
 import axion.client.compat.VersionCompatImpl
 import axion.client.config.AxionClientConfig
 import axion.client.config.AxionConfigScreen
@@ -31,7 +32,11 @@ object AxionTickHandler {
         AxionServerConnection.onEndTick()
         SelectionController.onEndTick(client)
         AxionInteractionRouter.onEndTick(client)
-        val player = client.player ?: return
+        val player = client.player
+        if (player == null) {
+            CrowBarCompat.setLocatorBarSuppressed(false)
+            return
+        }
         AxionToolSelectionController.syncWithPlayerSlot(player.inventory.selectedSlot)
         SavedHotbarController.onEndTick(client)
         ClientModeController.enforceCreativeMode(client)
@@ -40,6 +45,9 @@ object AxionTickHandler {
             ClientModeController.handleToggleKeypresses(client)
 
             while (AxionKeybindings.selectAxionTool.wasPressed()) {
+                if (!AxionToolSelectionController.isAxionSlotActive()) {
+                    SavedHotbarController.flushActiveHotbar(client)
+                }
                 AxionToolSelectionController.toggleAxionTool(player.inventory.selectedSlot)
             }
 

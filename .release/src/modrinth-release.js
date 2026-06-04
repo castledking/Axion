@@ -1,4 +1,5 @@
 import { readFileSync, existsSync } from 'fs';
+import { resolve } from 'path';
 import { execSync } from 'child_process';
 import { releaseToModrinth } from './modrinth.js';
 
@@ -24,6 +25,15 @@ function loadRepoConfig(repoName) {
   const configPath = new URL('spigot-resource-ids.json', import.meta.url);
   const config = JSON.parse(readFileSync(configPath, 'utf-8'));
   return config[repoName] || null;
+}
+
+function loadExternalDependencies(repoName) {
+  const depPath = resolve(`.modrinth/${repoName.toLowerCase()}-dependencies.json`);
+  if (existsSync(depPath)) {
+    log(`Loading external dependencies from ${depPath}`);
+    return JSON.parse(readFileSync(depPath, 'utf-8'));
+  }
+  return null;
 }
 
 function findJar(jarDir, pattern) {
@@ -106,6 +116,7 @@ async function main() {
       return;
     }
     const projectId = repoConfig.modrinth_project_id || repoConfig.modrinth;
+    const dependencies = loadExternalDependencies(repoName) || repoConfig.dependencies || [];
     try {
       const result = await releaseToModrinth({
         token, projectId, version,
@@ -113,7 +124,7 @@ async function main() {
         changelogMd,
         gameVersions: repoConfig.game_versions || [],
         loaders: repoConfig.loaders || ['paper'],
-        jarPath, dependencies: repoConfig.dependencies || [],
+        jarPath, dependencies,
         versionType: 'release', featured: false, status: 'listed',
       });
       log(`Modrinth release complete: ${result.id} (${result.version_number})`);

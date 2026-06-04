@@ -110,6 +110,7 @@ object SymmetryTransformService {
         return when (axis) {
             null -> vector
             SymmetryMirrorAxis.X -> net.minecraft.util.math.Vec3i(-vector.x, vector.y, vector.z)
+            SymmetryMirrorAxis.Y -> net.minecraft.util.math.Vec3i(vector.x, -vector.y, vector.z)
             SymmetryMirrorAxis.Z -> net.minecraft.util.math.Vec3i(vector.x, vector.y, -vector.z)
         }
     }

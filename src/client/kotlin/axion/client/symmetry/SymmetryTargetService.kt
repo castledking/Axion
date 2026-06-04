@@ -33,10 +33,13 @@ object SymmetryTargetService {
 
     fun resolveMirrorAxis(client: MinecraftClient): SymmetryMirrorAxis {
         val look = client.player?.rotationVecClient ?: return SymmetryMirrorAxis.X
-        return if (abs(look.x) >= abs(look.z)) {
-            SymmetryMirrorAxis.X
-        } else {
-            SymmetryMirrorAxis.Z
+        val ax = abs(look.x)
+        val ay = abs(look.y)
+        val az = abs(look.z)
+        return when {
+            ay >= ax && ay >= az -> SymmetryMirrorAxis.Y
+            ax >= ay && ax >= az -> SymmetryMirrorAxis.X
+            else -> SymmetryMirrorAxis.Z
         }
     }
 

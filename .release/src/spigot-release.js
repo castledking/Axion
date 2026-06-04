@@ -52,9 +52,21 @@ function sleep(ms) {
 
 async function loadCookies(page, cookiesB64) {
   try {
-    const cookies = JSON.parse(Buffer.from(cookiesB64, 'base64').toString());
+    const raw = JSON.parse(Buffer.from(cookiesB64, 'base64').toString());
+    const cookies = raw.map(c => {
+      const cookie = { ...c };
+      if ('sameSite' in cookie) {
+        const val = String(cookie.sameSite).toLowerCase();
+        if (val === 'lax') cookie.sameSite = 'Lax';
+        else if (val === 'strict') cookie.sameSite = 'Strict';
+        else if (val === 'none' || val === 'no_restriction') cookie.sameSite = 'None';
+        else delete cookie.sameSite;
+      }
+      return cookie;
+    });
+    const sample = cookies.slice(0, 3).map(c => `${c.name}=${c.sameSite ?? 'undefined'}`);
     await page.context().addCookies(cookies);
-    log(`Loaded ${cookies.length} cookies`);
+    log(`Loaded ${cookies.length} cookies (samples: ${sample.join(', ')})`);
     return true;
   } catch (e) {
     log('Failed to load cookies:', e.message);
@@ -62,19 +74,37 @@ async function loadCookies(page, cookiesB64) {
   }
 }
 
+async function findVisibleInput(page, selector) {
+  const inputs = page.locator(selector);
+  const count = await inputs.count();
+  for (let i = 0; i < count; i++) {
+    if (await inputs.nth(i).isVisible().catch(() => false)) return inputs.nth(i);
+  }
+  return null;
+}
+
 async function login(page, username, password) {
   log('Logging in...');
   await page.goto(`${BASE_URL}/login`, { waitUntil: 'networkidle' });
+  await sleep(2000);
 
-  const radio = page.locator('input[name="register"][value="0"]');
-  if (await radio.isVisible()) {
+  const radio = page.locator('#ctrl_pageLogin_registered');
+  if (await radio.isVisible().catch(() => false)) {
     await radio.check();
     await sleep(500);
   }
 
-  await page.fill('input[name="login"]', username);
-  await page.fill('input[name="password"]', password);
-  await page.click('input[type="submit"][value="Log in"]');
+  const loginInput = await findVisibleInput(page, 'input[name="login"]');
+  if (!loginInput) die('Could not find visible login input');
+  await loginInput.fill(username);
+
+  const passwordInput = await findVisibleInput(page, 'input[name="password"]');
+  if (!passwordInput) die('Could not find visible password input');
+  await passwordInput.fill(password);
+
+  const submitBtn = await findVisibleInput(page, 'input[type="submit"][value="Log in"]');
+  if (!submitBtn) die('Could not find visible login button');
+  await submitBtn.click();
 
   try {
     await page.waitForURL(url => !url.toString().includes('/login'), { timeout: 15000 });
@@ -101,7 +131,7 @@ function parseReleaseNotes(filePath) {
 
 async function submitToSpigotmc(page, resourceId, version, title, bbcodeBody, downloadUrl, dryRun) {
   log('--- SpigotMC submission ---');
-  await page.goto(`${BASE_URL}/resources/${resourceId}/add-update`, {
+  await page.goto(`${BASE_URL}/resources/${resourceId}/add-version`, {
     waitUntil: 'networkidle',
     timeout: 30000,
   });
@@ -112,12 +142,28 @@ async function submitToSpigotmc(page, resourceId, version, title, bbcodeBody, do
   }
 
   log(`Page loaded: ${await page.title()}`);
-  await sleep(2000);
+  await sleep(3000);
 
-  const versionInput = page.locator('input[name="version_string"]');
-  if (await versionInput.isVisible().catch(() => false)) {
-    await versionInput.fill(version);
-    log(`Filled version: ${version}`);
+  await page.evaluate(() => {
+    const forms = document.querySelectorAll('form');
+    console.log(`Found ${forms.length} form(s) on page`);
+    forms.forEach((f, i) => {
+      const fields = Array.from(f.querySelectorAll('input, textarea, select')).map(el => ({
+        name: el.name, type: el.type, id: el.id, visible: el.offsetParent !== null,
+        value: el.value, placeholder: el.placeholder,
+      }));
+      console.log(`Form ${i}: action=${f.action}, fields=`, JSON.stringify(fields));
+    });
+  });
+
+  const displayVersion = version.startsWith('v') ? version.slice(1) : version;
+  const versionInput = await findVisibleInput(page, 'input[name="version_string"]');
+  if (versionInput) {
+    await versionInput.fill(displayVersion);
+    log(`Filled version: ${displayVersion}`);
+  } else {
+    await page.locator('input[name="version_string"]').first().fill(displayVersion, { force: true });
+    log(`Filled version (forced): ${displayVersion}`);
   }
 
   const titleInput = page.locator('input[name="title"]');
@@ -127,29 +173,41 @@ async function submitToSpigotmc(page, resourceId, version, title, bbcodeBody, do
     log(`Filled title: ${cleanTitle}`);
   }
 
-  const externalRadio = page.locator(
-    'input[type="radio"][value*="external"], ' +
-    'input[type="radio"][name*="download"][value*="url"], ' +
-    'label:has-text("External") input[type="radio"]'
-  );
-  if (await externalRadio.isVisible().catch(() => false)) {
+  const externalRadio = await findVisibleInput(page, 'input[type="radio"][name="resource_file_type"][value="url"]');
+  if (externalRadio) {
     await externalRadio.check();
     log('Selected external download link');
     await sleep(500);
   }
 
-  const urlInput = page.locator(
-    'input[name="external_url"], input[name*="download_url"], input[type="url"]'
-  );
-  if (await urlInput.isVisible().catch(() => false)) {
+  const urlInput = await findVisibleInput(page, 'input[name="download_url"]');
+  if (urlInput) {
     await urlInput.fill(downloadUrl);
     log(`Filled download URL: ${downloadUrl}`);
   }
 
-  const messageEditor = page.locator('textarea[name="message"]');
-  if (await messageEditor.isVisible().catch(() => false) && bbcodeBody) {
-    await messageEditor.fill(bbcodeBody);
-    log('Filled BBCode description');
+  // SpigotMC uses Redactor (WYSIWYG) for the message field. On submit, Redactor copies
+  // the iframe's HTML back into textarea[name="message_html"], which would wipe any
+  // value we filled directly. Click the BBCode-mode toggle first so the editor stops
+  // syncing from the iframe and the textarea content is what actually gets submitted.
+  if (bbcodeBody) {
+    const bbcodeToggle = page.locator('.redactor_btn_switchmode').first();
+    try {
+      await bbcodeToggle.click({ timeout: 5000 });
+      log('Toggled Redactor to BBCode mode');
+      await sleep(500);
+    } catch (e) {
+      log(`Could not toggle Redactor (continuing with forced fill): ${e.message}`);
+    }
+
+    const messageEditor = page.locator('textarea[name="message_html"]');
+    if (await messageEditor.isVisible().catch(() => false)) {
+      await messageEditor.fill(bbcodeBody);
+      log('Filled BBCode description');
+    } else {
+      await messageEditor.first().fill(bbcodeBody, { force: true });
+      log('Filled BBCode description (forced into hidden textarea)');
+    }
   }
 
   if (dryRun) {
@@ -158,26 +216,31 @@ async function submitToSpigotmc(page, resourceId, version, title, bbcodeBody, do
     return true;
   }
 
-  const submitBtn = page.locator(
-    'input[type="submit"][value="Save"], input[type="submit"][value="Submit"], ' +
-    'input[type="submit"][value="Add Update"], button:has-text("Save"), ' +
-    'button:has-text("Submit"), button:has-text("Add Update")'
-  );
+  await screenshot(page, 'before-submit');
 
-  if (!await submitBtn.first().isVisible().catch(() => false)) {
+  const submitSelector =
+    'input[type="submit"][value="Save Update"], input[type="submit"][value="Save"], ' +
+    'input[type="submit"][value="Submit"], input[type="submit"][value="Add Update"], ' +
+    'button:has-text("Save Update"), button:has-text("Save"), ' +
+    'button:has-text("Submit"), button:has-text("Add Update")';
+
+  const visibleSubmit = await findVisibleInput(page, submitSelector);
+  if (!visibleSubmit) {
     await screenshot(page, 'no-submit-button');
     throw new Error('Could not find submit button');
   }
 
-  await submitBtn.first().click();
+  await visibleSubmit.click();
   log('Form submitted');
 
   try {
-    await page.waitForURL(url => !url.toString().includes('/add-update'), { timeout: 15000 });
+    await page.waitForURL(url => !url.toString().includes('/add-version'), { timeout: 30000 });
     log(`SpigotMC submission successful: ${page.url()}`);
   } catch {
     await screenshot(page, 'submission-result');
-    log('SpigotMC submission completed');
+    const errorText = await page.locator('.error, .notice, .alert, .important, .warning').first().textContent().catch(() => 'none');
+    log(`SpigotMC submission may have failed. Page errors: ${errorText}`);
+    throw new Error(`Submission stuck on add-version page. Errors: ${errorText}`);
   }
   return true;
 }
@@ -206,9 +269,10 @@ async function release() {
 
   const finalResourceId = resourceId || String(repoConfig.spigot);
   const modrinthSlug = repoConfig?.modrinth || null;
+  const releaseTag = version.startsWith('v') ? version : `v${version}`;
   const downloadUrl = modrinthSlug
     ? `https://modrinth.com/plugin/${modrinthSlug}#download`
-    : `https://github.com/${repoOwner}/${repoName}/releases/download/${version}/${repoName}.jar`;
+    : `https://github.com/${repoOwner}/${repoName}/releases/download/${releaseTag}/${repoName}.jar`;
 
   log(`Releasing ${repoName} v${version}`);
   log(`SpigotMC resource: ${finalResourceId}`);

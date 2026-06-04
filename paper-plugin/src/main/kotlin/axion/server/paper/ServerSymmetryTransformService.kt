@@ -67,6 +67,7 @@ object ServerSymmetryTransformService {
         return when (axis) {
             null -> vector
             SymmetryMirrorAxisPayload.X -> Triple(-vector.first, vector.second, vector.third)
+            SymmetryMirrorAxisPayload.Y -> Triple(vector.first, -vector.second, vector.third)
             SymmetryMirrorAxisPayload.Z -> Triple(vector.first, vector.second, -vector.third)
         }
     }

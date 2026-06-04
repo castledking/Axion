@@ -5,6 +5,7 @@ import axion.client.render.AxionBlockTessellator
 import axion.client.render.AxionPreviewBuffer
 import axion.client.render.AxionWorldRenderContext
 import axion.client.render.PreviewBlockInfo
+import axion.client.render.ShaderPackCompat
 import axion.client.render.RenderLayerCompat
 import axion.client.render.TintedAlphaVertexConsumer
 import axion.client.render.getBuffer
@@ -140,7 +141,12 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
             return ChunkedDrawResult.NO_BUFFERS
         }
 
-        if (!USE_DIRECT_GPU_DRAW || DEBUG_FORCE_LEGACY_PATH || AxionPreviewBlockDrawer.isDisabled()) {
+        if (
+            !USE_DIRECT_GPU_DRAW ||
+            DEBUG_FORCE_LEGACY_PATH ||
+            AxionPreviewBlockDrawer.isDisabled() ||
+            ShaderPackCompat.shouldDisableDirectGpuPreview()
+        ) {
             renderLegacy(context, world, color, alpha, translationDelta)
             return ChunkedDrawResult.DREW
         }

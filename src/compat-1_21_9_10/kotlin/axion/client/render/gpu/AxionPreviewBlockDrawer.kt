@@ -3,6 +3,7 @@ import axion.client.compat.CameraAccess
 
 import axion.client.render.AxionPreviewBuffer
 import axion.client.render.RenderLayerCompat
+import axion.client.render.ShaderPackCompat
 import axion.client.compat.VersionCompatImpl
 import com.mojang.blaze3d.buffers.GpuBufferSlice
 import com.mojang.blaze3d.systems.RenderSystem
@@ -119,6 +120,7 @@ object AxionPreviewBlockDrawer {
         projectionMatrix: Matrix4fc? = null,
     ): ChunkedDrawResult {
         if (disabled || sectionBuffers.isEmpty()) return ChunkedDrawResult.FAILED
+        if (ShaderPackCompat.shouldDisableDirectGpuPreview()) return ChunkedDrawResult.FAILED
 
         return try {
             val result = doDrawChunked(

@@ -112,13 +112,18 @@ object RegionRepeatPlacementService {
         )
     }
 
-    fun toOperation(preview: RepeatRegionPreview, mode: Mode): EditOperation {
+    fun toOperation(
+        preview: RepeatRegionPreview,
+        mode: Mode,
+        keepExisting: Boolean = false,
+    ): EditOperation {
         val currentOperation = toOperation(
             sourceRegion = preview.sourceRegion,
             clipboardBuffer = preview.clipboardBuffer,
             step = preview.step,
             repeatCount = preview.repeatCount,
             mode = mode,
+            keepExisting = keepExisting,
         )
         val committedOperations = preview.committedSegments.map { segment ->
             toOperation(
@@ -127,6 +132,7 @@ object RegionRepeatPlacementService {
                 step = segment.step,
                 repeatCount = segment.repeatCount,
                 mode = mode,
+                keepExisting = keepExisting,
             )
         }
         return when {
@@ -232,6 +238,7 @@ object RegionRepeatPlacementService {
         step: Vec3i,
         repeatCount: Int,
         mode: Mode,
+        keepExisting: Boolean,
     ): EditOperation {
         return when (mode) {
             Mode.STACK -> StackRegionOperation(
@@ -239,6 +246,7 @@ object RegionRepeatPlacementService {
                 clipboardBuffer = clipboardBuffer,
                 step = step,
                 repeatCount = repeatCount,
+                keepExisting = keepExisting,
             )
 
             Mode.SMEAR -> SmearRegionOperation(

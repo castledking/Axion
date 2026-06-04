@@ -1,20 +1,27 @@
 package axion.client.render
 
+import axion.client.network.BlockWrite
+import axion.client.network.LocalWritePlanner
 import axion.client.selection.SelectionBounds
 import axion.client.tool.RegionRepeatPlacementService
 import axion.client.tool.RepeatRegionPreview
 import axion.common.model.BlockRegion
 import axion.common.model.ClipboardBuffer
+import axion.common.model.ClipboardCell
+import net.minecraft.client.MinecraftClient
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Vec3i
+import net.minecraft.world.World
 
 object RepeatPreviewRenderer {
     private const val MAX_REGION_OUTLINES: Int = 96
+    private const val MAX_COLLISION_PULSE_BLOCKS: Int = 2048
     private const val DESTINATION_GHOST_COLOR: Int = 0xFFFFFFFF.toInt()
     private const val DEFAULT_GHOST_ALPHA: Int = 156
     private const val SPARSE_GHOST_ALPHA: Int = 228
     private const val GHOST_SCALE: Float = 0.985f
     private const val SOURCE_SELECTION_COLOR: Int = 0xFFFFFFFF.toInt()
+    private val writePlanner = LocalWritePlanner()
 
     fun render(
         context: AxionWorldRenderContext,
@@ -64,21 +71,27 @@ object RepeatPreviewRenderer {
             }
         }
 
-        val globalAggregate = if (mode == RegionRepeatPlacementService.Mode.SMEAR) {
-            aggregateRegionForOffsets(
-                sourceRegion = preview.sourceRegion,
-                offsets = listOf(Vec3i.ZERO) + RegionRepeatPlacementService.smearOffsets(preview.step, preview.repeatCount),
+        if (mode == RegionRepeatPlacementService.Mode.SMEAR) {
+            renderClippedSmear(
+                context = context,
+                preview = preview,
+                destinationColor = destinationColor,
+                lineWidth = lineWidth,
             )
-        } else {
-            RepeatPreviewLayout.globalAggregateRegion(
-                segments = preview.committedSegments,
-                activeSourceRegion = preview.sourceRegion,
-                activeStep = preview.step,
-                activeRepeatCount = preview.repeatCount,
-            )
+            renderArrow(context, preview)
+            return
         }
+
+        // Compute a single global aggregate outline across all committed segments + active segment
+        val globalAggregate = RepeatPreviewLayout.globalAggregateRegion(
+            segments = preview.committedSegments,
+            activeSourceRegion = preview.sourceRegion,
+            activeStep = preview.step,
+            activeRepeatCount = preview.repeatCount,
+        )
         val globalAggregateBox = globalAggregate?.let { SelectionBounds.regionBox(it) }
 
+        // Render the single global outline
         if (globalAggregateBox != null) {
             PulsingCuboidRenderer.renderOutlineBox(
                 context = context,
@@ -88,6 +101,10 @@ object RepeatPreviewRenderer {
             )
         }
 
+        // Active preview's folded clipboard already contains all committed segment
+        // blocks merged into one buffer, so we only render the active segment.
+        // Rendering committed segments separately would cause internal face bleed
+        // because each render pass has its own face-culling context.
         renderStandardRepeat(
             context = context,
             preview = preview,
@@ -98,6 +115,53 @@ object RepeatPreviewRenderer {
             mode = mode,
         )
         renderArrow(context, preview)
+    }
+
+    private fun renderClippedSmear(
+        context: AxionWorldRenderContext,
+        preview: RepeatRegionPreview,
+        destinationColor: Int,
+        lineWidth: Float,
+    ) {
+        val world = MinecraftClient.getInstance().world ?: return
+        val layout = clippedSmearLayout(
+            world = world,
+            sourceRegion = preview.sourceRegion,
+            clipboardBuffer = preview.clipboardBuffer,
+            step = preview.step,
+            repeatCount = preview.repeatCount,
+        ) ?: return
+        val aggregateBox = SelectionBounds.regionBox(layout.region)
+
+        PulsingCuboidRenderer.renderOutlineBox(
+            context = context,
+            box = aggregateBox,
+            outlineColor = destinationColor,
+            lineWidth = lineWidth,
+        )
+
+        val selectionClipboard = ClipboardSelectionRenderer.sparseClipboard(layout.clipboardBuffer)
+        val ghostClipboard = ClipboardSelectionRenderer.surfaceClipboard(selectionClipboard)
+        val sparseDestination = ClipboardSelectionRenderer.isSparse(layout.region, selectionClipboard)
+        val nonAirCells = ghostClipboard.nonAirCells()
+
+        BlockPreviewPipeline.renderDestination(
+            context = context,
+            scene = BlockPreviewPipeline.Scene(
+                origins = if (nonAirCells.isNotEmpty()) listOf(layout.region.minCorner()) else emptyList(),
+                selectionClipboard = selectionClipboard,
+                shellClipboard = layout.clipboardBuffer,
+                fallbackGhostClipboard = ghostClipboard,
+                sparse = sparseDestination,
+                outlineColor = destinationColor,
+                lineWidth = lineWidth,
+                ghostColor = DESTINATION_GHOST_COLOR,
+                ghostAlpha = if (sparseDestination) SPARSE_GHOST_ALPHA else DEFAULT_GHOST_ALPHA,
+                ghostScale = GHOST_SCALE,
+                aggregateBox = aggregateBox,
+                renderGhost = nonAirCells.isNotEmpty(),
+            ),
+        )
     }
 
     private fun renderStandardRepeat(
@@ -299,4 +363,112 @@ object RepeatPreviewRenderer {
         )
         return BlockRegion(min, max).normalized()
     }
+
+    private fun clippedSmearLayout(
+        world: World,
+        sourceRegion: BlockRegion,
+        clipboardBuffer: ClipboardBuffer,
+        step: Vec3i,
+        repeatCount: Int,
+    ): ClippedSmearLayout? {
+        val offsets = RegionRepeatPlacementService.smearOffsets(step, repeatCount)
+        if (offsets.isEmpty()) {
+            return null
+        }
+
+        val source = sourceRegion.normalized()
+        val sourceOrigin = source.minCorner()
+        val sourcePositions = clipboardBuffer.cells.mapTo(linkedSetOf()) { cell ->
+            BlockPos(
+                sourceOrigin.x + cell.offset.x,
+                sourceOrigin.y + cell.offset.y,
+                sourceOrigin.z + cell.offset.z,
+            )
+        }
+        val candidates = linkedMapOf<BlockPos, ClippedSmearCandidate>()
+
+        clipboardBuffer.cells.forEach { cell ->
+            if (cell.state.isAir) {
+                return@forEach
+            }
+
+            offsets.forEach { offset ->
+                val destination = BlockPos(
+                    sourceOrigin.x + cell.offset.x + offset.x,
+                    sourceOrigin.y + cell.offset.y + offset.y,
+                    sourceOrigin.z + cell.offset.z + offset.z,
+                )
+                if (destination !in sourcePositions && !world.getBlockState(destination).isAir) {
+                    return@forEach
+                }
+
+                val distanceSq = offset.x * offset.x + offset.y * offset.y + offset.z * offset.z
+                val existing = candidates[destination]
+                if (existing == null || distanceSq < existing.distanceSq) {
+                    candidates[destination] = ClippedSmearCandidate(
+                        pos = destination,
+                        cell = cell,
+                        distanceSq = distanceSq,
+                    )
+                }
+            }
+        }
+
+        if (candidates.isEmpty()) {
+            return null
+        }
+
+        val region = boundingRegion(candidates.keys)
+        val min = region.minCorner()
+        val cells = candidates.values
+            .sortedWith(compareBy<ClippedSmearCandidate> { it.pos.x }.thenBy { it.pos.y }.thenBy { it.pos.z })
+            .map { candidate ->
+                ClipboardCell(
+                    offset = Vec3i(
+                        candidate.pos.x - min.x,
+                        candidate.pos.y - min.y,
+                        candidate.pos.z - min.z,
+                    ),
+                    state = candidate.cell.state,
+                    blockEntityData = candidate.cell.blockEntityData?.copy(),
+                )
+            }
+
+        return ClippedSmearLayout(
+            region = region,
+            clipboardBuffer = ClipboardBuffer(size = region.size(), cells = cells),
+        )
+    }
+
+    private fun boundingRegion(positions: Collection<BlockPos>): BlockRegion {
+        val iterator = positions.iterator()
+        val first = iterator.next()
+        var minX = first.x
+        var minY = first.y
+        var minZ = first.z
+        var maxX = first.x
+        var maxY = first.y
+        var maxZ = first.z
+        while (iterator.hasNext()) {
+            val pos = iterator.next()
+            minX = minOf(minX, pos.x)
+            minY = minOf(minY, pos.y)
+            minZ = minOf(minZ, pos.z)
+            maxX = maxOf(maxX, pos.x)
+            maxY = maxOf(maxY, pos.y)
+            maxZ = maxOf(maxZ, pos.z)
+        }
+        return BlockRegion(BlockPos(minX, minY, minZ), BlockPos(maxX, maxY, maxZ)).normalized()
+    }
+
+    private data class ClippedSmearLayout(
+        val region: BlockRegion,
+        val clipboardBuffer: ClipboardBuffer,
+    )
+
+    private data class ClippedSmearCandidate(
+        val pos: BlockPos,
+        val cell: ClipboardCell,
+        val distanceSq: Int,
+    )
 }

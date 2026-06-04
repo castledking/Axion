@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Discord notification for plugin releases. Reads config from env vars and YAML."""
 import os, sys, json
-from datetime import datetime
+from datetime import datetime, timezone
 
 try:
     import yaml
@@ -18,6 +18,9 @@ def main():
         return
 
     version = os.environ['VERSION']
+    version_number = version[1:] if version.startswith('v') else version
+    release_tag = version if version.startswith('v') else f"v{version}"
+    display_version = release_tag
     repo_name = os.environ.get('REPO_NAME', 'unknown')
     repo_owner = os.environ.get('REPO_OWNER', 'castledking')
 
@@ -36,19 +39,24 @@ def main():
         if msg.get('content'): payload['content'] = msg['content']
 
     embed = {}
-    notes_path = os.environ.get('RELEASE_NOTES_PATH', f".release/v{version}.md")
+    use_short = config.get('use-short-md', False)
+    notes_suffix = '-SHORT' if use_short else ''
+    # Files live in .release/latest/ in the repo; CI copies them to /tmp/release-notes/
+    # for the Modrinth/Spigot scripts. Prefer the in-repo path so Discord works without
+    # the workflow having to copy/mount anything.
+    notes_path = os.environ.get('RELEASE_NOTES_PATH', f".release/latest/v{version_number}{notes_suffix}.md")
     if os.path.exists(notes_path):
         with open(notes_path) as f:
             lines = f.readlines()
-        embed['title'] = lines[0].strip() if lines else f"{repo_name} v{version}"
+        embed['title'] = lines[0].strip() if lines else f"{repo_name} {display_version}"
         body = ''.join(lines[1:]).strip()
         if len(body) > 4000: body = body[:4000] + "..."
         embed['description'] = body if body else "No release notes available."
     else:
-        embed['title'] = f"{repo_name} v{version}"
+        embed['title'] = f"{repo_name} {display_version}"
         embed['description'] = "No release notes available."
 
-    embed['url'] = f"https://github.com/{repo_owner}/{repo_name}/releases/tag/{version}"
+    embed['url'] = f"https://github.com/{repo_owner}/{repo_name}/releases/tag/{release_tag}"
 
     if 'embed' in config:
         ec = config['embed']
@@ -69,7 +77,7 @@ def main():
                 'icon_url': ec['footer'].get('icon_url', '')
             }
         if ec.get('timestamp', True):
-            embed['timestamp'] = datetime.utcnow().isoformat() + 'Z'
+            embed['timestamp'] = datetime.now(timezone.utc).isoformat()
         if 'fields' in ec:
             embed['fields'] = []
             for field in ec['fields']:
@@ -83,34 +91,34 @@ def main():
     payload_json = json.dumps(payload)
 
     import urllib.request
+    # Cloudflare blocks the default Python-urllib User-Agent with rule 1010.
+    # Send a bot-style UA so the webhook actually reaches Discord.
+    ua = f'{repo_name}ReleaseBot/1.0 (+https://github.com/{repo_owner}/{repo_name})'
+
+    # If edit.message_id is set, PATCH that message; otherwise POST a new one.
+    # Doing both produces a duplicate embed.
+    msg_id = (config.get('edit') or {}).get('message_id', '')
+    if msg_id:
+        url = f"{webhook_url}/messages/{msg_id}"
+        method = 'PATCH'
+        success_label = f"Discord message {msg_id} updated"
+    else:
+        url = webhook_url
+        method = 'POST'
+        success_label = "Discord notification sent"
+
     req = urllib.request.Request(
-        webhook_url, data=payload_json.encode('utf-8'),
-        headers={'Content-Type': 'application/json'},
-        method='POST')
+        url, data=payload_json.encode('utf-8'),
+        headers={'Content-Type': 'application/json', 'User-Agent': ua},
+        method=method)
 
     try:
         resp = urllib.request.urlopen(req)
-        print(f"Discord notification sent (HTTP {resp.status})")
+        print(f"{success_label} (HTTP {resp.status})")
     except urllib.error.HTTPError as e:
         body = e.read().decode()
         print(f"Discord webhook error: {e.code} {body}")
         sys.exit(1)
-
-    # Edit mode
-    if 'edit' in config and config['edit'].get('message_id'):
-        msg_id = config['edit']['message_id']
-        if msg_id:
-            edit_req = urllib.request.Request(
-                f"{webhook_url}/messages/{msg_id}",
-                data=payload_json.encode('utf-8'),
-                headers={'Content-Type': 'application/json'},
-                method='PATCH')
-            try:
-                resp = urllib.request.urlopen(edit_req)
-                print(f"Discord message {msg_id} updated (HTTP {resp.status})")
-            except urllib.error.HTTPError as e:
-                body = e.read().decode()
-                print(f"Discord edit error: {e.code} {body}")
 
 if __name__ == '__main__':
     main()

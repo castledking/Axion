@@ -169,6 +169,7 @@ data class StackRegionRequest(
     val cells: List<ClipboardCellPayload>,
     val step: IntVector3,
     val repeatCount: Int,
+    val keepExisting: Boolean = false,
 ) : AxionRemoteOperation {
     override val type: AxionOperationType = AxionOperationType.STACK_REGION
 }
@@ -190,6 +191,7 @@ enum class AxionExtrudeMode {
 
 enum class SymmetryMirrorAxisPayload {
     X,
+    Y,
     Z,
 }
 

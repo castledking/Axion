@@ -2,6 +2,7 @@ package axion.common.model
 
 enum class SymmetryMirrorAxis {
     X,
+    Y,
     Z,
 }
 

@@ -58,6 +58,38 @@ class BlockRegionTest {
     }
 
     @Test
+    fun `resize face grows selected face and planar axes toward outside target`() {
+        val region = BlockRegion(BlockPos(0, 0, 0), BlockPos(4, 4, 4))
+
+        assertEquals(
+            BlockRegion(BlockPos(0, -2, 0), BlockPos(7, 4, 8)),
+            region.resizeFaceToward(RegionFace.EAST, BlockPos(7, -2, 8)),
+        )
+        assertEquals(
+            BlockRegion(BlockPos(-3, 0, -1), BlockPos(4, 7, 4)),
+            region.resizeFaceToward(RegionFace.WEST, BlockPos(-3, 7, -1)),
+        )
+    }
+
+    @Test
+    fun `resize face contracts selected face toward inside target`() {
+        val region = BlockRegion(BlockPos(0, 0, 0), BlockPos(4, 4, 4))
+
+        assertEquals(
+            BlockRegion(BlockPos(0, 0, 0), BlockPos(2, 4, 4)),
+            region.resizeFaceToward(RegionFace.EAST, BlockPos(2, 2, 2)),
+        )
+        assertEquals(
+            BlockRegion(BlockPos(2, 0, 0), BlockPos(4, 4, 4)),
+            region.resizeFaceToward(RegionFace.WEST, BlockPos(2, 2, 2)),
+        )
+        assertEquals(
+            BlockRegion(BlockPos(0, 3, 0), BlockPos(4, 4, 4)),
+            region.resizeFaceToward(RegionFace.DOWN, BlockPos(2, 3, 2)),
+        )
+    }
+
+    @Test
     fun `remap corner keeps first corner on expanded west face`() {
         val original = BlockRegion(BlockPos(0, 10, 0), BlockPos(4, 14, 4))
         val expanded = BlockRegion(BlockPos(-1, 10, 0), BlockPos(4, 14, 4))

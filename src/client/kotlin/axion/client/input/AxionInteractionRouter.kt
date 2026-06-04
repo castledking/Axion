@@ -211,6 +211,9 @@ object AxionInteractionRouter {
             }
         }
 
+        if (!altHeld && !AxionToolSelectionController.isAxionSlotActive()) {
+            SavedHotbarController.flushActiveHotbar(client)
+        }
         return AxionToolSelectionController.handleHotbarScroll(
             currentVanillaSlot = currentVanillaSlot,
             scrollAmount = scrollAmount,

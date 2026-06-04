@@ -6,7 +6,8 @@ cd "$ROOT_DIR"
 
 MOD_VERSION="${MOD_VERSION:-$(awk -F= '/^mod_version=/{print $2}' gradle.properties)}"
 
-# Multi-range release strategy (mirroring Axiom's multi-version-jar approach):
+# Multi-range release strategy:
+#   range "mc1_21_4" → covers 1.21.4, compiled against 1.21.4
 #   range "mc1_21_5" → covers 1.21.5, compiled against 1.21.5
 #   range "legacy"   → covers 1.21.6 .. 1.21.8, compiled against 1.21.7
 #   range "modern"  → covers 1.21.9 .. 1.21.11, compiled against 1.21.11
@@ -14,6 +15,7 @@ MOD_VERSION="${MOD_VERSION:-$(awk -F= '/^mod_version=/{print $2}' gradle.propert
 # Within each range, cross-version mixin compatibility is handled by `require = 0`
 # dual-signature injections.
 SUPPORTED_RANGES=(
+  "mc1_21_4"
   "mc1_21_5"
   "legacy"
   "modern"
@@ -22,6 +24,7 @@ SUPPORTED_RANGES=(
 
 resolve_compile_version() {
   case "$1" in
+    "mc1_21_4") echo "1.21.4" ;;
     "mc1_21_5") echo "1.21.5" ;;
     "mc1_21_6") echo "1.21.6" ;;
     "legacy") echo "1.21.7" ;;
@@ -36,6 +39,7 @@ resolve_compile_version() {
 
 resolve_yarn_mappings() {
   case "$1" in
+    "1.21.4") echo "1.21.4+build.8" ;;
     "1.21.5") echo "1.21.5+build.1" ;;
     "1.21.6") echo "1.21.6+build.1" ;;
     "1.21.7") echo "1.21.7+build.1" ;;
@@ -50,6 +54,7 @@ resolve_yarn_mappings() {
 
 resolve_loader_version() {
   case "$1" in
+    "1.21.4") echo "0.16.10" ;;
     "1.21.5") echo "0.16.12" ;;
     "1.21.6") echo "0.16.13" ;;
     "1.21.7") echo "0.16.13" ;;
@@ -64,6 +69,7 @@ resolve_loader_version() {
 
 resolve_fabric_version() {
   case "$1" in
+    "1.21.4") echo "0.119.4+1.21.4" ;;
     "1.21.5") echo "0.119.5+1.21.5" ;;
     "1.21.6") echo "0.128.2+1.21.6" ;;
     "1.21.7") echo "0.129.0+1.21.7" ;;
@@ -78,6 +84,7 @@ resolve_fabric_version() {
 
 resolve_fabric_kotlin_version() {
   case "$1" in
+    "1.21.4") echo "1.13.0+kotlin.2.1.0" ;;
     "1.21.5") echo "1.13.0+kotlin.2.1.0" ;;
     "1.21.6") echo "1.13.0+kotlin.2.1.0" ;;
     "1.21.7") echo "1.13.0+kotlin.2.1.0" ;;
@@ -92,6 +99,7 @@ resolve_fabric_kotlin_version() {
 
 resolve_modmenu_version() {
   case "$1" in
+    "1.21.4") echo "13.0.4" ;;
     "1.21.5") echo "14.0.0" ;;
     "1.21.6") echo "15.0.2" ;;
     "1.21.7") echo "15.0.2" ;;
@@ -106,6 +114,7 @@ resolve_modmenu_version() {
 
 resolve_paper_version() {
   case "$1" in
+    "1.21.4") echo "1.21.4-R0.1-SNAPSHOT" ;;
     "1.21.5") echo "1.21.5-R0.1-SNAPSHOT" ;;
     "1.21.6") echo "1.21.6-R0.1-SNAPSHOT" ;;
     "1.21.7") echo "1.21.7-R0.1-SNAPSHOT" ;;
@@ -134,6 +143,7 @@ resolve_paperweight_version() {
 
 resolve_range_tag() {
   case "$1" in
+    "mc1_21_4") echo "mc1.21.4" ;;
     "mc1_21_5") echo "mc1.21.5" ;;
     "mc1_21_6") echo "mc1.21.6" ;;
     "legacy") echo "mc1.21.6-1.21.8" ;;
@@ -148,6 +158,7 @@ resolve_range_tag() {
 
 resolve_metadata_version_range() {
   case "$1" in
+    "mc1_21_4") echo "1.21.4" ;;
     "mc1_21_5") echo "1.21.5" ;;
     "mc1_21_6") echo "1.21.6" ;;
     "legacy") echo ">=1.21.6 <=1.21.8" ;;
@@ -284,6 +295,7 @@ print_menu() {
   echo "  7) Exact Minecraft 1.21.8"
   echo "  8) Exact Minecraft 1.21.9"
   echo "  9) Exact Minecraft 1.21.10"
+  echo "  10) Minecraft 1.21.4"
   echo "  q) Cancel"
 }
 
@@ -325,6 +337,9 @@ case "$choice" in
     ;;
   9|1.21.10|mc1.21.10|mc1_21_10|MC1_21_10)
     build_range "mc1_21_10"
+    ;;
+  10|1.21.4|mc1.21.4|mc1_21_4|MC1_21_4)
+    build_range "mc1_21_4"
     ;;
   q|Q|quit|QUIT)
     echo "Cancelled."

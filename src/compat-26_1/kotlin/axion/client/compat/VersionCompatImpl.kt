@@ -128,6 +128,7 @@ object VersionCompatImpl : VersionCompat {
         color: Int,
         alpha: Int,
     ): Boolean {
+        if (ShaderPackCompat.shouldDisableDirectGpuPreview()) return false
         val session = ChunkedPreviewLifecycle.acquire(sessionId)
         session.setFromClipboard(clipboard, origins)
         return session.render(context, color, alpha).handled
@@ -525,10 +526,9 @@ object VersionCompatImpl : VersionCompat {
         hudRenderer: (DrawContext, RenderTickCounter) -> Unit,
         hintRenderer: (DrawContext, RenderTickCounter) -> Unit,
     ) {
-        // 26.1.x: Use HudElementRegistry to attach after HOTBAR
-        val hotbar = net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements.HOTBAR
+        val hotbarKey = net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements.HOTBAR
         net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry.attachElementAfter(
-            hotbar,
+            hotbarKey,
             hudId,
             net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement { extractor, deltaTracker ->
                 hudRenderer(DrawContext(extractor), deltaTracker)

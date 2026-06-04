@@ -13,7 +13,6 @@ import axion.client.compat.add
 object GhostBlockPreviewRenderer {
     private const val MAX_GHOST_BLOCKS: Int = 65536
     private const val MAX_TEXTURED_QUADS: Int = 8192
-    private const val CHUNKED_PATH_CELL_THRESHOLD: Int = 32768
 
     fun maxOriginsFor(nonAirCellCount: Int): Int {
         if (nonAirCellCount <= 0) {
@@ -41,8 +40,7 @@ object GhostBlockPreviewRenderer {
         }
 
         if (textured) {
-            val totalCells = cells.size.toLong() * origins.size.toLong()
-            if (allowChunked && (forceChunked || totalCells > CHUNKED_PATH_CELL_THRESHOLD)) {
+            if (allowChunked) {
                 val handled = VersionCompatImpl.renderChunkedPreview(
                     "ghost:$sessionTag",
                     context,

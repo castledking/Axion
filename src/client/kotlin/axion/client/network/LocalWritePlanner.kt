@@ -58,7 +58,7 @@ class LocalWritePlanner {
             is ClearRegionOperation -> appendClear(operation, overlay, writes)
             is DeleteEntitiesOperation -> entityDeletes += LocalEntityDeleteService.plan(world, operation)
             is FilteredCloneRegionOperation -> appendFilteredClone(world, operation, overlay, writes)
-            is StackRegionOperation -> appendStack(operation, overlay, writes)
+            is StackRegionOperation -> appendStack(world, operation, overlay, writes)
             is SmearRegionOperation -> appendSmear(world, operation, overlay, writes)
             is ExtrudeOperation -> appendExtrude(world, operation, overlay, writes)
             is MoveEntitiesOperation -> entityMoves += LocalEntityMoveService.plan(world, operation)
@@ -125,6 +125,7 @@ class LocalWritePlanner {
     }
 
     private fun appendStack(
+        world: World,
         operation: StackRegionOperation,
         overlay: MutableMap<BlockPos, BlockWrite>,
         writes: MutableList<BlockWrite>,
@@ -137,7 +138,11 @@ class LocalWritePlanner {
         for (index in 1..operation.repeatCount) {
             val destinationOrigin = source.minCorner().add(operation.step.multiply(index))
             operation.clipboardBuffer.cells.forEach { cell ->
-                appendWrite(destinationOrigin.add(cell.offset), cell.state, cell.blockEntityData, overlay, writes)
+                val destinationPos = destinationOrigin.add(cell.offset).toImmutable()
+                if (operation.keepExisting && !currentStateAt(world, overlay, destinationPos).isAir) {
+                    return@forEach
+                }
+                appendWrite(destinationPos, cell.state, cell.blockEntityData, overlay, writes)
             }
         }
     }

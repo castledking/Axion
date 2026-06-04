@@ -10,7 +10,7 @@ import axion.client.compat.unpackLongZ
 /**
  * Bit-packed positional store for chunked preview rendering.
  *
- * Mirrors Axiom's `ChunkedBooleanRegion` storage:
+ * Chunked boolean storage:
  *   - Positions are grouped into 16x16x16 sections keyed by chunk-section coords.
  *   - Each section holds a `short[256]` indexed as `[y + z*16]`. Bit `x` of that
  *     short marks whether `(x,y,z)` is occupied within the section.

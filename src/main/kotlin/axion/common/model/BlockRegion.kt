@@ -56,6 +56,42 @@ data class BlockRegion(
         }
     }
 
+    fun resizeFaceToward(face: RegionFace, target: BlockPos): BlockRegion {
+        val normalized = normalized()
+        val min = normalized.start
+        val max = normalized.end
+
+        val nextMinX = when (face) {
+            RegionFace.WEST -> minOf(target.x, max.x)
+            else -> minOf(min.x, target.x)
+        }
+        val nextMaxX = when (face) {
+            RegionFace.EAST -> maxOf(target.x, min.x)
+            else -> maxOf(max.x, target.x)
+        }
+        val nextMinY = when (face) {
+            RegionFace.DOWN -> minOf(target.y, max.y)
+            else -> minOf(min.y, target.y)
+        }
+        val nextMaxY = when (face) {
+            RegionFace.UP -> maxOf(target.y, min.y)
+            else -> maxOf(max.y, target.y)
+        }
+        val nextMinZ = when (face) {
+            RegionFace.NORTH -> minOf(target.z, max.z)
+            else -> minOf(min.z, target.z)
+        }
+        val nextMaxZ = when (face) {
+            RegionFace.SOUTH -> maxOf(target.z, min.z)
+            else -> maxOf(max.z, target.z)
+        }
+
+        return BlockRegion(
+            BlockPos(nextMinX, nextMinY, nextMinZ),
+            BlockPos(nextMaxX, nextMaxY, nextMaxZ),
+        ).normalized()
+    }
+
     fun extendFace(face: RegionFace, amount: Int = 1): BlockRegion {
         val normalized = normalized()
         val clampedAmount = amount.coerceAtLeast(1)

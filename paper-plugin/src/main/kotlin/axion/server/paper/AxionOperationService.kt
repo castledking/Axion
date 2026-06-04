@@ -272,7 +272,7 @@ class AxionOperationService(
     }
 
     private fun applyStack(world: World, operation: StackRegionRequest) {
-        applyRepeatedClipboard(world, operation.sourceOrigin, operation.cells, operation.step, operation.repeatCount, airOnly = false)
+        applyRepeatedClipboard(world, operation.sourceOrigin, operation.cells, operation.step, operation.repeatCount, airOnly = operation.keepExisting)
     }
 
     private fun applyFilteredClone(world: World, operation: FilteredCloneRegionRequest) {

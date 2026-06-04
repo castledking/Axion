@@ -15,12 +15,17 @@ object AxionClientConfig {
     private const val HOTBAR_SLOT_COUNT: Int = 9
     private val gson = GsonBuilder().setPrettyPrinting().create()
     private val path: Path = FabricLoader.getInstance().configDir.resolve("axion-client.json")
+    private val savedHotbarsPath: Path = FabricLoader.getInstance().gameDir.resolve("axion/saved-hotbars.json")
 
     private var data: Data = Data.default()
+    private var savedHotbarsLoadFailed: Boolean = false
 
     fun initialize() {
         data = load()
         save()
+        if (!savedHotbarsLoadFailed) {
+            saveSavedHotbars()
+        }
     }
 
     fun isMacOs(): Boolean {
@@ -62,6 +67,7 @@ object AxionClientConfig {
             savedHotbars = data.savedHotbars + List(requiredCount - data.savedHotbars.size) { SavedHotbarConfig.empty() },
         )
         save()
+        saveSavedHotbars()
     }
 
     fun activeSavedHotbarIndex(): Int = data.activeSavedHotbarIndex
@@ -71,6 +77,7 @@ object AxionClientConfig {
         val normalizedIndex = index.coerceIn(0, data.savedHotbars.lastIndex)
         data = data.copy(activeSavedHotbarIndex = normalizedIndex)
         save()
+        saveSavedHotbars()
     }
 
     fun updateSavedHotbar(index: Int, hotbar: SavedHotbarConfig) {
@@ -82,6 +89,7 @@ object AxionClientConfig {
             },
         )
         save()
+        saveSavedHotbars()
     }
 
     fun magicSelectTemplates(): List<MagicSelectTemplateConfig> = data.magicSelectTemplates
@@ -253,44 +261,72 @@ object AxionClientConfig {
     }
 
     private fun load(): Data {
-        return runCatching {
+        val defaults = Data.default()
+        val fileData = runCatching {
             if (!Files.exists(path)) {
-                return@runCatching Data.default()
+                return@runCatching null
             }
             Files.newBufferedReader(path).use { reader ->
-                val fileData = gson.fromJson(reader, FileData::class.java) ?: return@use Data.default()
-                val defaults = Data.default()
-                val loadedCustomMasks = fileData.magicSelectCustomMasks
-                    ?.mapNotNull(::sanitizeCustomMask)
-                    ?: defaults.magicSelectCustomMasks
-                val validCustomMaskIds = loadedCustomMasks.map { it.id }.toSet()
-                val loadedTemplates = fileData.magicSelectTemplates
-                    ?.mapNotNull { sanitizeTemplate(it, validCustomMaskIds) }
-                    ?.takeIf { it.isNotEmpty() }
-                    ?: defaults.magicSelectTemplates
-
-                Data(
-                    useCommandModifierOnMac = fileData.useCommandModifierOnMac ?: defaults.useCommandModifierOnMac,
-                    useSuperModifierOnLinux = fileData.useSuperModifierOnLinux ?: defaults.useSuperModifierOnLinux,
-                    sameBlockMagicSelectEnabled = fileData.sameBlockMagicSelectEnabled ?: defaults.sameBlockMagicSelectEnabled,
-                    activeSavedHotbarIndex = (fileData.activeSavedHotbarIndex ?: defaults.activeSavedHotbarIndex)
-                        .coerceIn(0, sanitizeSavedHotbars(fileData.savedHotbars ?: defaults.savedHotbars).lastIndex),
-                    nextMagicTemplateIndex = maxOf(
-                        fileData.nextMagicTemplateIndex ?: defaults.nextMagicTemplateIndex,
-                        loadedTemplates.size + 1,
-                    ),
-                    nextMagicCustomMaskIndex = maxOf(
-                        fileData.nextMagicCustomMaskIndex ?: defaults.nextMagicCustomMaskIndex,
-                        loadedCustomMasks.size + 1,
-                    ),
-                    savedHotbars = sanitizeSavedHotbars(fileData.savedHotbars ?: defaults.savedHotbars),
-                    magicSelectTemplates = loadedTemplates,
-                    magicSelectCustomMasks = loadedCustomMasks,
-                )
+                gson.fromJson(reader, FileData::class.java)
             }
-        }.getOrElse {
-            Data.default()
-        }
+        }.getOrNull()
+
+        val loadedCustomMasks = fileData?.magicSelectCustomMasks
+            ?.mapNotNull(::sanitizeCustomMask)
+            ?: defaults.magicSelectCustomMasks
+        val validCustomMaskIds = loadedCustomMasks.map { it.id }.toSet()
+        val loadedTemplates = fileData?.magicSelectTemplates
+            ?.mapNotNull { sanitizeTemplate(it, validCustomMaskIds) }
+            ?.takeIf { it.isNotEmpty() }
+            ?: defaults.magicSelectTemplates
+        val savedHotbarData = loadSavedHotbarData(fileData)
+
+        return Data(
+            useCommandModifierOnMac = fileData?.useCommandModifierOnMac ?: defaults.useCommandModifierOnMac,
+            useSuperModifierOnLinux = fileData?.useSuperModifierOnLinux ?: defaults.useSuperModifierOnLinux,
+            sameBlockMagicSelectEnabled = fileData?.sameBlockMagicSelectEnabled ?: defaults.sameBlockMagicSelectEnabled,
+            activeSavedHotbarIndex = savedHotbarData.activeSavedHotbarIndex,
+            nextMagicTemplateIndex = maxOf(
+                fileData?.nextMagicTemplateIndex ?: defaults.nextMagicTemplateIndex,
+                loadedTemplates.size + 1,
+            ),
+            nextMagicCustomMaskIndex = maxOf(
+                fileData?.nextMagicCustomMaskIndex ?: defaults.nextMagicCustomMaskIndex,
+                loadedCustomMasks.size + 1,
+            ),
+            savedHotbars = savedHotbarData.savedHotbars,
+            magicSelectTemplates = loadedTemplates,
+            magicSelectCustomMasks = loadedCustomMasks,
+        )
+    }
+
+    private fun loadSavedHotbarData(fileData: FileData?): ResolvedHotbarData {
+        savedHotbarsLoadFailed = false
+        val dedicatedData = runCatching {
+            if (!Files.exists(savedHotbarsPath)) {
+                return@runCatching null
+            }
+            Files.newBufferedReader(savedHotbarsPath).use { reader ->
+                gson.fromJson(reader, HotbarFileData::class.java)
+            }
+        }.onFailure {
+            savedHotbarsLoadFailed = true
+        }.getOrNull()
+
+        val defaults = Data.default()
+        val sourceHotbars = dedicatedData?.savedHotbars
+            ?: fileData?.savedHotbars
+            ?: defaults.savedHotbars
+        val savedHotbars = sanitizeSavedHotbars(sourceHotbars)
+        val activeSavedHotbarIndex = (dedicatedData?.activeSavedHotbarIndex
+            ?: fileData?.activeSavedHotbarIndex
+            ?: defaults.activeSavedHotbarIndex)
+            .coerceIn(0, savedHotbars.lastIndex)
+
+        return ResolvedHotbarData(
+            activeSavedHotbarIndex = activeSavedHotbarIndex,
+            savedHotbars = savedHotbars,
+        )
     }
 
     private fun sanitizeTemplate(
@@ -349,6 +385,22 @@ object AxionClientConfig {
             Files.newBufferedWriter(path).use { writer ->
                 gson.toJson(data, writer)
             }
+        }
+    }
+
+    private fun saveSavedHotbars() {
+        runCatching {
+            Files.createDirectories(savedHotbarsPath.parent)
+            Files.newBufferedWriter(savedHotbarsPath).use { writer ->
+                gson.toJson(
+                    HotbarFileData(
+                        activeSavedHotbarIndex = data.activeSavedHotbarIndex,
+                        savedHotbars = data.savedHotbars,
+                    ),
+                    writer,
+                )
+            }
+            savedHotbarsLoadFailed = false
         }
     }
 
@@ -427,6 +479,16 @@ object AxionClientConfig {
         val savedHotbars: List<SavedHotbarConfig>? = null,
         val magicSelectTemplates: List<MagicSelectTemplateConfig>? = null,
         val magicSelectCustomMasks: List<MagicSelectCustomMask>? = null,
+    )
+
+    private data class HotbarFileData(
+        val activeSavedHotbarIndex: Int? = null,
+        val savedHotbars: List<SavedHotbarConfig>? = null,
+    )
+
+    private data class ResolvedHotbarData(
+        val activeSavedHotbarIndex: Int,
+        val savedHotbars: List<SavedHotbarConfig>,
     )
 }
 

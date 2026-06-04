@@ -8,6 +8,8 @@ on:
     branches:
       - main
       - master
+    tags:
+      - "v*"
   pull_request:
   workflow_dispatch:
     inputs:
@@ -24,18 +26,16 @@ on:
         required: false
         default: main
         type: string
-  release:
-    types:
-      - published
-
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && github.ref_name || github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag || '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || github.event_name == 'workflow_dispatch' && github.event.inputs.checkout_ref || github.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.checkout_ref || github.ref }}
 
       - name: Set up Java 25
         uses: actions/setup-java@v4
@@ -47,22 +47,22 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build release artifacts
-        if: (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v')) || (github.event_name == 'workflow_dispatch' && startsWith(github.event.inputs.release_tag, 'v'))
+        if: env.RELEASE_TAG != ''
         run: ./build-axion.sh all
 
       - name: Build project
-        if: github.event_name != 'release' && github.event_name != 'workflow_dispatch'
+        if: env.RELEASE_TAG == ''
         run: ./build-axion.sh all
 
       - name: Collect release jars
-        if: (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v')) || (github.event_name == 'workflow_dispatch' && startsWith(github.event.inputs.release_tag, 'v'))
+        if: env.RELEASE_TAG != ''
         run: |
           mkdir -p release-artifacts
           find build/libs -mindepth 2 -maxdepth 2 -type f -name 'Axion-v*.jar' -exec cp {} release-artifacts/ \;
           find paper-plugin/build/libs -mindepth 2 -maxdepth 2 -type f -name 'AxionPaper-v*.jar' -exec cp {} release-artifacts/ \;
 
       - name: Upload release jars
-        if: (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v')) || (github.event_name == 'workflow_dispatch' && startsWith(github.event.inputs.release_tag, 'v'))
+        if: env.RELEASE_TAG != ''
         uses: actions/upload-artifact@v4
         with:
           name: release-jars
@@ -70,12 +70,26 @@ jobs:
           if-no-files-found: error
 
   release:
-    if: (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v')) || (github.event_name == 'workflow_dispatch' && startsWith(github.event.inputs.release_tag, 'v'))
+    if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && startsWith(github.event.inputs.release_tag, 'v'))
     needs: build
     runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || github.event.inputs.release_tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.checkout_ref || github.ref }}
+
+      - name: Resolve release notes
+        id: notes
+        run: |
+          NOTES_PATH=".release/latest/${RELEASE_TAG}.md"
+          if [ ! -f "${NOTES_PATH}" ]; then
+            echo "Missing release notes: ${NOTES_PATH}" >&2
+            exit 1
+          fi
+          echo "path=${NOTES_PATH}" >> "$GITHUB_OUTPUT"
 
       - name: Download release jars
         uses: actions/download-artifact@v4
@@ -86,63 +100,11 @@ jobs:
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event_name == 'release' && github.event.release.tag_name || github.event.inputs.release_tag }}
-          name: ${{ github.event_name == 'release' && github.event.release.name || github.event.inputs.release_name || github.event.inputs.release_tag }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_name || env.RELEASE_TAG }}
           target_commitish: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.checkout_ref || '' }}
+          body_path: ${{ steps.notes.outputs.path }}
           fail_on_unmatched_files: true
           overwrite_files: true
           files: |
             release-artifacts/*
-
-      - name: Determine version
-        id: version
-        run: |
-          TAG=${{ github.event_name == 'release' && github.event.release.tag_name || github.event.inputs.release_tag }}
-          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
-
-      - name: Copy release notes
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          if [ -f ".release/latest/v${VERSION}.md" ]; then
-            mkdir -p /tmp/release-notes
-            cp ".release/latest/v${VERSION}.md" /tmp/release-notes/
-          fi
-
-      - name: Release Axion mod to Modrinth
-        env:
-          MODRINTH_API_KEY: ${{ secrets.MODRINTH_API_KEY }}
-          REPO_NAME: Axion
-          VERSION: ${{ steps.version.outputs.version }}
-          PROJECT_INDEX: 0
-        run: |
-          JARS=$(find release-artifacts -name 'Axion-v*.jar' | paste -sd ',' -)
-          if [ -z "$JARS" ]; then echo "No Axion jars found"; exit 1; fi
-          JAR_PATHS="$JARS" node .release/src/modrinth-release.js
-
-      - name: Release Axion Paper plugin to Modrinth
-        env:
-          MODRINTH_API_KEY: ${{ secrets.MODRINTH_API_KEY }}
-          REPO_NAME: Axion
-          VERSION: ${{ steps.version.outputs.version }}
-          PROJECT_INDEX: 1
-        run: |
-          JARS=$(find release-artifacts -name 'AxionPaper-v*.jar' | paste -sd ',' -)
-          if [ -z "$JARS" ]; then echo "No Axion Paper jars found"; exit 1; fi
-          JAR_PATHS="$JARS" node .release/src/modrinth-release.js
-
-      - name: Discord notification
-        if: always()
-        env:
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          REPO_NAME: Axion
-          REPO_OWNER: castledking
-          VERSION: ${{ steps.version.outputs.version }}
-          DISCORD_CONFIG_PATH: .release/discord-updater-webhook.yml
-        run: |
-          if [ -z "${{ secrets.DISCORD_WEBHOOK_URL }}" ]; then
-            echo "No DISCORD_WEBHOOK_URL set, skipping"
-            exit 0
-          fi
-          pip install pyyaml -q
-          python3 .release/src/discord-notify.py
