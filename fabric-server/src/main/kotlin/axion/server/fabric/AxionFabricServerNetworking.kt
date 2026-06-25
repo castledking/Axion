@@ -59,10 +59,15 @@ class AxionFabricServerNetworking(
     }
 
     private fun decodeClientMessage(message: ByteArray): AxionClientMessage? {
-        return if (AxionTransportCodec.isClientFrame(message)) {
-            AxionClientMessageAssembler.consume(message)
-        } else {
-            AxionProtocolCodec.decodeClientMessage(message)
+        return try {
+            if (AxionTransportCodec.isClientFrame(message)) {
+                AxionClientMessageAssembler.consume(message)
+            } else {
+                AxionProtocolCodec.decodeClientMessage(message)
+            }
+        } catch (e: Exception) {
+            logger.warn("Failed to decode Axion client message ({} bytes): {}", message.size, e.message)
+            null
         }
     }
 

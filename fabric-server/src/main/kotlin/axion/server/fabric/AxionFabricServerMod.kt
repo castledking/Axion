@@ -30,6 +30,7 @@ class AxionFabricServerMod : DedicatedServerModInitializer {
             return try {
                 serverField?.get(player) as? net.minecraft.server.MinecraftServer
             } catch (e: Exception) {
+                LOGGER.debug("Failed to retrieve MinecraftServer from player {}: {}", player.gameProfile.name, e.message)
                 null
             }
         }

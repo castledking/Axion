@@ -47,12 +47,19 @@ class AxionWorldRenderContext private constructor(
         return true
     }
 
+    private var loggedDrawConsumersError = false
+
     fun drawConsumers() {
         try {
             val consumers = consumers()
             invokeNullable(consumers, "draw")
                 ?: invokeNullable(consumers, "endBatch")
-        } catch (_: Throwable) {
+        } catch (t: Throwable) {
+            if (!loggedDrawConsumersError) {
+                loggedDrawConsumersError = true
+                LoggerFactory.getLogger(AxionWorldRenderContext::class.java)
+                    .warn("[Axion/Render] drawConsumers failed; suppressing further errors", t)
+            }
         }
     }
 

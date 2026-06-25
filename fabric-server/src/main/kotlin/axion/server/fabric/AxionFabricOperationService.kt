@@ -303,6 +303,8 @@ class AxionFabricOperationService(
         val playerClass = player.javaClass
         val directWorld = runCatching {
             playerClass.methods.firstOrNull { it.name == "getServerWorld" }?.invoke(player) as? ServerWorld
+        }.onFailure { e ->
+            AxionFabricServerMod.LOGGER.debug("getServerWorld reflection failed for {}: {}", playerClass.name, e.message)
         }.getOrNull()
         if (directWorld != null) {
             return directWorld
@@ -310,6 +312,8 @@ class AxionFabricOperationService(
 
         val genericWorld = runCatching {
             playerClass.methods.firstOrNull { it.name == "getWorld" }?.invoke(player) as? ServerWorld
+        }.onFailure { e ->
+            AxionFabricServerMod.LOGGER.debug("getWorld reflection failed for {}: {}", playerClass.name, e.message)
         }.getOrNull()
         if (genericWorld != null) {
             return genericWorld
@@ -545,7 +549,8 @@ class AxionFabricOperationService(
                 StringReader(value),
                 true,
             )
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            AxionFabricServerMod.LOGGER.warn("Failed to parse block state '{}': {}", value, e.message)
             null
         }
     }
