@@ -130,6 +130,60 @@ resolve_modmenu_version() {
     esac
 }
 
+# Pre-fetch dependencies from flaky Maven repositories into the local Maven
+# cache (~/.m2/repository).  Gradle checks mavenLocal() before remote repos,
+# so this avoids the "Premature end of chunk coded message body" errors that
+# maven.terraformersmc.com repeatedly triggers on GitHub Actions runners.
+prefetch_flaky_deps() {
+    local group_path="com/terraformersmc"
+    local artifact="modmenu"
+    local versions=(
+        "11.0.3"
+        "12.0.1"
+        "13.0.4"
+        "14.0.0"
+        "15.0.2"
+        "16.0.0"
+        "17.0.0-alpha.1"
+        "17.0.0-beta.2"
+        "18.0.0-beta.1"
+    )
+    local repo="https://maven.terraformersmc.com/releases"
+    local max_attempts=4
+
+    for ver in "${versions[@]}"; do
+        local dir="$HOME/.m2/repository/${group_path}/${artifact}/${ver}"
+        local jar="${dir}/${artifact}-${ver}.jar"
+        local pom="${dir}/${artifact}-${ver}.pom"
+
+        if [[ -f "$jar" && -s "$jar" ]]; then
+            continue
+        fi
+
+        echo "Prefetching ${artifact}:${ver}..."
+        mkdir -p "$dir"
+
+        local attempt=1
+        while ((attempt <= max_attempts)); do
+            if curl -fsSL --retry 3 --retry-delay 2 \
+                     -o "$jar" "${repo}/${group_path}/${artifact}/${ver}/${artifact}-${ver}.jar" && \
+               [[ -s "$jar" ]]; then
+                curl -fsSL --retry 3 --retry-delay 2 \
+                     -o "$pom" "${repo}/${group_path}/${artifact}/${ver}/${artifact}-${ver}.pom" 2>/dev/null || true
+                break
+            fi
+            rm -f "$jar"
+            echo "  Attempt ${attempt}/${max_attempts} failed for ${artifact}:${ver}" >&2
+            if ((attempt >= max_attempts)); then
+                echo "  WARNING: Could not prefetch ${artifact}:${ver}" >&2
+                break
+            fi
+            sleep $((attempt * 3))
+            ((attempt += 1))
+        done
+    done
+}
+
 run_gradle_with_retry() {
     local attempt=1
     local max_attempts=3
@@ -348,6 +402,7 @@ print_menu() {
     echo "  q) Cancel"
 }
 
+prefetch_flaky_deps
 wipe_kotlin_caches
 
 if [[ $# -gt 0 ]]; then
