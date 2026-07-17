@@ -33,7 +33,7 @@ Axion Paper jar so edits remain authoritative and policy-aware.
 
 Download the latest Fabric and Paper jars from:
 
-**https://castled.codes/axion/dl**
+**https://castled.codes/axion/downloads**
 
 Choose the jar whose filename matches the Minecraft version range you run. Keep
 the Fabric mod and Paper plugin on the same Axion version.
