@@ -1,8 +1,10 @@
 package axion.server.paper
 
 import java.io.File
+import java.util.logging.Logger
 
 object AxionDevMode {
+    private val logger = Logger.getLogger("Axion")
     fun isEnabled(plugin: AxionPaperPlugin): Boolean {
         if (isOnlineMode(plugin)) {
             return false
@@ -24,7 +26,8 @@ object AxionDevMode {
         return try {
             val method = plugin.server.javaClass.methods.firstOrNull { it.name == "getOnlineMode" && it.parameterCount == 0 }
             method?.invoke(plugin.server) as? Boolean ?: true
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            logger.fine("Failed to check online-mode via reflection, assuming online: ${e.message}")
             true
         }
     }

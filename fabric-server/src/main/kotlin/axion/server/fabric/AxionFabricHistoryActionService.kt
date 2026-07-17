@@ -148,7 +148,8 @@ class AxionFabricHistoryActionService(
                 StringReader(value),
                 true,
             )
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            AxionFabricServerMod.LOGGER.warn("Failed to parse block state during history action '{}': {}", value, e.message)
             null
         }
     }

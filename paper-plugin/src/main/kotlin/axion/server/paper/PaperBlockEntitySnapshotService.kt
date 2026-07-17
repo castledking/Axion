@@ -8,6 +8,7 @@ import org.bukkit.World
 import org.bukkit.craftbukkit.CraftWorld
 
 object PaperBlockEntitySnapshotService {
+    private val logger = java.util.logging.Logger.getLogger("Axion")
     fun capture(world: World, pos: BlockPos): String? {
         val level = (world as CraftWorld).handle
         val blockEntity = level.getBlockEntity(pos) ?: return null
@@ -28,12 +29,16 @@ object PaperBlockEntitySnapshotService {
 
         val tag = try {
             rebase(PaperNbtCompat.parseCompound(blockEntityPayload), pos)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            logger.warning("Failed to parse block entity NBT at ${pos.x},${pos.y},${pos.z}: ${e.message}")
             return
         }
         val existing = level.getBlockEntity(pos)
         if (existing != null) {
             runCatching { loadBlockEntityWithComponents(existing, tag.copy(), level.registryAccess()) }
+                .onFailure { e ->
+                    logger.warning("Failed to load block entity components at ${pos.x},${pos.y},${pos.z}: ${e.message}")
+                }
                 .getOrElse { return }
             existing.setChanged()
             level.sendBlockUpdated(pos, blockState, blockState, 3)
@@ -42,6 +47,8 @@ object PaperBlockEntitySnapshotService {
 
         val restored = runCatching {
             BlockEntity.loadStatic(pos, blockState, tag.copy(), level.registryAccess())
+        }.onFailure { e ->
+            logger.warning("Failed to restore block entity at ${pos.x},${pos.y},${pos.z}: ${e.message}")
         }.getOrNull() ?: return
         level.getChunkAt(pos).setBlockEntity(restored)
         restored.setChanged()
