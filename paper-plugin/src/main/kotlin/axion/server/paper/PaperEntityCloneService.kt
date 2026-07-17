@@ -6,7 +6,6 @@ import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.ListTag
 import net.minecraft.nbt.Tag
 import net.minecraft.world.entity.EntityType
-import net.minecraft.world.entity.EntitySpawnReason
 import org.bukkit.Location
 import org.bukkit.World
 import org.bukkit.craftbukkit.CraftWorld
@@ -14,6 +13,8 @@ import org.bukkit.entity.Entity
 import org.bukkit.entity.Player
 import org.bukkit.util.BoundingBox
 import org.bukkit.util.Vector
+import java.lang.reflect.Modifier
+import java.lang.reflect.Proxy
 import java.util.UUID
 import kotlin.math.atan2
 import kotlin.math.sqrt
@@ -139,13 +140,62 @@ object PaperEntityCloneService {
         entityId: UUID,
     ): net.minecraft.world.entity.Entity? {
         stripUuids(tag)
-        val entity = EntityType.loadEntityRecursive(tag, level, EntitySpawnReason.COMMAND) { entity ->
-            entity.setUUID(entityId)
-            snapEntityTo(entity, location)
-            entity
-        } ?: return null
+
+        val entity = runCatching {
+            loadEntityFromTag(level, tag, location, entityId)
+        }.getOrNull() ?: return null
         level.tryAddFreshEntityWithPassengers(entity)
         return entity
+    }
+
+    /**
+     * Paper's mapped NMS signature changed twice across Axion's supported
+     * versions: the spawn reason was added after 1.21.1, and the callback
+     * changed from Function to EntityProcessor in 26.1. Resolve that narrow
+     * seam reflectively so every ranged Paper artifact compiles from one
+     * source set.
+     */
+    private fun loadEntityFromTag(
+        level: net.minecraft.server.level.ServerLevel,
+        tag: CompoundTag,
+        location: Location,
+        entityId: UUID,
+    ): net.minecraft.world.entity.Entity? {
+        val loadMethod = EntityType::class.java.methods.firstOrNull { method ->
+            val parameterTypes = method.parameterTypes
+            method.name == "loadEntityRecursive" &&
+                Modifier.isStatic(method.modifiers) &&
+                parameterTypes.size in 3..4 &&
+                parameterTypes[0].isAssignableFrom(tag.javaClass) &&
+                parameterTypes[1].isAssignableFrom(level.javaClass)
+        } ?: return null
+
+        val callbackType = loadMethod.parameterTypes.last()
+        val callback = Proxy.newProxyInstance(
+            callbackType.classLoader,
+            arrayOf(callbackType),
+        ) { proxy, method, arguments ->
+            when {
+                method.parameterCount == 1 && (method.name == "apply" || method.name == "process") -> {
+                    val entity = arguments?.firstOrNull() as net.minecraft.world.entity.Entity
+                    entity.setUUID(entityId)
+                    snapEntityTo(entity, location)
+                    entity
+                }
+                method.name == "equals" -> proxy === arguments?.firstOrNull()
+                method.name == "hashCode" -> System.identityHashCode(proxy)
+                method.name == "toString" -> "AxionEntityCloneProcessor"
+                else -> throw UnsupportedOperationException("Unsupported entity processor method: $method")
+            }
+        }
+
+        val arguments = if (loadMethod.parameterCount == 3) {
+            arrayOf(tag, level, callback)
+        } else {
+            val spawnReason = loadMethod.parameterTypes[2].getField("COMMAND").get(null)
+            arrayOf(tag, level, spawnReason, callback)
+        }
+        return loadMethod.invoke(null, *arguments) as? net.minecraft.world.entity.Entity
     }
 
     private fun stripUuids(tag: CompoundTag) {

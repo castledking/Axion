@@ -3,7 +3,6 @@ package axion.client.render.gpu
 import axion.client.compat.CameraAccess
 import axion.client.compat.VersionCompatImpl
 import axion.client.render.AxionPreviewBuffer
-import axion.client.render.RenderLayerCompat
 import axion.client.render.ShaderPackCompat
 import com.mojang.blaze3d.buffers.GpuBufferSlice
 import com.mojang.blaze3d.opengl.GlStateManager
@@ -103,11 +102,18 @@ object AxionPreviewBlockDrawer {
         val uniformSlices = ArrayList<GpuBufferSlice>(drawList.size)
         for (entry in drawList) {
             val mvMatrix = Matrix4f(baseMv)
-            mvMatrix.translate(
-                (entry.sectionOriginX.toDouble() - cameraPos.x + translationDelta.x.toDouble()).toFloat(),
-                (entry.sectionOriginY.toDouble() - cameraPos.y + translationDelta.y.toDouble()).toFloat(),
-                (entry.sectionOriginZ.toDouble() - cameraPos.z + translationDelta.z.toDouble()).toFloat(),
+            val translation = PreviewSectionTransform.cameraRelative(
+                entry.sectionOriginX,
+                entry.sectionOriginY,
+                entry.sectionOriginZ,
+                cameraPos.x,
+                cameraPos.y,
+                cameraPos.z,
+                translationDelta.x,
+                translationDelta.y,
+                translationDelta.z,
             )
+            mvMatrix.translate(translation.x, translation.y, translation.z)
             uniformSlices += VersionCompatImpl.writeDynamicUniforms(
                 dynamicUniforms,
                 mvMatrix,
@@ -126,18 +132,23 @@ object AxionPreviewBlockDrawer {
             depthView,
             OptionalDouble.empty(),
         )
+        var polygonOffsetEnabled = false
         try {
-            val renderLayer = RenderLayerCompat.translucentMovingBlock()
-            pass.setPipeline(VersionCompatImpl.getRenderPipeline(renderLayer))
+            val firstBuffer = drawList.first().buffer
+            pass.setPipeline(
+                VersionCompatImpl.getPreviewShellPipeline(
+                    firstBuffer.vertexFormatValue,
+                    firstBuffer.drawModeValue,
+                ),
+            )
             GlStateManager._enablePolygonOffset()
             GlStateManager._polygonOffset(-1.0f, -1.0f)
+            polygonOffsetEnabled = true
             RenderSystem.bindDefaultUniforms(pass)
 
             VersionCompatImpl.getBlockAtlasTextureView(client)?.let { atlasView ->
                 VersionCompatImpl.bindTextureToRenderPass(pass, "Sampler0", atlasView)
             }
-            val lightmapView = client.gameRenderer.levelLightmap()
-            VersionCompatImpl.bindTextureToRenderPass(pass, "Sampler2", lightmapView)
 
             val batched = VersionCompatImpl.drawMultipleIndexedPreview(pass, drawList, uniformSlices)
             if (!batched) {
@@ -148,6 +159,9 @@ object AxionPreviewBlockDrawer {
             }
             return ChunkedDrawResult.DREW
         } finally {
+            if (polygonOffsetEnabled) {
+                GlStateManager._disablePolygonOffset()
+            }
             pass.close()
         }
     }

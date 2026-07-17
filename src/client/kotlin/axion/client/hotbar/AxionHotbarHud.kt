@@ -438,6 +438,17 @@ object AxionHotbarHud {
         return target.javaClass.methods.firstOrNull { it.name == name && it.parameterCount == 0 }?.invoke(target)
     }
 
+    /** Calls drawStackOverlay if it exists (1.21.4+), otherwise falls back to drawItemInSlot (1.21.0-1.21.1). */
+    private fun drawStackOverlayReflective(context: DrawContext, textRenderer: net.minecraft.client.font.TextRenderer, stack: ItemStack, x: Int, y: Int) {
+        context.javaClass.methods.firstOrNull { method ->
+            method.name == "drawStackOverlay" && method.parameterCount == 4
+        }?.invoke(context, textRenderer, stack, x, y) ?: run {
+            context.javaClass.methods.firstOrNull { method ->
+                method.name == "drawItemInSlot" && method.parameterCount == 4
+            }?.invoke(context, textRenderer, stack, x, y)
+        }
+    }
+
     private fun renderFlyingSpeedSlider(
         context: DrawContext,
         client: MinecraftClient,
@@ -518,7 +529,7 @@ object AxionHotbarHud {
             val mouseX = VersionCompatImpl.getScaledMouseX(client).toInt()
             val mouseY = VersionCompatImpl.getScaledMouseY(client).toInt()
             context.drawItem(stack, mouseX - 8, mouseY - 8)
-            context.drawStackOverlay(client.textRenderer, stack, mouseX - 8, mouseY - 8)
+            drawStackOverlayReflective(context, client.textRenderer, stack, mouseX - 8, mouseY - 8)
         }
     }
 
@@ -595,7 +606,7 @@ object AxionHotbarHud {
             }
             if (!stack.isEmpty) {
                 context.drawItem(stack, slotX + 2, startY + 2)
-                context.drawStackOverlay(MinecraftClient.getInstance().textRenderer, stack, slotX + 2, startY + 2)
+                drawStackOverlayReflective(context, MinecraftClient.getInstance().textRenderer, stack, slotX + 2, startY + 2)
             }
         }
     }

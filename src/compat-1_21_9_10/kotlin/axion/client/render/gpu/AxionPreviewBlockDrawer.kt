@@ -230,11 +230,18 @@ object AxionPreviewBlockDrawer {
                 mvMatrix.identity()
                 mvMatrix.translate(0f, 0f, -8f)
             } else {
-                mvMatrix.translate(
-                    (entry.sectionOriginX.toDouble() - camX + deltaX.toDouble()).toFloat(),
-                    (entry.sectionOriginY.toDouble() - camY + deltaY.toDouble()).toFloat(),
-                    (entry.sectionOriginZ.toDouble() - camZ + deltaZ.toDouble()).toFloat(),
+                val translation = PreviewSectionTransform.cameraRelative(
+                    entry.sectionOriginX,
+                    entry.sectionOriginY,
+                    entry.sectionOriginZ,
+                    camX,
+                    camY,
+                    camZ,
+                    deltaX,
+                    deltaY,
+                    deltaZ,
                 )
+                mvMatrix.translate(translation.x, translation.y, translation.z)
             }
             uniformSlices += VersionCompatImpl.writeDynamicUniforms(
                 dynamicUniforms, mvMatrix, colorTint, ZERO_VEC3, normalMatrix, 1.0f,

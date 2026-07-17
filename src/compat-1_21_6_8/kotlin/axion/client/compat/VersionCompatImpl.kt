@@ -6,6 +6,7 @@ import axion.client.render.ShaderPackCompat
 import axion.client.render.gpu.ChunkedPreviewLifecycle
 import axion.client.network.AxionPluginPayload
 import axion.client.network.BlockWrite
+import axion.client.network.BlockWriteUpdatePolicy
 import axion.common.model.BlockEntityDataSnapshot
 import axion.common.model.ClipboardBuffer
 import com.mojang.blaze3d.pipeline.RenderPipeline
@@ -233,7 +234,7 @@ object VersionCompatImpl : VersionCompat {
     }
 
     fun applyBlockEntity(world: net.minecraft.world.World, write: BlockWrite) {
-        world.setBlockState(write.pos, write.state, 3)
+        world.setBlockState(write.pos, write.state, BlockWriteUpdatePolicy.MODERN_NO_PHYSICS_FLAGS)
         val payload = write.blockEntityData
         if (payload == null) {
             world.removeBlockEntity(write.pos)

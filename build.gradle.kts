@@ -20,7 +20,9 @@ val minecraftPatch = when {
     else -> 0
 }
 
-// Two release ranges:
+// Release ranges:
+//   - rangeMc12101: 1.21 .. 1.21.1    (compat-1_21_0_1, no MouseInput / WorldRenderState classes,
+//                                      both stubs required at compile time)
 //   - rangeMc12123: 1.21.2 .. 1.21.3  (compat-1_21_4, shared pre-1.21.5 client path)
 //   - rangeMc1214:  1.21.4            (compat-1_21_4, isolated exact-version port)
 //   - rangeMc1215:  1.21.5            (compat-1_21_5, isolated exact-version port)
@@ -31,6 +33,7 @@ val minecraftPatch = when {
 //
 // Cross-version mixin compatibility within each range is handled by `require = 0`
 // dual-signature injections in MouseMixin and WorldRendererFallbackMixin.
+val rangeMc12101 = minecraftVersion == "1.21" || minecraftVersion == "1.21.1"
 val rangeMc12123 = minecraftVersion == "1.21.2" || minecraftVersion == "1.21.3"
 val rangeMc1214 = minecraftVersion == "1.21.4"
 val rangeMc1215 = minecraftVersion == "1.21.5"
@@ -50,14 +53,15 @@ if (rangeMc261x) {
     apply(plugin = "fabric-loom")
 }
 
-val needsLegacyMouseInputStub = rangeMc12123 || rangeMc1214 || rangeMc1215 || rangeLegacy
-val needsLegacyWorldRenderStateStub = rangeMc12123 || rangeMc1214 || rangeMc1215 || rangeLegacy
+val needsLegacyMouseInputStub = rangeMc12101 || rangeMc12123 || rangeMc1214 || rangeMc1215 || rangeLegacy
+val needsLegacyWorldRenderStateStub = rangeMc12101 || rangeMc12123 || rangeMc1214 || rangeMc1215 || rangeLegacy
 val supportsFabricDedicatedServer = minecraftVersion == "1.21.11"
 
 // Define Minecraft version range for fabric.mod.json.
 // build-axion.sh can override this for exact-version test artifacts while the
 // release range artifacts keep their advertised multi-version metadata.
 val minecraftVersionRange = (findProperty("axion_minecraft_version_range") as String?)?.trim()?.takeIf { it.isNotEmpty() } ?: when {
+    rangeMc12101 -> ">=1.21 <=1.21.1"
     rangeMc12123 -> ">=1.21.2 <=1.21.3"
     rangeMc1215 -> "1.21.5"
     rangeMc1214 -> "1.21.4"
@@ -123,24 +127,24 @@ if (needsLegacyWorldRenderStateStub) {
     }
 }
 
+// 1.21-1.21.1 stubs for APIs that don't exist in these versions
+if (rangeMc12101) {
+    sourceSets.named("client") {
+        java.srcDir("src/client-1_21_0_1-stubs/java")
+    }
+}
 
 // Two compat source sets corresponding to the two release ranges
 sourceSets.named("client") {
-    if (rangeMc12123 || rangeMc1214) {
+    if (rangeMc12101) {
+        kotlin.srcDir("src/compat-1_21_0_1/kotlin")
+        // PreviewBlockTessellator references BlockModelPart which does not exist in 1.21-1.21.1
+        kotlin.exclude("axion/client/render/PreviewBlockTessellator.kt")
+
+    } else if (rangeMc12123 || rangeMc1214) {
         kotlin.srcDir("src/compat-1_21_4/kotlin")
     } else if (rangeMc1215) {
         kotlin.srcDir("src/compat-1_21_5/kotlin")
-        // 1.21.5 stays on the CPU preview path. Do not ship dormant GPU
-        // uploader/drawer classes that touch RenderSystem.getDevice().
-        kotlin.exclude("axion/client/render/AxionPreviewBuffer.kt")
-        kotlin.exclude("axion/client/render/gpu/AxionPreviewBlockDrawer.kt")
-        kotlin.exclude("axion/client/render/gpu/ChunkMeshTessellator.kt")
-        kotlin.exclude("axion/client/render/gpu/ChunkPreviewMeshCache.kt")
-        kotlin.exclude("axion/client/render/gpu/ChunkedBooleanStore.kt")
-        kotlin.exclude("axion/client/render/gpu/ChunkedDrawResult.kt")
-        kotlin.exclude("axion/client/render/gpu/ChunkedPreviewSession.kt")
-        kotlin.exclude("axion/client/render/gpu/ChunkedStateMap.kt")
-        kotlin.exclude("axion/client/render/gpu/SectionDrawList.kt")
     } else if (exactMc1216 || exactMc1217 || exactMc1218) {
         // 1.21.6, 1.21.7, 1.21.8 are byte-identical at the source level —
         // single shared compat folder, separate builds per MC version.
@@ -231,7 +235,7 @@ tasks.processResources {
     inputs.property("fabric_api_version_range", fabricApiVersionRange)
     inputs.property("fabric_kotlin_version_range", fabricKotlinVersionRange)
 
-    if (rangeMc12123 || rangeMc1214 || rangeMc1215) {
+    if (rangeMc12101 || rangeMc12123 || rangeMc1214 || rangeMc1215) {
         exclude("assets/axion/shaders/core/preview_shell.*")
     }
 
@@ -255,7 +259,7 @@ tasks.named<ProcessResources>("processClientResources") {
         delete(layout.buildDirectory.dir("resources/client"))
         // Copy version-specific mixin config
         val mixinConfigSource = when {
-            rangeMc12123 || rangeMc1214 || rangeMc1215 -> "axion.client.mixins-1.21.5.json"
+            rangeMc12101 || rangeMc12123 || rangeMc1214 || rangeMc1215 -> "axion.client.mixins-1.21.5.json"
             else -> null
         }
         if (mixinConfigSource != null) {
@@ -269,7 +273,7 @@ tasks.named<ProcessResources>("processClientResources") {
             }
         }
     }
-    if (minecraftVersion != "1.21.11") {
+    if (minecraftVersion != "1.21.11" && !rangeMc261x) {
         filesMatching("axion.client.mixins.json") {
             filter { line ->
                 if (line.contains("\"ServerEntityMixin\"")) null else line
@@ -282,9 +286,15 @@ tasks.named<ProcessResources>("processClientResources") {
                 when {
                     line.contains("\"InGameHudMixin\"") -> null
                     line.contains("\"WorldRendererFallbackMixin\"") -> null
-                    line.contains("\"PlayerEntityPoseMixin\",") -> line.replace("\"PlayerEntityPoseMixin\",", "\"PlayerEntityPoseMixin\"")
+                    line.contains("\"ServerEntityMixin\",") -> line.replace("\"ServerEntityMixin\",", "\"ServerEntityMixin\"")
                     else -> line
                 }
+            }
+        }
+    } else {
+        filesMatching("axion.client.mixins.json") {
+            filter { line ->
+                if (line.contains("\"GuiMixin\"")) null else line
             }
         }
     }
@@ -312,8 +322,147 @@ tasks.test {
     useJUnitPlatform()
 }
 
+val verifyIntegratedNoClipWiring by tasks.registering {
+    group = "verification"
+    description = "Verifies that integrated-server no-clip authority is packaged where supported."
+    dependsOn("compileClientKotlin", "processClientResources")
+    onlyIf { minecraftVersion == "1.21.11" || rangeMc261x }
+
+    doLast {
+        val clientClasses = layout.buildDirectory.dir("classes/kotlin/client").get().asFile
+        val mixinConfig = layout.buildDirectory.file("resources/client/axion.client.mixins.json").get().asFile
+        val requiredClasses = listOf(
+            "axion/client/compat/NoClipService.class",
+            "axion/mixin/client/ServerEntityMixin.class",
+        )
+
+        requiredClasses.forEach { relativePath ->
+            check(clientClasses.resolve(relativePath).isFile) {
+                "Missing integrated-server no-clip class for Minecraft $minecraftVersion: $relativePath"
+            }
+        }
+        check(mixinConfig.readText().contains("\"ServerEntityMixin\"")) {
+            "Integrated-server no-clip mixin is not enabled for Minecraft $minecraftVersion"
+        }
+    }
+}
+
+val gpuPreviewCompatDir = when {
+    rangeMc12101 -> "src/compat-1_21_0_1"
+    rangeMc12123 || rangeMc1214 -> "src/compat-1_21_4"
+    rangeMc1215 -> "src/compat-1_21_5"
+    rangeLegacy -> "src/compat-1_21_6_8"
+    exactMc1219 || exactMc12110 -> "src/compat-1_21_9_10"
+    rangeMc261x -> "src/compat-26_1"
+    else -> "src/compat-1_21_11"
+}
+
+val verifyGpuPreviewCoverage by tasks.registering {
+    group = "verification"
+    description = "Verifies that every supported Minecraft range packages and enables persistent GPU previews."
+    dependsOn("compileClientKotlin")
+
+    doLast {
+        val clientClasses = layout.buildDirectory.dir("classes/kotlin/client").get().asFile
+        val requiredClasses = listOf(
+            "axion/client/render/AxionPreviewBuffer.class",
+            "axion/client/render/gpu/AxionPreviewBlockDrawer.class",
+            "axion/client/render/gpu/ChunkedPreviewSession.class",
+        )
+        requiredClasses.forEach { relativePath ->
+            check(clientClasses.resolve(relativePath).isFile) {
+                "Missing GPU preview class for Minecraft $minecraftVersion: $relativePath"
+            }
+        }
+
+        val versionCompat = file("$gpuPreviewCompatDir/kotlin/axion/client/compat/VersionCompatImpl.kt").readText()
+        val disabledRoute = Regex(
+            """supportsChunkedPreview\s*\(\s*\)\s*:\s*Boolean\s*=\s*false""",
+        )
+        check(!disabledRoute.containsMatchIn(versionCompat)) {
+            "GPU preview routing is explicitly disabled for Minecraft $minecraftVersion"
+        }
+
+        val placementRenderer = file(
+            "$gpuPreviewCompatDir/kotlin/axion/client/render/PlacementPreviewRenderer.kt",
+        ).readText()
+        check("sessionTag = \"move-source\"" !in placementRenderer) {
+            "Move preview for Minecraft $minecraftVersion still draws a second textured source mesh"
+        }
+
+        val blockTessellator = file(
+            "$gpuPreviewCompatDir/kotlin/axion/client/render/AxionBlockTessellator.kt",
+        ).readText()
+        check("state.block == Blocks.GRASS_BLOCK" !in blockTessellator) {
+            "GPU terrain preview for Minecraft $minecraftVersion disables side culling for grass blocks"
+        }
+
+        val pulsingCuboidRenderer = file(
+            "$gpuPreviewCompatDir/kotlin/axion/client/render/PulsingCuboidRenderer.kt",
+        ).readText()
+        val selectionBoxBody = pulsingCuboidRenderer
+            .substringAfter("fun renderSelectionBox(")
+            .substringBefore("fun renderOutlineBox(")
+        check("RenderLayerCompat.xrayQuads()" in selectionBoxBody) {
+            "Placement pulse for Minecraft $minecraftVersion can write depth over the GPU preview"
+        }
+
+        if (rangeMc12101 || rangeMc12123 || rangeMc1214 || rangeMc1215) {
+            val drawer = file(
+                "$gpuPreviewCompatDir/kotlin/axion/client/render/gpu/AxionPreviewBlockDrawer.kt",
+            ).readText()
+            check("Matrix4f(RenderSystem.getModelViewMatrix())" in drawer) {
+                "Legacy GPU preview for Minecraft $minecraftVersion is not using the active camera model-view matrix"
+            }
+        }
+
+        if (rangeMc261x) {
+            val drawer = file(
+                "$gpuPreviewCompatDir/kotlin/axion/client/render/gpu/AxionPreviewBlockDrawer.kt",
+            ).readText()
+            check("getPreviewShellPipeline" in drawer) {
+                "Minecraft $minecraftVersion GPU previews are not using Axion's visible preview pipeline"
+            }
+            check("RenderLayerCompat.translucentMovingBlock()" !in drawer) {
+                "Minecraft $minecraftVersion GPU previews regressed to the invisible moving-block pipeline"
+            }
+            check("MATRICES_PROJECTION_SNIPPET" in versionCompat) {
+                "Minecraft $minecraftVersion preview pipeline is missing transform/projection uniforms"
+            }
+            check("DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, false)" in versionCompat) {
+                "Minecraft $minecraftVersion preview pipeline can write depth over later world rendering"
+            }
+
+            val renderLayerCompat = file(
+                "src/client/kotlin/axion/client/render/RenderLayerCompat.kt",
+            ).readText()
+            check("createRenderSetup" in renderLayerCompat && "findXrayPipelineSnippet" in renderLayerCompat) {
+                "Minecraft $minecraftVersion x-ray selection layer lacks the 26.1 RenderSetup/uniform compatibility path"
+            }
+        }
+
+        val bufferBytecode = clientClasses
+            .resolve("axion/client/render/AxionPreviewBuffer.class")
+            .readBytes()
+            .toString(Charsets.ISO_8859_1)
+        check(
+            "net/minecraft/client/gl/VertexBuffer" in bufferBytecode ||
+                "com/mojang/blaze3d/buffers/GpuBuffer" in bufferBytecode ||
+                "net/minecraft/client/gl/GpuBuffer" in bufferBytecode
+        ) {
+            "GPU preview buffer for Minecraft $minecraftVersion is not GPU-resident"
+        }
+    }
+}
+
+tasks.named("check") {
+    dependsOn(verifyIntegratedNoClipWiring)
+    dependsOn(verifyGpuPreviewCoverage)
+}
+
 // Range-style filename, e.g. "mc1.21.9-1.21.11"
 val rangeFileTag = (findProperty("axion_artifact_tag") as String?)?.trim()?.takeIf { it.isNotEmpty() } ?: when {
+    rangeMc12101 -> "mc1.21-1.21.1"
     rangeMc12123 -> "mc1.21.2-1.21.3"
     rangeMc1214 -> "mc1.21.4"
     rangeMc1215 -> "mc1.21.5"
@@ -418,6 +567,7 @@ tasks.register("setupPaperServer") {
     description = "Setup Paper server for current Minecraft version"
     val version = project.findProperty("version") as String? ?: minecraftVersion
     val paperVersion = when (version) {
+        "1.21.1" -> "1.21.1-R0.1-SNAPSHOT"
         "1.21.5" -> "1.21.5-R0.1-SNAPSHOT"
         "1.21.7" -> "1.21.7-R0.1-SNAPSHOT"
         "1.21.11" -> "1.21.11-R0.1-SNAPSHOT"
@@ -425,6 +575,7 @@ tasks.register("setupPaperServer") {
         else -> property("paper_version") as String
     }
     val rangeTag = when {
+        version == "1.21.1" -> "mc1.21-1.21.1"
         version == "1.21.5" -> "mc1.21.5"
         version == "1.21.7" -> "mc1.21.6-1.21.8"
         version == "1.21.11" -> "mc1.21.9-1.21.11"
@@ -446,6 +597,7 @@ tasks.register("setupPaperServer") {
         if (!paperJar.exists()) {
             println("Downloading Paper server $paperVersion...")
             val paperUrl = when (version) {
+                "1.21.1" -> "https://fill-data.papermc.io/v1/objects/39bd8c00b9e18de91dcabd3cc3dcfa5328685a53b7187a2f63280c22e2d287b9/paper-1.21.1-133.jar"
                 "1.21.5" -> "https://fill-data.papermc.io/v1/objects/2ae6ae22adf417699746e0f89fc2ef6cb6ee050a5f6608cee58f0535d60b509e/paper-1.21.5-114.jar"
                 "1.21.7" -> "https://fill-data.papermc.io/v1/objects/83838188699cb2837e55b890fb1a1d39ad0710285ed633fbf9fc14e9f47ce078/paper-1.21.7-32.jar"
                 "1.21.11" -> "https://fill-data.papermc.io/v1/objects/e708e8c132dc143ffd73528cccb9532e2eb17628b1a0eee74469bf466c7003f8/paper-1.21.11-116.jar"
@@ -476,6 +628,7 @@ tasks.register("setupPaperServer") {
         val serverProps = runDir.resolve("server.properties")
         if (!serverProps.exists()) {
             val port = when (version) {
+                "1.21.1" -> 25566
                 "1.21.5" -> 25567
                 "1.21.7" -> 25568
                 "1.21.11" -> 25569

@@ -6,7 +6,7 @@ plugins {
 group = rootProject.group
 version = rootProject.version
 val minecraftVersion = rootProject.property("minecraft_version") as String
-val isSupportedVersion = minecraftVersion in setOf("1.21.3", "1.21.4", "1.21.5", "1.21.6", "1.21.7", "1.21.8", "1.21.9", "1.21.10", "1.21.11") || minecraftVersion.startsWith("26.1")
+val isSupportedVersion = minecraftVersion in setOf("1.21.1", "1.21.3", "1.21.4", "1.21.5", "1.21.6", "1.21.7", "1.21.8", "1.21.9", "1.21.10", "1.21.11") || minecraftVersion.startsWith("26.1")
 val javaTargetVersion = if (minecraftVersion.startsWith("26.1")) 25 else 21
 
 base {
@@ -36,6 +36,7 @@ repositories {
 dependencies {
     implementation(project(":protocol"))
     paperweight.paperDevBundle("${property("paper_version")}")
+    testImplementation(kotlin("test"))
 }
 
 kotlin {
@@ -52,6 +53,10 @@ tasks.processResources {
     filesMatching("paper-plugin.yml") {
         expand("version" to project.version.toString())
     }
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 tasks.jar {

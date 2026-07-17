@@ -633,20 +633,19 @@ object ClipboardSelectionRenderer {
             if (occupiedCells.size <= 1) {
                 occupiedCells
             } else {
-                val opaquePositions = occupiedCells.asSequence()
-                    .filter { it.state.isOpaqueFullCube }
+                val occupiedPositions = occupiedCells.asSequence()
                     .map { BlockPos.asLong(it.offset.x, it.offset.y, it.offset.z) }
                     .toHashSet()
                 occupiedCells.filter { cell ->
                     val x = cell.offset.x
                     val y = cell.offset.y
                     val z = cell.offset.z
-                    BlockPos.asLong(x - 1, y, z) !in opaquePositions ||
-                        BlockPos.asLong(x + 1, y, z) !in opaquePositions ||
-                        BlockPos.asLong(x, y - 1, z) !in opaquePositions ||
-                        BlockPos.asLong(x, y + 1, z) !in opaquePositions ||
-                        BlockPos.asLong(x, y, z - 1) !in opaquePositions ||
-                        BlockPos.asLong(x, y, z + 1) !in opaquePositions
+                    BlockPos.asLong(x - 1, y, z) !in occupiedPositions ||
+                        BlockPos.asLong(x + 1, y, z) !in occupiedPositions ||
+                        BlockPos.asLong(x, y - 1, z) !in occupiedPositions ||
+                        BlockPos.asLong(x, y + 1, z) !in occupiedPositions ||
+                        BlockPos.asLong(x, y, z - 1) !in occupiedPositions ||
+                        BlockPos.asLong(x, y, z + 1) !in occupiedPositions
                 }
             }
         }

@@ -1,6 +1,5 @@
 package axion.client.render
 
-import axion.client.render.gpu.ChunkedPreviewLifecycle
 import net.fabricmc.fabric.api.event.Event
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.render.Immediate
@@ -22,7 +21,7 @@ class AxionWorldRenderContext private constructor(
         val currentDelegate = delegate ?: error("World render delegate unavailable")
         // Try both old (consumers) and new (bufferSource) method names for cross-version compatibility
         return invokeNullable("consumers") ?: invokeNullable("bufferSource")
-            ?: error("World render consumers unavailable in ${currentDelegate.javaClass.name}")
+        ?: error("World render consumers unavailable in ${currentDelegate.javaClass.name}")
     }
 
     fun matrices(): MatrixStack {
@@ -30,7 +29,7 @@ class AxionWorldRenderContext private constructor(
         val currentDelegate = delegate ?: error("World render delegate unavailable")
         // Try both old (matrices/matrixStack) and new (poseStack) method names for cross-version compatibility
         val value = invokeNullable("matrices") ?: invokeNullable("matrixStack") ?: invokeNullable("poseStack")
-            ?: error("World render matrices unavailable - tried matrices, matrixStack, poseStack on ${currentDelegate.javaClass.name}")
+        ?: error("World render matrices unavailable - tried matrices, matrixStack, poseStack on ${currentDelegate.javaClass.name}")
         return value as? MatrixStack
             ?: error("World render matrices type mismatch: got ${value.javaClass.name}, expected MatrixStack")
     }
@@ -90,6 +89,17 @@ object WorldRenderCompat {
         "net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents",
     )
 
+    private fun flushDeferredDraws() {
+        // Try to flush GPU preview draws if available (1.21.4+), otherwise no-op (1.21.0-1.21.3)
+        try {
+            val lifecycleClass = Class.forName("axion.client.render.gpu.ChunkedPreviewLifecycle")
+            val flushMethod = lifecycleClass.getMethod("flushDeferredDraws")
+            flushMethod.invoke(null)
+        } catch (e: Exception) {
+            // Class doesn't exist in this version, no-op
+        }
+    }
+
     fun registerBeforeDebugRender(callback: (AxionWorldRenderContext) -> Unit) {
         beforeDebugRenderCallbacks += callback
         ensureFabricBeforeDebugListener()
@@ -128,13 +138,14 @@ object WorldRenderCompat {
         endMainCallbacks.forEach { it(context) }
         beforeDebugRenderCallbacks.forEach { it(context) }
         // Flush deferred draws with no parameters - use internal defaults
-        ChunkedPreviewLifecycle.flushDeferredDraws()
+        flushDeferredDraws()
         consumers.draw()
     }
 
     fun hasFallbackCallbacks(): Boolean {
         val needsBeforeDebugFallback = beforeDebugRenderCallbacks.isNotEmpty() && !fabricBeforeDebugRegistered
-        val needsEndMainFallback = endMainCallbacks.isNotEmpty() && !fabricEndMainAvailable
+        val endMainHandledByBeforeDebug = !fabricEndMainAvailable && fabricBeforeDebugRegistered
+        val needsEndMainFallback = endMainCallbacks.isNotEmpty() && !fabricEndMainAvailable && !endMainHandledByBeforeDebug
         return needsBeforeDebugFallback || needsEndMainFallback
     }
 
@@ -150,7 +161,7 @@ object WorldRenderCompat {
                 }
                 for (cb in beforeDebugRenderCallbacks) cb(ctx)
                 // Flush deferred draws with no parameters - use internal defaults
-                ChunkedPreviewLifecycle.flushDeferredDraws()
+                flushDeferredDraws()
                 ctx.drawConsumers()
             }
             if (registered) {
@@ -168,7 +179,7 @@ object WorldRenderCompat {
             try {
                 for (cb in endMainCallbacks) cb(ctx)
                 // Flush deferred draws with no parameters - use internal defaults
-                ChunkedPreviewLifecycle.flushDeferredDraws()
+                flushDeferredDraws()
                 ctx.drawConsumers()
             } catch (e: Throwable) {
                 logger.error("[Axion/Render] END_MAIN dispatch error", e)

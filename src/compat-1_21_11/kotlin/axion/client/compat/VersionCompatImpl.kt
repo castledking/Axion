@@ -6,6 +6,7 @@ import axion.client.render.gpu.ChunkedPreviewLifecycle
 import axion.client.render.gpu.SectionDrawEntry
 import axion.client.network.AxionPluginPayload
 import axion.client.network.BlockWrite
+import axion.client.network.BlockWriteUpdatePolicy
 import axion.common.compat.VersionCompat
 import java.lang.reflect.Field
 import axion.common.model.BlockEntityDataSnapshot
@@ -270,7 +271,7 @@ object VersionCompatImpl : VersionCompat {
     }
 
     fun applyBlockEntity(world: net.minecraft.world.World, write: BlockWrite) {
-        world.setBlockState(write.pos, write.state, 3)
+        world.setBlockState(write.pos, write.state, BlockWriteUpdatePolicy.MODERN_NO_PHYSICS_FLAGS)
         val payload = write.blockEntityData
         if (payload == null) {
             world.removeBlockEntity(write.pos)
@@ -654,7 +655,7 @@ object VersionCompatImpl : VersionCompat {
                     .withSampler("Sampler0")
                     .withBlend(BlendFunction.TRANSLUCENT)
                     .withDepthTestFunction(DepthTestFunction.LEQUAL_DEPTH_TEST)
-                    .withDepthWrite(true)
+                    .withDepthWrite(false)
                     .withCull(true)
                     .withVertexFormat(vertexFormat, drawMode)
                     .build()

@@ -3,9 +3,12 @@
   "package": "axion.mixin.client",
   "compatibilityLevel": "JAVA_21",
   "client": [
+    "CameraNoClipMixin",
     "ClientPlayerEntityMixin",
     "EntityMixin",
+    "GuiMixin",
     "InGameHudMixin",
+    "InGameOverlayRendererMixin",
     "MinecraftClientMixin",
     "MouseMixin",
     "PlayerEntityPoseMixin",

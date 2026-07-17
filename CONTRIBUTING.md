@@ -1,236 +1,118 @@
 # Contributing to Axion
 
-Axion is an open-source Minecraft building toolkit built as a Fabric client mod with a companion Paper plugin for server-backed multiplayer editing.
+Axion is a multi-version Minecraft project with a Fabric client mod, a Paper
+plugin, and a shared operation protocol. Changes should remain compatible with
+every release range they affect.
 
-## Project Overview
+## Prerequisites
 
-Axion brings fast in-game building tools directly into Minecraft with hotbar-based editing, live previews, symmetry, long-range building modes, and multiplayer-safe execution through the Paper plugin.
-
-### Architecture
-
-The project consists of three main components:
-
-- **Fabric Mod** (`src/client/`): Client-side tools, previews, input, config UI, and local singleplayer behavior
-- **Paper Plugin** (`src/plugin/`): Authoritative multiplayer edit application, validation, history, undo/redo, and large-operation transport
-- **Common** (`src/common/`): Shared data models, operations, and protocol definitions
-
-### Technology Stack
-
-- **Kotlin**: Primary language for all components
-- **Fabric API**: Minecraft modding framework for the client mod
-- **Paper API**: Server plugin API for the Paper plugin
-- **Gradle**: Build system with Fabric Loom and Paperweight
-
-## Development Setup
-
-### Prerequisites
-
-- JDK 21 or later (JDK 25+ for 26.1.x)
-- IntelliJ IDEA or another Kotlin-compatible IDE
+- JDK 25 for the complete build matrix
 - Git
+- A Kotlin-capable IDE (IntelliJ IDEA is recommended)
 
-### Building
+The Gradle wrapper and build scripts handle the remaining build tooling.
 
-```bash
-./gradlew build
-```
+## Build and Test
 
-Or use the build script to target a specific version range:
-
-```bash
-./build-axion.sh mc1_21_5    # 1.21.5
-./build-axion.sh mc1_21_6    # 1.21.6
-./build-axion.sh mc1_21_7    # 1.21.7
-./build-axion.sh mc1_21_8    # 1.21.8
-./build-axion.sh mc1_21_9    # 1.21.9
-./build-axion.sh mc1_21_10   # 1.21.10
-./build-axion.sh mc1_21_11   # 1.21.11
-./build-axion.sh mc26_1_x    # 26.1.x
-```
-
-### Running Tests
+Build every supported Fabric and Paper range with:
 
 ```bash
-./gradlew test
+./build-axion.sh all
 ```
 
-### Running Client (Development)
+Build one range while iterating:
 
 ```bash
-./run-axion.sh [version]
+./build-axion.sh 1.21-1.21.1
+./build-axion.sh 1.21.2-1.21.3
+./build-axion.sh 1.21.4
+./build-axion.sh 1.21.5
+./build-axion.sh legacy       # 1.21.6 - 1.21.8
+./build-axion.sh modern       # 1.21.9 - 1.21.11
+./build-axion.sh 26.1         # 26.1 - 26.1.2
 ```
 
-The `run-axion.sh` script launches the Fabric client for the specified version with all required dependencies (Fabric API, Fabric Language Kotlin, ModMenu, IAS):
+Run the root and Paper unit tests with:
 
 ```bash
-./run-axion.sh 1.21.5        # Minecraft 1.21.5
-./run-axion.sh 1.21.7        # Minecraft 1.21.7
-./run-axion.sh 1.21.11       # Minecraft 1.21.11
-./run-axion.sh 26.1          # Minecraft 26.1.2
+./gradlew :test :paper-plugin:test
 ```
 
-**Note**: Versions marked "infrastructure only" have compatibility folders and build support but may require additional work to be fully functional.
+The GitHub build workflow runs `./build-axion.sh all` for pushes to the primary
+branches and for pull requests.
 
-### Testing with Servers
+## Run a Development Client
 
-#### Paper Server
-
-Start a Paper server alongside the client:
+Use `run-axion.sh` to launch an isolated development instance:
 
 ```bash
-WITH_PAPER=true ./run-axion.sh 1.21.11
+./run-axion.sh 1.21
+./run-axion.sh 1.21.3
+./run-axion.sh 1.21.11
+./run-axion.sh 26.1
 ```
 
-The script will:
-1. Download and configure a Paper server for that version
-2. Build and install the AxionPaper plugin
-3. Accept the EULA
-4. Start the Paper server in the background on its default port
-5. Launch the Fabric client connected to the offline server
-
-#### Fabric Server (1.21.11 only)
+Start a matching Paper server and connect automatically:
 
 ```bash
-WITH_FABRIC=true ./run-axion.sh 1.21.11
+WITH_PAPER=true QUICKPLAY=true ./run-axion.sh 1.21.11
 ```
 
-This starts a standalone Fabric server instead of Paper, using the AxionFabricServer mod. The Fabric Installer is downloaded and run automatically on first use. Fabric API and Fabric Language Kotlin are downloaded as mod dependencies.
-
-### Server Ports
-
-| Version  | Paper/Fabric Port |
-|----------|-------------------|
-| 1.21.5   | 25567             |
-| 1.21.7   | 25568             |
-| 1.21.11  | 25569             |
-| 26.1.x   | 25570             |
-
-### Offline Mode & Operator Access
-
-All servers are configured in offline mode for easier local testing. The **In-Game Account Switcher (IAS)** mod is automatically downloaded and installed by `run-axion.sh`. This lets you connect with any username without Mojang authentication.
-
-When the `.axiondev` marker file is present in the server run directory, the Axion server plugin/mod automatically promotes any player that joins to operator level (op 4). This is enabled by default for local development servers started via `run-axion.sh`.
-
-### Build And Run
+Minecraft `1.21.11` also supports the dedicated Fabric server path:
 
 ```bash
-WITH_PAPER=true ./run-axion.sh 1.21.11
+WITH_FABRIC=true QUICKPLAY=true ./run-axion.sh 1.21.11
 ```
 
-This builds the matching jars first, then starts both the Paper server and Fabric client.
+Development servers use isolated run directories and offline mode. Do not reuse
+those settings for a public server.
 
-## API Compatibility
+## Project Layout
 
-Detailed API differences across supported Minecraft versions are documented in [API_COMPATIBILITY.md](API_COMPATIBILITY.md). When adding features that touch version-specific code, consult this document and add entries for any new APIs introduced.
+- `src/client/kotlin/`: client tools, input, previews, UI, local operations, and
+  singleplayer behavior
+- `src/main/kotlin/`: shared models, operations, history types, and compatibility
+  interfaces
+- `protocol/`: client/server transport messages and codecs
+- `paper-plugin/`: authoritative Paper implementation
+- `fabric-server/`: dedicated Fabric server implementation
+- `src/compat-*/`: bytecode-level Minecraft version adapters
 
-## Code Organization
+The current compatibility source sets are:
 
-### Client Module (`src/client/`)
+- `compat-1_21_0_1`: Minecraft `1.21 - 1.21.1`
+- `compat-1_21_4`: Minecraft `1.21.2 - 1.21.4`
+- `compat-1_21_5`: Minecraft `1.21.5`
+- `compat-1_21_6_8`: Minecraft `1.21.6 - 1.21.8`
+- `compat-1_21_9_10`: Minecraft `1.21.9 - 1.21.10`
+- `compat-1_21_11`: Minecraft `1.21.11`
+- `compat-26_1`: Minecraft `26.1 - 26.1.2`
 
-- `tool/`: Hotbar tool implementations (Move, Clone, Stack, Smear, etc.)
-- `selection/`: Selection logic and Magic Select
-- `render/`: Rendering pipelines and preview visualization
-- `mode/`: Builder modes (replace, infinite reach, no clip, etc.)
-- `network/`: Client-side networking and operation dispatch
-- `hotbar/`: Hotbar management and saved hotbar system
-- `compat/`: Version compatibility layer for different Minecraft versions
+## Compatibility Rules
 
-### Plugin Module (`src/plugin/`)
-- `operation/`: Server-side operation application
-- `validation/`: Edit validation and policy checks
-- `history/`: Per-player history and undo/redo
-- `audit/`: Audit logging and metrics
+1. Keep version-independent behavior in `src/client` or `src/main`.
+2. Put only genuine Minecraft API or bytecode differences in `src/compat-*`.
+3. Prefer extending the compatibility interface over copying an entire feature
+   into multiple version folders.
+4. When a change touches rendering, input, networking, world writes, or mixins,
+   test the oldest and newest affected ranges at minimum.
+5. Keep Fabric and Paper operation behavior equivalent where both paths support
+   the operation.
 
-### Common Module (`src/common/`)
+See [API_COMPATIBILITY.md](API_COMPATIBILITY.md) for API-specific notes.
 
-- `model/`: Shared data models (BlockRegion, ClipboardBuffer, etc.)
-- `operation/`: Operation definitions and serialization
-- `protocol/`: Network protocol definitions
+## Pull Requests
 
-### Compatibility Layer
+Before opening a pull request:
 
-Version-specific compatibility code is organized in per-version folders under `src/compat-*/`:
+1. Keep the change focused and document the user-visible result.
+2. Add a regression test when the behavior can be isolated.
+3. Run the affected range builds and tests.
+4. Include the Minecraft versions and server type you tested.
+5. Attach logs or screenshots for rendering and multiplayer issues when useful.
 
-- `src/compat-1_21_5/`: Minecraft 1.21.5 compatibility (legacy Camera signature, shader exclusions)
-- `src/compat-1_21_6/`: Minecraft 1.21.6 (infrastructure only)
-- `src/compat-1_21_7/`: Minecraft 1.21.7 compatibility (baseline for 1.21.6-1.21.8)
-- `src/compat-1_21_8/`: Minecraft 1.21.8 compatibility (infrastructure only)
-- `src/compat-1_21_9/`: Minecraft 1.21.9 compatibility (infrastructure only)
-- `src/compat-1_21_10/`: Minecraft 1.21.10 compatibility (infrastructure only)
-- `src/compat-1_21_11/`: Minecraft 1.21.11+ compatibility (baseline for 1.21.9-1.21.11)
-- `src/compat-26_1/`: Minecraft 26.1.x compatibility (official namespace, extensive API bridges)
+Report bugs and feature requests through
+[GitHub Issues](https://github.com/castledking/Axion/issues).
 
-Each compatibility folder contains:
-- `VersionCompatImpl.kt`: Version-specific implementations of the VersionCompat interface
-- `kotlin/axion/mixin/client/`: Version-specific mixins
-
-### Fully Tested Versions
-- **1.21.5**: Fully working (shader exclusions applied for compatibility)
-- **1.21.7**: Fully working
-- **1.21.11**: Fully working
-- **26.1.x**: Fully working (official namespace, extensive API bridges)
-
-### Infrastructure Only Versions
-- **1.21.6**: Compatibility folder exists, requires additional testing and fixes (specific rendering classes, BlockRenderView API changes)
-- **1.21.8**: Compatibility folder exists, requires additional testing and fixes
-- **1.21.9**: Compatibility folder exists, requires additional testing and fixes
-- **1.21.10**: Compatibility folder exists, requires additional testing and fixes
-
-The build system selects the appropriate compatibility folder based on the target version. For versions marked "infrastructure only", the build system supports them but they may need additional work to be fully functional.
-
-## Coding Conventions
-
-- Use Kotlin idioms and standard library functions
-- Follow existing code style and naming conventions
-- Add KDoc comments for public APIs
-- Keep functions focused and reasonably sized
-- Use meaningful variable and function names
-
-## Version Compatibility
-
-Axion supports multiple Minecraft versions through a compatibility layer:
-
-- **1.21.5 - 1.21.11**: Primary support
-- **26.1.x**: Latest Minecraft version support
-
-When adding new features, ensure they work across supported versions. Use the compatibility layer (`src/compat-26_1/`) to handle version-specific differences.
-
-### Compat Folder Discipline
-
-The compat source sets exist to isolate **bytecode-level differences** between Minecraft versions, not to hold copies of version-agnostic logic. To prevent the duplication problem from coming back, follow these rules:
-
-1. **Files in `src/main/` and `src/client/` must not reference Minecraft classes whose signatures differ between supported versions.** Per-version API divergence goes through the `VersionCompat` interface. If you find yourself wanting to copy the same file into multiple compat folders, that file belongs in `src/client/` with the divergent calls extracted into new `VersionCompat` methods.
-
-2. **Never create a new compat folder preemptively.** A separate compat folder is only justified when the bytecode produced against that MC version genuinely differs from the next — typically because of a yarn rename, a class that doesn't exist, or a mixin target signature change. If the source is byte-identical to an existing compat folder, it shares that folder.
-
-3. **Current layout:**
-   - `src/compat-1_21_5/` — 1.21.5 only (CPU preview path, shader exclusions)
-   - `src/compat-1_21_6_8/` — 1.21.6, 1.21.7, 1.21.8 (shared, byte-identical)
-   - `src/compat-1_21_9_10/` — 1.21.9, 1.21.10 (shared, byte-identical)
-   - `src/compat-1_21_11/` — 1.21.11 only (renderer + mixin signatures diverge)
-   - `src/compat-26_1/` — 26.1.x (official namespace, extensive API bridges)
-
-4. **When fixing a bug,** prefer adding a `VersionCompat` method over duplicating a fix across compat folders. If a fix to one compat folder requires a parallel shim in another, that's a signal the affected code should move into `src/client/` behind `VersionCompat`.
-
-5. **When a future MC release diverges** inside one of the merged folders, branch the folder back out at that point — not earlier.
-
-## Submitting Changes
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes with clear commit messages
-4. Test your changes on supported Minecraft versions
-5. Submit a pull request with a description of your changes
-
-## Reporting Issues
-
-When reporting bugs or requesting features:
-
-- Use the GitHub issue tracker
-- Provide clear reproduction steps for bugs
-- Specify the Minecraft version you're using
-- Include relevant logs or screenshots if applicable
-
-## License
-
-By contributing to Axion, you agree that your contributions will be licensed under the GPL-3.0 license.
+By contributing, you agree that your work is licensed under the
+[GPL-3.0 license](LICENSE).

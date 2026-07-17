@@ -94,7 +94,10 @@ object AxionPreviewBlockDrawer {
         val camera = client.gameRenderer?.camera ?: return ChunkedDrawResult.FAILED
         val cameraPos = cameraPosOverride ?: CameraAccess.getPos(camera)
 
-        val baseMv = Matrix4f(baseModelView ?: RenderSystem.getModelViewMatrix())
+        // Fabric's 1.21.5 world-render MatrixStack is identity at this event.
+        // The direct render pass must explicitly use the active camera
+        // rotation that buffered RenderLayers otherwise apply during flush.
+        val baseMv = Matrix4f(RenderSystem.getModelViewMatrix())
 
         val drawList = SectionDrawList.buildAll(sectionBuffers)
         if (drawList.isEmpty()) return ChunkedDrawResult.NO_BUFFERS
@@ -139,11 +142,18 @@ object AxionPreviewBlockDrawer {
             val sectionMv = Matrix4f()
             for (entry in drawList) {
                 sectionMv.set(baseMv)
-                sectionMv.translate(
-                    (entry.sectionOriginX.toDouble() - camX + deltaX.toDouble()).toFloat(),
-                    (entry.sectionOriginY.toDouble() - camY + deltaY.toDouble()).toFloat(),
-                    (entry.sectionOriginZ.toDouble() - camZ + deltaZ.toDouble()).toFloat(),
+                val translation = PreviewSectionTransform.cameraRelative(
+                    entry.sectionOriginX,
+                    entry.sectionOriginY,
+                    entry.sectionOriginZ,
+                    camX,
+                    camY,
+                    camZ,
+                    deltaX,
+                    deltaY,
+                    deltaZ,
                 )
+                sectionMv.translate(translation.x, translation.y, translation.z)
                 pass.setUniform("ModelViewMat", sectionMv)
                 entry.buffer.drawIndexed(pass)
             }

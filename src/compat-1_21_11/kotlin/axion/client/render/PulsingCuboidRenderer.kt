@@ -118,9 +118,13 @@ object PulsingCuboidRenderer {
         val consumers = context.consumers()
         val cameraPos = CameraAccess.getPos(camera)
         val matrixStack = context.matrices()
-        val outlinedBox = SelectionBounds.outlineBox(box)
+        val baseBox = SelectionBounds.outlineBox(box)
+        val pulseBox = baseBox.expand(0.0015, 0.0015, 0.0015)
         val fillLayer = try {
-            RenderLayerCompat.debugQuads()
+            // Persistent GPU previews draw after this cuboid is queued. Using
+            // the vanilla debug layer here would write the cuboid's near face
+            // into the depth buffer and mask every preview fragment behind it.
+            RenderLayerCompat.xrayQuads()
         } catch (e: Exception) {
             return
         }
@@ -131,7 +135,7 @@ object PulsingCuboidRenderer {
             consumer = filledConsumer,
             layer = fillLayer,
             cameraPos = cameraPos,
-            box = outlinedBox,
+            box = baseBox,
             alpha = baseAlpha,
             color = baseFillColor,
         )
@@ -140,7 +144,7 @@ object PulsingCuboidRenderer {
             consumer = filledConsumer,
             layer = fillLayer,
             cameraPos = cameraPos,
-            box = outlinedBox,
+            box = pulseBox,
             alpha = pulsingAlpha(
                 minAlpha = pulseMinAlpha,
                 maxAlpha = pulseMaxAlpha,
@@ -151,7 +155,7 @@ object PulsingCuboidRenderer {
         VertexRenderingCompat.drawOutline(
             matrixStack,
             consumers.getBuffer(RenderLayerCompat.lines()),
-            VoxelShapes.cuboid(outlinedBox),
+            VoxelShapes.cuboid(pulseBox),
             -cameraPos.x,
             -cameraPos.y,
             -cameraPos.z,

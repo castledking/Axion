@@ -69,15 +69,7 @@ object AxionBlockTessellator {
             random.setSeed(state.getRenderingSeed(pos))
             model.addParts(random, parts)
             if (parts.isNotEmpty()) {
-                // For grass blocks, render each part individually with checkSides=false
-                // This bypasses the grass block model's built-in top-face culling
-                if (state.block == Blocks.GRASS_BLOCK) {
-                    for (part in parts) {
-                        blockRenderManager.renderBlock(state, pos, world, matrixStack, consumer, false, listOf(part))
-                    }
-                } else {
-                    blockRenderManager.renderBlock(state, pos, world, matrixStack, consumer, checkSides, parts)
-                }
+                blockRenderManager.renderBlock(state, pos, world, matrixStack, consumer, checkSides, parts)
                 rendered = true
             }
         }

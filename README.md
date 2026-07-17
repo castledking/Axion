@@ -1,72 +1,102 @@
-[![Axion Banner](https://castled.codes/assets/axion-banner.png)](https://github.com/castledking/Axion/wiki/)
+[![Axion Banner](https://castled.codes/assets/axion-banner.png)](https://castled.codes/axion/dl)
 
-Axion is an open-source Minecraft building toolkit built as a Fabric client mod with a companion Paper plugin for server-backed multiplayer editing.
+# Axion
+
+Axion is an open-source Minecraft building toolkit. The Fabric mod provides
+hotbar-driven editing tools and live in-world previews; the matching Paper plugin
+applies and validates those edits on multiplayer servers.
 
 <p align="center">
-  <a href="https://github.com/castledking/Axion/wiki"><img alt="Wiki" src="https://img.shields.io/badge/GitHub-Wiki-181717?style=for-the-badge&logo=github"></a>
-  <a href="https://github.com/castledking/Axion/issues"><img alt="Issues" src="https://img.shields.io/badge/GitHub-Issues-181717?style=for-the-badge&logo=github"></a>
-  <a href="https://discord.com/invite/pCKdCX6nYr"><img alt="Discord" src="https://img.shields.io/badge/Discord-Community-5865F2?style=for-the-badge&logo=discord&logoColor=white"></a>
-  <a href="https://castled.codes"><img alt="CASTLED CODEX" src="https://castled.codes/assets/logo-banner.png" width="140" height="35"></a>
+  <a href="https://github.com/castledking/Axion/actions/workflows/build.yml"><img alt="Build Verification" src="https://github.com/castledking/Axion/actions/workflows/build.yml/badge.svg?branch=main"></a>
+  <a href="https://castled.codes/axion/dl"><img alt="Download Axion" src="https://img.shields.io/badge/Download-Axion-818cf8?style=flat-square"></a>
+  <a href="https://github.com/castledking/Axion/wiki"><img alt="Wiki" src="https://img.shields.io/badge/GitHub-Wiki-181717?style=flat-square&logo=github"></a>
+  <a href="https://discord.com/invite/pCKdCX6nYr"><img alt="Discord" src="https://img.shields.io/badge/Discord-Community-5865F2?style=flat-square&logo=discord&logoColor=white"></a>
 </p>
 
-## Quick Links
+## What Axion Does
 
-- **[MOD-README](MOD-README.md)** — Fabric mod install and usage (for Modrinth)
-- **[PLUGIN-README](PLUGIN-README.md)** — Paper plugin install and server notes (for Modrinth)
-- **[Wiki](https://github.com/castledking/Axion/wiki)** — Documentation, usage notes, and setup pages
-- **[Contributing](CONTRIBUTING.md)** — Development guide for contributors
+- Move, clone, stack, smear, erase, extrude, and mirror terrain directly from
+  the hotbar.
+- Preview edits in-world before confirming them, including large GPU-rendered
+  selections.
+- Select organic regions with Magic Select, masks, templates, and a searchable
+  block picker.
+- Use symmetry, saved hotbars, replace mode, infinite reach, no-clip, and other
+  creative building utilities.
+- Undo and redo edits locally or through the companion Paper plugin.
 
-## Changelog
+Axion is designed for creative building. Singleplayer edits can run locally. On
+Paper servers, builders install the Fabric mod and the server runs the matching
+Axion Paper jar so edits remain authoritative and policy-aware.
 
-### v0.2.8 (Released)
+## Downloads
 
-- **UI/UX Polish** — Reworked the tool hint HUD into compact contextual prompts, including under-crosshair mouse hints and bottom-right keybind hints.
-- **New GUI Assets** — Added texture-backed mouse/input hints and a new icon-based Axion tool palette.
-- **Alt Tool Menu Improvements** — Holding Alt now expands the tool stack with cleaner icon slots and improved hover/selection behavior.
-- **Iris Shader Support** — Added Iris shader-pack detection and shader-aware preview fallback so large previews behave correctly when shaders are enabled or toggled.
-- **Input Fixes** — Improved mouse-scroll handling so Axion does not hijack scrolling while chat, menus, or option screens are open.
-- **Minecraft 1.21.2 - 1.21.3 Support** — Added a single range jar compiled against Minecraft `1.21.3` for the `1.21.2` through `1.21.3` client and Paper plugin line.
-- **Release Automation Update** — Release tags now publish the jars produced by `./build-axion.sh all` to the GitHub release, with release body text loaded from `.release/latest/<tag>.md`.
-- **Supported Versions** — Axion v0.2.8 supports Minecraft `1.21.2` through `1.21.11` and `26.1.x`.
+Download the latest Fabric and Paper jars from:
 
-### v0.2.7 (Released)
+**https://castled.codes/axion/dl**
 
-<a href="https://github.com/castledking/Axion/actions/workflows/cd.yml"><img alt="Build" src="https://github.com/castledking/Axion/actions/workflows/cd.yml/badge.svg?branch=main"></a>
+Choose the jar whose filename matches the Minecraft version range you run. Keep
+the Fabric mod and Paper plugin on the same Axion version.
 
-- **Minecraft 26.1.x Support** — Fabric client compatibility work for the latest Minecraft version
-- **26.1.x Rendering Fixes** — Restored toolbox icon textures, selection visuals, move-source glass overlays, and GPU block previews
-- **Smear Tool Overhaul** — True block smearing that samples your selection and spreads blocks as you scroll, perfect for creating staircases and roofs
-- **Stack & Smear Reliability** — Increased repeat limits, improved large GPU previews, fixed no-op smear feedback, and made smear overlap resolution more deterministic
-- **Hotbar Save/Load Fixes** — Saved hotbars restore correctly on 26.1.x
-- **Paper Admin Reload** — Added console-only `/axion reload` for reloading Paper plugin config and policy options without restarting the server
-- **Magic Selection Enhancements**
-  - More block tags available for custom masks
-  - Red outline for disabled templates for easy visual identification
-  - Same Block Select toggle to pick up matching blocks outside your mask
-  - Continuous stroke support for faster large selections
-- **1.21.5 - 1.21.8 GPU Preview Compatibility**
-  - Added chunked GPU preview support for Minecraft 1.21.5
-  - Added chunked GPU preview support for the legacy 1.21.6 - 1.21.8 range, compiled against 1.21.7
-  - Large move, clone, stack, smear, and glass/origin overlay previews now use persistent per-section GPU buffers on these older ranges
-  - Modern 1.21.9 - 1.21.11 previews adapt at runtime across the render-pass texture binding and `DynamicUniforms` API changes in that range
+## Supported Versions
 
-## Next: v0.2.9
+| Component | Supported Minecraft versions |
+| --- | --- |
+| Fabric client mod | `1.21 - 1.21.11`, `26.1 - 26.1.2` |
+| Paper plugin | `1.21 - 1.21.11`, `26.1 - 26.1.2` |
+| Fabric dedicated server | `1.21.11` |
 
-- **26.1.x Fabric Dedicated Server Support** — Fabric dedicated server support for the 26.1.x range is planned next in v0.2.9.
-- **1.21.1 Support** — Minecraft `1.21.1` remains the next 1.21.x client and Paper plugin backport target.
+Release artifacts are grouped into seven compatibility ranges:
 
-## Roadmap & Upcoming
+- `1.21 - 1.21.1`
+- `1.21.2 - 1.21.3`
+- `1.21.4`
+- `1.21.5`
+- `1.21.6 - 1.21.8`
+- `1.21.9 - 1.21.11`
+- `26.1 - 26.1.2`
 
-### Future Plans
-- More "capabilities" like `No Updates`, `Phantom`, `Angel Placement` and `Tinker`
-- Add support for older Minecraft versions after the `1.21.x` backport work
-- Add support for more Minecraft versions on Fabric dedicated servers
-- UI improvements and polish
-- 0.3.0 and beyond: Develop the `Editor Mode` for more advanced building workflows (MCEdit-style editor)
+## Installation
 
-## Support
+For singleplayer, install the Axion Fabric jar together with Fabric API and
+Fabric Language Kotlin.
 
+For a Paper server:
+
+1. Install the matching Axion Fabric jar on each builder's client.
+2. Install the matching Axion Paper jar in the server's `plugins` directory.
+3. Restart the server and grant the required Axion permissions.
+
+See [PLUGIN-README.md](PLUGIN-README.md) and the
+[wiki](https://github.com/castledking/Axion/wiki) for server configuration and
+permissions.
+
+## Contributing
+
+Contributions and focused bug reports are welcome. A full release-range build is:
+
+```bash
+./build-axion.sh all
+```
+
+Launch a development client for a specific supported version with:
+
+```bash
+./run-axion.sh 1.21.3
+./run-axion.sh 1.21.11
+./run-axion.sh 26.1
+```
+
+Before opening a pull request, test the affected Minecraft ranges and describe
+the versions you verified. See [CONTRIBUTING.md](CONTRIBUTING.md) for the project
+layout, compatibility rules, and server test commands.
+
+## Project Links
+
+- Downloads: https://castled.codes/axion/dl
 - Issues: https://github.com/castledking/Axion/issues
 - Wiki: https://github.com/castledking/Axion/wiki
 - Discord: https://discord.com/invite/pCKdCX6nYr
-- Website: https://castled.codes
+- Website: https://castled.codes/axion/
+
+Axion is licensed under the [GPL-3.0 license](LICENSE).

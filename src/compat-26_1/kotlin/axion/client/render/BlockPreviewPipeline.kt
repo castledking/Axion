@@ -56,6 +56,7 @@ object BlockPreviewPipeline {
         val ghostScale: Float,
         val aggregateBox: Box? = null,
         val renderGhost: Boolean = true,
+        val pulseSelection: Boolean = false,
     )
 
     fun renderOverlay(
@@ -185,42 +186,17 @@ object BlockPreviewPipeline {
             return true
         }
 
-        val totalCells = nonAirCells.size.toLong() * scene.origins.size.toLong()
-        if (totalCells > LARGE_PREVIEW_CELL_THRESHOLD) {
-            GhostBlockPreviewRenderer.render(
-                context = context,
-                clipboard = scene.fallbackGhostClipboard,
-                origins = scene.origins,
-                color = scene.ghostColor,
-                alpha = scene.ghostAlpha,
-                textured = true,
-                scale = scene.ghostScale,
-                sessionTag = scene.sessionTag,
-                forceChunked = true,
-            )
-            return true
-        }
-
-        val renderedShell = PreviewShellBlockRenderer.render(
+        GhostBlockPreviewRenderer.render(
             context = context,
-            clipboard = scene.shellClipboard,
+            clipboard = scene.fallbackGhostClipboard,
             origins = scene.origins,
             color = scene.ghostColor,
             alpha = scene.ghostAlpha,
+            textured = true,
             scale = scene.ghostScale,
+            sessionTag = scene.sessionTag,
+            forceChunked = true,
         )
-        if (!renderedShell) {
-            GhostBlockPreviewRenderer.render(
-                context = context,
-                clipboard = scene.fallbackGhostClipboard,
-                origins = scene.origins,
-                color = scene.ghostColor,
-                alpha = scene.ghostAlpha,
-                textured = true,
-                scale = scene.ghostScale,
-                sessionTag = scene.sessionTag,
-            )
-        }
         return true
     }
 
@@ -229,12 +205,26 @@ object BlockPreviewPipeline {
         scene: Scene,
     ) {
         scene.aggregateBox?.let { box ->
-            PulsingCuboidRenderer.renderOutlineBox(
-                context = context,
-                box = box,
-                outlineColor = scene.outlineColor,
-                lineWidth = scene.lineWidth,
-            )
+            if (scene.pulseSelection) {
+                PulsingCuboidRenderer.renderSelectionBox(
+                    context = context,
+                    box = box,
+                    outlineColor = scene.outlineColor,
+                    lineWidth = scene.lineWidth,
+                    baseFillColor = 0xFFCC5656.toInt(),
+                    baseAlpha = 1,
+                    pulseFillColor = 0xFF7C98FF.toInt(),
+                    pulseMinAlpha = 4,
+                    pulseMaxAlpha = 8,
+                )
+            } else {
+                PulsingCuboidRenderer.renderOutlineBox(
+                    context = context,
+                    box = box,
+                    outlineColor = scene.outlineColor,
+                    lineWidth = scene.lineWidth,
+                )
+            }
         }
     }
 }

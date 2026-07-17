@@ -31,7 +31,7 @@ object AxionClientBootstrap {
         logger.info("[Axion/Bootstrap] Client config initialized")
         AxionServerConnection.initialize()
         logger.info("[Axion/Bootstrap] Server connection initialized")
-        // Initialize NoClipService from compat module if available (1.21.9-1.21.11)
+        // Initialize integrated-server NoClipService when this version provides one.
         try {
             val noClipServiceClass = Class.forName("axion.client.compat.NoClipService")
             val initializeMethod = noClipServiceClass.getMethod("initialize")

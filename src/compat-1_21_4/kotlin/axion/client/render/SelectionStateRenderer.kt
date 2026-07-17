@@ -3,7 +3,6 @@ package axion.client.render
 import axion.client.AxionClientState
 import axion.client.selection.SelectionBounds
 import axion.client.tool.PlacementToolController
-import axion.client.tool.SmearToolController
 import axion.client.tool.StackToolController
 import axion.client.tool.AxionToolSelectionController
 import axion.common.model.AxionSubtool
@@ -13,10 +12,10 @@ object SelectionStateRenderer {
     private const val REGION_COLOR: Int = 0xFFFFFFFF.toInt()
     private const val LINE_WIDTH: Float = 2.0f
     private const val SELECTION_BASE_FILL_COLOR: Int = 0xFFCC5656.toInt()
-    private const val SELECTION_BASE_FILL_ALPHA: Int = 16
+    private const val SELECTION_BASE_FILL_ALPHA: Int = 1
     private const val SELECTION_PULSE_FILL_COLOR: Int = 0xFF7C98FF.toInt()
     private const val SELECTION_PULSE_MIN_ALPHA: Int = 4
-    private const val SELECTION_PULSE_MAX_ALPHA: Int = 34
+    private const val SELECTION_PULSE_MAX_ALPHA: Int = 8
 
     fun render(context: AxionWorldRenderContext) {
         if (!shouldRenderSelectionPulse()) {
@@ -110,7 +109,6 @@ object SelectionStateRenderer {
 
     private fun hasActivePreview(): Boolean {
         return PlacementToolController.currentPreview() != null ||
-            StackToolController.currentPreview() != null ||
-            SmearToolController.currentPreview() != null
+            StackToolController.currentPreview() != null
     }
 }

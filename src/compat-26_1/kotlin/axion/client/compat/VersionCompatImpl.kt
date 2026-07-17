@@ -6,7 +6,11 @@ import axion.client.render.gpu.ChunkedPreviewLifecycle
 import axion.client.render.gpu.SectionDrawEntry
 import axion.common.model.ClipboardBuffer
 import com.mojang.blaze3d.buffers.GpuBufferSlice
+import com.mojang.blaze3d.pipeline.BlendFunction
+import com.mojang.blaze3d.pipeline.ColorTargetState
+import com.mojang.blaze3d.pipeline.DepthStencilState
 import com.mojang.blaze3d.pipeline.RenderPipeline
+import com.mojang.blaze3d.platform.CompareOp
 import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.systems.RenderPass
 import com.mojang.blaze3d.textures.GpuTextureView
@@ -31,6 +35,7 @@ import net.minecraft.text.MutableText
 import net.minecraft.util.Formatting
 import axion.client.config.formatted
 import axion.client.network.BlockWrite
+import axion.client.network.BlockWriteUpdatePolicy
 import axion.common.model.BlockEntityDataSnapshot
 import net.minecraft.world.World
 import net.minecraft.block.entity.BlockEntity
@@ -57,6 +62,7 @@ import net.minecraft.world.level.storage.TagValueInput
 import net.minecraft.world.level.storage.TagValueOutput
 import org.lwjgl.glfw.GLFW
 import axion.common.compat.VersionCompat
+import java.util.concurrent.ConcurrentHashMap
 
 object VersionCompatImpl : VersionCompat {
     override fun getBlock(id: Identifier): Block? {
@@ -200,8 +206,24 @@ object VersionCompatImpl : VersionCompat {
         return layer.pipeline()
     }
 
-    fun getPreviewShellPipeline(vertexFormat: VertexFormat, drawMode: Any): RenderPipeline {
-        return RenderPipelines.TRANSLUCENT_BLOCK
+    private val previewShellPipelines = ConcurrentHashMap<net.minecraft.client.render.DrawMode, RenderPipeline>()
+
+    fun getPreviewShellPipeline(
+        vertexFormat: VertexFormat,
+        drawMode: net.minecraft.client.render.DrawMode,
+    ): RenderPipeline {
+        return previewShellPipelines.computeIfAbsent(drawMode) {
+            RenderPipeline.builder(RenderPipelines.MATRICES_PROJECTION_SNIPPET)
+                .withLocation(Identifier.fromNamespaceAndPath("axion", "pipeline/preview_shell"))
+                .withVertexShader(Identifier.fromNamespaceAndPath("axion", "core/preview_shell"))
+                .withFragmentShader(Identifier.fromNamespaceAndPath("axion", "core/preview_shell"))
+                .withSampler("Sampler0")
+                .withColorTargetState(ColorTargetState(BlendFunction.TRANSLUCENT))
+                .withDepthStencilState(DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, false))
+                .withCull(true)
+                .withVertexFormat(vertexFormat, drawMode)
+                .build()
+        }
     }
 
     fun playSoundClient(
@@ -270,7 +292,7 @@ object VersionCompatImpl : VersionCompat {
     }
 
     fun applyBlockEntity(world: World, write: BlockWrite) {
-        world.setBlock(write.pos, write.state, 3)
+        world.setBlock(write.pos, write.state, BlockWriteUpdatePolicy.MODERN_NO_PHYSICS_FLAGS)
         val payload = write.blockEntityData
         if (payload == null) {
             world.removeBlockEntity(write.pos)

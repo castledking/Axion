@@ -71,6 +71,7 @@ object BlockPreviewPipeline {
         val ghostScale: Float,
         val aggregateBox: Box? = null,
         val renderGhost: Boolean = true,
+        val pulseSelection: Boolean = false,
     )
 
     fun renderOverlay(
@@ -199,13 +200,6 @@ object BlockPreviewPipeline {
             return true
         }
 
-        // For large previews (e.g. cloning a whole church), skip the
-        // per-frame CPU tessellation path (PreviewShellBlockRenderer) and
-        // route straight through the GPU chunked session. That path uploads
-        // each 16³ section once to a persistent GpuBuffer and redraws from
-        // it every frame — O(visibleSections) instead of O(surfaceCells).
-        //
-        // Threshold mirrors GhostBlockPreviewRenderer.CHUNKED_PATH_CELL_THRESHOLD.
         val totalCells = nonAirCells.size.toLong() * scene.origins.size.toLong()
         if (totalCells > LARGE_PREVIEW_CELL_THRESHOLD) {
             GhostBlockPreviewRenderer.render(
@@ -265,12 +259,26 @@ object BlockPreviewPipeline {
         // [PreviewRegionOutlineRenderer] / sparse-clipboard parameters are
         // intentionally ignored here.
         scene.aggregateBox?.let { box ->
-            PulsingCuboidRenderer.renderOutlineBox(
-                context = context,
-                box = box,
-                outlineColor = scene.outlineColor,
-                lineWidth = scene.lineWidth,
-            )
+            if (scene.pulseSelection) {
+                PulsingCuboidRenderer.renderSelectionBox(
+                    context = context,
+                    box = box,
+                    outlineColor = scene.outlineColor,
+                    lineWidth = scene.lineWidth,
+                    baseFillColor = 0xFFCC5656.toInt(),
+                    baseAlpha = 1,
+                    pulseFillColor = 0xFF7C98FF.toInt(),
+                    pulseMinAlpha = 4,
+                    pulseMaxAlpha = 8,
+                )
+            } else {
+                PulsingCuboidRenderer.renderOutlineBox(
+                    context = context,
+                    box = box,
+                    outlineColor = scene.outlineColor,
+                    lineWidth = scene.lineWidth,
+                )
+            }
         }
     }
 }

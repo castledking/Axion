@@ -2,7 +2,9 @@ package axion.client.compat
 
 import axion.client.network.AxionPluginPayload
 import axion.client.network.BlockWrite
+import axion.client.network.BlockWriteUpdatePolicy
 import axion.client.render.AxionWorldRenderContext
+import axion.client.render.ShaderPackCompat
 import axion.client.render.gpu.ChunkedPreviewLifecycle
 import axion.common.compat.VersionCompat
 import axion.common.model.BlockEntityDataSnapshot
@@ -127,7 +129,7 @@ object VersionCompatImpl : VersionCompat {
     }
 
     fun applyBlockEntity(world: net.minecraft.world.World, write: BlockWrite) {
-        world.setBlockState(write.pos, write.state, 3)
+        world.setBlockState(write.pos, write.state, BlockWriteUpdatePolicy.MODERN_NO_PHYSICS_FLAGS)
         val payload = write.blockEntityData
         if (payload == null) {
             world.removeBlockEntity(write.pos)
@@ -160,10 +162,13 @@ object VersionCompatImpl : VersionCompat {
     }
 
     fun sendAxionPayload(payload: AxionPluginPayload) = ClientPlayNetworking.send(payload)
-    fun supportsChunkedPreview(): Boolean = false
+    fun supportsChunkedPreview(): Boolean = !ShaderPackCompat.shouldDisableDirectGpuPreview()
 
     fun renderChunkedPreview(sessionId: String, context: AxionWorldRenderContext, clipboard: ClipboardBuffer, origins: Collection<BlockPos>, color: Int, alpha: Int): Boolean {
-        return false
+        if (ShaderPackCompat.shouldDisableDirectGpuPreview()) return false
+        val session = ChunkedPreviewLifecycle.acquire(sessionId)
+        session.setFromClipboard(clipboard, origins)
+        return session.render(context, color, alpha).handled
     }
 
     fun closeChunkedPreviews() {

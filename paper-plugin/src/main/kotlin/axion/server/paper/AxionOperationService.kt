@@ -241,7 +241,7 @@ class AxionOperationService(
     private fun applyClear(world: World, operation: ClearRegionRequest) {
         forEachPos(operation.min, operation.max) { x, y, z ->
             val block = world.getBlockAt(x, y, z)
-            block.setType(Material.AIR, false)
+            PaperBlockWritePolicy.setType(block, Material.AIR)
         }
     }
 
@@ -267,7 +267,7 @@ class AxionOperationService(
                 (operation.destinationOrigin.y + capturedBlock.offset.y).toDouble(),
                 (operation.destinationOrigin.z + capturedBlock.offset.z).toDouble(),
             )
-            capturedBlock.state.copy(destination).update(true, false)
+            PaperBlockWritePolicy.copyState(capturedBlock.state, destination)
         }
     }
 

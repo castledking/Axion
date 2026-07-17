@@ -20,7 +20,7 @@ import net.minecraft.util.math.BlockPos
  * Cross-section neighbor lookups pre-fetch the 6 adjacent section arrays
  * once, so each cell's face checks are pure bit math. When a neighbor IS
  * present, a state-map lookup determines if it actually occludes the face
- * via [BlockState.isOpaqueFullCube] (a cached field, no world/pos needed).
+     * via the version-compatible opaque-full-cube state (cached per state).
  */
 object ChunkMeshTessellator {
 
@@ -145,6 +145,7 @@ object ChunkMeshTessellator {
             (v and (mask shr 1)) != 0
         }
         if (!minusXPresent) return false
+        if (statesByPosition != null && !isOpaqueAt(statesByPosition, baseX + x - 1, baseY + y, baseZ + z)) return false
 
         // +X
         val plusXPresent = if (x == 15) {
@@ -153,6 +154,7 @@ object ChunkMeshTessellator {
             (v and (mask shl 1)) != 0
         }
         if (!plusXPresent) return false
+        if (statesByPosition != null && !isOpaqueAt(statesByPosition, baseX + x + 1, baseY + y, baseZ + z)) return false
 
         // -Y
         val minusYPresent = if (y == 0) {
@@ -174,7 +176,7 @@ object ChunkMeshTessellator {
         if (statesByPosition != null) {
             val aboveState = statesByPosition[BlockPos.asLong(baseX + x, baseY + y + 1, baseZ + z)]
             // If there's a non-opaque block above (e.g., short grass, flowers), the block below is NOT interior
-            if (aboveState != null && !aboveState.isOpaqueFullCube) {
+            if (aboveState != null && !isOpaqueFullCubeCompat(aboveState)) {
                 return false
             }
             if (!isOpaqueAt(statesByPosition, baseX + x, baseY + y + 1, baseZ + z)) return false
@@ -187,6 +189,7 @@ object ChunkMeshTessellator {
             (section[y + (z - 1) * 16].toInt() and mask) != 0
         }
         if (!minusZPresent) return false
+        if (statesByPosition != null && !isOpaqueAt(statesByPosition, baseX + x, baseY + y, baseZ + z - 1)) return false
 
         // +Z
         val plusZPresent = if (z == 15) {
@@ -195,13 +198,18 @@ object ChunkMeshTessellator {
             (section[y + (z + 1) * 16].toInt() and mask) != 0
         }
         if (!plusZPresent) return false
+        if (statesByPosition != null && !isOpaqueAt(statesByPosition, baseX + x, baseY + y, baseZ + z + 1)) return false
 
         return true
     }
 
     private fun isOpaqueAt(statesByPosition: Map<Long, BlockState>, x: Int, y: Int, z: Int): Boolean {
         val state = statesByPosition[BlockPos.asLong(x, y, z)] ?: return false
-        return state.isOpaqueFullCube
+        return isOpaqueFullCubeCompat(state)
+    }
+
+    private fun isOpaqueFullCubeCompat(state: BlockState): Boolean {
+        return PreviewOcclusionCompat.isOpaqueFullCube(state)
     }
 
     /** Counts occupied cells in a section without iterating bits one-at-a-time. */

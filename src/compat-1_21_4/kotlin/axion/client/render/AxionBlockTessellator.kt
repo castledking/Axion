@@ -60,8 +60,7 @@ object AxionBlockTessellator {
         if (state.renderType == BlockRenderType.MODEL) {
             val random = threadLocalRandom.get()
             random.setSeed(state.getRenderingSeed(pos))
-            val blockCheckSides = if (state.block == Blocks.GRASS_BLOCK) false else checkSides
-            blockRenderManager.renderBlock(state, pos, world, matrixStack, consumer, blockCheckSides, random)
+            blockRenderManager.renderBlock(state, pos, world, matrixStack, consumer, checkSides, random)
             rendered = true
         }
 

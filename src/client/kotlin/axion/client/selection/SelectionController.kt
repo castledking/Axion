@@ -2,7 +2,9 @@ package axion.client.selection
 
 import axion.client.AxionClientState
 import axion.client.tool.AxionToolSelectionController
+import axion.common.compat.offset
 import axion.common.model.BlockRegion
+import axion.common.model.RegionFace
 import axion.common.model.SelectionState
 import net.minecraft.client.MinecraftClient
 import net.minecraft.util.math.BlockPos
@@ -75,6 +77,16 @@ object SelectionController {
             if (outwardFace != null) {
                 return region.resizeFaceToward(outwardFace, targetBlock)
             }
+
+            val clickedFace = (currentTarget as? AxionTarget.FaceTarget)?.face
+            if (clickedFace != null && region.contains(targetBlock)) {
+                val resizeTarget = if (isOnFaceBoundary(region, clickedFace, targetBlock)) {
+                    targetBlock.offset(clickedFace.stepX(), clickedFace.stepY(), clickedFace.stepZ())
+                } else {
+                    targetBlock
+                }
+                return region.resizeFaceToward(clickedFace, resizeTarget)
+            }
         }
 
         val cameraEntity = client.cameraEntity ?: client.player ?: return null
@@ -93,6 +105,36 @@ object SelectionController {
         return targetBlock
             ?.let { region.resizeFaceToward(faceHit.face, it) }
             ?: region.extendFace(faceHit.face)
+    }
+
+    private fun isOnFaceBoundary(region: BlockRegion, face: RegionFace, pos: BlockPos): Boolean {
+        val normalized = region.normalized()
+        return when (face) {
+            RegionFace.DOWN -> pos.y == normalized.start.y
+            RegionFace.UP -> pos.y == normalized.end.y
+            RegionFace.NORTH -> pos.z == normalized.start.z
+            RegionFace.SOUTH -> pos.z == normalized.end.z
+            RegionFace.WEST -> pos.x == normalized.start.x
+            RegionFace.EAST -> pos.x == normalized.end.x
+        }
+    }
+
+    private fun RegionFace.stepX(): Int = when (this) {
+        RegionFace.WEST -> -1
+        RegionFace.EAST -> 1
+        else -> 0
+    }
+
+    private fun RegionFace.stepY(): Int = when (this) {
+        RegionFace.DOWN -> -1
+        RegionFace.UP -> 1
+        else -> 0
+    }
+
+    private fun RegionFace.stepZ(): Int = when (this) {
+        RegionFace.NORTH -> -1
+        RegionFace.SOUTH -> 1
+        else -> 0
     }
 
     private fun isRegionSelectionContext(): Boolean {

@@ -37,15 +37,8 @@ MULTI_VERSION_SUPPORT.md
 bin/
 .kotlin/
 .modrinth/
-.release/node_modules/
-.release/.spigot-cookies.json
-.release/.screenshots/
 .idea/
 .run-workspaces/
 **/run/*
 *.txt
-.release/old/
 .release/plans/
-
-# Track the latest release notes pointer
-!.release/latest/

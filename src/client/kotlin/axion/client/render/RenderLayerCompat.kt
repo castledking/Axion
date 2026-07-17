@@ -32,6 +32,7 @@ object RenderLayerCompat {
         "getLines" to "method_23594",
         "getBlockTranslucentCull" to "method_76545",
         "getTranslucentMovingBlock" to "method_29380",
+        "getTranslucent" to "method_23596",
         "getDebugQuads" to "method_49042",
         "getDebugFilledBox" to "method_49047",
     )
@@ -40,6 +41,7 @@ object RenderLayerCompat {
         "lines" to "method_76015",
         "blockTranslucentCull" to "method_76545",
         "translucentMovingBlock" to "method_75977",
+        "translucent" to "method_23596",
         "debugQuads" to "method_76023",
         "debugFilledBox" to "method_76019",
         "cutout" to "method_75995",
@@ -92,6 +94,12 @@ object RenderLayerCompat {
         fieldNames = emptyList(),
     )
 
+    fun entityTranslucent(): RenderLayer = resolve(
+        key = "entityTranslucent",
+        namedMethodNames = listOf("translucent", "getTranslucent", "entityTranslucent"),
+        fieldNames = emptyList(),
+    )
+
     fun blockTranslucentCull(): RenderLayer = resolve(
         key = "blockTranslucentCull",
         namedMethodNames = listOf("blockTranslucentCull", "getBlockTranslucentCull", "translucentMovingBlock", "getTranslucentMovingBlock"),
@@ -135,6 +143,12 @@ object RenderLayerCompat {
         if (key == "blockTranslucentCull") {
             return translucentMovingBlock()
         }
+        if (key == "entityTranslucent") {
+            return translucentMovingBlock()
+        }
+
+        logResolveFailure(key, names, fieldNames)
+        error("Missing RenderLayer.$key")
 
         logResolveFailure(key, names, fieldNames)
         error("Missing RenderLayer.$key")
@@ -185,15 +199,117 @@ object RenderLayerCompat {
     }
 
     private fun createXrayQuadsLayer(): RenderLayer {
-        val pipeline = createXrayQuadsPipeline()
-        return createModernLayer(pipeline) ?: createLegacyLayer(pipeline)
+        val pipelineLayer = runCatching {
+            val pipeline = createXrayQuadsPipeline()
+            createModernLayer(pipeline) ?: createLegacyLayer(pipeline)
+        }.getOrNull()
+        return pipelineLayer ?: createClassicXrayQuadsLayer()
             ?: error("No compatible RenderLayer factory for xrayQuads")
+    }
+
+    /**
+     * Minecraft 1.21-1.21.3 predates RenderPipeline. Build the equivalent
+     * color-only layer reflectively because Yarn exposes MultiPhaseParameters
+     * with different source visibility between 1.21 and 1.21.1.
+     */
+    private fun createClassicXrayQuadsLayer(): RenderLayer? {
+        val paramsClass = candidateClasses(
+            "net.minecraft.client.render.RenderLayer\$MultiPhaseParameters",
+        ).firstOrNull() ?: return null
+        val builderFactory = paramsClass.declaredMethods.firstOrNull { method ->
+            Modifier.isStatic(method.modifiers) &&
+                method.parameterCount == 0 &&
+                method.returnType.enclosingClass == paramsClass
+        } ?: return null
+        builderFactory.isAccessible = true
+        val builder = builderFactory.invoke(null)
+
+        listOf(
+            classicPhase("COLOR_PROGRAM", "ShaderProgram"),
+            classicPhase("TRANSLUCENT_TRANSPARENCY", "Transparency"),
+            classicPhase("ALWAYS_DEPTH_TEST", "DepthTest"),
+            classicPhase("COLOR_MASK", "WriteMaskState"),
+            classicPhase("DISABLE_CULLING", "Cull"),
+        ).forEach { phase ->
+            val setter = builder.javaClass.declaredMethods.firstOrNull { method ->
+                method.parameterCount == 1 &&
+                    method.parameterTypes[0].isInstance(phase) &&
+                    method.returnType.isAssignableFrom(builder.javaClass)
+            } ?: return null
+            setter.isAccessible = true
+            setter.invoke(builder, phase)
+        }
+
+        val build = builder.javaClass.declaredMethods.firstOrNull { method ->
+            method.parameterCount == 1 &&
+                method.parameterTypes[0] == Boolean::class.javaPrimitiveType &&
+                method.returnType == paramsClass
+        } ?: return null
+        build.isAccessible = true
+        val params = build.invoke(builder, false)
+        val vertexFormat = positionColorVertexFormat()
+        val drawMode = quadsDrawMode()
+        val factory = RenderLayer::class.java.declaredMethods.firstOrNull { method ->
+            Modifier.isStatic(method.modifiers) &&
+                RenderLayer::class.java.isAssignableFrom(method.returnType) &&
+                method.parameterCount == 7 &&
+                method.parameterTypes[0] == String::class.java &&
+                method.parameterTypes[1].isInstance(vertexFormat) &&
+                method.parameterTypes[2].isInstance(drawMode) &&
+                method.parameterTypes[3] == Int::class.javaPrimitiveType &&
+                method.parameterTypes[4] == Boolean::class.javaPrimitiveType &&
+                method.parameterTypes[5] == Boolean::class.javaPrimitiveType &&
+                method.parameterTypes[6] == paramsClass
+        } ?: return null
+        factory.isAccessible = true
+        return factory.invoke(
+            null,
+            "axion_xray_quads",
+            vertexFormat,
+            drawMode,
+            1536,
+            false,
+            true,
+            params,
+        ) as RenderLayer
+    }
+
+    private fun classicPhase(namedField: String, namedPhaseType: String): Any {
+        val resolver = FabricLoader.getInstance().mappingResolver
+        val owner = "net.minecraft.client.render.RenderPhase"
+        val descriptor = "Lnet/minecraft/client/render/RenderPhase\$$namedPhaseType;"
+        // Mojang renamed the position/color shader phase between 1.21.1 and
+        // 1.21.2. Try both named fields so the classic color-only layer can be
+        // created throughout the complete 1.21-1.21.3 compatibility range.
+        val namedCandidates = if (namedField == "COLOR_PROGRAM") {
+            listOf("COLOR_PROGRAM", "POSITION_COLOR_PROGRAM")
+        } else {
+            listOf(namedField)
+        }
+        val fieldCandidates = namedCandidates.flatMap { candidate ->
+            listOf(
+                candidate,
+                runCatching {
+                    resolver.mapFieldName("named", owner, candidate, descriptor)
+                }.getOrDefault(candidate),
+            )
+        }.toSet()
+        val phaseClass = RenderLayer::class.java.superclass
+        val field = phaseClass.declaredFields.firstOrNull {
+            Modifier.isStatic(it.modifiers) && it.name in fieldCandidates
+        } ?: error("Missing RenderPhase.$namedField")
+        field.isAccessible = true
+        return field.get(null)
     }
 
     private fun createXrayQuadsPipeline(): Any {
         val pipelineClass = Class.forName("com.mojang.blaze3d.pipeline.RenderPipeline")
         val snippetClass = Class.forName("com.mojang.blaze3d.pipeline.RenderPipeline\$Snippet")
-        val snippets = Array.newInstance(snippetClass, 0)
+        val inheritedSnippet = findXrayPipelineSnippet(snippetClass)
+        val snippets = Array.newInstance(snippetClass, if (inheritedSnippet == null) 0 else 1)
+        if (inheritedSnippet != null) {
+            Array.set(snippets, 0, inheritedSnippet)
+        }
         var builder = pipelineClass.getMethod("builder", snippets.javaClass).invoke(null, snippets)
         builder = invokeBuilder(builder, "withLocation", "pipeline/axion_xray_quads")
         builder = invokeBuilder(builder, "withVertexShader", "core/rendertype_lightning")
@@ -203,6 +319,52 @@ object RenderLayerCompat {
         builder = configureNoDepth(builder)
         builder = invokeBuilder(builder, "withVertexFormat", positionColorVertexFormat(), quadsDrawMode())
         return builder.javaClass.getMethod("build").invoke(builder).let(::registerPipelineIfPossible)
+    }
+
+    /**
+     * In pipeline-based renderers the lightning shader's transform, projection,
+     * and fog uniforms are declared by a version-specific vanilla snippet. A
+     * pipeline built without that snippet can rasterize but logs unsupported
+     * DynamicTransforms uniforms on 26.1 and has undefined positioning.
+     */
+    private fun findXrayPipelineSnippet(snippetClass: Class<*>): Any? {
+        val namedFieldNames = setOf(
+            // 1.21.7-1.21.11 Yarn
+            "TRANSFORMS_PROJECTION_FOG_SNIPPET",
+            // 26.1 official namespace
+            "MATRICES_FOG_SNIPPET",
+            // 1.21.5 Yarn
+            "MATRICES_COLOR_FOG_SNIPPET",
+        )
+        val namedOwners = listOf(
+            "net.minecraft.client.gl.RenderPipelines",
+            "net.minecraft.client.renderer.RenderPipelines",
+        )
+        val owners = candidateClasses(*namedOwners.toTypedArray())
+        val resolver = FabricLoader.getInstance().mappingResolver
+        val descriptor = "Lcom/mojang/blaze3d/pipeline/RenderPipeline\$Snippet;"
+        val fieldNames = buildSet {
+            addAll(namedFieldNames)
+            namedOwners.forEach { owner ->
+                namedFieldNames.forEach { field ->
+                    runCatching {
+                        resolver.mapFieldName("named", owner, field, descriptor)
+                    }.getOrNull()?.let(::add)
+                }
+            }
+        }
+        owners.forEach { owner ->
+            val field = owner.declaredFields.firstOrNull {
+                Modifier.isStatic(it.modifiers) &&
+                    it.type == snippetClass &&
+                    it.name in fieldNames
+            }
+            if (field != null) {
+                field.isAccessible = true
+                return field.get(null)
+            }
+        }
+        return null
     }
 
     private fun configureBlend(builder: Any): Any {
@@ -236,9 +398,20 @@ object RenderLayerCompat {
             "net.minecraft.client.renderer.rendertype.RenderSetup",
         ).firstOrNull() ?: return null
         val builder = renderSetupClass.getMethod("builder", pipeline.javaClass).invoke(null, pipeline)
-        invokeIfPresent(builder, "translucent")
-        invokeIfPresent(builder, "expectedBufferSize", 1536)
-        val renderSetup = builder.javaClass.getMethod("build").invoke(builder)
+        // RenderSetup's builder API changed again in 26.1: translucent uploads
+        // are marked with sortOnUpload(), the buffer setter is bufferSize(), and
+        // createRenderSetup() replaced build(). Keep the older names for every
+        // 1.21.x range while accepting the new factory without falling back to
+        // a depth-writing vanilla layer.
+        if (invokeIfPresent(builder, "translucent") == null) {
+            invokeIfPresent(builder, "sortOnUpload")
+        }
+        if (invokeIfPresent(builder, "expectedBufferSize", 1536) == null) {
+            invokeIfPresent(builder, "bufferSize", 1536)
+        }
+        val renderSetup = invokeIfPresent(builder, "build")
+            ?: invokeIfPresent(builder, "createRenderSetup")
+            ?: return null
         val factory = RenderLayer::class.java.declaredMethods.firstOrNull { method ->
             Modifier.isStatic(method.modifiers) &&
                 method.name in setOf("of", "create") &&
@@ -289,13 +462,35 @@ object RenderLayerCompat {
     }
 
     private fun positionColorVertexFormat(): Any {
-        return staticFieldOrNull("net.minecraft.client.render.VertexFormats", "POSITION_COLOR")
+        return mappedStaticFieldOrNull(
+            "net.minecraft.client.render.VertexFormats",
+            "POSITION_COLOR",
+            "Lnet/minecraft/client/render/VertexFormat;",
+        )
             ?: staticField("com.mojang.blaze3d.vertex.DefaultVertexFormat", "POSITION_COLOR")
     }
 
     private fun quadsDrawMode(): Any {
-        return staticFieldOrNull("com.mojang.blaze3d.vertex.VertexFormat\$DrawMode", "QUADS")
+        return mappedStaticFieldOrNull(
+            "net.minecraft.client.render.VertexFormat\$DrawMode",
+            "QUADS",
+            "Lnet/minecraft/client/render/VertexFormat\$DrawMode;",
+        )
+            ?: staticFieldOrNull("com.mojang.blaze3d.vertex.VertexFormat\$DrawMode", "QUADS")
             ?: staticField("com.mojang.blaze3d.vertex.VertexFormat\$Mode", "QUADS")
+    }
+
+    private fun mappedStaticFieldOrNull(owner: String, fieldName: String, descriptor: String): Any? {
+        staticFieldOrNull(owner, fieldName)?.let { return it }
+        val resolver = FabricLoader.getInstance().mappingResolver
+        val runtimeOwner = runCatching { resolver.mapClassName("named", owner) }.getOrNull() ?: return null
+        val runtimeField = runCatching {
+            resolver.mapFieldName("named", owner, fieldName, descriptor)
+        }.getOrNull() ?: return null
+        val ownerClass = runCatching { Class.forName(runtimeOwner) }.getOrNull() ?: return null
+        val field = runCatching { ownerClass.getDeclaredField(runtimeField) }.getOrNull() ?: return null
+        field.isAccessible = true
+        return runCatching { field.get(null) }.getOrNull()
     }
 
     private fun invokeBuilder(builder: Any, methodName: String, vararg args: Any): Any {

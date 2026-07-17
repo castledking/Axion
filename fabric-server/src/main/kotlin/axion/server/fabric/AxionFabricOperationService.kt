@@ -121,7 +121,12 @@ class AxionFabricOperationService(
         val min = minVector(operation.min, operation.max)
         val max = maxVector(operation.min, operation.max)
         forEachPos(min, max) { pos ->
-            world.setBlockState(pos, net.minecraft.block.Blocks.AIR.defaultState, 3)
+            AxionFabricBlockEntitySnapshotService.apply(
+                world = world,
+                pos = pos,
+                state = net.minecraft.block.Blocks.AIR.defaultState,
+                blockEntityData = null,
+            )
         }
     }
 

@@ -26,9 +26,20 @@ abstract class PlayerEntityPoseMixin {
     private fun self(): PlayerEntity = this as PlayerEntity
 
     @Inject(method = ["updatePose"], at = [At("HEAD")], cancellable = true, require = 0)
-    private fun axionForceStandingPoseInNoClip(ci: CallbackInfo) {
+    private fun axionForceStandingPoseInNoClipYarn(ci: CallbackInfo) {
+        forceStandingPose(ci)
+    }
+
+    // 26.1.x official name. Without this hook, terrain forces the player back
+    // into the low crawl pose even though no-clip movement itself is active.
+    @Inject(method = ["updatePlayerPose"], at = [At("HEAD")], cancellable = true, require = 0)
+    private fun axionForceStandingPoseInNoClipOfficial(ci: CallbackInfo) {
+        forceStandingPose(ci)
+    }
+
+    private fun forceStandingPose(ci: CallbackInfo) {
         val entity = self()
-        if (!ClientModeController.isNoClipActiveFor(entity)) {
+        if (!axion.client.mode.NoClipVisualPolicy.forceStandingPose(ClientModeController.isNoClipActiveFor(entity))) {
             return
         }
 

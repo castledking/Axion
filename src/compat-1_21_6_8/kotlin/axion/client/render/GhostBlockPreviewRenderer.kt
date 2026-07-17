@@ -35,7 +35,7 @@ object GhostBlockPreviewRenderer {
     // GPU path is still useful for truly huge structures, but it can currently
     // produce outline-only previews on some 1.21.x render callbacks.
     private const val CHUNKED_PATH_CELL_THRESHOLD: Int = MAX_TEXTURED_GHOST_BLOCKS
-    private const val FORCE_CHUNKED_PREVIEW: Boolean = false
+    private const val FORCE_CHUNKED_PREVIEW: Boolean = true
 
     fun maxOriginsFor(nonAirCellCount: Int): Int {
         if (nonAirCellCount <= 0) {

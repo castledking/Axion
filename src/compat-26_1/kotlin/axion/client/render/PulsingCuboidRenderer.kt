@@ -2,6 +2,7 @@ package axion.client.render
 import axion.client.compat.CameraAccess
 
 import axion.client.selection.SelectionBounds
+import axion.client.selection.expand
 import com.mojang.blaze3d.vertex.VertexFormat
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.render.RenderLayer
@@ -114,8 +115,12 @@ object PulsingCuboidRenderer {
         val consumers = context.consumers()
         val cameraPos = CameraAccess.getPos(camera)
         val matrixStack = context.matrices()
-        val outlinedBox = SelectionBounds.outlineBox(box)
-        val fillLayer = RenderLayerCompat.debugQuads()
+        val baseBox = SelectionBounds.outlineBox(box)
+        val pulseBox = baseBox.expand(0.0015, 0.0015, 0.0015)
+        // Persistent GPU previews draw after this cuboid is queued. Using the
+        // vanilla debug layer here would write the cuboid's near face into the
+        // depth buffer and mask every preview fragment behind it.
+        val fillLayer = RenderLayerCompat.xrayQuads()
         val filledConsumer = consumers.getBuffer(fillLayer)
 
         val offset = if (context.needsCameraOffset()) cameraPos else Vec3d(0.0, 0.0, 0.0)
@@ -125,7 +130,7 @@ object PulsingCuboidRenderer {
             consumer = filledConsumer,
             layer = fillLayer,
             cameraPos = offset,
-            box = outlinedBox,
+            box = baseBox,
             alpha = baseAlpha,
             color = baseFillColor,
         )
@@ -134,7 +139,7 @@ object PulsingCuboidRenderer {
             consumer = filledConsumer,
             layer = fillLayer,
             cameraPos = offset,
-            box = outlinedBox,
+            box = pulseBox,
             alpha = pulsingAlpha(
                 minAlpha = pulseMinAlpha,
                 maxAlpha = pulseMaxAlpha,
@@ -145,7 +150,7 @@ object PulsingCuboidRenderer {
         VertexRenderingCompat.drawOutline(
             matrixStack,
             consumers.getBuffer(RenderLayerCompat.lines()),
-            VoxelShapes.cuboid(outlinedBox),
+            VoxelShapes.cuboid(pulseBox),
             -offset.x,
             -offset.y,
             -offset.z,

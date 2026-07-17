@@ -17,8 +17,8 @@ object RepeatPreviewRenderer {
     private const val MAX_REGION_OUTLINES: Int = 96
     private const val MAX_COLLISION_PULSE_BLOCKS: Int = 2048
     private const val DESTINATION_GHOST_COLOR: Int = 0xFFFFFFFF.toInt()
-    private const val DEFAULT_GHOST_ALPHA: Int = 156
-    private const val SPARSE_GHOST_ALPHA: Int = 228
+    private const val DEFAULT_GHOST_ALPHA: Int = 86
+    private const val SPARSE_GHOST_ALPHA: Int = 112
     private const val GHOST_SCALE: Float = 0.985f
     private const val SOURCE_SELECTION_COLOR: Int = 0xFFFFFFFF.toInt()
     private val writePlanner = LocalWritePlanner()
@@ -131,35 +131,20 @@ object RepeatPreviewRenderer {
             step = preview.step,
             repeatCount = preview.repeatCount,
         ) ?: return
-        val aggregateBox = SelectionBounds.regionBox(layout.region)
-
-        PulsingCuboidRenderer.renderOutlineBox(
-            context = context,
-            box = aggregateBox,
-            outlineColor = destinationColor,
-            lineWidth = lineWidth,
-        )
-
         val selectionClipboard = ClipboardSelectionRenderer.sparseClipboard(layout.clipboardBuffer)
         val ghostClipboard = ClipboardSelectionRenderer.surfaceClipboard(selectionClipboard)
         val sparseDestination = ClipboardSelectionRenderer.isSparse(layout.region, selectionClipboard)
         val nonAirCells = ghostClipboard.nonAirCells()
 
-        BlockPreviewPipeline.renderDestination(
+        BlockPreviewPipeline.renderOverlay(
             context = context,
-            scene = BlockPreviewPipeline.Scene(
+            scene = BlockPreviewPipeline.OverlayScene(
                 origins = if (nonAirCells.isNotEmpty()) listOf(layout.region.minCorner()) else emptyList(),
-                selectionClipboard = selectionClipboard,
-                shellClipboard = layout.clipboardBuffer,
-                fallbackGhostClipboard = ghostClipboard,
-                sparse = sparseDestination,
-                outlineColor = destinationColor,
-                lineWidth = lineWidth,
-                ghostColor = DESTINATION_GHOST_COLOR,
-                ghostAlpha = if (sparseDestination) SPARSE_GHOST_ALPHA else DEFAULT_GHOST_ALPHA,
-                ghostScale = GHOST_SCALE,
-                aggregateBox = aggregateBox,
-                renderGhost = nonAirCells.isNotEmpty(),
+                clipboard = ghostClipboard,
+                color = DESTINATION_GHOST_COLOR,
+                alpha = if (sparseDestination) SPARSE_GHOST_ALPHA else DEFAULT_GHOST_ALPHA,
+                scale = GHOST_SCALE,
+                sessionTag = "smear-destination",
             ),
         )
     }
@@ -284,6 +269,7 @@ object RepeatPreviewRenderer {
                         ghostScale = GHOST_SCALE,
                         aggregateBox = aggregateBox,
                         renderGhost = true,
+                        pulseSelection = mode == RegionRepeatPlacementService.Mode.STACK,
                     ),
                 )
             } else if (!sparseDestination) {
@@ -302,6 +288,7 @@ object RepeatPreviewRenderer {
                         ghostScale = GHOST_SCALE,
                         aggregateBox = aggregateBox,
                         renderGhost = false,
+                        pulseSelection = mode == RegionRepeatPlacementService.Mode.STACK,
                     ),
                 )
             } else {
@@ -321,6 +308,7 @@ object RepeatPreviewRenderer {
                         ghostScale = GHOST_SCALE,
                         aggregateBox = aggregateBox,
                         renderGhost = false,
+                        pulseSelection = mode == RegionRepeatPlacementService.Mode.STACK,
                     ),
                 )
             }

@@ -83,20 +83,12 @@ object AxionTickHandler {
                 SymmetryController.toggleConstruct()
             }
 
-            while (AxionKeybindings.undoAction.wasPressed()) {
-                if (AxionModifierKeys.isControlDown(client)) {
-                    if (AxionModifierKeys.isShiftDown(client)) {
-                        UndoRedoController.redo(client)
-                    } else {
-                        UndoRedoController.undo(client)
-                    }
-                }
+            if (KeyBindingHandler.wasCtrlComboPressed(AxionKeybindings.undoAction)) {
+                UndoRedoController.undo(client)
             }
 
-            while (AxionKeybindings.redoAction.wasPressed()) {
-                if (AxionModifierKeys.isControlDown(client)) {
-                    UndoRedoController.redo(client)
-                }
+            if (KeyBindingHandler.wasCtrlComboPressed(AxionKeybindings.redoAction, allowShift = true)) {
+                UndoRedoController.redo(client)
             }
 
             while (AxionKeybindings.openConfigScreen.wasPressed()) {

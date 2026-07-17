@@ -891,11 +891,25 @@ object ClientModeController {
             val serverPlayer = client.server?.playerManager?.getPlayer(clientPlayer.uuid)
             if (serverPlayer != null) {
                 try {
-                    // Use reflection to call NoClipService.setArmed(uuid, armed)
+                    // Prefer the player overload so disarming clears server noPhysics
+                    // immediately. Older compat services can still use the UUID overload.
                     val noClipServiceClass = Class.forName("axion.client.compat.NoClipService")
-                    val setArmedMethod = noClipServiceClass.getMethod("setArmed", java.util.UUID::class.java, Boolean::class.javaPrimitiveType)
                     val serviceInstance = noClipServiceClass.getDeclaredField("INSTANCE").get(null)
-                    setArmedMethod.invoke(serviceInstance, clientPlayer.uuid, armed)
+                    val playerMethod = noClipServiceClass.methods.firstOrNull { method ->
+                        method.name == "setArmed" &&
+                            method.parameterCount == 2 &&
+                            method.parameterTypes[0].isInstance(serverPlayer)
+                    }
+                    if (playerMethod != null) {
+                        playerMethod.invoke(serviceInstance, serverPlayer, armed)
+                    } else {
+                        val uuidMethod = noClipServiceClass.getMethod(
+                            "setArmed",
+                            java.util.UUID::class.java,
+                            Boolean::class.javaPrimitiveType,
+                        )
+                        uuidMethod.invoke(serviceInstance, clientPlayer.uuid, armed)
+                    }
                 } catch (e: Exception) {
                     // NoClipService not available in this version (e.g., 1.21.5-1.21.8)
                     // Fall back to network message
@@ -994,7 +1008,7 @@ object ClientModeController {
         if (player.isInCreativeMode) {
             val hotbarSlot = findInventorySlot(inventory, pickedItem, 0 until HOTBAR_SIZE)
             if (hotbarSlot >= 0) {
-                inventory.setSelectedSlot(hotbarSlot)
+                inventory.selectedSlot = hotbarSlot
                 return true
             }
 
@@ -1007,7 +1021,7 @@ object ClientModeController {
                     SlotActionType.SWAP,
                     player,
                 ) ?: return false
-                inventory.setSelectedSlot(inventory.selectedSlot)
+                inventory.selectedSlot = inventory.selectedSlot
                 return true
             }
 
@@ -1016,7 +1030,7 @@ object ClientModeController {
 
         val hotbarSlot = findInventorySlot(inventory, pickedItem, 0 until HOTBAR_SIZE)
         if (hotbarSlot >= 0) {
-            inventory.setSelectedSlot(hotbarSlot)
+            inventory.selectedSlot = hotbarSlot
             return true
         }
 
@@ -1032,7 +1046,7 @@ object ClientModeController {
             SlotActionType.SWAP,
             player,
         ) ?: return false
-        inventory.setSelectedSlot(inventory.selectedSlot)
+        inventory.selectedSlot = inventory.selectedSlot
         return true
     }
 

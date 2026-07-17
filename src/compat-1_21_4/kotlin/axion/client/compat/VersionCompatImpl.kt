@@ -2,6 +2,7 @@ package axion.client.compat
 
 import axion.client.network.AxionPluginPayload
 import axion.client.network.BlockWrite
+import axion.client.network.BlockWriteUpdatePolicy
 import axion.client.render.AxionWorldRenderContext
 import axion.client.render.ShaderPackCompat
 import axion.client.render.gpu.ChunkedPreviewLifecycle
@@ -126,7 +127,8 @@ object VersionCompatImpl : VersionCompat {
     }
 
     fun applyBlockEntity(world: net.minecraft.world.World, write: BlockWrite) {
-        world.setBlockState(write.pos, write.state, 3)
+        world.setBlockState(write.pos, write.state, BlockWriteUpdatePolicy.LEGACY_NO_PHYSICS_FLAGS)
+        suppressLegacyScheduledUpdates(world, write.pos)
         val payload = write.blockEntityData
         if (payload == null) {
             world.removeBlockEntity(write.pos)
@@ -145,6 +147,13 @@ object VersionCompatImpl : VersionCompat {
         world.removeBlockEntity(write.pos)
         world.getChunk(write.pos.x shr 4, write.pos.z shr 4).setBlockEntity(blockEntity)
         blockEntity.markDirty()
+    }
+
+    private fun suppressLegacyScheduledUpdates(world: net.minecraft.world.World, pos: BlockPos) {
+        val serverWorld = world as? net.minecraft.server.world.ServerWorld ?: return
+        val editedBlock = net.minecraft.util.math.BlockBox(pos)
+        serverWorld.blockTickScheduler.clearNextTicks(editedBlock)
+        serverWorld.fluidTickScheduler.clearNextTicks(editedBlock)
     }
 
     fun registerAxionPayloadChannel(id: CustomPayload.Id<AxionPluginPayload>, codec: PacketCodec<RegistryByteBuf, AxionPluginPayload>) {

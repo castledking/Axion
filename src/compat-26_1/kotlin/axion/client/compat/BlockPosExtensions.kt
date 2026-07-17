@@ -4,7 +4,9 @@ import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
 import net.minecraft.world.phys.Vec3
 
-fun BlockPos.toImmutable(): BlockPos = this
+// BlockPos.betweenClosed reuses a MutableBlockPos while iterating. Always copy it
+// before a position escapes the loop (for example into a move operation's write plan).
+fun BlockPos.toImmutable(): BlockPos = BlockPos(x, y, z)
 
 fun BlockPos.add(x: Int, y: Int, z: Int): BlockPos = this.offset(x, y, z)
 fun BlockPos.add(vec: Vec3i): BlockPos = this.offset(vec)
