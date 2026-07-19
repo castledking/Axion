@@ -1,4 +1,4 @@
-[![Axion Paper Banner](https://castled.codes/assets/axion-plugin-banner.png)](https://castled.codes/axion/dl)
+[![Axion Paper Banner](https://castled.codes/assets/axion-plugin-banner.png)](https://castled.codes/axion/downloads)
 
 # Axion Paper Plugin
 
