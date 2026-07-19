@@ -274,13 +274,6 @@ tasks.named<ProcessResources>("processClientResources") {
             }
         }
     }
-    if (minecraftVersion != "1.21.11" && !rangeMc261x) {
-        filesMatching("axion.client.mixins.json") {
-            filter { line ->
-                if (line.contains("\"ServerEntityMixin\"")) null else line
-            }
-        }
-    }
     if (rangeMc261x) {
         filesMatching("axion.client.mixins.json") {
             filter { line ->
@@ -325,9 +318,8 @@ tasks.test {
 
 val verifyIntegratedNoClipWiring by tasks.registering {
     group = "verification"
-    description = "Verifies that integrated-server no-clip authority is packaged where supported."
+    description = "Verifies that integrated-server no-clip authority is packaged for every supported version."
     dependsOn("compileClientKotlin", "processClientResources")
-    onlyIf { minecraftVersion == "1.21.11" || rangeMc261x }
 
     doLast {
         val clientClasses = layout.buildDirectory.dir("classes/kotlin/client").get().asFile

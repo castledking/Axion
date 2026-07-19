@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
-SUPPORTED_VERSION_LIST=("1.21" "1.21.1" "1.21.2" "1.21.3" "1.21.5" "1.21.6" "1.21.7" "1.21.8" "1.21.9" "1.21.10" "1.21.11" "26.1")
+SUPPORTED_VERSION_LIST=("1.21" "1.21.1" "1.21.2" "1.21.3" "1.21.4" "1.21.5" "1.21.6" "1.21.7" "1.21.8" "1.21.9" "1.21.10" "1.21.11" "26.1")
 
 # Parse command line arguments
 VERSION_ARG=""
@@ -63,16 +63,17 @@ if [[ "$ARGS_PROVIDED" == "false" && $# -eq 0 ]]; then
     echo "  2) 1.21.1"
     echo "  3) 1.21.2"
     echo "  4) 1.21.3"
-    echo "  5) 1.21.5"
-    echo "  6) 1.21.6"
-    echo "  7) 1.21.7"
-    echo "  8) 1.21.8"
-    echo "  9) 1.21.9"
-    echo " 10) 1.21.10"
-    echo " 11) 1.21.11"
-    echo " 12) 26.1 (default)"
-    echo " 13) All versions"
-    read -p "Enter choice [1-13 or comma-separated]: " version_choice
+    echo "  5) 1.21.4"
+    echo "  6) 1.21.5"
+    echo "  7) 1.21.6"
+    echo "  8) 1.21.7"
+    echo "  9) 1.21.8"
+    echo " 10) 1.21.9"
+    echo " 11) 1.21.10"
+    echo " 12) 1.21.11"
+    echo " 13) 26.1 (default)"
+    echo " 14) All versions"
+    read -p "Enter choice [1-14 or comma-separated]: " version_choice
 
     # Convert comma-separated choices to version list
     if [[ "$version_choice" == *,* ]]; then
@@ -84,15 +85,16 @@ if [[ "$ARGS_PROVIDED" == "false" && $# -eq 0 ]]; then
                 2) selected_versions+=("1.21.1") ;;
                 3) selected_versions+=("1.21.2") ;;
                 4) selected_versions+=("1.21.3") ;;
-                5) selected_versions+=("1.21.5") ;;
-                6) selected_versions+=("1.21.6") ;;
-                7) selected_versions+=("1.21.7") ;;
-                8) selected_versions+=("1.21.8") ;;
-                9) selected_versions+=("1.21.9") ;;
-                10) selected_versions+=("1.21.10") ;;
-                11) selected_versions+=("1.21.11") ;;
-                12) selected_versions+=("26.1") ;;
-                13) selected_versions+=("all") ;;
+                5) selected_versions+=("1.21.4") ;;
+                6) selected_versions+=("1.21.5") ;;
+                7) selected_versions+=("1.21.6") ;;
+                8) selected_versions+=("1.21.7") ;;
+                9) selected_versions+=("1.21.8") ;;
+                10) selected_versions+=("1.21.9") ;;
+                11) selected_versions+=("1.21.10") ;;
+                12) selected_versions+=("1.21.11") ;;
+                13) selected_versions+=("26.1") ;;
+                14) selected_versions+=("all") ;;
                 *) ;;
             esac
         done
@@ -104,15 +106,16 @@ if [[ "$ARGS_PROVIDED" == "false" && $# -eq 0 ]]; then
             2) VERSION_ARG="1.21.1" ;;
             3) VERSION_ARG="1.21.2" ;;
             4) VERSION_ARG="1.21.3" ;;
-            5) VERSION_ARG="1.21.5" ;;
-            6) VERSION_ARG="1.21.6" ;;
-            7) VERSION_ARG="1.21.7" ;;
-            8) VERSION_ARG="1.21.8" ;;
-            9) VERSION_ARG="1.21.9" ;;
-            10) VERSION_ARG="1.21.10" ;;
-            11) VERSION_ARG="1.21.11" ;;
-            12) VERSION_ARG="26.1" ;;
-            13) VERSION_ARG="all" ;;
+            5) VERSION_ARG="1.21.4" ;;
+            6) VERSION_ARG="1.21.5" ;;
+            7) VERSION_ARG="1.21.6" ;;
+            8) VERSION_ARG="1.21.7" ;;
+            9) VERSION_ARG="1.21.8" ;;
+            10) VERSION_ARG="1.21.9" ;;
+            11) VERSION_ARG="1.21.10" ;;
+            12) VERSION_ARG="1.21.11" ;;
+            13) VERSION_ARG="26.1" ;;
+            14) VERSION_ARG="all" ;;
             *) VERSION_ARG="26.1" ;;
         esac
     fi
@@ -165,7 +168,7 @@ if [[ "$VERSION_ARG" == "-h" || "$VERSION_ARG" == "--help" ]]; then
     echo "Usage: ./run-axion.sh [VERSIONS] [OPTIONS]"
     echo ""
     echo "VERSIONS: Minecraft version, comma-separated versions, or all"
-    echo "  Supported: 1.21, 1.21.1, 1.21.2, 1.21.3, 1.21.5, 1.21.6, 1.21.7, 1.21.8, 1.21.9, 1.21.10, 1.21.11, 26.1"
+    echo "  Supported: 1.21, 1.21.1, 1.21.2, 1.21.3, 1.21.4, 1.21.5, 1.21.6, 1.21.7, 1.21.8, 1.21.9, 1.21.10, 1.21.11, 26.1"
     echo "  Default: 26.1"
     echo ""
     echo "OPTIONS:"
@@ -230,6 +233,9 @@ build_version() {
         1.21.2|1.21.3)
             ./build-axion.sh mc1_21_2_3
             ;;
+        1.21.4)
+            ./build-axion.sh mc1_21_4
+            ;;
         1.21.5)
             ./build-axion.sh mc1_21_5
             ;;
@@ -256,7 +262,7 @@ build_version() {
             ;;
         *)
             echo "Unknown version for build: $1" >&2
-            echo "Supported versions: 1.21, 1.21.1, 1.21.2, 1.21.3, 1.21.5, 1.21.6, 1.21.7, 1.21.8, 1.21.9, 1.21.10, 1.21.11, 26.1" >&2
+            echo "Supported versions: 1.21, 1.21.1, 1.21.2, 1.21.3, 1.21.4, 1.21.5, 1.21.6, 1.21.7, 1.21.8, 1.21.9, 1.21.10, 1.21.11, 26.1" >&2
             exit 1
             ;;
     esac
@@ -269,6 +275,7 @@ resolve_mc_version() {
         1.21.1) echo "1.21.1" ;;
         1.21.2) echo "1.21.2" ;;
         1.21.3) echo "1.21.3" ;;
+        1.21.4) echo "1.21.4" ;;
         1.21.5) echo "1.21.5" ;;
         1.21.6) echo "1.21.6" ;;
         1.21.7) echo "1.21.7" ;;
@@ -287,6 +294,7 @@ resolve_yarn_mappings() {
         "1.21.1") echo "1.21.1+build.3" ;;
         "1.21.2") echo "1.21.2+build.1" ;;
         "1.21.3") echo "1.21.3+build.2" ;;
+        "1.21.4") echo "1.21.4+build.8" ;;
         "1.21.5") echo "1.21.5+build.1" ;;
         "1.21.6") echo "1.21.6+build.1" ;;
         "1.21.7") echo "1.21.7+build.1" ;;
@@ -305,6 +313,7 @@ resolve_loader_version() {
         "1.21.1") echo "0.16.5" ;;
         "1.21.2") echo "0.16.10" ;;
         "1.21.3") echo "0.16.10" ;;
+        "1.21.4") echo "0.16.10" ;;
         "1.21.5") echo "0.16.12" ;;
         "1.21.6") echo "0.16.13" ;;
         "1.21.7") echo "0.16.13" ;;
@@ -323,6 +332,7 @@ resolve_fabric_version() {
         "1.21.1") echo "0.102.0+1.21.1" ;;
         "1.21.2") echo "0.106.1+1.21.2" ;;
         "1.21.3") echo "0.106.1+1.21.3" ;;
+        "1.21.4") echo "0.119.4+1.21.4" ;;
         "1.21.5") echo "0.119.5+1.21.5" ;;
         "1.21.6") echo "0.128.2+1.21.6" ;;
         "1.21.7") echo "0.129.0+1.21.7" ;;
@@ -341,6 +351,7 @@ resolve_fabric_kotlin_version() {
         "1.21.1") echo "1.12.3+kotlin.2.0.21" ;;
         "1.21.2") echo "1.13.0+kotlin.2.1.0" ;;
         "1.21.3") echo "1.13.0+kotlin.2.1.0" ;;
+        "1.21.4") echo "1.13.0+kotlin.2.1.0" ;;
         "1.21.5") echo "1.13.0+kotlin.2.1.0" ;;
         "1.21.6") echo "1.13.0+kotlin.2.1.0" ;;
         "1.21.7") echo "1.13.0+kotlin.2.1.0" ;;
@@ -359,6 +370,7 @@ resolve_modmenu_version() {
         "1.21.1") echo "11.0.3" ;;
         "1.21.2") echo "12.0.1" ;;
         "1.21.3") echo "12.0.1" ;;
+        "1.21.4") echo "13.0.4" ;;
         "1.21.5") echo "14.0.0" ;;
         "1.21.6") echo "15.0.2" ;;
         "1.21.7") echo "15.0.2" ;;
@@ -384,6 +396,7 @@ resolve_paper_version() {
         1.21) echo "1.21-R0.1-SNAPSHOT" ;;
         1.21.1) echo "1.21.1-R0.1-SNAPSHOT" ;;
         1.21.3) echo "1.21.3-R0.1-SNAPSHOT" ;;
+        1.21.4) echo "1.21.4-R0.1-SNAPSHOT" ;;
         1.21.5) echo "1.21.5-R0.1-SNAPSHOT" ;;
         1.21.6) echo "1.21.6-R0.1-SNAPSHOT" ;;
         1.21.7) echo "1.21.7-R0.1-SNAPSHOT" ;;
@@ -401,6 +414,7 @@ resolve_range_tag() {
     case "$1" in
         1.21|1.21.1) echo "mc1.21-1.21.1" ;;
         1.21.2|1.21.3) echo "mc1.21.2-1.21.3" ;;
+        1.21.4) echo "mc1.21.4" ;;
         1.21.5) echo "mc1.21.5" ;;
         1.21.6) echo "mc1.21.6" ;;
         1.21.7) echo "mc1.21.6-1.21.8" ;;
@@ -481,6 +495,7 @@ start_paper_server() {
         1.21) port=25563 ;;
         1.21.1) port=25564 ;;
         1.21.3) port=25566 ;;
+        1.21.4) port=25576 ;;
         1.21.5) port=25567 ;;
         1.21.6) port=25568 ;;
         1.21.7) port=25569 ;;
@@ -508,6 +523,7 @@ start_paper_server() {
             1.21) paper_url="https://fill-data.papermc.io/v1/objects/ab9bb1afc3cea6978a0c03ce8448aa654fe8a9c4dddf341e7cbda1b0edaa73f5/paper-1.21-130.jar" ;;
             1.21.1) paper_url="https://fill-data.papermc.io/v1/objects/39bd8c00b9e18de91dcabd3cc3dcfa5328685a53b7187a2f63280c22e2d287b9/paper-1.21.1-133.jar" ;;
             1.21.3) paper_url="https://fill-data.papermc.io/v1/objects/87e973e1d338e869e7fdbc4b8fadc1579d7bb0246a0e0cf6e5700ace6c8bc17e/paper-1.21.3-83.jar" ;;
+            1.21.4) paper_url="https://fill-data.papermc.io/v1/objects/5ee4f542f628a14c644410b08c94ea42e772ef4d29fe92973636b6813d4eaffc/paper-1.21.4-232.jar" ;;
             1.21.5) paper_url="https://fill-data.papermc.io/v1/objects/2ae6ae22adf417699746e0f89fc2ef6cb6ee050a5f6608cee58f0535d60b509e/paper-1.21.5-114.jar" ;;
             1.21.6) paper_url="https://fill-data.papermc.io/v1/objects/35e2dfa66b3491b9d2f0bb033679fa5aca1e1fdf097e7a06a80ce8afeda5c214/paper-1.21.6-48.jar" ;;
             1.21.7) paper_url="https://fill-data.papermc.io/v1/objects/83838188699cb2837e55b890fb1a1d39ad0710285ed633fbf9fc14e9f47ce078/paper-1.21.7-32.jar" ;;
@@ -830,6 +846,7 @@ declare -A IAS_VERSION
 IAS_VERSION["1.21"]="RQG6VufY"
 IAS_VERSION["1.21.1"]="UvDJxEv7"
 IAS_VERSION["1.21.3"]="SBaEsGhZ"
+IAS_VERSION["1.21.4"]="Ks4d60aS"
 IAS_VERSION["1.21.5"]="Rqmwlwr6"
 IAS_VERSION["1.21.7"]="Fs2YTzMh"
 IAS_VERSION["1.21.8"]="OqjOUdNs"
@@ -847,6 +864,7 @@ SODIUM_VERSION["1.21"]="RncWhTxD"
 SODIUM_VERSION["1.21.1"]="u1OEbNKx"
 SODIUM_VERSION["1.21.2"]="rLBgU2jc"
 SODIUM_VERSION["1.21.3"]="rLBgU2jc"
+SODIUM_VERSION["1.21.4"]="c3YkZvne"
 SODIUM_VERSION["1.21.5"]="DA250htH"
 SODIUM_VERSION["1.21.6"]="7pwil2dy"
 SODIUM_VERSION["1.21.7"]="7pwil2dy"
@@ -860,6 +878,7 @@ declare -A FERRITECORE_VERSION
 FERRITECORE_VERSION["1.21"]="wmIZ4wP4"
 FERRITECORE_VERSION["1.21.1"]="wmIZ4wP4"
 FERRITECORE_VERSION["1.21.3"]="a3QXXGz2"
+FERRITECORE_VERSION["1.21.4"]="7KqeXPRS"
 FERRITECORE_VERSION["1.21.5"]="LdlksamY"
 FERRITECORE_VERSION["1.21.6"]="LdlksamY"
 FERRITECORE_VERSION["1.21.7"]="LdlksamY"
@@ -874,6 +893,7 @@ LITHIUM_VERSION["1.21"]="Yu6L8EnD"
 LITHIUM_VERSION["1.21.1"]="Yu6L8EnD"
 LITHIUM_VERSION["1.21.2"]="W0Cc7ZVd"
 LITHIUM_VERSION["1.21.3"]="W0Cc7ZVd"
+LITHIUM_VERSION["1.21.4"]="u8pHPXJl"
 # No compatible Lithium release for 1.21.5-1.21.7
 LITHIUM_VERSION["1.21.8"]="qxIL7Kb8"
 LITHIUM_VERSION["1.21.9"]="L1sSIxFm"
@@ -882,11 +902,14 @@ LITHIUM_VERSION["1.21.11"]="Ow7wA0kG"
 LITHIUM_VERSION["26.1.2"]="R7MxYvuW"
 
 declare -A IMMEDIATELYFAST_VERSION
-# ImmediatelyFast 1.6.11 embeds Java 24 Reflect classes, which Fabric Loader
-# 0.16.5's development remapper cannot analyze on Minecraft 1.21-1.21.1.
-# Keep the optional optimization out of these development launch profiles.
+# The newest 1.21.1 and 1.21.4 releases embed Java 24 Reflect classes, which
+# their Fabric development remappers cannot analyze. Pin the immediately
+# preceding Java-21-safe releases for those profiles.
+IMMEDIATELYFAST_VERSION["1.21"]="yHztKxR5"
+IMMEDIATELYFAST_VERSION["1.21.1"]="yHztKxR5"
 IMMEDIATELYFAST_VERSION["1.21.2"]="2zcdbf00"
 IMMEDIATELYFAST_VERSION["1.21.3"]="2zcdbf00"
+IMMEDIATELYFAST_VERSION["1.21.4"]="CFJfGS8F"
 # No compatible ImmediatelyFast release for 1.21.5-1.21.7
 IMMEDIATELYFAST_VERSION["1.21.8"]="iNldtLH8"
 IMMEDIATELYFAST_VERSION["1.21.9"]="ntac1Na0"
@@ -925,7 +948,9 @@ install_cached_client_mod() {
     local version_id="$3"
     local mods_dir="$4"
     local cache_dir=".cache/client-mods"
-    local cached_file="$cache_dir/${mod_name}-${mc_version}.jar"
+    # Include the immutable Modrinth version id in the cache key. Otherwise a
+    # changed compatibility pin keeps reusing the previous jar for seven days.
+    local cached_file="$cache_dir/${mod_name}-${mc_version}-${version_id}.jar"
     local target_file="$mods_dir/${mod_name}-${mc_version}.jar"
 
     mkdir -p "$cache_dir"
@@ -1142,6 +1167,7 @@ servers = [
     ("1.21", "127.0.0.1:25563"),
     ("1.21.1", "127.0.0.1:25564"),
     ("1.21.3", "127.0.0.1:25566"),
+    ("1.21.4", "127.0.0.1:25576"),
     ("1.21.5", "127.0.0.1:25567"),
     ("1.21.6", "127.0.0.1:25568"),
     ("1.21.7", "127.0.0.1:25569"),
@@ -1234,6 +1260,7 @@ get_port() {
         1.21.1) echo "25564" ;;
         1.21.2) echo "25565" ;;
         1.21.3) echo "25566" ;;
+        1.21.4) echo "25576" ;;
         1.21.5) echo "25567" ;;
         1.21.6) echo "25568" ;;
         1.21.7) echo "25569" ;;
@@ -1292,7 +1319,7 @@ start_client() {
     mc_version="$(resolve_mc_version "$version")"
     if [[ -z "$mc_version" ]]; then
         echo "  ERROR: Unknown version: $version" >&2
-        echo "  Supported versions: 1.21, 1.21.1, 1.21.2, 1.21.3, 1.21.5, 1.21.6, 1.21.7, 1.21.8, 1.21.9, 1.21.10, 1.21.11, 26.1" >&2
+        echo "  Supported versions: 1.21, 1.21.1, 1.21.2, 1.21.3, 1.21.4, 1.21.5, 1.21.6, 1.21.7, 1.21.8, 1.21.9, 1.21.10, 1.21.11, 26.1" >&2
         exit 1
     fi
 

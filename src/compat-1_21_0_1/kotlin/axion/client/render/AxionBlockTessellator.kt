@@ -1,5 +1,7 @@
 package axion.client.render
 
+import axion.client.render.gpu.PreviewOcclusionCompat
+import axion.client.render.gpu.PreviewOcclusionPolicy
 import net.minecraft.block.BlockRenderType
 import net.minecraft.block.BlockState
 import net.minecraft.block.Blocks
@@ -154,9 +156,13 @@ object AxionBlockTessellator {
             // (short grass, crops, flowers, glass, etc.), return AIR for that position so
             // the block renderer doesn't cull the face. This ensures all outer faces are
             // visible regardless of transparent preview neighbors.
-            if (renderingPos != null && isDirectNeighbor(pos, renderingPos)) {
+            if (renderingPos != null && PreviewOcclusionPolicy.isDirectNeighbor(
+                    pos.x, pos.y, pos.z,
+                    renderingPos.x, renderingPos.y, renderingPos.z,
+                )
+            ) {
                 val neighborState = statesByPosition[pos.asLong()]
-                if (neighborState != null && !isOpaqueFullCubeCompat(neighborState)) {
+                if (PreviewOcclusionPolicy.isFaceExposed(neighborState, PreviewOcclusionCompat::isOpaqueFullCube)) {
                     return airState
                 }
             }
@@ -199,9 +205,13 @@ object AxionBlockTessellator {
         override fun getBlockEntity(pos: BlockPos): BlockEntity? = null
 
         override fun getBlockState(pos: BlockPos): BlockState {
-            if (renderingPos != null && isDirectNeighbor(pos, renderingPos)) {
+            if (renderingPos != null && PreviewOcclusionPolicy.isDirectNeighbor(
+                    pos.x, pos.y, pos.z,
+                    renderingPos.x, renderingPos.y, renderingPos.z,
+                )
+            ) {
                 val neighborState = statesByPosition[pos.asLong()]
-                if (neighborState != null && !isOpaqueFullCubeCompat(neighborState)) {
+                if (PreviewOcclusionPolicy.isFaceExposed(neighborState, PreviewOcclusionCompat::isOpaqueFullCube)) {
                     return airState
                 }
             }
@@ -325,28 +335,6 @@ object AxionBlockTessellator {
         }
     }
 
-    /**
-     * Compatibility for isOpaqueFullCube which is a property in 1.21.2+ but
-     * a method in 1.21.1. Uses reflection to handle both.
-     */
-    private fun isDirectNeighbor(pos: BlockPos, origin: BlockPos): Boolean {
-        val dx = pos.x - origin.x
-        val dy = pos.y - origin.y
-        val dz = pos.z - origin.z
-        return (if (dx < 0) -dx else dx) +
-            (if (dy < 0) -dy else dy) +
-            (if (dz < 0) -dz else dz) == 1
-    }
-
-    private fun isOpaqueFullCubeCompat(state: BlockState): Boolean {
-        // In 1.21.1, isOpaqueFullCube() is a method that takes no args
-        return runCatching {
-            state.javaClass.getMethod("isOpaqueFullCube").invoke(state) as Boolean
-        }.getOrElse {
-            // Fallback: check isOpaque as a rough approximation
-            state.isOpaque
-        }
-    }
 }
 
 data class PreviewBlockInfo(

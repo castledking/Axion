@@ -884,8 +884,8 @@ object ClientModeController {
     private fun syncRemoteNoClip(client: MinecraftClient) {
         val armed = canUseModes(client) && AxionClientState.globalModeState.noClipEnabled
 
-        // In singleplayer (integrated server), call the service directly via UUID
-        // This is only available in 1.21.9+ where the compat module includes server-side classes
+        // In singleplayer, arm the matching integrated-server player directly
+        // so server collision handling cannot rubber-band the local player.
         if (client.server != null) {
             val clientPlayer = client.player ?: return
             val serverPlayer = client.server?.playerManager?.getPlayer(clientPlayer.uuid)
@@ -911,8 +911,8 @@ object ClientModeController {
                         uuidMethod.invoke(serviceInstance, clientPlayer.uuid, armed)
                     }
                 } catch (e: Exception) {
-                    // NoClipService not available in this version (e.g., 1.21.5-1.21.8)
-                    // Fall back to network message
+                    // Preserve the Paper/Fabric-server path if integrated-server
+                    // compatibility initialization fails unexpectedly.
                     AxionServerConnection.syncNoClipState(armed)
                 }
             }

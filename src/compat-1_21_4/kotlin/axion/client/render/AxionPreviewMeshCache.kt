@@ -1,5 +1,7 @@
 package axion.client.render
 
+import axion.client.render.gpu.PreviewOcclusionCompat
+import axion.client.render.gpu.PreviewOcclusionPolicy
 import axion.common.model.ClipboardBuffer
 import axion.common.model.ClipboardCell
 import net.minecraft.block.BlockRenderType
@@ -130,9 +132,9 @@ object AxionPreviewMeshCache {
     }
 
     private fun filterSurfaceCells(cells: List<ClipboardCell>): List<ClipboardCell> {
-        val positionSet = HashSet<Long>(cells.size)
+        val statesByOffset = HashMap<Long, BlockState>(cells.size)
         cells.forEach { cell ->
-            positionSet.add(BlockPos.asLong(cell.offset.x, cell.offset.y, cell.offset.z))
+            statesByOffset[BlockPos.asLong(cell.offset.x, cell.offset.y, cell.offset.z)] = cell.state
         }
 
         return cells.filter { cell ->
@@ -143,7 +145,10 @@ object AxionPreviewMeshCache {
                     cell.offset.y + face.offsetY,
                     cell.offset.z + face.offsetZ,
                 )
-                !positionSet.contains(neighborKey)
+                PreviewOcclusionPolicy.isFaceExposed(
+                    statesByOffset[neighborKey],
+                    PreviewOcclusionCompat::isOpaqueFullCube,
+                )
             }
         }
     }

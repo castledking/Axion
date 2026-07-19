@@ -130,58 +130,62 @@ resolve_modmenu_version() {
     esac
 }
 
-# Pre-fetch dependencies from flaky Maven repositories into the local Maven
-# cache (~/.m2/repository).  Gradle checks mavenLocal() before remote repos,
-# so this avoids the "Premature end of chunk coded message body" errors that
-# maven.terraformersmc.com repeatedly triggers on GitHub Actions runners.
-prefetch_flaky_deps() {
+# Pre-fetch the one Mod Menu artifact needed by the selected build range.
+# Gradle checks mavenLocal() before remote repositories, which avoids the
+# truncated HTTP responses occasionally returned by TerraformersMC Maven.
+prefetch_modmenu_dependency() {
+    local ver="$1"
     local group_path="com/terraformersmc"
     local artifact="modmenu"
-    local versions=(
-        "11.0.3"
-        "12.0.1"
-        "13.0.4"
-        "14.0.0"
-        "15.0.2"
-        "16.0.0"
-        "17.0.0-alpha.1"
-        "17.0.0-beta.2"
-        "18.0.0-beta.1"
-    )
     local repo="https://maven.terraformersmc.com/releases"
-    local max_attempts=4
+    local dir="$HOME/.m2/repository/${group_path}/${artifact}/${ver}"
+    local jar="${dir}/${artifact}-${ver}.jar"
+    local pom="${dir}/${artifact}-${ver}.pom"
+    local jar_tmp="${jar}.part.$$"
+    local pom_tmp="${pom}.part.$$"
+    local curl_error="${jar}.curl-error.$$"
+    local jar_url="${repo}/${group_path}/${artifact}/${ver}/${artifact}-${ver}.jar"
+    local pom_url="${repo}/${group_path}/${artifact}/${ver}/${artifact}-${ver}.pom"
+    local curl_args=(
+        --http1.1
+        --fail
+        --location
+        --silent
+        --show-error
+        --connect-timeout 15
+        --retry 3
+        --retry-delay 2
+        --retry-all-errors
+    )
 
-    for ver in "${versions[@]}"; do
-        local dir="$HOME/.m2/repository/${group_path}/${artifact}/${ver}"
-        local jar="${dir}/${artifact}-${ver}.jar"
-        local pom="${dir}/${artifact}-${ver}.pom"
+    if [[ -s "$jar" ]] && jar tf "$jar" >/dev/null 2>&1; then
+        return
+    fi
 
-        if [[ -f "$jar" && -s "$jar" ]]; then
-            continue
+    mkdir -p "$dir"
+    rm -f "$jar" "$jar_tmp" "$pom_tmp" "$curl_error"
+    echo "Prefetching ${artifact}:${ver} over HTTP/1.1..."
+
+    if ! curl "${curl_args[@]}" --output "$jar_tmp" "$jar_url" 2>"$curl_error" ||
+       [[ ! -s "$jar_tmp" ]] ||
+       ! jar tf "$jar_tmp" >/dev/null 2>&1; then
+        rm -f "$jar_tmp"
+        if [[ -s "$curl_error" ]]; then
+            sed -n '1,5p' "$curl_error" >&2
         fi
+        rm -f "$curl_error"
+        echo "  WARNING: Could not prefetch a valid ${artifact}:${ver} jar; Gradle will retry the repository." >&2
+        return
+    fi
+    rm -f "$curl_error"
+    mv -f "$jar_tmp" "$jar"
 
-        echo "Prefetching ${artifact}:${ver}..."
-        mkdir -p "$dir"
-
-        local attempt=1
-        while ((attempt <= max_attempts)); do
-            if curl -fsSL --retry 3 --retry-delay 2 \
-                     -o "$jar" "${repo}/${group_path}/${artifact}/${ver}/${artifact}-${ver}.jar" && \
-               [[ -s "$jar" ]]; then
-                curl -fsSL --retry 3 --retry-delay 2 \
-                     -o "$pom" "${repo}/${group_path}/${artifact}/${ver}/${artifact}-${ver}.pom" 2>/dev/null || true
-                break
-            fi
-            rm -f "$jar"
-            echo "  Attempt ${attempt}/${max_attempts} failed for ${artifact}:${ver}" >&2
-            if ((attempt >= max_attempts)); then
-                echo "  WARNING: Could not prefetch ${artifact}:${ver}" >&2
-                break
-            fi
-            sleep $((attempt * 3))
-            ((attempt += 1))
-        done
-    done
+    if curl "${curl_args[@]}" --output "$pom_tmp" "$pom_url" 2>"$curl_error"; then
+        mv -f "$pom_tmp" "$pom"
+    else
+        rm -f "$pom_tmp"
+    fi
+    rm -f "$curl_error"
 }
 
 run_gradle_with_retry() {
@@ -317,6 +321,7 @@ build_range() {
     fabric_version="$(resolve_fabric_version "$compile_version")"
     fabric_kotlin_version="$(resolve_fabric_kotlin_version "$compile_version")"
     modmenu_version="$(resolve_modmenu_version "$compile_version")"
+    prefetch_modmenu_dependency "$modmenu_version"
     paper_version="$(resolve_paper_version "$compile_version")"
     loom_version="$(resolve_loom_version "$compile_version")"
     paperweight_version="$(resolve_paperweight_version "$compile_version")"
@@ -333,10 +338,20 @@ build_range() {
     cleanup_range_jars "${range_tag}"
     wipe_kotlin_caches
 
-    local gradle_tasks=(remapJar :paper-plugin:jar verifyGpuPreviewCoverage)
+    local gradle_tasks=(
+        remapJar
+        :paper-plugin:jar
+        verifyGpuPreviewCoverage
+        verifyIntegratedNoClipWiring
+    )
     if [[ "$range" == "mc26_1_x" ]]; then
         echo "    Fabric client/mod 26.1.x builds in the official namespace; using jar instead of remapJar."
-        gradle_tasks=(jar :paper-plugin:jar verifyGpuPreviewCoverage)
+        gradle_tasks=(
+            jar
+            :paper-plugin:jar
+            verifyGpuPreviewCoverage
+            verifyIntegratedNoClipWiring
+        )
     fi
 
     run_gradle_with_retry "${gradle_tasks[@]}" \
@@ -401,9 +416,6 @@ print_menu() {
     echo "  12) All ranges"
     echo "  q) Cancel"
 }
-
-prefetch_flaky_deps
-wipe_kotlin_caches
 
 if [[ $# -gt 0 ]]; then
     choice="$1"

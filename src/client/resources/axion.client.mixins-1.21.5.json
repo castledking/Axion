@@ -12,6 +12,7 @@
     "MinecraftClientMixin",
     "MouseMixin",
     "PlayerEntityPoseMixin",
+    "ServerEntityMixin",
     "WorldRendererFallbackMixin"
   ],
   "injectors": {

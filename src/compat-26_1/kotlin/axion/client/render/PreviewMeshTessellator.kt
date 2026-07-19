@@ -1,5 +1,7 @@
 package axion.client.render
 
+import axion.client.render.gpu.PreviewOcclusionCompat
+import axion.client.render.gpu.PreviewOcclusionPolicy
 import axion.common.model.ClipboardBuffer
 import axion.common.model.ClipboardCell
 import net.minecraft.block.BlockRenderType
@@ -131,7 +133,7 @@ object PreviewMeshTessellator {
                         cell.offset.z + face.offsetZ,
                     )
                     val neighbor = statesByOffset[neighborKey]
-                    if (neighbor == null || neighbor.isAir) {
+                    if (PreviewOcclusionPolicy.isFaceExposed(neighbor, PreviewOcclusionCompat::isOpaqueFullCube)) {
                         exposedFaces += ExposedFace(
                             offset = cell.offset,
                             state = state,

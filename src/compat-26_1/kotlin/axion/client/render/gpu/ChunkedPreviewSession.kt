@@ -9,7 +9,6 @@ import axion.client.render.TintedAlphaVertexConsumer
 import axion.client.render.getBuffer
 import axion.client.render.defaultState
 import axion.client.render.getRenderingSeedCompat
-import axion.client.render.isOpaqueFullCube
 import axion.common.model.ClipboardBuffer
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap
 import net.minecraft.block.BlockRenderType
@@ -321,9 +320,13 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
             null
 
         override fun getBlockState(pos: net.minecraft.core.BlockPos): BlockState {
-            if (renderingPos != null && pos == renderingPos.above()) {
-                val aboveState = statesByPosition[pos.asLong()]
-                if (aboveState != null && !aboveState.isOpaqueFullCube) {
+            if (renderingPos != null && PreviewOcclusionPolicy.isDirectNeighbor(
+                    pos.x, pos.y, pos.z,
+                    renderingPos.x, renderingPos.y, renderingPos.z,
+                )
+            ) {
+                val neighborState = statesByPosition[pos.asLong()]
+                if (PreviewOcclusionPolicy.isFaceExposed(neighborState, PreviewOcclusionCompat::isOpaqueFullCube)) {
                     return airState
                 }
             }

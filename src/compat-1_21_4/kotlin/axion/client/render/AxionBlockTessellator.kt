@@ -1,5 +1,7 @@
 package axion.client.render
 
+import axion.client.render.gpu.PreviewOcclusionCompat
+import axion.client.render.gpu.PreviewOcclusionPolicy
 import net.minecraft.block.BlockRenderType
 import net.minecraft.block.BlockState
 import net.minecraft.block.Blocks
@@ -138,12 +140,13 @@ object AxionBlockTessellator {
         override fun getBlockEntity(pos: BlockPos): BlockEntity? = null
 
         override fun getBlockState(pos: BlockPos): BlockState {
-            // When rendering a block, if the position directly above it is a non-opaque block
-            // (short grass, crops, flowers, etc.), return AIR for that position so the
-            // block renderer doesn't cull its top face.
-            if (renderingPos != null && pos == renderingPos.up()) {
-                val aboveState = statesByPosition[pos.asLong()]
-                if (aboveState != null && !aboveState.isOpaqueFullCube) {
+            if (renderingPos != null && PreviewOcclusionPolicy.isDirectNeighbor(
+                    pos.x, pos.y, pos.z,
+                    renderingPos.x, renderingPos.y, renderingPos.z,
+                )
+            ) {
+                val neighborState = statesByPosition[pos.asLong()]
+                if (PreviewOcclusionPolicy.isFaceExposed(neighborState, PreviewOcclusionCompat::isOpaqueFullCube)) {
                     return airState
                 }
             }
@@ -186,12 +189,13 @@ object AxionBlockTessellator {
         override fun getBlockEntity(pos: BlockPos): BlockEntity? = null
 
         override fun getBlockState(pos: BlockPos): BlockState {
-            // When rendering a block, if the position directly above it is a non-opaque block
-            // (short grass, crops, flowers, etc.), return AIR for that position so the
-            // block renderer doesn't cull its top face.
-            if (renderingPos != null && pos == renderingPos.up()) {
-                val aboveState = statesByPosition[pos.asLong()]
-                if (aboveState != null && !aboveState.isOpaqueFullCube) {
+            if (renderingPos != null && PreviewOcclusionPolicy.isDirectNeighbor(
+                    pos.x, pos.y, pos.z,
+                    renderingPos.x, renderingPos.y, renderingPos.z,
+                )
+            ) {
+                val neighborState = statesByPosition[pos.asLong()]
+                if (PreviewOcclusionPolicy.isFaceExposed(neighborState, PreviewOcclusionCompat::isOpaqueFullCube)) {
                     return airState
                 }
             }

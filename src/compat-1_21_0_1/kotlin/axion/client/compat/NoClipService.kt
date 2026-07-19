@@ -5,18 +5,20 @@ import net.minecraft.server.MinecraftServer
 import net.minecraft.server.network.ServerPlayerEntity
 import java.util.UUID
 
-/**
- * Service to track no-clip state for players.
- * Used by the server-side mixin to cancel movement when no-clip is active.
- * In singleplayer, this runs in the client JVM as part of the integrated server.
- */
+/** Integrated-server collision authority for the 1.21-1.21.1 client range. */
 object NoClipService {
     private val armedPlayers: MutableSet<UUID> = linkedSetOf()
     private var initialized = false
 
-    fun isEnabled(uuid: UUID): Boolean {
-        return armedPlayers.contains(uuid)
+    fun initialize() {
+        if (initialized) {
+            return
+        }
+        initialized = true
+        ServerTickEvents.END_SERVER_TICK.register(ServerTickEvents.EndTick(::onEndTick))
     }
+
+    fun isEnabled(uuid: UUID): Boolean = uuid in armedPlayers
 
     fun setArmed(uuid: UUID, armed: Boolean) {
         if (armed) {
@@ -27,29 +29,13 @@ object NoClipService {
     }
 
     fun setArmed(player: ServerPlayerEntity, armed: Boolean) {
-        if (armed) {
-            armedPlayers += player.uuid
-        } else {
-            armedPlayers -= player.uuid
-        }
-        applyState(player)
+        setArmed(player.uuid, armed)
+        setNoPhysics(player, armed)
     }
 
     fun clear(player: ServerPlayerEntity) {
         armedPlayers -= player.uuid
         setNoPhysics(player, false)
-    }
-
-    fun isEnabled(player: ServerPlayerEntity): Boolean {
-        return armedPlayers.contains(player.uuid)
-    }
-
-    fun initialize() {
-        if (initialized) {
-            return
-        }
-        initialized = true
-        ServerTickEvents.END_SERVER_TICK.register(ServerTickEvents.EndTick(::onEndTick))
     }
 
     fun stop(server: MinecraftServer) {
@@ -65,13 +51,9 @@ object NoClipService {
             if (player == null) {
                 armedPlayers -= uuid
             } else {
-                applyState(player)
+                setNoPhysics(player, true)
             }
         }
-    }
-
-    private fun applyState(player: ServerPlayerEntity) {
-        setNoPhysics(player, armedPlayers.contains(player.uuid))
     }
 
     private fun setNoPhysics(player: ServerPlayerEntity, active: Boolean) {
@@ -80,7 +62,7 @@ object NoClipService {
             player.setOnGround(false)
             player.horizontalCollision = false
             player.verticalCollision = false
-            player.fallDistance = 0.0
+            player.fallDistance = 0f
         }
     }
 }

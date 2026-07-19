@@ -1,6 +1,8 @@
 package axion.client.render
 
 import axion.client.compat.CameraAccess
+import axion.client.render.gpu.PreviewOcclusionCompat
+import axion.client.render.gpu.PreviewOcclusionPolicy
 import net.minecraft.block.BlockRenderType
 import net.minecraft.block.BlockState
 import net.minecraft.block.Blocks
@@ -88,9 +90,13 @@ object PreviewBlockTessellator {
         }
 
         override fun getBlockState(pos: net.minecraft.core.BlockPos): BlockState {
-            if (renderingPos != null && pos == renderingPos.above()) {
-                val aboveState = statesByPosition[pos.asLong()]
-                if (aboveState != null && !aboveState.isOpaqueFullCube) {
+            if (renderingPos != null && PreviewOcclusionPolicy.isDirectNeighbor(
+                    pos.x, pos.y, pos.z,
+                    renderingPos.x, renderingPos.y, renderingPos.z,
+                )
+            ) {
+                val neighborState = statesByPosition[pos.asLong()]
+                if (PreviewOcclusionPolicy.isFaceExposed(neighborState, PreviewOcclusionCompat::isOpaqueFullCube)) {
                     return airState
                 }
             }

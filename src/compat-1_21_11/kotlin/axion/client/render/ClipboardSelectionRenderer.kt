@@ -1,6 +1,8 @@
 package axion.client.render
 import axion.client.compat.CameraAccess
 
+import axion.client.render.gpu.PreviewOcclusionCompat
+import axion.client.render.gpu.PreviewOcclusionPolicy
 import axion.client.selection.SelectionBounds
 import axion.common.model.BlockRegion
 import axion.common.model.ClipboardCell
@@ -13,6 +15,7 @@ import net.minecraft.client.util.math.Entry
 import net.minecraft.client.util.math.MatrixStack
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Box
+import net.minecraft.util.math.Direction
 import net.minecraft.util.shape.VoxelShape
 import net.minecraft.util.shape.VoxelShapes
 import java.util.WeakHashMap
@@ -639,19 +642,18 @@ object ClipboardSelectionRenderer {
             if (occupiedCells.size <= 1) {
                 occupiedCells
             } else {
-                val occupiedPositions = occupiedCells.asSequence()
-                    .map { BlockPos.asLong(it.offset.x, it.offset.y, it.offset.z) }
-                    .toHashSet()
+                val statesByOffset = occupiedCells.associate { cell ->
+                    BlockPos.asLong(cell.offset.x, cell.offset.y, cell.offset.z) to cell.state
+                }
                 occupiedCells.filter { cell ->
-                    val x = cell.offset.x
-                    val y = cell.offset.y
-                    val z = cell.offset.z
-                    BlockPos.asLong(x - 1, y, z) !in occupiedPositions ||
-                        BlockPos.asLong(x + 1, y, z) !in occupiedPositions ||
-                        BlockPos.asLong(x, y - 1, z) !in occupiedPositions ||
-                        BlockPos.asLong(x, y + 1, z) !in occupiedPositions ||
-                        BlockPos.asLong(x, y, z - 1) !in occupiedPositions ||
-                        BlockPos.asLong(x, y, z + 1) !in occupiedPositions
+                    Direction.entries.any { face ->
+                        val neighbor = statesByOffset[BlockPos.asLong(
+                            cell.offset.x + face.offsetX,
+                            cell.offset.y + face.offsetY,
+                            cell.offset.z + face.offsetZ,
+                        )]
+                        PreviewOcclusionPolicy.isFaceExposed(neighbor, PreviewOcclusionCompat::isOpaqueFullCube)
+                    }
                 }
             }
         }
