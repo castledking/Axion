@@ -283,18 +283,120 @@ cleanup_range_jars() {
 
     mkdir -p "${mod_output_dir}" "${paper_output_dir}"
 
-    # Remove stale release jars for this target range before building. Gradle's
-    # own caches, dev jars, dependencies, and jars for other ranges are left
-    # untouched.
-    rm -f \
-        "build/libs/Axion-v"*"-${range_tag}.jar" \
-        "${mod_output_dir}/Axion-v"*"-${range_tag}.jar" \
-        "${paper_output_dir}/AxionPaper-v"*"-${range_tag}.jar"
+    # Clear only Gradle's staging output. The range-directory jars may be the
+    # version currently advertised by the locally hosted download site, so
+    # leave them in place until validated replacements are ready.
+    rm -f "build/libs/Axion-v${MOD_VERSION}-${range_tag}.jar"
 
     # The Paper subproject emits a compile-version jar first, then this script
     # renames it into the range directory. Remove only AxionPaper outputs from
     # the staging directory so an older version cannot be picked up by ls/head.
     rm -f "paper-plugin/build/libs/AxionPaper-v"*.jar
+}
+
+resolve_range_id() {
+    case "$1" in
+    "mc1_21_0_1") echo "1.21-1.21.1" ;;
+    "mc1_21_2_3") echo "1.21.2-1.21.3" ;;
+    "mc1_21_4") echo "1.21.4" ;;
+    "mc1_21_5") echo "1.21.5" ;;
+    "legacy") echo "1.21.6-1.21.8" ;;
+    "modern") echo "1.21.9-1.21.11" ;;
+    "mc26_1_x") echo "26.1.x" ;;
+    *) return 1 ;;
+    esac
+}
+
+resolve_range_label() {
+    case "$1" in
+    "mc1_21_0_1") echo "1.21 – 1.21.1" ;;
+    "mc1_21_2_3") echo "1.21.2 – 1.21.3" ;;
+    "mc1_21_4") echo "1.21.4" ;;
+    "mc1_21_5") echo "1.21.5" ;;
+    "legacy") echo "1.21.6 – 1.21.8" ;;
+    "modern") echo "1.21.9 – 1.21.11" ;;
+    "mc26_1_x") echo "26.1.x" ;;
+    *) return 1 ;;
+    esac
+}
+
+publish_release_manifest() {
+    local manifest_path="build/libs/axion-release.json"
+    local manifest_tmp="${manifest_path}.tmp.$$"
+    local display_ranges=(
+        "mc26_1_x"
+        "modern"
+        "legacy"
+        "mc1_21_5"
+        "mc1_21_4"
+        "mc1_21_2_3"
+        "mc1_21_0_1"
+    )
+    local range
+    local range_tag
+    local mod_jar
+    local paper_jar
+
+    # Validate the complete release before changing what the website advertises.
+    for range in "${display_ranges[@]}"; do
+        range_tag="$(resolve_range_tag "$range")"
+        mod_jar="Axion-v${MOD_VERSION}-${range_tag}.jar"
+        paper_jar="AxionPaper-v${MOD_VERSION}-${range_tag}.jar"
+        if [[ ! -f "build/libs/${range_tag}/${mod_jar}" ]]; then
+            echo "Cannot publish release manifest: missing build/libs/${range_tag}/${mod_jar}" >&2
+            return 1
+        fi
+        if [[ ! -f "paper-plugin/build/libs/${range_tag}/${paper_jar}" ]]; then
+            echo "Cannot publish release manifest: missing paper-plugin/build/libs/${range_tag}/${paper_jar}" >&2
+            return 1
+        fi
+    done
+
+    mkdir -p "$(dirname "$manifest_path")"
+    {
+        echo "{"
+        echo "  \"schemaVersion\": 1,"
+        echo "  \"version\": \"${MOD_VERSION}\","
+        echo "  \"latestRange\": \"mc26.1.x\","
+        echo "  \"ranges\": ["
+
+        local index=0
+        local range_id
+        local range_label
+        local compile_version
+        local fabric_api
+        local java_version
+        local separator
+        for range in "${display_ranges[@]}"; do
+            range_tag="$(resolve_range_tag "$range")"
+            range_id="$(resolve_range_id "$range")"
+            range_label="$(resolve_range_label "$range")"
+            compile_version="$(resolve_compile_version "$range")"
+            fabric_api="$(resolve_fabric_version "$compile_version")"
+            java_version="21+"
+            if [[ "$range" == "mc26_1_x" ]]; then
+                java_version="25+"
+            fi
+            mod_jar="Axion-v${MOD_VERSION}-${range_tag}.jar"
+            paper_jar="AxionPaper-v${MOD_VERSION}-${range_tag}.jar"
+            separator=","
+            if ((index == ${#display_ranges[@]} - 1)); then
+                separator=""
+            fi
+
+            printf '    {"id":"%s","dir":"%s","label":"%s","fabric":"%s","paper":"%s","fabricApi":"%s","java":"%s"}%s\n' \
+                "$range_id" "$range_tag" "$range_label" "$mod_jar" "$paper_jar" \
+                "$fabric_api" "$java_version" "$separator"
+            ((index += 1))
+        done
+
+        echo "  ]"
+        echo "}"
+    } >"$manifest_tmp"
+
+    mv -f "$manifest_tmp" "$manifest_path"
+    echo
+    echo "Published release manifest: ${manifest_path}"
 }
 
 build_range() {
@@ -368,23 +470,30 @@ build_range() {
         -Paxion_artifact_tag="${range_tag}" \
         -Paxion_minecraft_version_range="${metadata_version_range}"
 
-    if [[ -f "build/libs/${mod_jar}" ]]; then
-        mv -f "build/libs/${mod_jar}" "${mod_output_dir}/${mod_jar}"
-    fi
+    local staged_mod_jar="build/libs/${mod_jar}"
     # Paper plugin emits a single-version filename; rename to range-style for output
     local actual_paper_jar
     actual_paper_jar="$(find paper-plugin/build/libs -maxdepth 1 -type f -name 'AxionPaper-*.jar' -print -quit 2>/dev/null)"
-    if [[ -n "${actual_paper_jar}" ]]; then
-        mv -f "${actual_paper_jar}" "${paper_output_dir}/${paper_jar}"
+
+    # Check both staged artifacts before replacing either served artifact. This
+    # keeps a failed same-version rebuild from leaving the current release
+    # partially updated or unavailable.
+    if [[ ! -s "${staged_mod_jar}" ]] || ! jar tf "${staged_mod_jar}" >/dev/null 2>&1; then
+        echo "Build did not produce a valid Fabric artifact: ${staged_mod_jar}" >&2
+        return 1
+    fi
+    if [[ -z "${actual_paper_jar}" || ! -s "${actual_paper_jar}" ]] ||
+       ! jar tf "${actual_paper_jar}" >/dev/null 2>&1; then
+        echo "Build did not produce a valid AxionPaper artifact for ${range_tag}" >&2
+        return 1
     fi
 
+    mv -f "${staged_mod_jar}" "${mod_output_dir}/${mod_jar}"
+    mv -f "${actual_paper_jar}" "${paper_output_dir}/${paper_jar}"
+
     echo "Built:"
-    if [[ -f "${mod_output_dir}/${mod_jar}" ]]; then
-        echo "  ${mod_output_dir}/${mod_jar}"
-    fi
-    if [[ -n "${actual_paper_jar}" ]]; then
-        echo "  ${paper_output_dir}/${paper_jar}"
-    fi
+    echo "  ${mod_output_dir}/${mod_jar}"
+    echo "  ${paper_output_dir}/${paper_jar}"
 }
 
 # Wipe Kotlin incremental compilation caches so new source files are
@@ -462,6 +571,7 @@ case "$choice" in
     for range in "${SUPPORTED_RANGES[@]}"; do
         build_range "$range"
     done
+    publish_release_manifest
     ;;
  q | Q | quit | QUIT)
     echo "Cancelled."
