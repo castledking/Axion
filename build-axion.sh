@@ -175,6 +175,10 @@ prefetch_modmenu_dependency() {
     local group_path="com/terraformersmc"
     local artifact="modmenu"
     local repo="https://maven.terraformersmc.com/releases"
+    # TerraformersMC publishes the same build to Modrinth, and Modrinth serves it
+    # from a CDN. The jars are byte-identical, so it is a safe second source when
+    # the canonical Maven times out or returns 502.
+    local mirror="https://api.modrinth.com/maven/maven/modrinth/${artifact}"
     local dir="$HOME/.m2/repository/${group_path}/${artifact}/${ver}"
     local jar="${dir}/${artifact}-${ver}.jar"
     local pom="${dir}/${artifact}-${ver}.pom"
@@ -183,15 +187,31 @@ prefetch_modmenu_dependency() {
     local curl_error="${jar}.curl-error.$$"
     local jar_url="${repo}/${group_path}/${artifact}/${ver}/${artifact}-${ver}.jar"
     local pom_url="${repo}/${group_path}/${artifact}/${ver}/${artifact}-${ver}.pom"
-    local curl_args=(
+    local mirror_jar_url="${mirror}/${ver}/${artifact}-${ver}.jar"
+    # The canonical host gets a deliberately short budget: when it is down it
+    # tends to hang until timeout, and seven ranges each burning the full retry
+    # window would cost more than the build itself.
+    local primary_args=(
         --http1.1
+        --fail
+        --location
+        --silent
+        --show-error
+        --connect-timeout 10
+        --max-time 45
+        --retry 2
+        --retry-delay 2
+        --retry-max-time 60
+        --retry-all-errors
+    )
+    local mirror_args=(
         --fail
         --location
         --silent
         --show-error
         --connect-timeout 15
         --max-time 120
-        --retry 5
+        --retry 3
         --retry-delay 2
         --retry-max-time 180
         --retry-all-errors
@@ -206,32 +226,41 @@ prefetch_modmenu_dependency() {
 
     mkdir -p "$dir"
     rm -f "$jar_tmp" "$pom_tmp" "$curl_error"
-    echo "Prefetching ${artifact}:${ver} over HTTP/1.1..."
+    echo "Prefetching ${artifact}:${ver}..."
 
     if ! archive_is_readable "$jar"; then
         rm -f "$jar"
-        if ! curl "${curl_args[@]}" --output "$jar_tmp" "$jar_url" 2>"$curl_error" ||
-           ! archive_is_readable "$jar_tmp"; then
+        if curl "${primary_args[@]}" --output "$jar_tmp" "$jar_url" 2>"$curl_error" &&
+           archive_is_readable "$jar_tmp"; then
+            mv -f "$jar_tmp" "$jar"
+        else
             rm -f "$jar_tmp"
             if [[ -s "$curl_error" ]]; then
-                sed -n '1,5p' "$curl_error" >&2
+                sed -n '1,3p' "$curl_error" >&2
             fi
-            rm -f "$curl_error"
-            echo "  WARNING: Could not prefetch a valid ${artifact}:${ver} jar; Gradle will retry the repository." >&2
-            return
+            echo "  NOTE: TerraformersMC Maven unavailable; falling back to Modrinth." >&2
+            if curl "${mirror_args[@]}" --output "$jar_tmp" "$mirror_jar_url" 2>"$curl_error" &&
+               archive_is_readable "$jar_tmp"; then
+                mv -f "$jar_tmp" "$jar"
+            else
+                rm -f "$jar_tmp"
+                if [[ -s "$curl_error" ]]; then
+                    sed -n '1,3p' "$curl_error" >&2
+                fi
+                rm -f "$curl_error"
+                echo "  WARNING: Could not prefetch a valid ${artifact}:${ver} jar from either source; Gradle will retry the repository." >&2
+                return
+            fi
         fi
         rm -f "$curl_error"
-        mv -f "$jar_tmp" "$jar"
     fi
 
     if [[ ! -s "$pom" ]]; then
-        if curl "${curl_args[@]}" --output "$pom_tmp" "$pom_url" 2>"$curl_error" && [[ -s "$pom_tmp" ]]; then
+        # Modrinth only serves the jar, so a mirrored fetch always lands here.
+        if curl "${primary_args[@]}" --output "$pom_tmp" "$pom_url" 2>"$curl_error" && [[ -s "$pom_tmp" ]]; then
             mv -f "$pom_tmp" "$pom"
         else
             rm -f "$pom_tmp"
-            if [[ -s "$curl_error" ]]; then
-                sed -n '1,5p' "$curl_error" >&2
-            fi
             echo "  NOTE: ${artifact}:${ver} POM unavailable; writing a minimal local POM so mavenLocal() resolves." >&2
             write_minimal_modmenu_pom "$pom" "$ver"
         fi
