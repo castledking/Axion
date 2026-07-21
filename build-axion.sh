@@ -130,6 +130,43 @@ resolve_modmenu_version() {
     esac
 }
 
+archive_is_readable() {
+    local candidate="$1"
+    [[ -s "$candidate" ]] || return 1
+    if command -v jar >/dev/null 2>&1; then
+        jar tf "$candidate" >/dev/null 2>&1
+    elif command -v unzip >/dev/null 2>&1; then
+        unzip -qq -t "$candidate" >/dev/null 2>&1
+    else
+        # No archive tool on PATH; a non-empty file is the best signal available.
+        return 0
+    fi
+}
+
+# Mod Menu is compile-only and the integration touches only ModMenuApi and
+# ConfigScreenFactory, both of which live in the jar itself. A dependency-less
+# POM is therefore enough for Gradle to resolve the module locally, and it keeps
+# the build alive when TerraformersMC Maven serves the jar but not the metadata.
+write_minimal_modmenu_pom() {
+    local target="$1"
+    local ver="$2"
+    local tmp="${target}.synth.$$"
+
+    cat >"$tmp" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.terraformersmc</groupId>
+  <artifactId>modmenu</artifactId>
+  <version>${ver}</version>
+  <packaging>jar</packaging>
+</project>
+EOF
+    mv -f "$tmp" "$target"
+}
+
 # Pre-fetch the one Mod Menu artifact needed by the selected build range.
 # Gradle checks mavenLocal() before remote repositories, which avoids the
 # truncated HTTP responses occasionally returned by TerraformersMC Maven.
@@ -153,37 +190,51 @@ prefetch_modmenu_dependency() {
         --silent
         --show-error
         --connect-timeout 15
-        --retry 3
+        --max-time 120
+        --retry 5
         --retry-delay 2
+        --retry-max-time 180
         --retry-all-errors
     )
 
-    if [[ -s "$jar" ]] && jar tf "$jar" >/dev/null 2>&1; then
+    # mavenLocal() cannot resolve a module whose POM is absent, so a cached jar
+    # on its own still sends every range back to the remote repository. Both
+    # files must be present before the prefetch can be considered done.
+    if archive_is_readable "$jar" && [[ -s "$pom" ]]; then
         return
     fi
 
     mkdir -p "$dir"
-    rm -f "$jar" "$jar_tmp" "$pom_tmp" "$curl_error"
+    rm -f "$jar_tmp" "$pom_tmp" "$curl_error"
     echo "Prefetching ${artifact}:${ver} over HTTP/1.1..."
 
-    if ! curl "${curl_args[@]}" --output "$jar_tmp" "$jar_url" 2>"$curl_error" ||
-       [[ ! -s "$jar_tmp" ]] ||
-       ! jar tf "$jar_tmp" >/dev/null 2>&1; then
-        rm -f "$jar_tmp"
-        if [[ -s "$curl_error" ]]; then
-            sed -n '1,5p' "$curl_error" >&2
+    if ! archive_is_readable "$jar"; then
+        rm -f "$jar"
+        if ! curl "${curl_args[@]}" --output "$jar_tmp" "$jar_url" 2>"$curl_error" ||
+           ! archive_is_readable "$jar_tmp"; then
+            rm -f "$jar_tmp"
+            if [[ -s "$curl_error" ]]; then
+                sed -n '1,5p' "$curl_error" >&2
+            fi
+            rm -f "$curl_error"
+            echo "  WARNING: Could not prefetch a valid ${artifact}:${ver} jar; Gradle will retry the repository." >&2
+            return
         fi
         rm -f "$curl_error"
-        echo "  WARNING: Could not prefetch a valid ${artifact}:${ver} jar; Gradle will retry the repository." >&2
-        return
+        mv -f "$jar_tmp" "$jar"
     fi
-    rm -f "$curl_error"
-    mv -f "$jar_tmp" "$jar"
 
-    if curl "${curl_args[@]}" --output "$pom_tmp" "$pom_url" 2>"$curl_error"; then
-        mv -f "$pom_tmp" "$pom"
-    else
-        rm -f "$pom_tmp"
+    if [[ ! -s "$pom" ]]; then
+        if curl "${curl_args[@]}" --output "$pom_tmp" "$pom_url" 2>"$curl_error" && [[ -s "$pom_tmp" ]]; then
+            mv -f "$pom_tmp" "$pom"
+        else
+            rm -f "$pom_tmp"
+            if [[ -s "$curl_error" ]]; then
+                sed -n '1,5p' "$curl_error" >&2
+            fi
+            echo "  NOTE: ${artifact}:${ver} POM unavailable; writing a minimal local POM so mavenLocal() resolves." >&2
+            write_minimal_modmenu_pom "$pom" "$ver"
+        fi
     fi
     rm -f "$curl_error"
 }
