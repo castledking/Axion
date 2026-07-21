@@ -15,6 +15,9 @@ permissions:
   axion.use:
     default: op
     description: Allows authoritative Axion editing operations.
+  axion.gamemode:
+    default: op
+    description: Allows changing your own game mode from the Axion hotbar menu.
   axion.tool.clone:
     default: op
     description: Allows Axion clone operations.

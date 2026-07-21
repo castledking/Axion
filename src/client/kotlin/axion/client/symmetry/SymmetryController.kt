@@ -121,6 +121,8 @@ object SymmetryController {
         return true
     }
 
+    fun canToggleMirrorFromHotkey(): Boolean = canToggleFromHotkey()
+
     private fun moveAnchor(): Boolean {
         if (!isSymmetrySetupActive()) {
             return false

@@ -10,13 +10,25 @@ object ShaderPackCompat {
     private var lastShaderPackActive: Boolean? = null
 
     /**
+     * Returns true when an Iris shader pack is active.
+     *
+     * Beyond the GPU preview path, this also matters for render-layer choice:
+     * Iris only maps *vanilla* render layers onto a pack's shader programs, so
+     * layers Axion builds at runtime are dropped while a pack is loaded.
+     */
+    fun isShaderPackActive(): Boolean {
+        val shaderPackActive = FabricLoader.getInstance().isModLoaded("iris") && isIrisShaderPackActive()
+        observeShaderPackState(shaderPackActive)
+        return shaderPackActive
+    }
+
+    /**
      * Returns true when an Iris shader pack is active. Direct GPU preview draws
      * (separate render pass on the main framebuffer) do not composite correctly
      * with Iris, so callers should route through the legacy consumer path instead.
      */
     fun shouldDisableDirectGpuPreview(): Boolean {
-        val shaderPackActive = FabricLoader.getInstance().isModLoaded("iris") && isIrisShaderPackActive()
-        observeShaderPackState(shaderPackActive)
+        val shaderPackActive = isShaderPackActive()
         if (shaderPackActive && !loggedGpuFallback) {
             loggedGpuFallback = true
             logger.info("[Axion GPU] Active Iris shader pack detected; using CPU preview renderer for shader compatibility")

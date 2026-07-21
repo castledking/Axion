@@ -1,6 +1,7 @@
 package axion.server.paper
 
 import axion.protocol.AxionOperationType
+import axion.protocol.AxionInteractionOrigin
 import axion.protocol.AxionRemoteOperation
 import axion.protocol.AxionResultCode
 import axion.protocol.AxionResultSource
@@ -19,7 +20,6 @@ import axion.protocol.PlaceBlocksRequest
 import axion.protocol.SmearRegionRequest
 import axion.protocol.StackRegionRequest
 import org.bukkit.Location
-import org.bukkit.Material
 import org.bukkit.World
 import org.bukkit.block.BlockState
 import org.bukkit.entity.Player
@@ -29,6 +29,7 @@ class AxionOperationService(
 ) {
     private val history = AxionServerHistory()
     private val historyActions = AxionHistoryActionService(history, policyService)
+    private val interactionEventGateway = PaperInteractionEventGateway()
 
     fun applyBatch(player: Player, request: OperationBatchRequest, timing: AxionTimingContext): OperationBatchResult {
         if (request.operations.isEmpty()) {
@@ -77,6 +78,46 @@ class AxionOperationService(
             }
         }
 
+        val interactionRoute = PaperInteractionEventPolicy.routeBatch(
+            origin = request.interactionOrigin,
+            recordHistory = request.recordHistory,
+            operations = request.operations,
+        )
+        val interactionProblem = interactionRoute.problem
+        if (interactionProblem != null) {
+            val message = when (interactionProblem) {
+                PaperInteractionRequestProblem.BULK_CLEAR ->
+                    "Infinite-reach interaction batches may only clear one block per operation"
+
+                PaperInteractionRequestProblem.TOO_MANY_WRITES ->
+                    "Infinite-reach interaction exceeds the ${PaperInteractionEventPolicy.MAX_INTERACTION_WRITES}-block event limit"
+
+                PaperInteractionRequestProblem.UNSUPPORTED_OPERATION ->
+                    "Infinite-reach interaction batches may only break or place blocks"
+            }
+            return rejected(
+                request.requestId,
+                player,
+                world,
+                request.operations,
+                request.usesSymmetry,
+                AxionRejection(
+                    code = if (interactionProblem == PaperInteractionRequestProblem.TOO_MANY_WRITES) {
+                        AxionResultCode.WRITE_LIMIT_EXCEEDED
+                    } else {
+                        AxionResultCode.VALIDATION_FAILED
+                    },
+                    source = if (interactionProblem == PaperInteractionRequestProblem.TOO_MANY_WRITES) {
+                        AxionResultSource.POLICY
+                    } else {
+                        AxionResultSource.REQUEST
+                    },
+                    message = message,
+                ),
+            )
+        }
+        val interactionEye = if (interactionRoute.eventEligible) player.eyeLocation else null
+
         val extrudePlanning = planExtrudes(player, request, world, timing)
         if (extrudePlanning is ExtrudePlanningResult.Rejected) {
             return extrudePlanning.result
@@ -113,7 +154,7 @@ class AxionOperationService(
             }
         }
 
-        val touchedOverride = if (resolvedExtrudePlans.isEmpty()) {
+        val committedTouchedOverride = if (resolvedExtrudePlans.isEmpty()) {
             null
         } else {
             buildSet<IntVector3> {
@@ -125,7 +166,10 @@ class AxionOperationService(
                 }
             }
         }
-        val plannedTouched = touchedOverride ?: AxionCommittedDiffBuilder.collectTouched(operations = request.operations)
+        val plannedTouched = buildSet {
+            addAll(AxionCommittedDiffBuilder.collectPolicyTouched(request.operations))
+            resolvedExtrudePlans.values.forEach { addAll(it.touchedPositions) }
+        }
         val plannedWriteCount = when {
             resolvedExtrudePlans.isNotEmpty() -> request.operations.sumOf { operation ->
                 when (operation) {
@@ -165,7 +209,7 @@ class AxionOperationService(
             transactionId = plannedTransactionId,
             label = actionLabel(request.operations),
             operations = request.operations,
-            touchedOverride = touchedOverride,
+            touchedOverride = committedTouchedOverride,
             timing = timing,
         ) {
             val appliedEntityMoves = mutableListOf<CommittedEntityMove>()
@@ -173,7 +217,7 @@ class AxionOperationService(
             val appliedEntityDeletes = mutableListOf<CommittedEntityClone>()
             request.operations.forEach { operation ->
                 when (operation) {
-                    is ClearRegionRequest -> applyClear(world, operation)
+                    is ClearRegionRequest -> applyClear(player, world, operation, interactionRoute, interactionEye)
                     is CloneEntitiesRequest -> appliedEntityClones += PaperEntityCloneService.clone(world, operation)
                     is CloneRegionRequest -> applyClone(world, operation)
                     is DeleteEntitiesRequest -> appliedEntityDeletes += PaperEntityDeleteService.delete(world, operation)
@@ -182,7 +226,7 @@ class AxionOperationService(
                     is StackRegionRequest -> applyStack(world, operation)
                     is SmearRegionRequest -> applySmear(world, operation)
                     is ExtrudeRequest -> applyExtrude(world, resolvedExtrudePlans.getValue(operation))
-                    is PlaceBlocksRequest -> applyPlacements(world, operation)
+                    is PlaceBlocksRequest -> applyPlacements(player, world, operation, interactionRoute, interactionEye)
                 }
             }
             entityMoves = appliedEntityMoves
@@ -238,10 +282,21 @@ class AxionOperationService(
         return historyActions.redo(player, requestId, transactionId, timing)
     }
 
-    private fun applyClear(world: World, operation: ClearRegionRequest) {
+    private fun applyClear(
+        player: Player,
+        world: World,
+        operation: ClearRegionRequest,
+        interactionRoute: PaperInteractionBatchRoute,
+        interactionEye: Location?,
+    ) {
         forEachPos(operation.min, operation.max) { x, y, z ->
-            val block = world.getBlockAt(x, y, z)
-            PaperBlockWritePolicy.setType(block, Material.AIR)
+            val pos = IntVector3(x, y, z)
+            interactionEventGateway.applyClear(
+                player = player,
+                world = world,
+                pos = pos,
+                origin = interactionOriginForWrite(interactionRoute, interactionEye, pos),
+            )
         }
     }
 
@@ -332,15 +387,38 @@ class AxionOperationService(
         }
     }
 
-    private fun applyPlacements(world: World, operation: PlaceBlocksRequest) {
+    private fun applyPlacements(
+        player: Player,
+        world: World,
+        operation: PlaceBlocksRequest,
+        interactionRoute: PaperInteractionBatchRoute,
+        interactionEye: Location?,
+    ) {
         operation.placements.forEach { placement ->
-            PaperBlockEntitySnapshotService.apply(
+            interactionEventGateway.applyPlacement(
+                player = player,
                 world = world,
-                pos = net.minecraft.core.BlockPos(placement.pos.x, placement.pos.y, placement.pos.z),
-                blockStateString = placement.blockState,
-                blockEntityPayload = placement.blockEntityData,
+                pos = placement.pos,
+                blockState = placement.blockState,
+                blockEntityData = placement.blockEntityData,
+                origin = interactionOriginForWrite(interactionRoute, interactionEye, placement.pos),
             )
         }
+    }
+
+    private fun interactionOriginForWrite(
+        route: PaperInteractionBatchRoute,
+        eye: Location?,
+        pos: IntVector3,
+    ): AxionInteractionOrigin {
+        eye ?: return AxionInteractionOrigin.NONE
+        return PaperInteractionEventPolicy.originForWrite(
+            route = route,
+            eyeX = eye.x,
+            eyeY = eye.y,
+            eyeZ = eye.z,
+            pos = pos,
+        )
     }
 
     private fun applyRepeatedClipboard(
@@ -542,7 +620,9 @@ class AxionOperationService(
         val hasSmear = operations.any { it is SmearRegionRequest }
         val hasExtrude = operations.any { it is ExtrudeRequest }
         val hasPlace = operations.any { it is PlaceBlocksRequest }
+        val hasMoveEntities = operations.any { it is MoveEntitiesRequest }
         return when {
+            hasMoveEntities -> "Move"
             hasClone && hasClear -> "Move"
             hasClone || hasFilteredClone || hasCloneEntities -> "Clone"
             hasStack -> "Stack"

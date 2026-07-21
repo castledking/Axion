@@ -10,6 +10,8 @@ import axion.protocol.CloneRegionRequest
 import axion.protocol.ClipboardCellPayload
 import axion.protocol.DeleteEntitiesRequest
 import axion.protocol.ExtrudeRequest
+import axion.protocol.EntitySelectionGeometry
+import axion.protocol.EntitySelectionMask
 import axion.protocol.FilteredCloneRegionRequest
 import axion.protocol.IntVector3
 import axion.protocol.MoveEntitiesRequest
@@ -18,6 +20,7 @@ import axion.protocol.OperationBatchResult
 import axion.protocol.PlaceBlocksRequest
 import axion.protocol.SmearRegionRequest
 import axion.protocol.StackRegionRequest
+import axion.protocol.AxionTransportCodec
 import net.minecraft.command.argument.BlockArgumentParser
 import net.minecraft.command.argument.BlockArgumentParser.BlockResult
 import com.mojang.brigadier.StringReader
@@ -50,6 +53,26 @@ class AxionFabricOperationService(
         val world = resolveServerWorld(player)
         val plannedExtrudes = linkedMapOf<ExtrudeRequest, AxionFabricServerExtrudePlanner.PlannedExtrude>()
         request.operations.forEach { operation ->
+            val entitySelectionProblem = when (operation) {
+                is CloneEntitiesRequest -> validateEntitySelection(
+                    operation.sourceMin,
+                    operation.sourceMax,
+                    operation.entitySelection,
+                )
+                is MoveEntitiesRequest -> validateEntitySelection(
+                    operation.sourceMin,
+                    operation.sourceMax,
+                    operation.entitySelection,
+                )
+                else -> null
+            }
+            if (entitySelectionProblem != null) {
+                return rejected(
+                    requestId = request.requestId,
+                    code = entitySelectionProblem.first,
+                    message = entitySelectionProblem.second,
+                )
+            }
             val invalidPos = when (operation) {
                 is ExtrudeRequest -> {
                     val planned = AxionFabricServerExtrudePlanner(world).plan(operation)
@@ -393,6 +416,25 @@ class AxionFabricOperationService(
         }
     }
 
+    private fun validateEntitySelection(
+        sourceMin: IntVector3,
+        sourceMax: IntVector3,
+        selection: EntitySelectionMask,
+    ): Pair<AxionResultCode, String>? {
+        val size = try {
+            EntitySelectionGeometry.sourceSize(sourceMin, sourceMax)
+        } catch (_: IllegalArgumentException) {
+            return AxionResultCode.VALIDATION_FAILED to "Entity selection bounds are too large"
+        }
+        if (!selection.isValidFor(size)) {
+            return AxionResultCode.VALIDATION_FAILED to "Entity selection offset is outside its source region"
+        }
+        if (selection.selectedBlockCount(size) > MAX_ENTITY_SELECTION_CELLS) {
+            return AxionResultCode.CLIPBOARD_LIMIT_EXCEEDED to "Entity selection exceeds the transport limit"
+        }
+        return null
+    }
+
     private fun firstOutOfBoundsRepeated(
         world: ServerWorld,
         sourceOrigin: IntVector3,
@@ -470,6 +512,7 @@ class AxionFabricOperationService(
         val hasClone = operations.any { it is CloneRegionRequest }
         val hasClear = operations.any { it is ClearRegionRequest }
         return when {
+            operations.any { it is MoveEntitiesRequest } -> "Move"
             hasClone && hasClear -> "Move"
             hasClone -> "Clone"
             operations.any { it is StackRegionRequest } -> "Stack"
@@ -533,6 +576,10 @@ class AxionFabricOperationService(
     )
 
     companion object {
+        private const val ENCODED_ENTITY_OFFSET_BYTES: Long = 3L * Int.SIZE_BYTES
+        private val MAX_ENTITY_SELECTION_CELLS: Long =
+            AxionTransportCodec.MAX_SERIALIZED_BYTES.toLong() / ENCODED_ENTITY_OFFSET_BYTES
+
         val SUPPORTED_OPERATIONS: Set<AxionOperationType> = setOf(
             AxionOperationType.CLEAR_REGION,
             AxionOperationType.CLONE_REGION,

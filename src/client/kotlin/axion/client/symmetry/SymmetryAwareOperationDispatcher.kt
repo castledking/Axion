@@ -9,16 +9,21 @@ import axion.client.network.NetworkOperationDispatcher
 import axion.client.network.PermissiveOperationValidator
 import axion.common.operation.EditOperation
 import axion.common.operation.OperationDispatcher
+import axion.protocol.AxionInteractionOrigin
 import net.minecraft.client.MinecraftClient
 import net.minecraft.text.Text
 
 class SymmetryAwareOperationDispatcher(
     private val recordHistory: Boolean = true,
+    interactionOrigin: AxionInteractionOrigin = AxionInteractionOrigin.NONE,
 ) : OperationDispatcher {
     private val validator = PermissiveOperationValidator()
     private val planner = LocalWritePlanner()
     private val applier = LocalOperationApplier()
-    private val networkDispatcher = NetworkOperationDispatcher(recordHistory = recordHistory)
+    private val networkDispatcher = NetworkOperationDispatcher(
+        recordHistory = recordHistory,
+        interactionOrigin = interactionOrigin,
+    )
 
     override fun dispatch(operation: EditOperation) {
         if (!validator.validate(operation)) {

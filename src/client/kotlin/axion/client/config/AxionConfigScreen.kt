@@ -3,11 +3,14 @@ package axion.client.config
 import net.minecraft.client.gui.DrawContext
 import net.minecraft.client.gui.screen.Screen
 import net.minecraft.client.gui.widget.ButtonWidget
+import net.minecraft.client.gui.widget.TextFieldWidget
 import net.minecraft.text.Text
 
 class AxionConfigScreen(
     private val parent: Screen?,
 ) : Screen(Text.translatable("axion.config.title")) {
+    private lateinit var infiniteReachRangeField: TextFieldWidget
+
     override fun init() {
         val centerX = width / 2
         val centerY = height / 2
@@ -23,7 +26,7 @@ class AxionConfigScreen(
                     AxionClientConfig.setUseCommandModifierOnMac(!AxionClientConfig.useCommandModifierOnMac())
                     clearAndInit()
                 }
-            }.dimensions(centerX - 110, centerY - 40, 220, 20).build().apply {
+            }.dimensions(centerX - 110, centerY - 55, 220, 20).build().apply {
                 active = macOnly
             },
         )
@@ -37,23 +40,44 @@ class AxionConfigScreen(
                     AxionClientConfig.setUseSuperModifierOnLinux(!AxionClientConfig.useSuperModifierOnLinux())
                     clearAndInit()
                 }
-            }.dimensions(centerX - 110, centerY - 10, 220, 20).build().apply {
+            }.dimensions(centerX - 110, centerY - 30, 220, 20).build().apply {
                 active = linuxOnly
             },
         )
+
+        infiniteReachRangeField = TextFieldWidget(
+            textRenderer,
+            centerX + 20,
+            centerY - 5,
+            90,
+            20,
+            Text.translatable("axion.config.infinite_reach_range"),
+        ).apply {
+            text = InfiniteReachRange.display(AxionClientConfig.configuredInfiniteReachRange())
+            setMaxLength(12)
+            setChangedListener { input ->
+                when {
+                    InfiniteReachRange.isUnlimitedInput(input) -> AxionClientConfig.setInfiniteReachRange(null)
+                    input.trim().toDoubleOrNull()?.isFinite() == true -> {
+                        AxionClientConfig.setInfiniteReachRange(InfiniteReachRange.parse(input))
+                    }
+                }
+            }
+        }
+        addSelectableChild(infiniteReachRangeField)
 
         addDrawableChild(
             ButtonWidget.builder(
                 Text.translatable("axion.config.magic_select.templates.button"),
             ) {
                 client?.setScreen(MagicSelectMaskConfigScreen(this))
-            }.dimensions(centerX - 110, centerY + 20, 220, 20).build(),
+            }.dimensions(centerX - 110, centerY + 25, 220, 20).build(),
         )
 
         addDrawableChild(
             ButtonWidget.builder(Text.translatable("gui.done")) {
                 close()
-            }.dimensions(centerX - 100, centerY + 58, 200, 20).build(),
+            }.dimensions(centerX - 100, centerY + 60, 200, 20).build(),
         )
     }
 
@@ -67,6 +91,14 @@ class AxionConfigScreen(
         super.render(context, mouseX, mouseY, deltaTicks)
 
         context.drawCenteredTextWithShadow(textRenderer, title, width / 2, 28, 0xFFFFFF)
+        context.drawTextWithShadow(
+            textRenderer,
+            Text.translatable("axion.config.infinite_reach_range"),
+            (width / 2) - 110,
+            (height / 2) + 1,
+            0xFFFFFF,
+        )
+        infiniteReachRangeField.render(context, mouseX, mouseY, deltaTicks)
     }
 
     private fun commandToggleLabel(): Text {

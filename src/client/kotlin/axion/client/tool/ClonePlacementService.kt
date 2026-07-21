@@ -2,6 +2,7 @@ package axion.client.tool
 
 import axion.common.model.BlockRegion
 import axion.common.model.ClipboardBuffer
+import axion.protocol.EntitySelectionMask
 import axion.client.tool.directionGetFacing
 import axion.client.compat.add
 import net.minecraft.client.MinecraftClient
@@ -17,7 +18,7 @@ object ClonePlacementService {
         clipboardBuffer: ClipboardBuffer,
         offset: Vec3i,
         transform: PlacementTransform = PlacementTransform(),
-        entityUuids: List<java.util.UUID> = emptyList(),
+        entitySelection: EntitySelectionMask = clipboardBuffer.toEntitySelectionMask(),
     ): ClonePreviewState {
         val normalized = sourceRegion.normalized()
         val anchor = normalized.minCorner()
@@ -35,7 +36,7 @@ object ClonePlacementService {
                 anchor.add(offset).add(destinationClipboardBuffer.size).add(-1, -1, -1),
             ).normalized(),
             transform = transform,
-            entityUuids = entityUuids,
+            entitySelection = entitySelection,
         )
     }
 
@@ -58,7 +59,7 @@ object ClonePlacementService {
             clipboardBuffer = preview.sourceClipboardBuffer,
             offset = preview.offset.add(delta),
             transform = preview.transform,
-            entityUuids = preview.entityUuids,
+            entitySelection = preview.entitySelection,
         )
     }
 
@@ -78,23 +79,7 @@ object ClonePlacementService {
             offset = Vec3i.ZERO,
         )
 
-        val nudged = nudgePreview(client, initial, scrollAmount)
-        // Capture entity UUIDs from the source region on first scroll
-        val world = client.world ?: return nudged
-        val sourceMin = sourceRegion.minCorner()
-        val sourceMax = sourceRegion.maxCorner()
-        val queryBox = net.minecraft.util.math.Box(
-            sourceMin.x.toDouble(),
-            sourceMin.y.toDouble(),
-            sourceMin.z.toDouble(),
-            sourceMax.x + 1.0,
-            sourceMax.y + 1.25,
-            sourceMax.z + 1.0,
-        )
-        val entityUuids = world.getEntitiesByClass(net.minecraft.entity.Entity::class.java, queryBox) { true }
-            .mapNotNull { it.uuid }
-            .toList()
-        return nudged.copy(entityUuids = entityUuids)
+        return nudgePreview(client, initial, scrollAmount)
     }
 
     fun reanchorPreview(preview: ClonePreviewState, destinationOrigin: BlockPos): ClonePreviewState {
@@ -112,7 +97,7 @@ object ClonePlacementService {
             clipboardBuffer = preview.sourceClipboardBuffer,
             offset = offset,
             transform = preview.transform,
-            entityUuids = preview.entityUuids,
+            entitySelection = preview.entitySelection,
         )
     }
 
@@ -124,7 +109,7 @@ object ClonePlacementService {
             clipboardBuffer = preview.sourceClipboardBuffer,
             offset = preview.offset,
             transform = preview.transform.rotateClockwise(),
-            entityUuids = preview.entityUuids,
+            entitySelection = preview.entitySelection,
         )
     }
 
@@ -137,7 +122,7 @@ object ClonePlacementService {
             clipboardBuffer = preview.sourceClipboardBuffer,
             offset = preview.offset,
             transform = preview.transform.toggleMirror(axis),
-            entityUuids = preview.entityUuids,
+            entitySelection = preview.entitySelection,
         )
     }
 

@@ -6,6 +6,8 @@ import axion.protocol.CloneEntitiesRequest
 import axion.protocol.CloneRegionRequest
 import axion.protocol.DeleteEntitiesRequest
 import axion.protocol.ExtrudeRequest
+import axion.protocol.EntitySelectionGeometry
+import axion.protocol.EntitySelectionMask
 import axion.protocol.FilteredCloneRegionRequest
 import axion.protocol.IntVector3
 import axion.protocol.MoveEntitiesRequest
@@ -45,6 +47,7 @@ class AxionOperationValidator(
                             operation.destinationOrigin.z + abs(operation.sourceMax.z - operation.sourceMin.z),
                         ),
                     )
+                    ?: validateEntitySelection(operation.sourceMin, operation.sourceMax, operation.entitySelection)
             }
 
             is FilteredCloneRegionRequest -> {
@@ -71,6 +74,7 @@ class AxionOperationValidator(
                             operation.destinationOrigin.z + abs(operation.sourceMax.z - operation.sourceMin.z),
                         ),
                     )
+                    ?: validateEntitySelection(operation.sourceMin, operation.sourceMax, operation.entitySelection)
             }
 
             is StackRegionRequest -> validateRepeatedClipboard(operation.sourceOrigin, operation.cells, operation.step, operation.repeatCount)
@@ -116,6 +120,37 @@ class AxionOperationValidator(
                 code = AxionResultCode.VALIDATION_FAILED,
                 source = AxionResultSource.REQUEST,
                 message = "Edit is outside build height",
+            )
+        }
+        return null
+    }
+
+    private fun validateEntitySelection(
+        sourceMin: IntVector3,
+        sourceMax: IntVector3,
+        selection: EntitySelectionMask,
+    ): AxionRejection? {
+        val size = try {
+            EntitySelectionGeometry.sourceSize(sourceMin, sourceMax)
+        } catch (_: IllegalArgumentException) {
+            return AxionRejection(
+                code = AxionResultCode.VALIDATION_FAILED,
+                source = AxionResultSource.REQUEST,
+                message = "Entity selection bounds are too large",
+            )
+        }
+        if (!selection.isValidFor(size)) {
+            return AxionRejection(
+                code = AxionResultCode.VALIDATION_FAILED,
+                source = AxionResultSource.REQUEST,
+                message = "Entity selection offset is outside its source region",
+            )
+        }
+        if (selection.selectedBlockCount(size) > policy.maxClipboardCells.toLong()) {
+            return AxionRejection(
+                code = AxionResultCode.CLIPBOARD_LIMIT_EXCEEDED,
+                source = AxionResultSource.POLICY,
+                message = "Entity selection is too large",
             )
         }
         return null

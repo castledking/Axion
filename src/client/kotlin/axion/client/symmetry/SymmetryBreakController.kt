@@ -1,5 +1,6 @@
 package axion.client.symmetry
 
+import axion.client.AxionClientState
 import axion.client.mode.ModeTargeting
 import axion.client.tool.AxionToolSelectionController
 import axion.common.model.BlockRegion
@@ -7,9 +8,13 @@ import axion.common.operation.ClearRegionOperation
 import axion.common.operation.CompositeOperation
 import net.minecraft.client.MinecraftClient
 import net.minecraft.util.math.BlockPos
+import axion.protocol.AxionInteractionOrigin
 
 object SymmetryBreakController {
     private val dispatcher = SymmetryAwareOperationDispatcher()
+    private val infiniteReachDispatcher = SymmetryAwareOperationDispatcher(
+        interactionOrigin = AxionInteractionOrigin.INFINITE_REACH,
+    )
 
     fun handlePrimaryAction(client: MinecraftClient): Boolean {
         if (!AxionToolSelectionController.isCreativeModeAllowed()) {
@@ -20,10 +25,20 @@ object SymmetryBreakController {
         }
 
         val target = ModeTargeting.currentBlockTarget(client) ?: return false
-        return dispatchDerivedBreaks(client, target.hitResult.blockPos.toImmutable())
+        return dispatchDerivedBreaks(
+            client,
+            target.hitResult.blockPos.toImmutable(),
+            interactionOrigin = SymmetryBreakOriginPolicy.forPrimaryBreak(
+                AxionClientState.globalModeState.infiniteReachEnabled,
+            ),
+        )
     }
 
-    fun dispatchDerivedBreaks(client: MinecraftClient, primaryPos: BlockPos): Boolean {
+    fun dispatchDerivedBreaks(
+        client: MinecraftClient,
+        primaryPos: BlockPos,
+        interactionOrigin: AxionInteractionOrigin = AxionInteractionOrigin.NONE,
+    ): Boolean {
         val config = ActiveSymmetryConfig.current() ?: return false
         if (!ActiveSymmetryConfig.hasDerivedTransforms(config)) {
             return false
@@ -49,7 +64,10 @@ object SymmetryBreakController {
                 },
             )
         }
-        dispatcher.dispatch(operation)
+        when (interactionOrigin) {
+            AxionInteractionOrigin.NONE -> dispatcher
+            AxionInteractionOrigin.INFINITE_REACH -> infiniteReachDispatcher
+        }.dispatch(operation)
         return true
     }
 }

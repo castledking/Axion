@@ -16,16 +16,20 @@ import com.mojang.blaze3d.pipeline.RenderPipeline
 import com.mojang.blaze3d.platform.DepthTestFunction
 import com.mojang.blaze3d.buffers.GpuBufferSlice
 import com.mojang.blaze3d.systems.RenderPass
+import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.vertex.VertexFormat
+import com.mojang.blaze3d.textures.FilterMode
 import com.mojang.blaze3d.textures.GpuTextureView
 import io.netty.buffer.Unpooled
 import net.minecraft.block.Block
 import net.minecraft.block.BlockState
 import net.minecraft.client.MinecraftClient
+import net.minecraft.client.gl.GpuSampler
 import net.minecraft.client.gl.RenderPipelines
 import net.minecraft.client.gui.DrawContext
 import net.minecraft.client.render.Camera
 import net.minecraft.client.render.RenderLayer
+import net.minecraft.client.render.RenderLayers
 import net.minecraft.client.render.RenderTickCounter
 import net.minecraft.command.argument.BlockArgumentParser
 import net.minecraft.entity.Entity
@@ -38,6 +42,7 @@ import net.minecraft.registry.DynamicRegistryManager
 import net.minecraft.registry.Registries
 import net.minecraft.registry.RegistryKeys
 import net.minecraft.registry.RegistryOps
+import net.minecraft.client.texture.AbstractTexture
 import net.minecraft.storage.NbtWriteView
 import net.minecraft.util.ErrorReporter
 import net.minecraft.util.Identifier
@@ -65,7 +70,7 @@ import org.slf4j.LoggerFactory
  */
 object VersionCompatImpl : VersionCompat {
     private val logger = LoggerFactory.getLogger(VersionCompatImpl::class.java)
-    private var currentAtlasSampler: Any? = null
+    private var currentAtlasSampler: GpuSampler? = null
     private val previewShellPipelines = java.util.EnumMap<VertexFormat.DrawMode, RenderPipeline>(VertexFormat.DrawMode::class.java)
 
     private val dynamicUniformsWrite4 by lazy {
@@ -105,32 +110,6 @@ object VersionCompatImpl : VersionCompat {
                 net.minecraft.client.gl.DynamicUniforms::class.java.methods.forEach { m ->
                     logger.warn("  {}({}) -> {}", m.name, m.parameterTypes.joinToString { it.simpleName }, m.returnType.simpleName)
                 }
-            }
-        }
-    }
-
-    private val renderPassBindTexture by lazy {
-        // 1.21.11: bindTexture(String, GpuTextureView, GpuSampler) — 3 params
-        RenderPass::class.java.methods.firstOrNull { method ->
-            method.name == "bindTexture" && method.parameterTypes.size == 3
-        }.also { m ->
-            if (m != null) {
-                logger.info("[Axion GPU] Found RenderPass.bindTexture(3-arg): {}", m)
-            }
-        }
-    }
-
-    private val renderPassBindSampler by lazy {
-        // 1.21.9/1.21.10: bindSampler(String, GpuTextureView) — 2 params
-        RenderPass::class.java.methods.firstOrNull { method ->
-            method.name == "bindSampler" && method.parameterTypes.size == 2
-        }.also { m ->
-            if (m != null) {
-                logger.info("[Axion GPU] Found RenderPass.bindSampler(2-arg): {}", m)
-            } else {
-                // Dump all RenderPass methods for diagnosis if neither primary lookup matched
-                val allMethods = RenderPass::class.java.methods.map { "${it.name}(${it.parameterTypes.joinToString { t -> t.simpleName }})" }
-                logger.warn("[Axion GPU] RenderPass.bindSampler(2-arg) NOT found. Available methods: {}", allMethods)
             }
         }
     }
@@ -255,6 +234,25 @@ object VersionCompatImpl : VersionCompat {
         player?.sendMessage(text, overlay)
     }
 
+    fun sendGameModeCommand(client: MinecraftClient, gameModeId: String) {
+        client.networkHandler?.sendChatCommand("gamemode $gameModeId")
+    }
+
+    fun changeLocalGameMode(client: MinecraftClient, gameModeId: String): Boolean {
+        val server = client.server ?: return false
+        val playerId = client.player?.uuid ?: return false
+        val gameMode = when (gameModeId.lowercase()) {
+            "survival" -> net.minecraft.world.GameMode.SURVIVAL
+            "creative" -> net.minecraft.world.GameMode.CREATIVE
+            "spectator" -> net.minecraft.world.GameMode.SPECTATOR
+            else -> return false
+        }
+        server.execute {
+            server.playerManager.getPlayer(playerId)?.changeGameMode(gameMode)
+        }
+        return true
+    }
+
     fun hasLocalServer(client: MinecraftClient): Boolean = client.server != null
 
     fun runOnRenderThread(client: MinecraftClient, task: Runnable) {
@@ -321,14 +319,12 @@ object VersionCompatImpl : VersionCompat {
             logger.info("[Axion GPU] supportsChunkedPreview=false (shader-pack fallback)")
             return false
         }
-        val hasBindTexture = renderPassBindTexture != null
-        val hasBindSampler = renderPassBindSampler != null
         val hasWrite4 = dynamicUniformsWrite4 != null
         val hasWrite5 = dynamicUniformsWrite5 != null
-        val supported = hasBindTexture || hasBindSampler
+        val supported = hasWrite4 || hasWrite5 || dynamicUniformsWriteAny.isNotEmpty()
         logger.info(
-            "[Axion GPU] supportsChunkedPreview={} (bindTexture={}, bindSampler={}, dynWrite4={}, dynWrite5={})",
-            supported, hasBindTexture, hasBindSampler, hasWrite4, hasWrite5,
+            "[Axion GPU] supportsChunkedPreview={} (dynWrite4={}, dynWrite5={})",
+            supported, hasWrite4, hasWrite5,
         )
         return supported
     }
@@ -340,11 +336,12 @@ object VersionCompatImpl : VersionCompat {
         origins: Collection<BlockPos>,
         color: Int,
         alpha: Int,
+        scale: Float,
     ): Boolean {
         return try {
             if (ShaderPackCompat.shouldDisableDirectGpuPreview()) return false
             val session = ChunkedPreviewLifecycle.acquire(sessionId)
-            session.setFromClipboard(clipboard, origins)
+            session.setFromClipboard(clipboard, origins, scale)
             session.render(context, color, alpha).handled
         } catch (t: Throwable) {
             logger.warn("[Axion GPU] renderChunkedPreview failed for session={} — falling back to CPU path", sessionId, t)
@@ -577,15 +574,14 @@ object VersionCompatImpl : VersionCompat {
     }
 
     // Rendering compatibility for 1.21.11
+    private const val BLOCK_ATLAS_SAMPLER_NAME: String = "Sampler0"
     private var loggedAtlasResult: Boolean = false
     private var loggedBindFailure: Boolean = false
 
     fun getBlockAtlasTextureView(client: MinecraftClient): GpuTextureView? {
         return try {
             val atlas = client.atlasManager?.getAtlasTexture(net.minecraft.util.Identifier.of("minecraft", "blocks"))
-            currentAtlasSampler = atlas?.javaClass?.methods
-                ?.firstOrNull { it.name == "getSampler" && it.parameterCount == 0 }
-                ?.invoke(atlas)
+            currentAtlasSampler = blockAtlasSampler(atlas)
             val view = atlas?.getGlTextureView()
             if (!loggedAtlasResult) {
                 loggedAtlasResult = true
@@ -602,28 +598,41 @@ object VersionCompatImpl : VersionCompat {
         }
     }
 
+    /**
+     * Sampler for the preview's block atlas binding.
+     *
+     * Prefer the sampler vanilla terrain uses (clamped, mipmapped, LINEAR
+     * minification with NEAREST magnification) so preview blocks filter exactly
+     * like the world blocks around them; the atlas' own sampler is unmipmapped
+     * and only serves as a fallback if that field ever moves.
+     */
+    private fun blockAtlasSampler(atlas: AbstractTexture?): GpuSampler? {
+        return runCatching { RenderLayers.BLOCK_SAMPLER.get() }.getOrNull()
+            ?: runCatching { atlas?.sampler }.getOrNull()
+    }
+
+    /** The lightmap is read with texelFetch, so it wants plain unmipmapped NEAREST. */
+    private fun lightmapSampler(): GpuSampler? = runCatching {
+        RenderSystem.getSamplerCache().get(FilterMode.NEAREST)
+    }.getOrNull()
+
     fun bindTextureToRenderPass(pass: RenderPass, samplerName: String, textureView: GpuTextureView) {
-        val sampler = currentAtlasSampler
-        val bindTexture = renderPassBindTexture
-        if (bindTexture != null && sampler != null) {
-            try {
-                bindTexture.invoke(pass, samplerName, textureView, sampler)
-            } catch (e: Exception) {
-                logger.warn("[Axion GPU] bindTexture.invoke failed for {}", samplerName, e)
+        // 1.21.11 replaced RenderPass.bindSampler(name, view) with
+        // bindTexture(name, view, sampler): there is no name-only binding left,
+        // so an unresolved sampler means the draw samples whatever sampler state
+        // the previous pass left on that texture unit.
+        val sampler = if (samplerName == BLOCK_ATLAS_SAMPLER_NAME) currentAtlasSampler else lightmapSampler()
+        if (sampler == null) {
+            if (!loggedBindFailure) {
+                loggedBindFailure = true
+                logger.error("[Axion GPU] No block-atlas sampler resolved — GPU preview textures will be misfiltered")
             }
             return
         }
-
-        val bindSampler = renderPassBindSampler
-        if (bindSampler != null) {
-            try {
-                bindSampler.invoke(pass, samplerName, textureView)
-            } catch (e: Exception) {
-                logger.warn("[Axion GPU] bindSampler.invoke failed for {}", samplerName, e)
-            }
-        } else if (!loggedBindFailure) {
-            loggedBindFailure = true
-            logger.error("[Axion GPU] bindTextureToRenderPass: no bind method available — GPU preview will be invisible")
+        try {
+            pass.bindTexture(samplerName, textureView, sampler)
+        } catch (e: Exception) {
+            logger.warn("[Axion GPU] bindTexture failed for {}", samplerName, e)
         }
     }
 
@@ -760,6 +769,32 @@ object VersionCompatImpl : VersionCompat {
     ) {
         context.drawTexture(RenderPipelines.GUI_TEXTURED, texture, x, y, 0.0f, 0.0f, width, height, width, height)
     }
+
+    fun renderVanillaButton(
+        context: DrawContext,
+        button: net.minecraft.client.gui.widget.ButtonWidget,
+        mouseX: Int,
+        mouseY: Int,
+        delta: Float,
+    ) {
+        button.render(context, mouseX, mouseY, delta)
+    }
+
+    @Suppress("UNUSED_PARAMETER")
+    fun clickVanillaButton(
+        client: MinecraftClient,
+        button: net.minecraft.client.gui.widget.ButtonWidget,
+        mouseX: Double,
+        mouseY: Double,
+        mouseButton: Int,
+    ): Boolean = button.mouseClicked(
+        net.minecraft.client.gui.Click(
+            mouseX,
+            mouseY,
+            net.minecraft.client.input.MouseInput(mouseButton, 0),
+        ),
+        false,
+    )
 
     fun drawGuiTextureRegion(
         context: DrawContext,

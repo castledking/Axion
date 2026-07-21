@@ -13,6 +13,14 @@ kotlin {
     jvmToolchain(21)
 }
 
+dependencies {
+    testImplementation(kotlin("test"))
+}
+
+tasks.test {
+    useJUnitPlatform()
+}
+
 tasks.withType<JavaCompile>().configureEach {
     options.release.set(21)
 }

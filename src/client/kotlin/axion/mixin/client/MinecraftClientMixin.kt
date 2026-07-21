@@ -1,6 +1,8 @@
 package axion.mixin.client
 
 import axion.client.input.AxionInteractionRouter
+import axion.client.input.AxionPrimaryActionRouting
+import axion.client.input.AxionShortcutPreemption
 import axion.client.mode.ClientModeController
 import axion.client.symmetry.SymmetryBreakController
 import net.minecraft.client.MinecraftClient
@@ -14,6 +16,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable
 abstract class MinecraftClientMixin {
     @Suppress("CAST_NEVER_SUCCEEDS")
     private fun self(): MinecraftClient = this as MinecraftClient
+
+    // Drain a conflicting vanilla offhand click before its packet is emitted.
+    @Inject(method = ["handleInputEvents", "handleKeybinds"], at = [At("HEAD")], require = 0)
+    private fun axionPreemptConflictingOffhandSwap(ci: CallbackInfo) {
+        AxionShortcutPreemption.suppressConflictingOffhandSwap(self())
+    }
 
     // Yarn name: doAttack (1.21.x)
     @Inject(method = ["doAttack"], at = [At("HEAD")], cancellable = true, require = 0)
@@ -31,17 +39,20 @@ abstract class MinecraftClientMixin {
         // Manually track attack key press since cancelling prevents vanilla key binding updates
         ClientModeController.setAttackKeyManuallyPressed()
 
-        SymmetryBreakController.handlePrimaryAction(self())
-
-        // Handle bulldozer + infinite reach multi-block breaking
-        if (ClientModeController.handleBulldozerInfiniteReachBreaking(self())) {
-            ci.setReturnValue(false)
-            ci.cancel()
-            return
-        }
-
-        // Handle infinite reach block breaking at vanilla speed
-        if (ClientModeController.handleInfiniteReachBreaking(self())) {
+        // Infinite reach owns the primary click before generic symmetry. Both IR
+        // handlers already dispatch their derived breaks with the protected origin.
+        val infiniteReachOwned = AxionPrimaryActionRouting.route(
+            handleBulldozerInfiniteReach = {
+                ClientModeController.handleBulldozerInfiniteReachBreaking(self())
+            },
+            handleInfiniteReach = {
+                ClientModeController.handleInfiniteReachBreaking(self())
+            },
+            handleGenericSymmetry = {
+                SymmetryBreakController.handlePrimaryAction(self())
+            },
+        )
+        if (infiniteReachOwned) {
             ci.setReturnValue(false)
             ci.cancel()
             return

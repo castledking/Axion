@@ -6,12 +6,14 @@ import axion.protocol.AxionProtocolCodec
 import axion.protocol.AxionTransportCodec
 import axion.protocol.ClientHello
 import axion.protocol.FlightSpeedRequest
+import axion.protocol.GameModeChangeRequest
 import axion.protocol.NoClipStateRequest
 import axion.protocol.OperationBatchRequest
 import axion.protocol.OperationBatchResult
 import axion.protocol.RedoRequest
 import axion.protocol.ServerHello
 import axion.protocol.UndoRequest
+import org.bukkit.GameMode
 import org.bukkit.entity.Player
 import org.bukkit.plugin.messaging.PluginMessageListener
 
@@ -46,6 +48,7 @@ class AxionPluginMessaging(
             is ClientHello -> handleHello(player, decoded)
             is NoClipStateRequest -> handleNoClipState(player, decoded)
             is FlightSpeedRequest -> handleFlightSpeed(player, decoded)
+            is GameModeChangeRequest -> handleGameModeChange(player, decoded)
             is OperationBatchRequest -> handleOperationBatch(player, decoded)
             is UndoRequest -> handleUndo(player, decoded)
             is RedoRequest -> handleRedo(player, decoded)
@@ -97,6 +100,19 @@ class AxionPluginMessaging(
 
     private fun handleFlightSpeed(player: Player, request: FlightSpeedRequest) {
         flightSpeedService.blessPlayer(player, request.multiplier)
+    }
+
+    private fun handleGameModeChange(player: Player, request: GameModeChangeRequest) {
+        if (!AxionDevMode.isEnabled(plugin) && !player.hasPermission(AxionPolicyService.Permissions.GAME_MODE)) {
+            player.sendMessage("Missing permission ${AxionPolicyService.Permissions.GAME_MODE}")
+            return
+        }
+
+        player.gameMode = when (request.gameMode) {
+            axion.protocol.AxionGameMode.SURVIVAL -> GameMode.SURVIVAL
+            axion.protocol.AxionGameMode.CREATIVE -> GameMode.CREATIVE
+            axion.protocol.AxionGameMode.SPECTATOR -> GameMode.SPECTATOR
+        }
     }
 
     private fun handleUndo(player: Player, request: UndoRequest) {

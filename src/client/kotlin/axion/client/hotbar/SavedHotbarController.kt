@@ -18,6 +18,7 @@ object SavedHotbarController {
     private const val HOTBAR_SIZE: Int = 9
 
     private var pendingSelectionIndex: Int? = null
+    private var wasAltDown: Boolean = false
     private val stackCache: MutableMap<String, ItemStack> = linkedMapOf()
 
     data class DisplayHotbar(
@@ -107,6 +108,20 @@ object SavedHotbarController {
     }
 
     fun onEndTick(client: MinecraftClient) {
+        SavedHotbarGameModeController.onEndTick(client)
+        val isAltDown = AxionModifierKeys.isAltDown(client)
+        val shouldRequestCreative = SavedHotbarAltPolicy.shouldRequestCreative(
+            wasAltDown = wasAltDown,
+            isAltDown = isAltDown,
+            isSpectator = client.player?.isSpectator == true,
+            menuEligible = isSavedHotbarContextEligible(client),
+        )
+        wasAltDown = isAltDown
+
+        if (shouldRequestCreative) {
+            SavedHotbarGameModeController.request(client, SavedHotbarMenuAction.CREATIVE)
+        }
+
         val player = client.player
         if (player == null || client.world == null) {
             pendingSelectionIndex = null
@@ -118,7 +133,7 @@ object SavedHotbarController {
             return
         }
 
-        if (AxionModifierKeys.isAltDown(client)) {
+        if (isAltDown) {
             if (pendingSelectionIndex == null) {
                 pendingSelectionIndex = AxionClientConfig.activeSavedHotbarIndex()
             }
@@ -146,9 +161,17 @@ object SavedHotbarController {
     }
 
     private fun supportsSavedHotbars(client: MinecraftClient): Boolean {
-        return client.currentScreen == null &&
+        return isSavedHotbarContextEligible(client) &&
             AxionToolSelectionController.isCreativeModeAllowed() &&
             !AxionToolSelectionController.isAxionSlotActive()
+    }
+
+    private fun isSavedHotbarContextEligible(client: MinecraftClient): Boolean {
+        return client.currentScreen == null &&
+            !client.options.hudHidden &&
+            !SavedHotbarGameModeController.isTransitionPending() &&
+            !AxionToolSelectionController.isAxionSlotActive() &&
+            !LitematicaCompat.isHoldingConfiguredTool(client)
     }
 
     private fun canPersistActiveHotbar(client: MinecraftClient): Boolean {

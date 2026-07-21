@@ -3,17 +3,22 @@ package axion.client.symmetry
 import axion.client.AxionClientState
 import axion.client.compat.VersionCompatImpl
 import axion.client.mode.BuildPlacementService
+import axion.client.mode.InfiniteReachInteractionPolicy
 import axion.client.mode.ModeTargeting
 import axion.client.tool.AxionToolSelectionController
 import axion.client.symmetry.SymmetryAwareOperationDispatcher
 import axion.common.model.SymmetryConfig
 import axion.common.model.SymmetryState
+import axion.protocol.AxionInteractionOrigin
 import net.minecraft.client.MinecraftClient
 import net.minecraft.sound.SoundCategory
 import net.minecraft.util.Hand
 
 object SymmetryPlacementController {
     private val dispatcher = SymmetryAwareOperationDispatcher()
+    private val infiniteReachDispatcher = SymmetryAwareOperationDispatcher(
+        interactionOrigin = AxionInteractionOrigin.INFINITE_REACH,
+    )
 
     fun updatePreview(client: MinecraftClient): Boolean {
         AxionClientState.updateSymmetryPreview(null)
@@ -36,6 +41,17 @@ object SymmetryPlacementController {
         if (state.fastPlaceEnabled || state.replaceModeEnabled) {
             return false
         }
+        // Infinite reach is an extension beyond vanilla's target range. If
+        // vanilla already has a block/entity target, leave the click untouched
+        // so containers, buttons, doors, and ordinary placement keep working.
+        if (InfiniteReachInteractionPolicy.shouldYieldToVanilla(
+                infiniteReachEnabled = state.infiniteReachEnabled,
+                replaceModeEnabled = false,
+                vanillaTargetPresent = client.crosshairTarget?.type?.name?.let { it != "MISS" } == true,
+            )
+        ) {
+            return false
+        }
         val target = ModeTargeting.currentBlockTarget(client) ?: return false
         val operation = BuildPlacementService.createPlacementOperation(
             client = client,
@@ -47,7 +63,14 @@ object SymmetryPlacementController {
             return false
         }
 
-        dispatcher.dispatch(operation)
+        val interactionOrigin = SymmetryPlacementOriginPolicy.forTarget(
+            infiniteReachEnabled = state.infiniteReachEnabled,
+            beyondVanillaReach = target.beyondVanillaReach,
+        )
+        when (interactionOrigin) {
+            AxionInteractionOrigin.NONE -> dispatcher
+            AxionInteractionOrigin.INFINITE_REACH -> infiniteReachDispatcher
+        }.dispatch(operation)
         playPlacementEffects(client, operation)
         client.player?.swingHand(Hand.MAIN_HAND)
         return true

@@ -199,46 +199,11 @@ class AxionPolicyService(
         }
     }
 
-    fun primaryTool(operations: List<AxionRemoteOperation>): AxionToolKind? {
-        val hasClone = operations.any { it is CloneRegionRequest }
-        val hasFilteredClone = operations.any { it is FilteredCloneRegionRequest }
-        val hasClear = operations.any { it is ClearRegionRequest }
-        val hasStack = operations.any { it is StackRegionRequest }
-        val hasSmear = operations.any { it is SmearRegionRequest }
-        val hasExtrude = operations.any { it is ExtrudeRequest }
-        val hasPlace = operations.any { it is PlaceBlocksRequest }
-        val hasDeleteEntities = operations.any { it is DeleteEntitiesRequest }
-        return when {
-            hasClone && hasClear && operations.all {
-                it is CloneRegionRequest || it is ClearRegionRequest || it is MoveEntitiesRequest
-            } -> AxionToolKind.MOVE
-            hasClone || hasFilteredClone || operations.any { it is CloneEntitiesRequest } -> AxionToolKind.CLONE
-            hasStack -> AxionToolKind.STACK
-            hasSmear -> AxionToolKind.SMEAR
-            hasExtrude -> AxionToolKind.EXTRUDE
-            hasDeleteEntities || hasClear -> AxionToolKind.ERASE
-            hasPlace -> null
-            else -> null
-        }
-    }
+    fun primaryTool(operations: List<AxionRemoteOperation>): AxionToolKind? =
+        AxionOperationToolPolicy.primaryTool(operations)
 
-    private fun requiredTools(operations: List<AxionRemoteOperation>): Set<AxionToolKind> {
-        primaryTool(operations)?.let { return setOf(it) }
-        return operations.mapNotNullTo(linkedSetOf()) { operation ->
-            when (operation) {
-                is ClearRegionRequest -> AxionToolKind.ERASE
-                is CloneRegionRequest -> AxionToolKind.CLONE
-                is FilteredCloneRegionRequest -> AxionToolKind.CLONE
-                is CloneEntitiesRequest -> AxionToolKind.CLONE
-                is DeleteEntitiesRequest -> AxionToolKind.ERASE
-                is MoveEntitiesRequest -> null
-                is StackRegionRequest -> AxionToolKind.STACK
-                is SmearRegionRequest -> AxionToolKind.SMEAR
-                is ExtrudeRequest -> AxionToolKind.EXTRUDE
-                is PlaceBlocksRequest -> null
-            }
-        }
-    }
+    private fun requiredTools(operations: List<AxionRemoteOperation>): Set<AxionToolKind> =
+        AxionOperationToolPolicy.requiredTools(operations)
 
     private fun validateTouchedPositions(
         player: Player,
@@ -318,6 +283,7 @@ class AxionPolicyService(
 
     object Permissions {
         const val USE: String = "axion.use"
+        const val GAME_MODE: String = "axion.gamemode"
         const val TOOL_CLONE: String = "axion.tool.clone"
         const val TOOL_MOVE: String = "axion.tool.move"
         const val TOOL_STACK: String = "axion.tool.stack"

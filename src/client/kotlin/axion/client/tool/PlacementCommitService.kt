@@ -42,13 +42,13 @@ object PlacementCommitService {
 
         return when (preview.mode) {
             PlacementToolMode.CLONE -> {
-                if (!AxionClientState.copyEntitiesEnabled || preview.entityUuids.isEmpty()) {
+                if (!AxionClientState.copyEntitiesEnabled || preview.entitySelection.isEmpty) {
                     cloneOperation
                 } else {
                     compositeWithOptionalEntityClone(
                         operations = listOf(cloneOperation),
                         entityCloneOperation = CloneEntitiesOperation(
-                            entityUuids = preview.entityUuids,
+                            entitySelection = preview.entitySelection,
                             sourceRegion = preview.sourceRegion,
                             destinationOrigin = preview.destinationRegion.minCorner(),
                             rotationQuarterTurns = preview.transform.normalizedRotationQuarterTurns,
@@ -94,6 +94,7 @@ object PlacementCommitService {
     ): EditOperation {
         val entityMoveOperation = if (AxionClientState.copyEntitiesEnabled) {
             MoveEntitiesOperation(
+                entitySelection = preview.entitySelection,
                 sourceRegion = preview.sourceRegion,
                 destinationOrigin = preview.destinationRegion.minCorner(),
                 rotationQuarterTurns = preview.transform.normalizedRotationQuarterTurns,

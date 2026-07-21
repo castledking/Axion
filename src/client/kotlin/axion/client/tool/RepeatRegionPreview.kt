@@ -5,10 +5,12 @@ import axion.common.model.ClipboardBuffer
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Direction
 import net.minecraft.util.math.Vec3i
+import axion.protocol.EntitySelectionMask
 
 data class RepeatPreviewSegment(
     val sourceRegion: BlockRegion,
     val clipboardBuffer: ClipboardBuffer,
+    val entitySelection: EntitySelectionMask,
     val step: Vec3i,
     val repeatCount: Int,
     val lookDirection: Direction,
@@ -19,6 +21,7 @@ data class RepeatRegionPreview(
     val firstCorner: BlockPos,
     val sourceRegion: BlockRegion,
     val clipboardBuffer: ClipboardBuffer,
+    val entitySelection: EntitySelectionMask,
     val lookDirection: Direction,
     val step: Vec3i,
     val scrollSign: Int,

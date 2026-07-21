@@ -10,6 +10,7 @@ import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Box
 import net.minecraft.util.math.Vec3d
 import net.minecraft.world.World
+import axion.protocol.IntVector3
 import java.util.UUID
 import kotlin.math.atan2
 import kotlin.math.sqrt
@@ -28,11 +29,21 @@ object LocalEntityMoveService {
             sourceMax.y + 1.25,
             sourceMax.z + 1.0,
         )
+        val entityMatcher = operation.entitySelection.matcher(
+            IntVector3(sourceMin.x, sourceMin.y, sourceMin.z),
+            IntVector3(sourceMax.x, sourceMax.y, sourceMax.z),
+        )
         val seen = linkedSetOf<UUID>()
-        val dummyEntity = serverWorld.getEntitiesByClass(Entity::class.java, queryBox) { true }.firstOrNull()
-        return VersionCompat.INSTANCE.worldGetOtherEntities(serverWorld, dummyEntity ?: return emptyList(), queryBox)
+        return serverWorld.getEntitiesByClass(Entity::class.java, queryBox) { entity ->
+            entity !is PlayerEntity &&
+                !VersionCompat.INSTANCE.entityIsRemoved(entity) &&
+                entityMatcher.containsFeet(
+                    VersionCompat.INSTANCE.entityGetX(entity),
+                    VersionCompat.INSTANCE.entityGetY(entity),
+                    VersionCompat.INSTANCE.entityGetZ(entity),
+                )
+        }
             .asSequence()
-            .mapNotNull { it as? Entity }
             .map(::rootEntity)
             .filter { entity ->
                 entity !is PlayerEntity &&

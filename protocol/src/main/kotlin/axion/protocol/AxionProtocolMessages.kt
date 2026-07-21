@@ -62,11 +62,17 @@ data class ClientHello(
     val clientVersion: String,
 ) : AxionClientMessage
 
+enum class AxionInteractionOrigin {
+    NONE,
+    INFINITE_REACH,
+}
+
 data class OperationBatchRequest(
     val requestId: Long,
     val operations: List<AxionRemoteOperation>,
     val usesSymmetry: Boolean = false,
     val recordHistory: Boolean = true,
+    val interactionOrigin: AxionInteractionOrigin = AxionInteractionOrigin.NONE,
 ) : AxionClientMessage
 
 data class UndoRequest(
@@ -85,6 +91,16 @@ data class NoClipStateRequest(
 
 data class FlightSpeedRequest(
     val multiplier: Float,
+) : AxionClientMessage
+
+enum class AxionGameMode {
+    SURVIVAL,
+    CREATIVE,
+    SPECTATOR,
+}
+
+data class GameModeChangeRequest(
+    val gameMode: AxionGameMode,
 ) : AxionClientMessage
 
 sealed interface AxionRemoteOperation {
@@ -124,6 +140,7 @@ data class FilteredCloneRegionRequest(
 }
 
 data class MoveEntitiesRequest(
+    val entitySelection: EntitySelectionMask,
     val sourceMin: IntVector3,
     val sourceMax: IntVector3,
     val destinationOrigin: IntVector3,
@@ -134,7 +151,7 @@ data class MoveEntitiesRequest(
 }
 
 data class CloneEntitiesRequest(
-    val entityUuids: List<java.util.UUID>,
+    val entitySelection: EntitySelectionMask,
     val sourceMin: IntVector3,
     val sourceMax: IntVector3,
     val destinationOrigin: IntVector3,

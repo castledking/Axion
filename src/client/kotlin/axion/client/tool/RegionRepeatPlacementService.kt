@@ -41,11 +41,13 @@ object RegionRepeatPlacementService {
         }
 
         val direction = dominantLookDirection(client)
+        val entitySelection = clipboardBuffer.toEntitySelectionMask()
         if (mode == Mode.SMEAR) {
             return createPreview(
                 firstCorner = firstCorner,
                 sourceRegion = sourceRegion,
                 clipboardBuffer = clipboardBuffer,
+                entitySelection = entitySelection,
                 lookDirection = direction,
                 step = direction.vector.multiply(scrollDirection).let { Vec3i(it.x, it.y, it.z) },
                 scrollSign = scrollDirection,
@@ -58,6 +60,7 @@ object RegionRepeatPlacementService {
             firstCorner = firstCorner,
             sourceRegion = sourceRegion,
             clipboardBuffer = clipboardBuffer,
+            entitySelection = entitySelection,
             lookDirection = direction,
             step = stepFor(sourceRegion, direction, scrollDirection),
             scrollSign = scrollDirection,
@@ -104,6 +107,7 @@ object RegionRepeatPlacementService {
             firstCorner = preview.firstCorner,
             sourceRegion = preview.sourceRegion,
             clipboardBuffer = preview.clipboardBuffer,
+            entitySelection = preview.entitySelection,
             lookDirection = currentDirection,
             step = nextStep,
             scrollSign = intSign(scrollDirection),
@@ -165,6 +169,7 @@ object RegionRepeatPlacementService {
             firstCorner = preview.firstCorner,
             sourceRegion = preview.sourceRegion,
             clipboardBuffer = preview.clipboardBuffer,
+            entitySelection = preview.entitySelection,
             lookDirection = preview.lookDirection,
             step = nextStep,
             scrollSign = nextScrollSign,
@@ -182,6 +187,7 @@ object RegionRepeatPlacementService {
             firstCorner = preview.firstCorner,
             sourceRegion = lastSegment.sourceRegion,
             clipboardBuffer = lastSegment.clipboardBuffer,
+            entitySelection = lastSegment.entitySelection,
             lookDirection = lastSegment.lookDirection,
             step = lastSegment.step,
             scrollSign = lastSegment.scrollSign,
@@ -201,6 +207,7 @@ object RegionRepeatPlacementService {
             firstCorner = preview.firstCorner,
             sourceRegion = folded.region,
             clipboardBuffer = folded.clipboardBuffer,
+            entitySelection = folded.entitySelection,
             lookDirection = nextDirection,
             step = stepFor(folded.region, nextDirection, scrollDirection),
             scrollSign = scrollDirection,
@@ -213,6 +220,7 @@ object RegionRepeatPlacementService {
         firstCorner: BlockPos,
         sourceRegion: BlockRegion,
         clipboardBuffer: ClipboardBuffer,
+        entitySelection: axion.protocol.EntitySelectionMask,
         lookDirection: Direction,
         step: Vec3i,
         scrollSign: Int,
@@ -224,6 +232,7 @@ object RegionRepeatPlacementService {
             firstCorner = firstCorner,
             sourceRegion = normalized,
             clipboardBuffer = clipboardBuffer,
+            entitySelection = entitySelection,
             lookDirection = lookDirection,
             step = step,
             scrollSign = scrollSign,
@@ -260,6 +269,7 @@ object RegionRepeatPlacementService {
 
     private data class FoldCacheKey(
         val clipboardHash: Int,
+        val entitySelectionHash: Int,
         val sourceRegion: BlockRegion,
         val step: Vec3i,
         val repeatCount: Int,
@@ -268,12 +278,13 @@ object RegionRepeatPlacementService {
 
     private val foldCache = LinkedHashMap<FoldCacheKey, FoldedRepeatPreview>(8, 0.75f, true)
 
-    private fun foldPreview(
+    fun foldPreview(
         preview: RepeatRegionPreview,
         mode: Mode,
     ): FoldedRepeatPreview {
         val key = FoldCacheKey(
             clipboardHash = preview.clipboardBuffer.hashCode(),
+            entitySelectionHash = preview.entitySelection.hashCode(),
             sourceRegion = preview.sourceRegion,
             step = preview.step,
             repeatCount = preview.repeatCount,
@@ -322,9 +333,11 @@ object RegionRepeatPlacementService {
             return FoldedRepeatPreview(
                 region = preview.sourceRegion,
                 clipboardBuffer = preview.clipboardBuffer,
+                entitySelection = preview.entitySelection,
                 segment = RepeatPreviewSegment(
                     sourceRegion = preview.sourceRegion,
                     clipboardBuffer = preview.clipboardBuffer,
+                    entitySelection = preview.entitySelection,
                     step = preview.step,
                     repeatCount = preview.repeatCount,
                     lookDirection = preview.lookDirection,
@@ -351,12 +364,34 @@ object RegionRepeatPlacementService {
             }
         }
 
+        val repeatedEntitySelection = preview.entitySelection.repeated(
+            sourceSize = preview.sourceRegion.size().toProtocolVector(),
+            step = preview.step.toProtocolVector(),
+            repeatCount = preview.repeatCount,
+        )
+        check(repeatedEntitySelection.size == region.size().toProtocolVector()) {
+            "Folded entity selection size does not match folded block region"
+        }
+        check(
+            sourceOrigin.add(
+                Vec3i(
+                    repeatedEntitySelection.relativeOrigin.x,
+                    repeatedEntitySelection.relativeOrigin.y,
+                    repeatedEntitySelection.relativeOrigin.z,
+                ),
+            ) == region.minCorner(),
+        ) {
+            "Folded entity selection origin does not match folded block region"
+        }
+
         return FoldedRepeatPreview(
             region = region,
             clipboardBuffer = ClipboardBuffer(size = region.size(), cells = foldedCells),
+            entitySelection = repeatedEntitySelection.mask,
             segment = RepeatPreviewSegment(
                 sourceRegion = preview.sourceRegion,
                 clipboardBuffer = preview.clipboardBuffer,
+                entitySelection = preview.entitySelection,
                 step = preview.step,
                 repeatCount = preview.repeatCount,
                 lookDirection = preview.lookDirection,
@@ -432,9 +467,10 @@ object RegionRepeatPlacementService {
         }
     }
 
-    private data class FoldedRepeatPreview(
+    data class FoldedRepeatPreview(
         val region: BlockRegion,
         val clipboardBuffer: ClipboardBuffer,
+        val entitySelection: axion.protocol.EntitySelectionMask,
         val segment: RepeatPreviewSegment,
     )
 }

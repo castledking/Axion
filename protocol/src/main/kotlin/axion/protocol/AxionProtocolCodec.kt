@@ -23,6 +23,7 @@ object AxionProtocolCodec {
                     message.operations.forEach { writeOperation(data, it) }
                     data.writeBoolean(message.usesSymmetry)
                     data.writeBoolean(message.recordHistory)
+                    data.writeUTF(message.interactionOrigin.name)
                 }
 
                 is UndoRequest -> {
@@ -45,6 +46,11 @@ object AxionProtocolCodec {
                 is FlightSpeedRequest -> {
                     data.writeByte(6)
                     data.writeFloat(message.multiplier)
+                }
+
+                is GameModeChangeRequest -> {
+                    data.writeByte(7)
+                    data.writeUTF(message.gameMode.name)
                 }
             }
         }
@@ -75,6 +81,7 @@ object AxionProtocolCodec {
                     operations = List(data.readInt()) { readOperation(data) },
                     usesSymmetry = data.readBoolean(),
                     recordHistory = data.readBoolean(),
+                    interactionOrigin = AxionInteractionOrigin.valueOf(data.readUTF()),
                 )
 
                 3 -> UndoRequest(
@@ -93,6 +100,10 @@ object AxionProtocolCodec {
 
                 6 -> FlightSpeedRequest(
                     multiplier = data.readFloat(),
+                )
+
+                7 -> GameModeChangeRequest(
+                    gameMode = AxionGameMode.valueOf(data.readUTF()),
                 )
 
                 else -> null
@@ -212,8 +223,7 @@ object AxionProtocolCodec {
             }
 
             is CloneEntitiesRequest -> {
-                output.writeInt(operation.entityUuids.size)
-                operation.entityUuids.forEach { writeUuid(output, it) }
+                writeEntitySelection(output, operation.entitySelection)
                 writeVector(output, operation.sourceMin)
                 writeVector(output, operation.sourceMax)
                 writeVector(output, operation.destinationOrigin)
@@ -227,6 +237,7 @@ object AxionProtocolCodec {
             }
 
             is MoveEntitiesRequest -> {
+                writeEntitySelection(output, operation.entitySelection)
                 writeVector(output, operation.sourceMin)
                 writeVector(output, operation.sourceMax)
                 writeVector(output, operation.destinationOrigin)
@@ -301,7 +312,7 @@ object AxionProtocolCodec {
             )
 
             AxionOperationType.CLONE_ENTITIES -> CloneEntitiesRequest(
-                entityUuids = List(input.readInt()) { readUuid(input) },
+                entitySelection = readEntitySelection(input),
                 sourceMin = readVector(input),
                 sourceMax = readVector(input),
                 destinationOrigin = readVector(input),
@@ -315,6 +326,7 @@ object AxionProtocolCodec {
             )
 
             AxionOperationType.MOVE_ENTITIES -> MoveEntitiesRequest(
+                entitySelection = readEntitySelection(input),
                 sourceMin = readVector(input),
                 sourceMax = readVector(input),
                 destinationOrigin = readVector(input),
@@ -438,6 +450,34 @@ object AxionProtocolCodec {
         }
     }
 
+    private fun writeEntitySelection(output: DataOutputStream, selection: EntitySelectionMask) {
+        output.writeByte(selection.mode.ordinal)
+        if (selection.mode == EntitySelectionMode.SPARSE_OFFSETS) {
+            output.writeInt(selection.offsets.size)
+            selection.offsets.forEach { writeVector(output, it) }
+        }
+    }
+
+    private fun readEntitySelection(input: DataInputStream): EntitySelectionMask {
+        val modeOrdinal = input.readUnsignedByte()
+        val mode = EntitySelectionMode.entries.getOrNull(modeOrdinal)
+            ?: error("Unknown entity selection mode $modeOrdinal")
+        return when (mode) {
+            EntitySelectionMode.FULL_REGION -> EntitySelectionMask.fullRegion()
+            EntitySelectionMode.SPARSE_OFFSETS -> {
+                val count = input.readInt()
+                require(count >= 0) { "Negative entity selection offset count" }
+                require(count <= EntitySelectionMask.MAX_SPARSE_OFFSETS) {
+                    "Entity selection offset count exceeds the protocol limit"
+                }
+                require(count.toLong() * ENCODED_VECTOR_BYTES <= input.available().toLong()) {
+                    "Entity selection offset count exceeds the remaining payload"
+                }
+                EntitySelectionMask.sparseOffsets(List(count) { readVector(input) })
+            }
+        }
+    }
+
     private fun writeVector(output: DataOutputStream, vector: IntVector3) {
         output.writeInt(vector.x)
         output.writeInt(vector.y)
@@ -482,14 +522,5 @@ object AxionProtocolCodec {
         }
     }
 
-    private fun writeUuid(output: DataOutputStream, uuid: java.util.UUID) {
-        output.writeLong(uuid.mostSignificantBits)
-        output.writeLong(uuid.leastSignificantBits)
-    }
-
-    private fun readUuid(input: DataInputStream): java.util.UUID {
-        val mostSig = input.readLong()
-        val leastSig = input.readLong()
-        return java.util.UUID(mostSig, leastSig)
-    }
+    private const val ENCODED_VECTOR_BYTES: Long = 3L * Int.SIZE_BYTES
 }

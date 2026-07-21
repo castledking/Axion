@@ -40,10 +40,10 @@ object SelectionStateRenderer {
                         outlineColor = REGION_COLOR,
                         lineWidth = LINE_WIDTH,
                         baseFillColor = SELECTION_BASE_FILL_COLOR,
-                        baseAlpha = SELECTION_BASE_FILL_ALPHA,
-                        pulseFillColor = SELECTION_PULSE_FILL_COLOR,
-                        pulseMinAlpha = SELECTION_PULSE_MIN_ALPHA,
-                        pulseMaxAlpha = SELECTION_PULSE_MAX_ALPHA,
+                        baseAlpha = 0,
+                        pulseFillColor = null,
+                        pulseMinAlpha = 0,
+                        pulseMaxAlpha = 0,
                     ),
                 )
             }

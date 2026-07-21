@@ -8,7 +8,6 @@ import net.minecraft.util.math.Box
 import net.minecraft.util.shape.VoxelShapes
 
 object SymmetryGizmoRenderer {
-    private const val GIZMO_COLOR: Int = 0xFFF2C94C.toInt()
     private const val HALF_SIZE: Double = 2.0 / 16.0
     private const val LINE_WIDTH: Float = 1.5f
     private const val FILL_ALPHA: Int = 130
@@ -26,6 +25,10 @@ object SymmetryGizmoRenderer {
         val consumers = context.consumers()
         val matrixStack = context.matrices()
         val box = gizmoBox(config.anchor.position)
+        val color = SymmetryGizmoStylePolicy.color(
+            rotationalEnabled = config.rotationalEnabled,
+            mirrorEnabled = config.mirrorEnabled,
+        )
 
         val fillLayer = RenderLayerCompat.xrayQuads()
         val lineLayer = RenderLayerCompat.lines()
@@ -37,7 +40,7 @@ object SymmetryGizmoRenderer {
                 cameraPos = cameraPos,
                 box = box,
                 alpha = FILL_ALPHA,
-                color = GIZMO_COLOR,
+                color = color,
             )
 
             VertexRenderingCompat.drawOutline(
@@ -47,7 +50,7 @@ object SymmetryGizmoRenderer {
                 -cameraPos.x,
                 -cameraPos.y,
                 -cameraPos.z,
-                GIZMO_COLOR,
+                color,
                 LINE_WIDTH,
             )
         }

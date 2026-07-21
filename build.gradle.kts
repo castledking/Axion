@@ -350,6 +350,219 @@ val gpuPreviewCompatDir = when {
     else -> "src/compat-1_21_11"
 }
 
+val allPreviewCompatDirs = listOf(
+    "src/compat-1_21_0_1",
+    "src/compat-1_21_4",
+    "src/compat-1_21_5",
+    "src/compat-1_21_6_8",
+    "src/compat-1_21_9_10",
+    "src/compat-1_21_11",
+    "src/compat-26_1",
+)
+
+val verifyXraySelectionRenderingCoverage by tasks.registering {
+    group = "verification"
+    description = "Verifies selection outlines and symmetry anchors render through blocks in every compatibility branch."
+
+    doLast {
+        allPreviewCompatDirs.forEach { compatDir ->
+            val pulsingCuboidRenderer = file(
+                "$compatDir/kotlin/axion/client/render/PulsingCuboidRenderer.kt",
+            ).readText()
+            // The vanilla lines layer bakes a depth test into its pipeline, so
+            // wrapping the draw in DepthRenderCompat cannot make the outline
+            // show through terrain. Both entry points must emit their edges as
+            // beams on the same no-depth fill layer the pulse uses.
+            val selectionBoxBody = pulsingCuboidRenderer
+                .substringAfter("fun renderSelectionBox(")
+                .substringBefore("fun renderOutlineBox(")
+            listOf(
+                "renderXrayOutline(",
+                "layer = fillLayer",
+            ).forEach { requiredSource ->
+                check(requiredSource in selectionBoxBody) {
+                    "Selection outline can be hidden by terrain in $compatDir: missing $requiredSource"
+                }
+            }
+            check("DepthRenderCompat.renderThroughBlocks(consumers, lineLayer)" !in selectionBoxBody) {
+                "Selection outline in $compatDir still draws on the depth-tested lines layer"
+            }
+            val outlineBoxBody = pulsingCuboidRenderer
+                .substringAfter("fun renderOutlineBox(")
+                .substringBefore("fun renderXrayOutline(")
+            listOf(
+                "RenderLayerCompat.xrayQuads()",
+                "renderXrayOutline(",
+            ).forEach { requiredSource ->
+                check(requiredSource in outlineBoxBody) {
+                    "Outline-only selection can be hidden by terrain in $compatDir: missing $requiredSource"
+                }
+            }
+            check("DepthRenderCompat.renderThroughBlocks(consumers, lineLayer)" !in outlineBoxBody) {
+                "Outline-only selection in $compatDir still draws on the depth-tested lines layer"
+            }
+
+            val symmetryRenderer = file(
+                "$compatDir/kotlin/axion/client/render/SymmetryGizmoRenderer.kt",
+            ).readText()
+            listOf(
+                "SymmetryGizmoStylePolicy.color(",
+                "rotationalEnabled = config.rotationalEnabled",
+                "mirrorEnabled = config.mirrorEnabled",
+                "DepthRenderCompat.renderThroughBlocks(consumers, fillLayer, lineLayer)",
+            ).forEach { requiredSource ->
+                check(requiredSource in symmetryRenderer) {
+                    "Symmetry anchor styling/depth coverage is incomplete in $compatDir: missing $requiredSource"
+                }
+            }
+        }
+    }
+}
+
+val verifyFabricServerRangeCompatibility by tasks.registering {
+    group = "verification"
+    description = "Guards the 1.21.9-1.21.11 Fabric server bundle from 1.21.11-only permission APIs."
+
+    doLast {
+        val networkingSource = file(
+            "fabric-server/src/main/kotlin/axion/server/fabric/AxionFabricServerNetworking.kt",
+        ).readText()
+        check("GameModeCommand.PERMISSION_CHECK" !in networkingSource && "player.permissions" !in networkingSource) {
+            "Fabric game-mode permissions must remain binary-compatible with Minecraft 1.21.9-1.21.11"
+        }
+        listOf(
+            "PlayerConfigEntry(player.gameProfile)",
+            "server.playerManager.isOperator(",
+        ).forEach { requiredSource ->
+            check(requiredSource in networkingSource) {
+                "Fabric game-mode permission wiring is missing $requiredSource"
+            }
+        }
+    }
+}
+
+val verifyMoveSourceReplacementCoverage by tasks.registering {
+    group = "verification"
+    description = "Verifies that Move alone renders a post-scroll glass replacement at the source region."
+
+    doLast {
+        val expectedTagFiles = mutableSetOf<File>()
+        val normalizedMoveSourceRenderers = mutableSetOf<String>()
+
+        allPreviewCompatDirs.forEach { compatDir ->
+            val placementRenderer = file(
+                "$compatDir/kotlin/axion/client/render/PlacementPreviewRenderer.kt",
+            )
+            val placementSource = placementRenderer.readText()
+            expectedTagFiles += placementRenderer.canonicalFile
+
+            listOf(
+                "PlacementToolController.currentPreview() ?: return",
+                "renderMoveSourceReplacement(context, preview)",
+                "PlacementPreviewPolicy.shouldRenderMoveSourceReplacement(preview)",
+                "preview.sourceRegion.minCorner()",
+                "preview.sourceClipboardBuffer",
+                "Blocks.LIGHT_GRAY_STAINED_GLASS.defaultState",
+                "sessionTag = \"move-source-replacement\"",
+            ).forEach { requiredSource ->
+                check(requiredSource in placementSource) {
+                    "Move source replacement coverage is incomplete in $placementRenderer: missing $requiredSource"
+                }
+            }
+            val moveSourceRenderer = placementSource
+                .substringAfter("private fun renderMoveSourceReplacement(")
+                .substringBefore("private fun moveSourceClipboard(")
+            check("PlacementToolMode.CLONE" !in moveSourceRenderer) {
+                "Clone must not enter the Move source replacement renderer in $placementRenderer"
+            }
+            normalizedMoveSourceRenderers += moveSourceRenderer
+                .replace("forceChunked = true,", "")
+                .replace(Regex("\\s+"), " ")
+                .trim()
+
+            val selectionRenderer = file(
+                "$compatDir/kotlin/axion/client/render/ClipboardSelectionRenderer.kt",
+            )
+            check("GLASS_OVERLAY_" !in selectionRenderer.readText()) {
+                "Generic selection glass is amplified in $selectionRenderer; replacement glass must be Move-only"
+            }
+
+            val selectionStateRenderer = file(
+                "$compatDir/kotlin/axion/client/render/SelectionStateRenderer.kt",
+            ).readText()
+            val pendingMagicSelectionBranch = selectionStateRenderer
+                .substringAfter("SelectionState.Idle ->")
+                .substringBefore("is SelectionState.FirstCornerSet")
+            check(
+                "baseAlpha = 0" in pendingMagicSelectionBranch &&
+                    "pulseFillColor = null" in pendingMagicSelectionBranch
+            ) {
+                "Pre-scroll Magic Select must be outline-only in $compatDir"
+            }
+
+            val ghostRenderer = file(
+                "$compatDir/kotlin/axion/client/render/GhostBlockPreviewRenderer.kt",
+            ).readText()
+            val chunkedPreviewCall = ghostRenderer
+                .substringAfter("VersionCompatImpl.renderChunkedPreview(")
+                .substringBefore("if (handled)")
+            check("scale" in chunkedPreviewCall) {
+                "Chunked preview routing drops overlay scale in $compatDir"
+            }
+
+            if (compatDir == "src/compat-26_1") {
+                val previewDrawer = file(
+                    "$compatDir/kotlin/axion/client/render/gpu/AxionPreviewBlockDrawer.kt",
+                ).readText()
+                check("_polygonOffset(-1.0f, -1.0f)" in previewDrawer) {
+                    "26.1 Move source replacement lacks a GPU depth bias"
+                }
+            } else {
+                val chunkedSession = file(
+                    "$compatDir/kotlin/axion/client/render/gpu/ChunkedPreviewSession.kt",
+                ).readText()
+                check(
+                    "scale = meshScale" in chunkedSession &&
+                        "scale.toBits()" in chunkedSession
+                ) {
+                    "Chunked preview meshes do not preserve scale in $compatDir"
+                }
+            }
+        }
+
+        check(normalizedMoveSourceRenderers.size == 1) {
+            "Move source replacement renderers differ across compatibility branches"
+        }
+
+        val actualTagFiles = fileTree("src") {
+            include("**/*.kt")
+        }.files.filterTo(mutableSetOf()) { sourceFile ->
+            "sessionTag = \"move-source-replacement\"" in sourceFile.readText()
+        }.mapTo(mutableSetOf()) { it.canonicalFile }
+
+        check(actualTagFiles == expectedTagFiles) {
+            "Move source replacement session must occur only in every compatibility PlacementPreviewRenderer; " +
+                "expected=$expectedTagFiles actual=$actualTagFiles"
+        }
+
+        val placementController = file(
+            "src/client/kotlin/axion/client/tool/PlacementToolController.kt",
+        ).readText()
+        val magicSelectionScrollBranch = placementController
+            .substringAfter("val magicSelection = AxionClientState.clipboardState")
+            .substringBefore("is CloneToolState.RegionDefined")
+        listOf(
+            "mode = mode",
+            "sourceRegion = magicSelection.region",
+            "clipboardBuffer = magicSelection.clipboardBuffer",
+        ).forEach { requiredSource ->
+            check(requiredSource in magicSelectionScrollBranch) {
+                "Magic Select no longer forwards $requiredSource into the post-scroll placement preview"
+            }
+        }
+    }
+}
+
 val verifyGpuPreviewCoverage by tasks.registering {
     group = "verification"
     description = "Verifies that every supported Minecraft range packages and enables persistent GPU previews."
@@ -451,6 +664,9 @@ val verifyGpuPreviewCoverage by tasks.registering {
 tasks.named("check") {
     dependsOn(verifyIntegratedNoClipWiring)
     dependsOn(verifyGpuPreviewCoverage)
+    dependsOn(verifyFabricServerRangeCompatibility)
+    dependsOn(verifyMoveSourceReplacementCoverage)
+    dependsOn(verifyXraySelectionRenderingCoverage)
 }
 
 // Range-style filename, e.g. "mc1.21.9-1.21.11"

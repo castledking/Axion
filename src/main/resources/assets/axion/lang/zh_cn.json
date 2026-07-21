@@ -24,6 +24,7 @@
   "axion.config.main_modifier.ctrl": "Ctrl",
   "axion.config.main_modifier.cmd": "CMD",
   "axion.config.magic_select.templates.button": "魔法选择模板",
+  "axion.config.infinite_reach_range": "无限距离范围:",
   "axion.config.magic_select.templates.summary": "配置用于魔法选择匹配的已保存模板。",
   "axion.config.magic_select.title": "魔法选择模板",
   "axion.config.magic_select.description": "启用您希望魔法选择使用的模板。",

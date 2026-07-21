@@ -1,6 +1,7 @@
 package axion.server.fabric
 
 import axion.protocol.AxionClientMessage
+import axion.protocol.AxionGameMode
 import axion.protocol.AxionProtocol
 import axion.protocol.AxionProtocolCodec
 import axion.protocol.AxionResultCode
@@ -9,6 +10,7 @@ import axion.protocol.AxionServerMessage
 import axion.protocol.AxionTransportCodec
 import axion.protocol.ClientHello
 import axion.protocol.FlightSpeedRequest
+import axion.protocol.GameModeChangeRequest
 import axion.protocol.NoClipStateRequest
 import axion.protocol.OperationBatchRequest
 import axion.protocol.OperationBatchResult
@@ -19,7 +21,10 @@ import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.server.MinecraftServer
+import net.minecraft.server.PlayerConfigEntry
 import net.minecraft.server.network.ServerPlayerEntity
+import net.minecraft.text.Text
+import net.minecraft.world.GameMode
 import org.slf4j.Logger
 
 class AxionFabricServerNetworking(
@@ -42,6 +47,7 @@ class AxionFabricServerNetworking(
                     is ClientHello -> handleHello(context.player(), decoded)
                     is NoClipStateRequest -> noClipService.setArmed(context.player(), decoded.armed)
                     is FlightSpeedRequest -> handleFlightSpeed(context.player(), decoded)
+                    is GameModeChangeRequest -> handleGameModeChange(context.server(), context.player(), decoded)
                     is OperationBatchRequest -> handleOperationBatch(context.player(), decoded)
                     is UndoRequest -> handleUndo(context.server(), context.player(), decoded)
                     is RedoRequest -> handleRedo(context.server(), context.player(), decoded)
@@ -115,6 +121,27 @@ class AxionFabricServerNetworking(
                 }
             }
         }
+    }
+
+    private fun handleGameModeChange(
+        server: MinecraftServer,
+        player: ServerPlayerEntity,
+        request: GameModeChangeRequest,
+    ) {
+        val allowed = AxionFabricDevMode.isEnabled(server) ||
+            server.playerManager.isOperator(PlayerConfigEntry(player.gameProfile))
+        if (!allowed) {
+            player.sendMessage(Text.literal("You do not have permission to change game mode."), true)
+            return
+        }
+
+        player.changeGameMode(
+            when (request.gameMode) {
+                AxionGameMode.SURVIVAL -> GameMode.SURVIVAL
+                AxionGameMode.CREATIVE -> GameMode.CREATIVE
+                AxionGameMode.SPECTATOR -> GameMode.SPECTATOR
+            },
+        )
     }
 
     private fun sendRejected(

@@ -6,6 +6,7 @@ import axion.client.config.AxionClientConfig
 import axion.client.config.AxionConfigScreen
 import axion.client.hotbar.AxionAltMenuController
 import axion.client.hotbar.SavedHotbarController
+import axion.client.hotbar.SavedHotbarGameModeController
 import axion.client.history.UndoRedoController
 import axion.client.mode.ClientModeController
 import axion.client.network.AxionServerConnection
@@ -34,6 +35,7 @@ object AxionTickHandler {
         AxionInteractionRouter.onEndTick(client)
         val player = client.player
         if (player == null) {
+            SavedHotbarGameModeController.reset()
             CrowBarCompat.setLocatorBarSuppressed(false)
             return
         }

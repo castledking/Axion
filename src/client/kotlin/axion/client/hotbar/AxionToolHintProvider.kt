@@ -110,7 +110,10 @@ object AxionToolHintProvider {
         return CompactToolHints(
             crosshairHints = buildList {
                 when (state) {
-                    EraseToolState.Idle -> add(left("First Point"))
+                    EraseToolState.Idle -> {
+                        add(left("First Point"))
+                        add(right("Erase connected"))
+                    }
                     is EraseToolState.FirstCornerSet -> addAll(selectionPointHints())
                     is EraseToolState.RegionDefined -> {
                         addAll(selectionPointHints())
@@ -120,7 +123,11 @@ object AxionToolHintProvider {
                 addMagicSelectCrosshair()
             },
             keyHints = buildList {
-                addMagicSelectKeyHints()
+                if (state == EraseToolState.Idle) {
+                    add(ToolHintEntry("Ctrl + Scroll", "Erase brush size"))
+                } else {
+                    addMagicSelectKeyHints()
+                }
             },
         )
     }

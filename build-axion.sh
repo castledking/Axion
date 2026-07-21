@@ -444,6 +444,9 @@ build_range() {
         remapJar
         :paper-plugin:jar
         verifyGpuPreviewCoverage
+        verifyFabricServerRangeCompatibility
+        verifyMoveSourceReplacementCoverage
+        verifyXraySelectionRenderingCoverage
         verifyIntegratedNoClipWiring
     )
     if [[ "$range" == "mc26_1_x" ]]; then
@@ -452,6 +455,9 @@ build_range() {
             jar
             :paper-plugin:jar
             verifyGpuPreviewCoverage
+            verifyFabricServerRangeCompatibility
+            verifyMoveSourceReplacementCoverage
+            verifyXraySelectionRenderingCoverage
             verifyIntegratedNoClipWiring
         )
     fi

@@ -19,7 +19,10 @@ object RepeatPreviewRenderer {
     private const val DESTINATION_GHOST_COLOR: Int = 0xFFFFFFFF.toInt()
     private const val DEFAULT_GHOST_ALPHA: Int = 86
     private const val SPARSE_GHOST_ALPHA: Int = 112
-    private const val GHOST_SCALE: Float = 0.985f
+    // Full size: see DESTINATION_GHOST_SCALE in PlacementPreviewRenderer -- a
+    // per-block shrink only takes effect on the CPU fallback path and shows up
+    // there as seams between neighbouring preview blocks.
+    private const val GHOST_SCALE: Float = 1.0f
     private const val SOURCE_SELECTION_COLOR: Int = 0xFFFFFFFF.toInt()
     private val writePlanner = LocalWritePlanner()
 

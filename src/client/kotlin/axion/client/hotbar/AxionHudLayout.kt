@@ -15,6 +15,8 @@ object AxionHudLayout {
     private const val FLY_BUTTON_WIDTH: Int = 16
     private const val FLY_BUTTON_HEIGHT: Int = 14
     private const val FLY_TRACK_WIDTH: Int = 16
+    private const val ACTION_BUTTON_HEIGHT: Int = 18
+    private const val ACTION_BUTTON_GAP: Int = 2
     const val STRIP_ENTRY_HEIGHT: Int = 18
     const val STRIP_ENTRY_WIDTH: Int = 42
     const val STRIP_ENTRY_GAP: Int = 2
@@ -66,6 +68,19 @@ object AxionHudLayout {
         val width: Int,
         val height: Int,
         val direction: Int,
+    ) {
+        fun contains(mouseX: Double, mouseY: Double): Boolean {
+            return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height
+        }
+    }
+
+    data class SavedHotbarActionButtonBounds(
+        val x: Int,
+        val y: Int,
+        val width: Int,
+        val height: Int,
+        val action: SavedHotbarMenuAction,
+        val enabled: Boolean,
     ) {
         fun contains(mouseX: Double, mouseY: Double): Boolean {
             return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height
@@ -137,6 +152,56 @@ object AxionHudLayout {
                 height = SAVED_HOTBAR_HEIGHT,
                 index = pageStart + row,
             )
+        }
+    }
+
+    fun savedHotbarActionButtons(screenWidth: Int, screenHeight: Int, page: Int): List<SavedHotbarActionButtonBounds> {
+        val topRow = savedHotbarRows(screenWidth, screenHeight, page).last()
+        val modeY = topRow.y - ACTION_BUTTON_HEIGHT
+        val editY = modeY - ACTION_BUTTON_GAP - ACTION_BUTTON_HEIGHT
+        val displayY = editY - ACTION_BUTTON_GAP - ACTION_BUTTON_HEIGHT
+        val modeWidths = intArrayOf(59, 59, 60)
+        val modeActions = listOf(
+            SavedHotbarMenuAction.SURVIVAL,
+            SavedHotbarMenuAction.SPECTATOR,
+            SavedHotbarMenuAction.CREATIVE,
+        )
+        var modeX = topRow.x
+
+        return buildList {
+            add(
+                SavedHotbarActionButtonBounds(
+                    x = topRow.x,
+                    y = displayY,
+                    width = topRow.width,
+                    height = ACTION_BUTTON_HEIGHT,
+                    action = SavedHotbarMenuAction.CREATE_DISPLAY_ENTITY,
+                    enabled = false,
+                ),
+            )
+            add(
+                SavedHotbarActionButtonBounds(
+                    x = topRow.x,
+                    y = editY,
+                    width = topRow.width,
+                    height = ACTION_BUTTON_HEIGHT,
+                    action = SavedHotbarMenuAction.EDIT_BLOCK_ATTRIBUTES,
+                    enabled = false,
+                ),
+            )
+            modeActions.forEachIndexed { index, action ->
+                add(
+                    SavedHotbarActionButtonBounds(
+                        x = modeX,
+                        y = modeY,
+                        width = modeWidths[index],
+                        height = ACTION_BUTTON_HEIGHT,
+                        action = action,
+                        enabled = true,
+                    ),
+                )
+                modeX += modeWidths[index] + ACTION_BUTTON_GAP
+            }
         }
     }
 

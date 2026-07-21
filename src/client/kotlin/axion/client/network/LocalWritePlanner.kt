@@ -316,6 +316,7 @@ class LocalWritePlanner {
         val hasClone = operation.operations.any { it is CloneRegionOperation }
         val hasClear = operation.operations.any { it is ClearRegionOperation }
         return when {
+            operation.operations.any { it is MoveEntitiesOperation } -> "Move"
             hasClone && hasClear -> "Move"
             hasClone -> "Clone"
             else -> operation.operations.firstOrNull()?.let(::operationLabel) ?: "Edit"

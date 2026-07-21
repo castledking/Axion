@@ -54,6 +54,17 @@ object AxionClientConfig {
         save()
     }
 
+    fun infiniteReachRange(): Double = InfiniteReachRange.effective(data.infiniteReachRange)
+
+    fun configuredInfiniteReachRange(): Double? = data.infiniteReachRange
+
+    fun setInfiniteReachRange(range: Double?) {
+        data = data.copy(
+            infiniteReachRange = range?.let(InfiniteReachRange::effective),
+        )
+        save()
+    }
+
     fun savedHotbars(): List<SavedHotbarConfig> = data.savedHotbars
 
     fun savedHotbar(index: Int): SavedHotbarConfig? = data.savedHotbars.getOrNull(index)
@@ -285,6 +296,9 @@ object AxionClientConfig {
             useCommandModifierOnMac = fileData?.useCommandModifierOnMac ?: defaults.useCommandModifierOnMac,
             useSuperModifierOnLinux = fileData?.useSuperModifierOnLinux ?: defaults.useSuperModifierOnLinux,
             sameBlockMagicSelectEnabled = fileData?.sameBlockMagicSelectEnabled ?: defaults.sameBlockMagicSelectEnabled,
+            infiniteReachRange = fileData?.infiniteReachRange
+                ?.takeIf(Double::isFinite)
+                ?.let(InfiniteReachRange::effective),
             activeSavedHotbarIndex = savedHotbarData.activeSavedHotbarIndex,
             nextMagicTemplateIndex = maxOf(
                 fileData?.nextMagicTemplateIndex ?: defaults.nextMagicTemplateIndex,
@@ -408,6 +422,7 @@ object AxionClientConfig {
         val useCommandModifierOnMac: Boolean,
         val useSuperModifierOnLinux: Boolean,
         val sameBlockMagicSelectEnabled: Boolean,
+        val infiniteReachRange: Double?,
         val activeSavedHotbarIndex: Int,
         val nextMagicTemplateIndex: Int,
         val nextMagicCustomMaskIndex: Int,
@@ -426,6 +441,7 @@ object AxionClientConfig {
                     // opt into Super via the config screen if their Alt key has issues.
                     useSuperModifierOnLinux = false,
                     sameBlockMagicSelectEnabled = false,
+                    infiniteReachRange = null,
                     activeSavedHotbarIndex = 0,
                     nextMagicTemplateIndex = 3,
                     nextMagicCustomMaskIndex = 3,
@@ -473,6 +489,7 @@ object AxionClientConfig {
         val useCommandModifierOnMac: Boolean? = null,
         val useSuperModifierOnLinux: Boolean? = null,
         val sameBlockMagicSelectEnabled: Boolean? = null,
+        val infiniteReachRange: Double? = null,
         val activeSavedHotbarIndex: Int? = null,
         val nextMagicTemplateIndex: Int? = null,
         val nextMagicCustomMaskIndex: Int? = null,

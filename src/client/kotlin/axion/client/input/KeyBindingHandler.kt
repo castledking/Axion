@@ -103,6 +103,12 @@ object KeyBindingHandler {
         }
     }
 
+    fun isBoundKeyDown(keyBinding: KeyBinding): Boolean {
+        val keyCode = getBoundKeyCode(keyBinding) ?: return false
+        if (keyCode == GLFW.GLFW_KEY_UNKNOWN) return false
+        return GLFW.glfwGetKey(MinecraftClient.getInstance().window.handle, keyCode) == GLFW.GLFW_PRESS
+    }
+
     /**
      * Get the GLFW key code for a KeyBinding's currently bound key.
      * Uses reflection to access the protected `boundKey` field.

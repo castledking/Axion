@@ -7,11 +7,13 @@ import axion.client.symmetry.SymmetryController
 import axion.client.symmetry.SymmetryPlacementController
 import axion.client.tool.AxionToolSelectionController
 import axion.client.tool.CloneToolState
+import axion.client.tool.EraseBrushSize
 import axion.client.tool.EraseToolController
 import axion.client.tool.EraseToolState
 import axion.client.tool.ExtrudeToolController
 import axion.client.tool.MagicSelectionService
 import axion.client.tool.PlacementToolController
+import axion.client.tool.RegionEraseService
 import axion.client.tool.SmearToolState
 import axion.client.tool.SmearToolController
 import axion.client.tool.StackToolState
@@ -153,8 +155,41 @@ object AxionInteractionRouter {
         return when (AxionToolSelectionController.selectedSubtool()) {
             AxionSubtool.ERASE -> EraseToolController.handleDeleteAction(client)
             AxionSubtool.SETUP_SYMMETRY -> SymmetryController.handleDeleteAction(client)
-            else -> false
+
+            // Undocumented convenience: once a tool has both corners set, delete
+            // clears that region in place instead of forcing a trip through the
+            // erase tool. Still a normal dispatch, so undo restores it.
+            AxionSubtool.CLONE,
+            AxionSubtool.MOVE,
+                -> eraseDefinedRegion(
+                    (AxionClientState.placementToolState as? CloneToolState.RegionDefined)
+                        ?.let { RegionEraseService.Target(it.region, it.clipboardBuffer) },
+                    PlacementToolController::reset,
+                )
+
+            AxionSubtool.STACK -> eraseDefinedRegion(
+                (AxionClientState.stackToolState as? StackToolState.RegionDefined)
+                    ?.let { RegionEraseService.Target(it.region, it.clipboardBuffer) },
+                StackToolController::reset,
+            )
+
+            AxionSubtool.SMEAR -> eraseDefinedRegion(
+                (AxionClientState.smearToolState as? SmearToolState.RegionDefined)
+                    ?.let { RegionEraseService.Target(it.region, it.clipboardBuffer) },
+                SmearToolController::reset,
+            )
+
+            AxionSubtool.EXTRUDE -> false
         }
+    }
+
+    private fun eraseDefinedRegion(target: RegionEraseService.Target?, reset: () -> Unit): Boolean {
+        if (target == null || !AxionToolSelectionController.isAxionSlotActive()) {
+            return false
+        }
+        RegionEraseService.erase(target.region, target.clipboard)
+        reset()
+        return true
     }
 
     fun handleScroll(
@@ -171,6 +206,16 @@ object AxionInteractionRouter {
         }
 
         if (ctrlHeld && AxionToolSelectionController.isAxionSlotActive()) {
+            // With no corner set, right click means the connected erase, so the
+            // scroll sizes that brush rather than the magic-select one.
+            if (AxionToolSelectionController.selectedSubtool() == AxionSubtool.ERASE &&
+                AxionClientState.eraseToolState == EraseToolState.Idle
+            ) {
+                // Consume even at the clamp, so scrolling past the limit does not
+                // silently fall through and resize the magic-select brush instead.
+                handleEraseBrushScroll(client, scrollAmount)
+                return AxionToolSelectionController.ScrollOutcome.Consumed
+            }
             if (handleMagicSelectBrushScroll(client, scrollAmount)) {
                 return AxionToolSelectionController.ScrollOutcome.Consumed
             }
@@ -324,6 +369,12 @@ object AxionInteractionRouter {
 
             else -> false
         }
+    }
+
+    private fun handleEraseBrushScroll(client: MinecraftClient, scrollAmount: Double): Boolean {
+        val nextBrushSize = EraseBrushSize.adjust(scrollAmount) ?: return false
+        client.inGameHud.setOverlayMessage(Text.literal("Axion Erase Brush Size: $nextBrushSize"), false)
+        return true
     }
 
     private fun handleMagicSelectBrushScroll(client: MinecraftClient, scrollAmount: Double): Boolean {

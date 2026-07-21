@@ -41,8 +41,7 @@ object MagicSelectionService {
         return brushRadius
     }
 
-    fun select(world: World, center: BlockPos): Result? {
-        val radius = brushRadius
+    fun select(world: World, center: BlockPos, radius: Int = brushRadius): Result? {
         val radiusSquared = radius * radius
         val seedState = world.getBlockState(center)
         if (seedState.isAir) {

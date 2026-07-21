@@ -19,6 +19,7 @@ import axion.common.operation.CloneEntitiesOperation
 import axion.common.operation.DeleteEntitiesOperation
 import axion.common.operation.SymmetryPlacementOperation
 import axion.protocol.AxionExtrudeMode
+import axion.protocol.AxionInteractionOrigin
 import axion.protocol.AxionRemoteOperation
 import axion.protocol.ClipboardCellPayload
 import axion.protocol.ClearRegionRequest
@@ -39,6 +40,7 @@ import net.minecraft.command.argument.BlockArgumentParser
 
 class NetworkOperationDispatcher(
     private val recordHistory: Boolean = true,
+    private val interactionOrigin: AxionInteractionOrigin = AxionInteractionOrigin.NONE,
 ) : OperationDispatcher {
     override fun dispatch(operation: EditOperation) {
         val flattened = flattenOperations(operation)
@@ -81,6 +83,7 @@ class NetworkOperationDispatcher(
                 operations = remoteOperations,
                 usesSymmetry = false,
                 recordHistory = recordHistory,
+                interactionOrigin = interactionOrigin,
             ),
         )
     }
@@ -125,7 +128,7 @@ class NetworkOperationDispatcher(
             is CloneEntitiesOperation -> {
                 val source = operation.sourceRegion.normalized()
                 CloneEntitiesRequest(
-                    entityUuids = operation.entityUuids,
+                    entitySelection = operation.entitySelection,
                     sourceMin = source.minCorner().toProtocolVector(),
                     sourceMax = source.maxCorner().toProtocolVector(),
                     destinationOrigin = operation.destinationOrigin.toProtocolVector(),
@@ -150,6 +153,7 @@ class NetworkOperationDispatcher(
             is MoveEntitiesOperation -> {
                 val source = operation.sourceRegion.normalized()
                 MoveEntitiesRequest(
+                    entitySelection = operation.entitySelection,
                     sourceMin = source.minCorner().toProtocolVector(),
                     sourceMax = source.maxCorner().toProtocolVector(),
                     destinationOrigin = operation.destinationOrigin.toProtocolVector(),

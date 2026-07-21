@@ -1,6 +1,7 @@
 package axion.common.operation
 
 import axion.common.model.BlockRegion
+import axion.protocol.EntitySelectionMask
 import net.minecraft.util.math.BlockPos
 
 enum class EntityMoveMirrorAxis {
@@ -11,6 +12,7 @@ enum class EntityMoveMirrorAxis {
 }
 
 data class MoveEntitiesOperation(
+    val entitySelection: EntitySelectionMask,
     val sourceRegion: BlockRegion,
     val destinationOrigin: BlockPos,
     val rotationQuarterTurns: Int = 0,

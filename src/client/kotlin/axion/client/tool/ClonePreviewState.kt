@@ -4,7 +4,7 @@ import axion.common.model.BlockRegion
 import axion.common.model.ClipboardBuffer
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Vec3i
-import java.util.UUID
+import axion.protocol.EntitySelectionMask
 
 data class ClonePreviewState(
     val mode: PlacementToolMode,
@@ -16,5 +16,5 @@ data class ClonePreviewState(
     val offset: Vec3i,
     val destinationRegion: BlockRegion,
     val transform: PlacementTransform = PlacementTransform(),
-    val entityUuids: List<UUID> = emptyList(),
+    val entitySelection: EntitySelectionMask,
 )

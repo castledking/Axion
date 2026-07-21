@@ -341,7 +341,7 @@ object ClipboardSelectionRenderer {
         } else {
             null
         }
-        val pulseAlpha = if (pulseFillColor != null) {
+        val pulseAlpha = if (pulseFillColor != null && pulseMaxAlpha > 0) {
             PulsingCuboidRenderer.pulsingAlpha(
                 minAlpha = pulseMinAlpha,
                 maxAlpha = pulseMaxAlpha,
@@ -356,7 +356,7 @@ object ClipboardSelectionRenderer {
             null
         }
 
-        if (baseOverlay != null) {
+        if (baseOverlay != null && baseAlpha > 0) {
             GhostBlockPreviewRenderer.render(
                 context = context,
                 clipboard = baseOverlay,
@@ -367,7 +367,7 @@ object ClipboardSelectionRenderer {
                 sessionTag = "selection-base",
             )
         }
-        if (pulseOverlay != null) {
+        if (pulseOverlay != null && pulseAlpha > 0) {
             GhostBlockPreviewRenderer.render(
                 context = context,
                 clipboard = pulseOverlay,

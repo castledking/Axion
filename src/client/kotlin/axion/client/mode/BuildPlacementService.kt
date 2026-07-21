@@ -1,6 +1,7 @@
 package axion.client.mode
 
 import axion.common.model.SymmetryConfig
+import axion.client.compat.normalizeReplacePlacementState
 import axion.common.operation.SymmetryBlockPlacement
 import axion.common.operation.SymmetryPlacementOperation
 import net.minecraft.block.ShapeContext
@@ -301,7 +302,8 @@ object BuildPlacementService {
             override fun canReplaceExisting(): Boolean = true
         }
         val adjustedContext = blockItem.getPlacementContext(placementContext) ?: placementContext
-        val placementState = blockItem.block.getPlacementState(adjustedContext) ?: return null
+        val rawPlacementState = blockItem.block.getPlacementState(adjustedContext) ?: return null
+        val placementState = normalizeReplacePlacementState(rawPlacementState, hitResult, pos)
         if (!placementState.canPlaceAt(world, pos)) {
             return null
         }

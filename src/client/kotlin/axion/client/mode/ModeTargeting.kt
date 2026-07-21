@@ -1,8 +1,8 @@
 package axion.client.mode
 
 import axion.client.AxionClientState
+import axion.client.config.AxionClientConfig
 import axion.client.selection.AxionTarget
-import axion.client.selection.AxionTargeting
 import axion.client.selection.SelectionRaycast
 import axion.client.selection.toDirection
 import net.minecraft.client.MinecraftClient
@@ -25,7 +25,7 @@ object ModeTargeting {
         val hitResult = if (vanillaCrosshair != null) {
             vanillaCrosshair
         } else if (AxionClientState.globalModeState.infiniteReachEnabled) {
-            val selectionTarget = SelectionRaycast.raycast(client, AxionTargeting.DEFAULT_REACH)
+            val selectionTarget = SelectionRaycast.raycast(client, AxionClientConfig.infiniteReachRange())
             when (selectionTarget) {
                 is AxionTarget.FaceTarget -> BlockHitResult(
                     selectionTarget.hitPos,

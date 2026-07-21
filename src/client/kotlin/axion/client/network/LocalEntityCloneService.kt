@@ -5,6 +5,7 @@ import axion.common.compat.VersionCompat
 import axion.common.history.EntityCloneChange
 import axion.common.operation.CloneEntitiesOperation
 import axion.common.operation.EntityMoveMirrorAxis
+import axion.protocol.IntVector3
 import net.minecraft.entity.Entity
 import net.minecraft.entity.EntityType
 import net.minecraft.entity.SpawnReason
@@ -26,10 +27,29 @@ object LocalEntityCloneService {
         val source = operation.sourceRegion.normalized()
         val sourceMin = source.minCorner()
         val sourceMax = source.maxCorner()
+        val queryBox = Box(
+            sourceMin.x.toDouble(),
+            sourceMin.y.toDouble(),
+            sourceMin.z.toDouble(),
+            sourceMax.x + 1.0,
+            sourceMax.y + 1.25,
+            sourceMax.z + 1.0,
+        )
+        val entityMatcher = operation.entitySelection.matcher(
+            IntVector3(sourceMin.x, sourceMin.y, sourceMin.z),
+            IntVector3(sourceMax.x, sourceMax.y, sourceMax.z),
+        )
         val seen = linkedSetOf<UUID>()
-        return operation.entityUuids
+        return serverWorld.getEntitiesByClass(Entity::class.java, queryBox) { entity ->
+            entity !is PlayerEntity &&
+                !VersionCompat.INSTANCE.entityIsRemoved(entity) &&
+                entityMatcher.containsFeet(
+                    VersionCompat.INSTANCE.entityGetX(entity),
+                    VersionCompat.INSTANCE.entityGetY(entity),
+                    VersionCompat.INSTANCE.entityGetZ(entity),
+                )
+        }
             .asSequence()
-            .mapNotNull { serverWorld.getEntity(it) }
             .map(::rootEntity)
             .filter { entity ->
                 entity !is PlayerEntity &&

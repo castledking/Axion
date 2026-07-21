@@ -26,6 +26,9 @@ val Options.attackKey: KeyBinding
 val Options.useKey: KeyBinding
     get() = keyUse
 
+val Options.swapHandsKey: KeyBinding
+    get() = keySwapOffhand
+
 fun MultiPlayerGameMode.cancelBlockBreaking() {
     stopDestroyBlock()
 }

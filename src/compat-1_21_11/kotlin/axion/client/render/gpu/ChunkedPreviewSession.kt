@@ -51,17 +51,24 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
     private var anchoredClipboard: ClipboardBuffer? = null
     private var anchoredSingleOrigin: BlockPos? = null
     private var translationDelta: Vec3i = Vec3i.ZERO
+    private var meshScale: Float = 1.0f
 
     val isEmpty: Boolean get() = store.isEmpty()
     val totalCells: Int get() = store.size
     fun totalSurfaceCells(): Int = store.size
 
-    fun setFromClipboard(clipboard: ClipboardBuffer, origins: Collection<BlockPos>): Boolean {
-        val signature = computeSignature(clipboard, origins)
+    fun setFromClipboard(
+        clipboard: ClipboardBuffer,
+        origins: Collection<BlockPos>,
+        scale: Float,
+    ): Boolean {
+        val signature = computeSignature(clipboard, origins, scale)
         if (signature == lastSignature && lastSignature != 0L) return false
 
+        val scaleChanged = scale != meshScale
         val nextSingleOrigin = if (origins.size == 1) origins.first() else null
         if (
+            !scaleChanged &&
             clipboard === anchoredClipboard &&
             nextSingleOrigin != null &&
             anchoredSingleOrigin != null &&
@@ -75,6 +82,17 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
             )
             lastSignature = signature
             return true
+        }
+
+        if (scaleChanged) {
+            store.clear()
+            states.clear()
+            chunkBuffers.values.forEach { it.close() }
+            chunkBuffers.clear()
+            anchoredClipboard = null
+            anchoredSingleOrigin = null
+            translationDelta = Vec3i.ZERO
+            meshScale = scale
         }
 
         lastSignature = signature
@@ -121,6 +139,10 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
         chunkBuffers.values.forEach { it.close() }
         chunkBuffers.clear()
         lastSignature = 0
+        anchoredClipboard = null
+        anchoredSingleOrigin = null
+        translationDelta = Vec3i.ZERO
+        meshScale = 1.0f
     }
 
     fun render(
@@ -250,6 +272,7 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
             cameraY = sectionOriginY,
             cameraZ = sectionOriginZ,
             checkSides = true,
+            scale = meshScale,
         )
         return bufferBuilder.endNullable()
     }
@@ -291,13 +314,18 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
                     cameraY = cameraPos.y - translationDelta.y,
                     cameraZ = cameraPos.z - translationDelta.z,
                     checkSides = true,
+                    scale = meshScale,
                 )
             }
         }
     }
 
-    private fun computeSignature(clipboard: ClipboardBuffer, origins: Collection<BlockPos>): Long {
-        var sig = System.identityHashCode(clipboard).toLong()
+    private fun computeSignature(
+        clipboard: ClipboardBuffer,
+        origins: Collection<BlockPos>,
+        scale: Float,
+    ): Long {
+        var sig = System.identityHashCode(clipboard).toLong() * 31L + scale.toBits()
         origins.forEach { sig = sig * 31L + it.asLong() }
         return if (sig == 0L) 1L else sig
     }

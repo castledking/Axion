@@ -27,10 +27,26 @@ object PaperEntityCloneService {
         val sizeY = sourceMax.y - sourceMin.y + 1.0
         val sizeZ = sourceMax.z - sourceMin.z + 1.0
         val level = (world as CraftWorld).handle
+        val queryBox = BoundingBox(
+            sourceMin.x.toDouble(),
+            sourceMin.y.toDouble(),
+            sourceMin.z.toDouble(),
+            sourceMax.x + 1.0,
+            sourceMax.y + 1.25,
+            sourceMax.z + 1.0,
+        )
+        val entityMatcher = operation.entitySelection.matcher(sourceMin, sourceMax)
         val seen = linkedSetOf<UUID>()
-        return operation.entityUuids
+        return world.getNearbyEntities(queryBox)
             .asSequence()
-            .mapNotNull { uuid -> world.entities.firstOrNull { it.uniqueId == uuid } }
+            .filter { entity ->
+                if (entity is Player || !entity.isValid) {
+                    false
+                } else {
+                    val location = entity.location
+                    entityMatcher.containsFeet(location.x, location.y, location.z)
+                }
+            }
             .map(::rootEntity)
             .filter { entity ->
                 entity !is Player &&

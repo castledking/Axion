@@ -1,15 +1,17 @@
 package axion.client.mode
 import axion.client.AxionClientState
 import axion.client.compat.VersionCompatImpl
+import axion.client.config.AxionClientConfig
 import axion.client.input.AxionKeybindings
 import axion.client.network.AxionServerConnection
-import axion.client.selection.AxionTargeting
 import axion.client.symmetry.ActiveSymmetryConfig
 import axion.client.symmetry.SymmetryAwareOperationDispatcher
 import axion.client.symmetry.SymmetryBreakController
+import axion.client.symmetry.SymmetryBreakOriginPolicy
 import axion.client.tool.AxionToolSelectionController
 import axion.common.model.BlockRegion
 import axion.common.operation.ClearRegionOperation
+import axion.protocol.AxionInteractionOrigin
 import axion.AxionMod
 import axion.client.compat.ClientPlayerInteractionManagerAccess
 import axion.client.compat.MinecraftClientAccess
@@ -44,6 +46,10 @@ object ClientModeController {
     private const val MULTI_SAMPLE_COUNT: Int = 50
     private const val HOTBAR_SIZE: Int = 9
     private val dispatcher = SymmetryAwareOperationDispatcher(recordHistory = false)
+    private val infiniteReachDispatcher = SymmetryAwareOperationDispatcher(
+        recordHistory = false,
+        interactionOrigin = AxionInteractionOrigin.INFINITE_REACH,
+    )
     private var suppressPrimaryUntilRelease: Boolean = false
     private var suppressSecondaryUntilRelease: Boolean = false
     private var noClipEscapeTicks: Int = 0
@@ -116,15 +122,21 @@ object ClientModeController {
                 if (state.infiniteReachEnabled && !useFastPlace && !AxionToolSelectionController.isAxionSlotActive()) {
                     // Enforce vanilla placement speed (4 tick cooldown)
                     val currentTick = client.world?.time ?: 0
-                    if (currentTick - lastPlacementTick >= VANILLA_PLACEMENT_COOLDOWN_TICKS) {
+                    if (!shouldYieldInfiniteReachToVanilla(client, state) &&
+                        currentTick - lastPlacementTick >= VANILLA_PLACEMENT_COOLDOWN_TICKS
+                    ) {
                         performSingleBlockPlacement(client)
                         lastPlacementTick = currentTick
                     }
                 } else if (useFastPlace && !AxionToolSelectionController.isAxionSlotActive()) {
-                    // Multi-sample fast place for fast place mode or infinite reach + fast place
-                    // Execute every tick (0 cooldown) but only once per tick
+                    // Explicit fast place remains every tick. Replace-only placement is
+                    // deliberately paced at ten updates per second.
                     val currentTick = client.world?.time ?: 0
                     val tickDiff = currentTick - lastPlacementTick
+                    val cooldownTicks = ReplacePlacementPolicy.cooldownTicks(
+                        fastPlaceEnabled = state.fastPlaceEnabled,
+                        replaceModeEnabled = state.replaceModeEnabled,
+                    )
 
                     // Reset flag if we're on a new tick
                     if (tickDiff > 0) {
@@ -132,7 +144,9 @@ object ClientModeController {
                     }
 
                     // Only place if we haven't already placed this tick
-                    if (!fastPlaceExecutedThisTick) {
+                    if (!fastPlaceExecutedThisTick && tickDiff >= cooldownTicks &&
+                        !shouldYieldInfiniteReachToVanilla(client, state)
+                    ) {
                         performMultiSampleFastPlace(client)
                         lastPlacementTick = currentTick
                         fastPlaceExecutedThisTick = true
@@ -160,7 +174,9 @@ object ClientModeController {
             if (state.infiniteReachEnabled && !state.bulldozerEnabled && attackPressed && !AxionToolSelectionController.isAxionSlotActive()) {
                 // Enforce vanilla breaking speed (4 tick cooldown)
                 val currentTick = client.world?.time ?: 0
-                if (currentTick - lastBreakTick >= VANILLA_BREAK_COOLDOWN_TICKS) {
+                if (!hasVanillaInteractionTarget(client) &&
+                    currentTick - lastBreakTick >= VANILLA_BREAK_COOLDOWN_TICKS
+                ) {
                     bypassBlockBreakingCooldown(client)
                     performInfiniteReachSingleBreak(client)
                     lastBreakTick = currentTick
@@ -311,6 +327,10 @@ object ClientModeController {
             return false
         }
 
+        if (hasVanillaInteractionTarget(client)) {
+            return false
+        }
+
         // Enforce vanilla breaking speed (4 tick cooldown)
         val currentTick = client.world?.time ?: 0
         if (currentTick - lastBreakTick < VANILLA_BREAK_COOLDOWN_TICKS) {
@@ -323,7 +343,7 @@ object ClientModeController {
         val cameraEntity = client.cameraEntity ?: player
         val origin = cameraEntity.getCameraPosVec(1.0f)
         val direction = cameraEntity.getRotationVec(1.0f)
-        val maxDistance = AxionTargeting.DEFAULT_REACH
+        val maxDistance = AxionClientConfig.infiniteReachRange()
 
         val target = origin.add(direction.multiply(maxDistance))
         val hit = world.raycast(
@@ -352,12 +372,16 @@ object ClientModeController {
         bypassBlockBreakingCooldown(client)
 
         // Dispatch break operation
-        dispatcher.dispatch(
+        infiniteReachDispatcher.dispatch(
             ClearRegionOperation(
                 BlockRegion(targetPos, targetPos),
             ),
         )
-        SymmetryBreakController.dispatchDerivedBreaks(client, targetPos)
+        SymmetryBreakController.dispatchDerivedBreaks(
+            client,
+            targetPos,
+            interactionOrigin = AxionInteractionOrigin.INFINITE_REACH,
+        )
         player.swingHand(Hand.MAIN_HAND)
         if (!brokenState.isAir) {
             playBreakEffects(client, targetPos, brokenState)
@@ -377,7 +401,7 @@ object ClientModeController {
         val cameraEntity = client.cameraEntity ?: player
         val origin = cameraEntity.getCameraPosVec(1.0f)
         val direction = cameraEntity.getRotationVec(1.0f)
-        val maxDistance = AxionTargeting.DEFAULT_REACH
+        val maxDistance = AxionClientConfig.infiniteReachRange()
 
         val target = origin.add(direction.multiply(maxDistance))
         val hit = world.raycast(
@@ -403,12 +427,16 @@ object ClientModeController {
         }
 
         bypassBlockBreakingCooldown(client)
-        dispatcher.dispatch(
+        infiniteReachDispatcher.dispatch(
             ClearRegionOperation(
                 BlockRegion(targetPos, targetPos),
             ),
         )
-        SymmetryBreakController.dispatchDerivedBreaks(client, targetPos)
+        SymmetryBreakController.dispatchDerivedBreaks(
+            client,
+            targetPos,
+            interactionOrigin = AxionInteractionOrigin.INFINITE_REACH,
+        )
         player.swingHand(Hand.MAIN_HAND)
         if (!brokenState.isAir) {
             playBreakEffects(client, targetPos, brokenState)
@@ -435,7 +463,7 @@ object ClientModeController {
         // Unified cooldown with regular bulldozer - 2 tick speed
         val currentTick = client.world?.time ?: 0
         if (currentTick - lastBulldozerTick < BULLDOZER_COOLDOWN_TICKS) {
-            return false
+            return true
         }
 
         bypassBlockBreakingCooldown(client)
@@ -460,6 +488,10 @@ object ClientModeController {
         }
 
         if (AxionToolSelectionController.isAxionSlotActive()) {
+            return false
+        }
+
+        if (shouldYieldInfiniteReachToVanilla(client, state)) {
             return false
         }
 
@@ -512,18 +544,26 @@ object ClientModeController {
             return false
         }
 
-        // Execute every tick (0 cooldown) but only once per tick
+        if (shouldYieldInfiniteReachToVanilla(client, state)) {
+            return false
+        }
+
         val currentTick = client.world?.time ?: 0
         val tickDiff = currentTick - lastPlacementTick
+        val cooldownTicks = ReplacePlacementPolicy.cooldownTicks(
+            fastPlaceEnabled = state.fastPlaceEnabled,
+            replaceModeEnabled = state.replaceModeEnabled,
+        )
 
         // Reset flag if we're on a new tick
         if (tickDiff > 0) {
             fastPlaceExecutedThisTick = false
         }
 
-        // If already placed this tick, let vanilla handle it
-        if (fastPlaceExecutedThisTick) {
-            return false
+        // Keep ownership during the replacement cooldown; falling through would
+        // let vanilla merge slabs or interact with the block underneath Axion.
+        if (fastPlaceExecutedThisTick || tickDiff < cooldownTicks) {
+            return true
         }
 
         // Use multi-sample fast place like regular fast place
@@ -645,12 +685,16 @@ object ClientModeController {
         suppressPrimaryUntilRelease = true
         client.interactionManager?.cancelBlockBreaking()
 
-        dispatcher.dispatch(
+        infiniteReachDispatcher.dispatch(
             ClearRegionOperation(
                 BlockRegion(targetPos, targetPos),
             ),
         )
-        SymmetryBreakController.dispatchDerivedBreaks(client, targetPos)
+        SymmetryBreakController.dispatchDerivedBreaks(
+            client,
+            targetPos,
+            interactionOrigin = AxionInteractionOrigin.INFINITE_REACH,
+        )
         client.player?.swingHand(Hand.MAIN_HAND)
         if (!brokenState.isAir) {
             playBreakEffects(client, targetPos, brokenState)
@@ -679,12 +723,27 @@ object ClientModeController {
             return false
         }
 
+        if (shouldYieldInfiniteReachToVanilla(client, state)) {
+            return false
+        }
+
+        if (state.replaceModeEnabled) {
+            val currentTick = client.world?.time ?: 0
+            val cooldownTicks = ReplacePlacementPolicy.cooldownTicks(
+                fastPlaceEnabled = state.fastPlaceEnabled,
+                replaceModeEnabled = true,
+            )
+            if (currentTick - lastPlacementTick < cooldownTicks) {
+                return true
+            }
+        }
+
         val player = client.player ?: return false
         val world = client.world ?: return false
         val cameraEntity = client.cameraEntity ?: player
         val origin = cameraEntity.getCameraPosVec(1.0f)
         val direction = cameraEntity.getRotationVec(1.0f)
-        val maxDistance = if (state.infiniteReachEnabled) AxionTargeting.DEFAULT_REACH else blockInteractionRangeOf(player)
+        val maxDistance = if (state.infiniteReachEnabled) AxionClientConfig.infiniteReachRange() else blockInteractionRangeOf(player)
 
         // For infinite reach placement:
         // - Within vanilla range: use interactBlock for client prediction
@@ -727,7 +786,7 @@ object ClientModeController {
                         replaceMode = false,
                     )
                     if (operation != null) {
-                        dispatcher.dispatch(operation)
+                        infiniteReachDispatcher.dispatch(operation)
                         client.player?.swingHand(Hand.MAIN_HAND)
                         playPlacementEffects(client, operation)
                     }
@@ -777,7 +836,15 @@ object ClientModeController {
             replaceMode = state.replaceModeEnabled,
         ) ?: return false
         bypassItemUseCooldown(client)
-        dispatcher.dispatch(operation)
+        if (beyondVanillaReach) {
+            infiniteReachDispatcher.dispatch(operation)
+        } else {
+            dispatcher.dispatch(operation)
+        }
+        if (state.replaceModeEnabled) {
+            lastPlacementTick = client.world?.time ?: lastPlacementTick
+            fastPlaceExecutedThisTick = true
+        }
         client.player?.swingHand(Hand.MAIN_HAND)
         playPlacementEffects(client, operation)
         return true
@@ -1117,12 +1184,13 @@ object ClientModeController {
         val state = AxionClientState.globalModeState
         val origin = cameraEntity.getCameraPosVec(1.0f)
         val direction = cameraEntity.getRotationVec(1.0f)
-        val maxDistance = if (state.infiniteReachEnabled) AxionTargeting.DEFAULT_REACH else blockInteractionRangeOf(player)
+        val maxDistance = if (state.infiniteReachEnabled) AxionClientConfig.infiniteReachRange() else blockInteractionRangeOf(player)
 
         // For infinite reach, use ray marching to find multiple blocks along the ray
         if (state.infiniteReachEnabled) {
             val seenTargets = linkedSetOf<PlacementSampleTarget>()
             val withinRangeOperations = mutableListOf<BlockHitResult>()
+            val withinRangeReplacementOperations = mutableListOf<axion.common.operation.EditOperation>()
             val beyondRangeOperations = mutableListOf<axion.common.operation.EditOperation>()
             val vanillaReachSq = blockInteractionRangeOf(player) * blockInteractionRangeOf(player)
 
@@ -1131,7 +1199,11 @@ object ClientModeController {
             var currentPos = origin
             var steps = 0
             var blocksFound = 0
-            val maxBlocks = 25
+            val maxBlocks = ReplacePlacementPolicy.maxSamples(
+                fastPlaceEnabled = state.fastPlaceEnabled,
+                replaceModeEnabled = state.replaceModeEnabled,
+                configuredMaximum = 25,
+            )
             val maxSteps = (maxDistance / stepSize).toInt()
 
             while (steps < maxSteps && blocksFound < maxBlocks) {
@@ -1190,7 +1262,22 @@ object ClientModeController {
                 val beyondVanillaReach = origin.squaredDistanceTo(currentPos) > vanillaReachSq
 
                 if (!beyondVanillaReach) {
-                    withinRangeOperations += blockHit
+                    if (state.replaceModeEnabled) {
+                        val blockTarget = ModeTargeting.BlockTarget(
+                            hitResult = blockHit,
+                            squaredDistance = origin.squaredDistanceTo(currentPos),
+                            beyondVanillaReach = false,
+                        )
+                        BuildPlacementService.createPlacementOperation(
+                            client = client,
+                            target = blockTarget,
+                            symmetryConfig = ActiveSymmetryConfig.current()
+                                ?.takeIf(ActiveSymmetryConfig::hasDerivedTransforms),
+                            replaceMode = true,
+                        )?.let(withinRangeReplacementOperations::add)
+                    } else {
+                        withinRangeOperations += blockHit
+                    }
                 } else {
                     val blockTarget = ModeTargeting.BlockTarget(
                         hitResult = blockHit,
@@ -1215,10 +1302,13 @@ object ClientModeController {
             withinRangeOperations.forEach { blockHit ->
                 client.interactionManager?.interactBlock(player, Hand.MAIN_HAND, blockHit)
             }
+            if (withinRangeReplacementOperations.isNotEmpty()) {
+                dispatchBatch(withinRangeReplacementOperations)
+            }
 
             // Execute beyond-range placements with dispatch
             if (beyondRangeOperations.isNotEmpty()) {
-                dispatchBatch(beyondRangeOperations)
+                dispatchBatch(beyondRangeOperations, infiniteReachDispatcher)
                 beyondRangeOperations.forEach { operation ->
                     if (operation is axion.common.operation.SymmetryPlacementOperation) {
                         playPlacementEffects(client, operation)
@@ -1226,7 +1316,10 @@ object ClientModeController {
                 }
             }
 
-            if (withinRangeOperations.isNotEmpty() || beyondRangeOperations.isNotEmpty()) {
+            if (withinRangeOperations.isNotEmpty() ||
+                withinRangeReplacementOperations.isNotEmpty() ||
+                beyondRangeOperations.isNotEmpty()
+            ) {
                 client.player?.swingHand(Hand.MAIN_HAND)
             }
             return
@@ -1239,7 +1332,12 @@ object ClientModeController {
             var rayOrigin = origin
             var blocksFound = 0
 
-            while (blocksFound < MULTI_SAMPLE_COUNT) {
+            val maxSamples = ReplacePlacementPolicy.maxSamples(
+                fastPlaceEnabled = state.fastPlaceEnabled,
+                replaceModeEnabled = true,
+                configuredMaximum = MULTI_SAMPLE_COUNT,
+            )
+            while (blocksFound < maxSamples) {
                 val rayTarget = rayOrigin.add(direction.multiply(maxDistance))
                 val hit = world.raycast(
                     RaycastContext(
@@ -1343,7 +1441,7 @@ object ClientModeController {
         val origin = cameraEntity.getCameraPosVec(1.0f)
         val direction = cameraEntity.getRotationVec(1.0f)
         val vanillaReach = blockInteractionRangeOf(player)
-        val maxDistance = if (state.infiniteReachEnabled) AxionTargeting.DEFAULT_REACH else vanillaReach
+        val maxDistance = if (state.infiniteReachEnabled) AxionClientConfig.infiniteReachRange() else vanillaReach
 
         bypassItemUseCooldown(client)
 
@@ -1392,7 +1490,11 @@ object ClientModeController {
             )
 
             if (operation != null) {
-                dispatcher.dispatch(operation)
+                if (blockTarget.beyondVanillaReach) {
+                    infiniteReachDispatcher.dispatch(operation)
+                } else {
+                    dispatcher.dispatch(operation)
+                }
                 player.swingHand(Hand.MAIN_HAND)
                 playPlacementEffects(client, operation)
                 return
@@ -1412,7 +1514,7 @@ object ClientModeController {
         val origin = cameraEntity.getCameraPosVec(1.0f)
         val direction = cameraEntity.getRotationVec(1.0f)
         val vanillaReach = blockInteractionRangeOf(player)
-        val maxDistance = if (infiniteReach) AxionTargeting.DEFAULT_REACH else vanillaReach
+        val maxDistance = if (infiniteReach) AxionClientConfig.infiniteReachRange() else vanillaReach
 
         // Raycast to find target block
         val hit = world.raycast(
@@ -1444,15 +1546,23 @@ object ClientModeController {
             // Within vanilla range - use vanilla attackBlock for proper client prediction
             // This prevents ghost blocks by letting the client handle the break prediction
             client.interactionManager?.attackBlock(BlockPos(targetPos), blockHit.side)
-            SymmetryBreakController.dispatchDerivedBreaks(client, BlockPos(targetPos))
+            SymmetryBreakController.dispatchDerivedBreaks(
+                client,
+                BlockPos(targetPos),
+                interactionOrigin = SymmetryBreakOriginPolicy.forPrimaryBreak(infiniteReach),
+            )
         } else {
             // Beyond vanilla range - use dispatch for infinite reach breaking
-            dispatcher.dispatch(
+            infiniteReachDispatcher.dispatch(
                 ClearRegionOperation(
                     BlockRegion(BlockPos(targetPos), BlockPos(targetPos)),
                 ),
             )
-            SymmetryBreakController.dispatchDerivedBreaks(client, BlockPos(targetPos))
+            SymmetryBreakController.dispatchDerivedBreaks(
+                client,
+                BlockPos(targetPos),
+                interactionOrigin = AxionInteractionOrigin.INFINITE_REACH,
+            )
             playBreakEffects(client, BlockPos(targetPos), brokenState)
         }
 
@@ -1470,11 +1580,29 @@ object ClientModeController {
         }
     }
 
-    private fun dispatchBatch(operations: List<axion.common.operation.EditOperation>) {
+    private fun shouldYieldInfiniteReachToVanilla(
+        client: MinecraftClient,
+        state: axion.common.model.GlobalModeState,
+    ): Boolean {
+        return InfiniteReachInteractionPolicy.shouldYieldToVanilla(
+            infiniteReachEnabled = state.infiniteReachEnabled,
+            replaceModeEnabled = state.replaceModeEnabled,
+            vanillaTargetPresent = hasVanillaInteractionTarget(client),
+        )
+    }
+
+    private fun hasVanillaInteractionTarget(client: MinecraftClient): Boolean {
+        return client.crosshairTarget?.type?.name?.let { it != "MISS" } == true
+    }
+
+    private fun dispatchBatch(
+        operations: List<axion.common.operation.EditOperation>,
+        operationDispatcher: SymmetryAwareOperationDispatcher = dispatcher,
+    ) {
         when (operations.size) {
             0 -> return
-            1 -> dispatcher.dispatch(operations.first())
-            else -> dispatcher.dispatch(axion.common.operation.CompositeOperation(operations))
+            1 -> operationDispatcher.dispatch(operations.first())
+            else -> operationDispatcher.dispatch(axion.common.operation.CompositeOperation(operations))
         }
     }
 

@@ -77,7 +77,15 @@ object GhostBlockPreviewRenderer {
         if (textured) {
             val totalCells = allOccupiedCells.size.toLong() * origins.size.toLong()
             if (allowChunked && (forceChunked || FORCE_CHUNKED_PREVIEW || totalCells > CHUNKED_PATH_CELL_THRESHOLD)) {
-                val handled = VersionCompatImpl.renderChunkedPreview("ghost:$sessionTag", context, clipboard, origins, color, alpha)
+                val handled = VersionCompatImpl.renderChunkedPreview(
+                    "ghost:$sessionTag",
+                    context,
+                    clipboard,
+                    origins,
+                    color,
+                    alpha,
+                    scale,
+                )
                 if (DEBUG_LOG) {
                     val now = System.currentTimeMillis()
                     if (now - lastLogTime >= LOG_INTERVAL_MS) {

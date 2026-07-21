@@ -48,6 +48,7 @@ object GhostBlockPreviewRenderer {
                     origins,
                     color,
                     alpha.coerceIn(0, 255),
+                    scale,
                 )
                 if (handled) {
                     return

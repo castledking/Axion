@@ -3,25 +3,14 @@ package axion.client.tool
 import axion.client.AxionClientState
 import axion.client.selection.SelectionController
 import axion.client.selection.blockPosOrNull
-import axion.client.symmetry.SymmetryAwareOperationDispatcher
 import axion.common.model.AxionSubtool
 import axion.common.model.BlockRegion
 import axion.common.model.ClipboardState
 import axion.common.model.SelectionState
-import axion.common.operation.ClearRegionOperation
-import axion.common.operation.CompositeOperation
-import axion.common.operation.DeleteEntitiesOperation
-import axion.common.operation.SymmetryBlockPlacement
-import axion.common.operation.SymmetryPlacementOperation
-import net.minecraft.block.Blocks
 import net.minecraft.client.MinecraftClient
-import net.minecraft.util.math.BlockPos
 import axion.client.compat.toImmutable
-import axion.client.compat.add
 
 object EraseToolController {
-    private val dispatcher = SymmetryAwareOperationDispatcher()
-
     fun onEndTick(client: MinecraftClient) {
         if (!isEraseActive() && AxionClientState.eraseToolState !is EraseToolState.Idle) {
             reset()
@@ -48,7 +37,9 @@ object EraseToolController {
 
         val secondCorner = SelectionController.currentTarget().blockPosOrNull()?.toImmutable() ?: return false
         val firstCorner = when (val state = AxionClientState.eraseToolState) {
-            EraseToolState.Idle -> return false
+            // Nothing has been selected yet, so right click is free to mean the
+            // instant connected erase rather than "close the box".
+            EraseToolState.Idle -> return handleConnectedErase(client)
             is EraseToolState.FirstCornerSet -> state.firstCorner
             is EraseToolState.RegionDefined -> state.firstCorner
         }
@@ -96,41 +87,33 @@ object EraseToolController {
             return false
         }
 
-        val operation = when (val state = AxionClientState.eraseToolState) {
-            is EraseToolState.RegionDefined -> state.clipboardBuffer?.let { clipboard ->
-                eraseOperation(
-                    state.region,
-                    SymmetryPlacementOperation(
-                        clipboard.cells.map { cell ->
-                            SymmetryBlockPlacement(
-                                pos = state.region.minCorner().add(cell.offset),
-                                state = Blocks.AIR.defaultState,
-                                blockEntityData = null,
-                            )
-                        },
-                    ),
-                )
-            } ?: eraseOperation(state.region)
+        when (val state = AxionClientState.eraseToolState) {
+            is EraseToolState.RegionDefined -> RegionEraseService.erase(state.region, state.clipboardBuffer)
             EraseToolState.Idle,
             is EraseToolState.FirstCornerSet,
                 -> {
                 val magic = AxionClientState.clipboardState as? ClipboardState.MagicSelection ?: return false
-                eraseOperation(
-                    magic.region,
-                    SymmetryPlacementOperation(
-                        magic.clipboardBuffer.cells.map { cell ->
-                            SymmetryBlockPlacement(
-                                pos = magic.region.minCorner().add(cell.offset),
-                                state = Blocks.AIR.defaultState,
-                                blockEntityData = null,
-                            )
-                        },
-                    ),
-                )
+                RegionEraseService.erase(magic.region, magic.clipboardBuffer)
             }
         }
-        dispatcher.dispatch(operation)
         reset()
+        return true
+    }
+
+    /**
+     * Right click flood-fills outward from the targeted block and erases the
+     * connected run of matching blocks immediately, bounded by the erase brush
+     * radius. There is no preview to confirm, so nothing is rendered for it.
+     */
+    fun handleConnectedErase(client: MinecraftClient): Boolean {
+        val world = client.world ?: return false
+        val seed = SelectionController.currentTarget().blockPosOrNull()?.toImmutable() ?: return false
+        val result = MagicSelectionService.select(
+            world = world,
+            center = seed,
+            radius = EraseBrushSize.radius(),
+        ) ?: return false
+        RegionEraseService.erase(result.region, result.clipboardBuffer)
         return true
     }
 
@@ -182,19 +165,4 @@ object EraseToolController {
             AxionToolSelectionController.selectedSubtool() == AxionSubtool.ERASE
     }
 
-    private fun eraseOperation(
-        region: BlockRegion,
-        blockOperation: axion.common.operation.EditOperation = ClearRegionOperation(region),
-    ): axion.common.operation.EditOperation {
-        if (!AxionClientState.copyEntitiesEnabled) {
-            return blockOperation
-        }
-
-        return CompositeOperation(
-            listOf(
-                blockOperation,
-                DeleteEntitiesOperation(region),
-            ),
-        )
-    }
 }

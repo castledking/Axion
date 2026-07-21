@@ -218,6 +218,25 @@ object VersionCompatImpl : VersionCompat {
         player?.sendMessage(text, overlay)
     }
 
+    fun sendGameModeCommand(client: MinecraftClient, gameModeId: String) {
+        client.networkHandler?.sendChatCommand("gamemode $gameModeId")
+    }
+
+    fun changeLocalGameMode(client: MinecraftClient, gameModeId: String): Boolean {
+        val server = client.server ?: return false
+        val playerId = client.player?.uuid ?: return false
+        val gameMode = when (gameModeId.lowercase()) {
+            "survival" -> net.minecraft.world.GameMode.SURVIVAL
+            "creative" -> net.minecraft.world.GameMode.CREATIVE
+            "spectator" -> net.minecraft.world.GameMode.SPECTATOR
+            else -> return false
+        }
+        server.execute {
+            server.playerManager.getPlayer(playerId)?.changeGameMode(gameMode)
+        }
+        return true
+    }
+
     fun hasLocalServer(client: MinecraftClient): Boolean = client.server != null
 
     fun runOnRenderThread(client: MinecraftClient, task: Runnable) {
@@ -290,10 +309,11 @@ object VersionCompatImpl : VersionCompat {
         origins: Collection<BlockPos>,
         color: Int,
         alpha: Int,
+        scale: Float,
     ): Boolean {
         if (ShaderPackCompat.shouldDisableDirectGpuPreview()) return false
         val session = ChunkedPreviewLifecycle.acquire(sessionId)
-        session.setFromClipboard(clipboard, origins)
+            session.setFromClipboard(clipboard, origins, scale)
         return session.render(context, color, alpha).handled
     }
 
@@ -339,6 +359,25 @@ object VersionCompatImpl : VersionCompat {
     ) {
         context.drawTexture(RenderPipelines.GUI_TEXTURED, texture, x, y, 0.0f, 0.0f, width, height, width, height)
     }
+
+    fun renderVanillaButton(
+        context: DrawContext,
+        button: net.minecraft.client.gui.widget.ButtonWidget,
+        mouseX: Int,
+        mouseY: Int,
+        delta: Float,
+    ) {
+        button.render(context, mouseX, mouseY, delta)
+    }
+
+    @Suppress("UNUSED_PARAMETER")
+    fun clickVanillaButton(
+        client: MinecraftClient,
+        button: net.minecraft.client.gui.widget.ButtonWidget,
+        mouseX: Double,
+        mouseY: Double,
+        mouseButton: Int,
+    ): Boolean = button.mouseClicked(mouseX, mouseY, mouseButton)
 
     fun drawGuiTextureRegion(
         context: DrawContext,

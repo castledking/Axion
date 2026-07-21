@@ -1,6 +1,7 @@
 package axion.client.selection
 
 import axion.client.AxionClientState
+import axion.client.config.AxionClientConfig
 import axion.client.tool.AxionToolSelectionController
 import axion.common.compat.offset
 import axion.common.model.BlockRegion
@@ -15,7 +16,14 @@ object SelectionController {
     fun onEndTick(client: MinecraftClient) {
         val modeActive = AxionClientState.globalModeState.infiniteReachEnabled
         currentTarget = if (AxionToolSelectionController.isAxionSlotActive() || modeActive) {
-            SelectionRaycast.raycast(client)
+            SelectionRaycast.raycast(
+                client,
+                if (AxionToolSelectionController.isAxionSlotActive()) {
+                    AxionTargeting.DEFAULT_REACH
+                } else {
+                    AxionClientConfig.infiniteReachRange()
+                },
+            )
         } else {
             AxionTarget.MissTarget
         }

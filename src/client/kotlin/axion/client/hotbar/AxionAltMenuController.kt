@@ -152,6 +152,24 @@ object AxionAltMenuController {
             }
     }
 
+    fun hoveringSavedHotbarActionButton(
+        client: MinecraftClient,
+        screenWidth: Int,
+        screenHeight: Int,
+    ): AxionHudLayout.SavedHotbarActionButtonBounds? {
+        if (!SavedHotbarController.isOverlayActive(client)) {
+            return null
+        }
+
+        val mouseX = VersionCompatImpl.getScaledMouseX(client)
+        val mouseY = VersionCompatImpl.getScaledMouseY(client)
+        return AxionHudLayout.savedHotbarActionButtons(
+            screenWidth,
+            screenHeight,
+            SavedHotbarController.selectedPage(),
+        ).firstOrNull { it.contains(mouseX, mouseY) }
+    }
+
     fun hoveringSavedHotbarRow(
         client: MinecraftClient,
         screenWidth: Int,
@@ -426,6 +444,24 @@ object AxionAltMenuController {
     fun handleMouseButton(client: MinecraftClient, button: Int, action: Int): Boolean {
         if (SavedHotbarController.isOverlayActive(client)) {
             if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && action == GLFW.GLFW_PRESS) {
+                hoveringSavedHotbarActionButton(
+                    client,
+                    client.window.scaledWidth,
+                    client.window.scaledHeight,
+                )?.let { actionButton ->
+                    VanillaHudButtonStore.click(
+                        client,
+                        VanillaHudButtonStore.actionKey(actionButton.action),
+                        button,
+                    )
+                    if (actionButton.enabled && actionButton.action.gameModeId != null) {
+                        restoreGrabbedItem(client)
+                        SavedHotbarController.flushActiveHotbar(client)
+                        SavedHotbarGameModeController.request(client, actionButton.action)
+                    }
+                    return true
+                }
+
                 val slot = findAnySlotAtPosition(client, client.window.scaledWidth, client.window.scaledHeight)
 
                 if (slot != null) {
@@ -511,18 +547,22 @@ object AxionAltMenuController {
 
         if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && action == GLFW.GLFW_PRESS) {
             if (isHoveringMiddleClickToggle(client, client.window.scaledWidth, client.window.scaledHeight)) {
+                VanillaHudButtonStore.click(client, VanillaHudButtonStore.MIDDLE_CLICK, button)
                 AxionClientState.updateMiddleClickMagicSelect(!AxionClientState.middleClickMagicSelectEnabled)
                 return true
             }
             if (isHoveringKeepExistingToggle(client, client.window.scaledWidth, client.window.scaledHeight)) {
+                VanillaHudButtonStore.click(client, VanillaHudButtonStore.KEEP_EXISTING, button)
                 AxionClientState.updateKeepExisting(!AxionClientState.keepExistingEnabled)
                 return true
             }
             if (isHoveringCopyEntitiesToggle(client, client.window.scaledWidth, client.window.scaledHeight)) {
+                VanillaHudButtonStore.click(client, VanillaHudButtonStore.COPY_ENTITIES, button)
                 AxionClientState.updateCopyEntities(!AxionClientState.copyEntitiesEnabled)
                 return true
             }
             if (isHoveringCopyAirToggle(client, client.window.scaledWidth, client.window.scaledHeight)) {
+                VanillaHudButtonStore.click(client, VanillaHudButtonStore.COPY_AIR, button)
                 AxionClientState.updateCopyAir(!AxionClientState.copyAirEnabled)
                 return true
             }

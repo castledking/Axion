@@ -7,6 +7,8 @@ import axion.protocol.CloneRegionRequest
 import axion.protocol.CommittedBlockChangePayload
 import axion.protocol.DeleteEntitiesRequest
 import axion.protocol.ExtrudeRequest
+import axion.protocol.EntitySelectionGeometry
+import axion.protocol.EntitySelectionMask
 import axion.protocol.FilteredCloneRegionRequest
 import axion.protocol.IntVector3
 import axion.protocol.MoveEntitiesRequest
@@ -32,7 +34,27 @@ class AxionCommittedDiffBuilder(
         val touched = touchedOverride ?: collectTouched(operations)
 
         val before = measureDiff(timing) { touched.associateWith(::snapshot) }
-        measureApply(timing) { apply() }
+        val transactionResult = PaperInteractionTransaction.run(
+            apply = { measureApply(timing) { apply() } },
+            rollback = {
+                measureApply(timing) {
+                    before.forEach { (pos, state) -> restore(pos, state) }
+                }
+            },
+        )
+        if (transactionResult is PaperInteractionTransaction.Result.Denied) {
+            val rejection = transactionResult.rejection
+            return OperationBatchResult(
+                requestId = requestId,
+                accepted = false,
+                message = rejection.message,
+                changedBlockCount = 0,
+                code = rejection.code,
+                source = rejection.source,
+                blockedPosition = rejection.blockedPosition,
+                actionLabel = label,
+            )
+        }
         val changes = measureDiff(timing) {
             touched.mapNotNull { pos ->
                 val oldState = before[pos] ?: return@mapNotNull null
@@ -126,6 +148,33 @@ class AxionCommittedDiffBuilder(
             return touched
         }
 
+        fun collectPolicyTouched(operations: List<AxionRemoteOperation>): Set<IntVector3> = buildSet {
+            addAll(collectTouched(operations))
+            operations.forEach { operation ->
+                when (operation) {
+                    is CloneEntitiesRequest -> collectEntitySelection(
+                        target = this,
+                        sourceMin = operation.sourceMin,
+                        sourceMax = operation.sourceMax,
+                        destinationOrigin = operation.destinationOrigin,
+                        rotationQuarterTurns = operation.rotationQuarterTurns,
+                        mirrorAxis = operation.mirrorAxis,
+                        mask = operation.entitySelection,
+                    )
+                    is MoveEntitiesRequest -> collectEntitySelection(
+                        target = this,
+                        sourceMin = operation.sourceMin,
+                        sourceMax = operation.sourceMax,
+                        destinationOrigin = operation.destinationOrigin,
+                        rotationQuarterTurns = operation.rotationQuarterTurns,
+                        mirrorAxis = operation.mirrorAxis,
+                        mask = operation.entitySelection,
+                    )
+                    else -> Unit
+                }
+            }
+        }
+
         private fun collectRegion(target: MutableSet<IntVector3>, a: IntVector3, b: IntVector3) {
             val min = minVector(a, b)
             val max = maxVector(a, b)
@@ -136,6 +185,26 @@ class AxionCommittedDiffBuilder(
                     }
                 }
             }
+        }
+
+        private fun collectEntitySelection(
+            target: MutableSet<IntVector3>,
+            sourceMin: IntVector3,
+            sourceMax: IntVector3,
+            destinationOrigin: IntVector3,
+            rotationQuarterTurns: Int,
+            mirrorAxis: axion.protocol.PlacementMirrorAxisPayload,
+            mask: EntitySelectionMask,
+        ) {
+            EntitySelectionGeometry.sourcePositions(sourceMin, sourceMax, mask).forEach(target::add)
+            EntitySelectionGeometry.destinationPositions(
+                sourceMin = sourceMin,
+                sourceMax = sourceMax,
+                destinationOrigin = destinationOrigin,
+                rotationQuarterTurns = rotationQuarterTurns,
+                mirrorAxis = mirrorAxis,
+                mask = mask,
+            ).forEach(target::add)
         }
 
         private fun collectRepeatedClipboard(
@@ -204,6 +273,15 @@ class AxionCommittedDiffBuilder(
         return BlockSnapshot(
             blockState = world.getBlockAt(pos.x, pos.y, pos.z).blockData.getAsString(false),
             blockEntityData = PaperBlockEntitySnapshotService.capture(world, blockPos),
+        )
+    }
+
+    private fun restore(pos: IntVector3, snapshot: BlockSnapshot) {
+        PaperBlockEntitySnapshotService.apply(
+            world = world,
+            pos = BlockPos(pos.x, pos.y, pos.z),
+            blockStateString = snapshot.blockState,
+            blockEntityPayload = snapshot.blockEntityData,
         )
     }
 

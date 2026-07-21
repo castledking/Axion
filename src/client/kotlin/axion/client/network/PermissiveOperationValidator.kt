@@ -13,6 +13,7 @@ import axion.common.operation.OperationValidator
 import axion.common.operation.SmearRegionOperation
 import axion.common.operation.StackRegionOperation
 import axion.common.operation.SymmetryPlacementOperation
+import axion.protocol.IntVector3
 
 class PermissiveOperationValidator : OperationValidator {
     var lastFailureMessage: String? = null
@@ -24,6 +25,7 @@ class PermissiveOperationValidator : OperationValidator {
     }
 
     private fun validationMessage(operation: EditOperation): String? {
+        invalidEntitySelection(operation)?.let { return it }
         val estimate = estimate(operation)
         if (estimate.clipboardCells > MAX_CLIPBOARD_CELLS) {
             return "Axion edit canceled: clipboard preview exceeds $MAX_CLIPBOARD_CELLS cells."
@@ -53,7 +55,9 @@ class PermissiveOperationValidator : OperationValidator {
                 totalWrites = operation.sourceRegion.volume(),
                 blocksPerBatch = operation.sourceRegion.volume(),
             )
-            is CloneEntitiesOperation -> OperationEstimate()
+            is CloneEntitiesOperation -> OperationEstimate(
+                clipboardCells = entitySelectionCellCount(operation.sourceRegion, operation.entitySelection),
+            )
             is DeleteEntitiesOperation -> OperationEstimate()
             is FilteredCloneRegionOperation -> OperationEstimate(
                 totalWrites = operation.sourceRegion.volume(),
@@ -75,7 +79,9 @@ class PermissiveOperationValidator : OperationValidator {
                 extrudeFootprint = operation.footprint.size,
                 extrudeWrites = operation.footprint.size,
             )
-            is MoveEntitiesOperation -> OperationEstimate()
+            is MoveEntitiesOperation -> OperationEstimate(
+                clipboardCells = entitySelectionCellCount(operation.sourceRegion, operation.entitySelection),
+            )
             is SymmetryPlacementOperation -> OperationEstimate(
                 totalWrites = operation.placements.size.toLong(),
                 blocksPerBatch = operation.placements.size.toLong(),
@@ -108,6 +114,33 @@ class PermissiveOperationValidator : OperationValidator {
     private fun axion.common.model.BlockRegion.volume(): Long {
         val size = size()
         return size.x.toLong() * size.y.toLong() * size.z.toLong()
+    }
+
+    private fun invalidEntitySelection(operation: EditOperation): String? = when (operation) {
+        is CloneEntitiesOperation -> invalidEntitySelection(operation.sourceRegion, operation.entitySelection)
+        is MoveEntitiesOperation -> invalidEntitySelection(operation.sourceRegion, operation.entitySelection)
+        is CompositeOperation -> operation.operations.firstNotNullOfOrNull(::invalidEntitySelection)
+        else -> null
+    }
+
+    private fun invalidEntitySelection(
+        region: axion.common.model.BlockRegion,
+        selection: axion.protocol.EntitySelectionMask,
+    ): String? {
+        val size = region.normalized().size().let { IntVector3(it.x, it.y, it.z) }
+        return if (selection.isValidFor(size)) {
+            null
+        } else {
+            "Axion edit canceled: entity selection contains a cell outside its source region."
+        }
+    }
+
+    private fun entitySelectionCellCount(
+        region: axion.common.model.BlockRegion,
+        selection: axion.protocol.EntitySelectionMask,
+    ): Int {
+        val size = region.normalized().size().let { IntVector3(it.x, it.y, it.z) }
+        return selection.selectedBlockCount(size).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
     }
 
     private companion object {

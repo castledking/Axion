@@ -146,42 +146,18 @@ object AxionHotbarHud {
             renderMiddleClickToggle(
                 context = context,
                 sideSlot = sideSlot,
-                hovered = AxionAltMenuController.isHoveringMiddleClickToggle(
-                    client,
-                    context.scaledWindowWidth,
-                    context.scaledWindowHeight,
-                ),
-                textRenderer = client.textRenderer,
             )
             renderKeepExistingToggle(
                 context = context,
                 sideSlot = sideSlot,
-                hovered = AxionAltMenuController.isHoveringKeepExistingToggle(
-                    client,
-                    context.scaledWindowWidth,
-                    context.scaledWindowHeight,
-                ),
-                textRenderer = client.textRenderer,
             )
             renderCopyEntitiesToggle(
                 context = context,
                 sideSlot = sideSlot,
-                hovered = AxionAltMenuController.isHoveringCopyEntitiesToggle(
-                    client,
-                    context.scaledWindowWidth,
-                    context.scaledWindowHeight,
-                ),
-                textRenderer = client.textRenderer,
             )
             renderCopyAirToggle(
                 context = context,
                 sideSlot = sideSlot,
-                hovered = AxionAltMenuController.isHoveringCopyAirToggle(
-                    client,
-                    context.scaledWindowWidth,
-                    context.scaledWindowHeight,
-                ),
-                textRenderer = client.textRenderer,
             )
         }
     }
@@ -336,6 +312,7 @@ object AxionHotbarHud {
             // 9×9 grid background
             val centerX = context.scaledWindowWidth / 2
             drawHotbarSwapperRegion(context, HOTBAR_GRID_BG, centerX - 91, context.scaledWindowHeight - 182)
+            renderSavedHotbarActionButtons(context, client, page)
 
             val hoveredSlot = findHoveredSlot(client, context.scaledWindowWidth, context.scaledWindowHeight, rowBounds)
 
@@ -366,6 +343,37 @@ object AxionHotbarHud {
                 renderTooltipNow(context, textRenderer, lines, mx, my)
             }
             pendingTooltip = null
+        }
+    }
+
+    private fun renderSavedHotbarActionButtons(
+        context: DrawContext,
+        client: MinecraftClient,
+        page: Int,
+    ) {
+        val player = client.player ?: return
+        val currentMode = when {
+            player.isSpectator -> SavedHotbarMenuAction.SPECTATOR
+            AxionToolSelectionController.isCreativeModeAllowed() -> SavedHotbarMenuAction.CREATIVE
+            else -> SavedHotbarMenuAction.SURVIVAL
+        }
+
+        AxionHudLayout.savedHotbarActionButtons(
+            context.scaledWindowWidth,
+            context.scaledWindowHeight,
+            page,
+        ).forEach { bounds ->
+            VanillaHudButtonStore.render(
+                context = context,
+                key = VanillaHudButtonStore.actionKey(bounds.action),
+                label = bounds.action.label,
+                x = bounds.x,
+                y = bounds.y,
+                width = bounds.width,
+                height = bounds.height,
+                enabled = bounds.enabled,
+                selected = bounds.action == currentMode,
+            )
         }
     }
 
@@ -640,108 +648,80 @@ object AxionHotbarHud {
     private fun renderMiddleClickToggle(
         context: DrawContext,
         sideSlot: AxionHudLayout.SlotBounds,
-        hovered: Boolean,
-        textRenderer: net.minecraft.client.font.TextRenderer,
     ) {
         val bounds = AxionHudLayout.middleClickToggleBounds(sideSlot)
         val enabled = AxionClientState.middleClickMagicSelectEnabled
-        val borderColor = when {
-            enabled -> BORDER_SELECTED
-            hovered -> BORDER_HOVER
-            else -> BORDER_NEUTRAL
-        }
-        val textColor = if (enabled || hovered) TEXT_SELECTED else TEXT_IDLE
         val label = if (enabled) "MMB: Magic Select" else "MMB: Extend Face"
 
-        context.fill(bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + bounds.height, OUTER_BACKGROUND)
-        context.drawStrokedRectangleCompat(bounds.x, bounds.y, bounds.width, bounds.height, borderColor)
-        context.drawCenteredTextWithShadow(
-            textRenderer,
+        VanillaHudButtonStore.render(
+            context,
+            VanillaHudButtonStore.MIDDLE_CLICK,
             label,
-            bounds.x + (bounds.width / 2),
-            bounds.y + 5,
-            textColor,
+            bounds.x,
+            bounds.y,
+            bounds.width,
+            bounds.height,
+            selected = enabled,
         )
     }
 
     private fun renderKeepExistingToggle(
         context: DrawContext,
         sideSlot: AxionHudLayout.SlotBounds,
-        hovered: Boolean,
-        textRenderer: net.minecraft.client.font.TextRenderer,
     ) {
         val bounds = AxionHudLayout.keepExistingToggleBounds(sideSlot)
         val enabled = AxionClientState.keepExistingEnabled
-        val borderColor = when {
-            enabled -> BORDER_SELECTED
-            hovered -> BORDER_HOVER
-            else -> BORDER_NEUTRAL
-        }
-        val textColor = if (enabled || hovered) TEXT_SELECTED else TEXT_IDLE
         val label = if (enabled) "Keep Existing: ON" else "Keep Existing: OFF"
 
-        context.fill(bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + bounds.height, OUTER_BACKGROUND)
-        context.drawStrokedRectangleCompat(bounds.x, bounds.y, bounds.width, bounds.height, borderColor)
-        context.drawCenteredTextWithShadow(
-            textRenderer,
+        VanillaHudButtonStore.render(
+            context,
+            VanillaHudButtonStore.KEEP_EXISTING,
             label,
-            bounds.x + (bounds.width / 2),
-            bounds.y + 5,
-            textColor,
+            bounds.x,
+            bounds.y,
+            bounds.width,
+            bounds.height,
+            selected = enabled,
         )
     }
 
     private fun renderCopyEntitiesToggle(
         context: DrawContext,
         sideSlot: AxionHudLayout.SlotBounds,
-        hovered: Boolean,
-        textRenderer: net.minecraft.client.font.TextRenderer,
     ) {
         val bounds = AxionHudLayout.copyEntitiesToggleBounds(sideSlot)
         val enabled = AxionClientState.copyEntitiesEnabled
-        val borderColor = when {
-            enabled -> BORDER_SELECTED
-            hovered -> BORDER_HOVER
-            else -> BORDER_NEUTRAL
-        }
-        val textColor = if (enabled || hovered) TEXT_SELECTED else TEXT_IDLE
         val label = if (enabled) "Copy Entities: ON" else "Copy Entities: OFF"
 
-        context.fill(bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + bounds.height, OUTER_BACKGROUND)
-        context.drawStrokedRectangleCompat(bounds.x, bounds.y, bounds.width, bounds.height, borderColor)
-        context.drawCenteredTextWithShadow(
-            textRenderer,
+        VanillaHudButtonStore.render(
+            context,
+            VanillaHudButtonStore.COPY_ENTITIES,
             label,
-            bounds.x + (bounds.width / 2),
-            bounds.y + 5,
-            textColor,
+            bounds.x,
+            bounds.y,
+            bounds.width,
+            bounds.height,
+            selected = enabled,
         )
     }
 
     private fun renderCopyAirToggle(
         context: DrawContext,
         sideSlot: AxionHudLayout.SlotBounds,
-        hovered: Boolean,
-        textRenderer: net.minecraft.client.font.TextRenderer,
     ) {
         val bounds = AxionHudLayout.copyAirToggleBounds(sideSlot)
         val enabled = AxionClientState.copyAirEnabled
-        val borderColor = when {
-            enabled -> BORDER_SELECTED
-            hovered -> BORDER_HOVER
-            else -> BORDER_NEUTRAL
-        }
-        val textColor = if (enabled || hovered) TEXT_SELECTED else TEXT_IDLE
         val label = if (enabled) "Copy Air: ON" else "Copy Air: OFF"
 
-        context.fill(bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + bounds.height, OUTER_BACKGROUND)
-        context.drawStrokedRectangleCompat(bounds.x, bounds.y, bounds.width, bounds.height, borderColor)
-        context.drawCenteredTextWithShadow(
-            textRenderer,
+        VanillaHudButtonStore.render(
+            context,
+            VanillaHudButtonStore.COPY_AIR,
             label,
-            bounds.x + (bounds.width / 2),
-            bounds.y + 5,
-            textColor,
+            bounds.x,
+            bounds.y,
+            bounds.width,
+            bounds.height,
+            selected = enabled,
         )
     }
 }

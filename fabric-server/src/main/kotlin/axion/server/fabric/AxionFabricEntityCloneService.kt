@@ -28,10 +28,23 @@ object AxionFabricEntityCloneService {
     fun clone(world: ServerWorld, operation: CloneEntitiesRequest): List<FabricCommittedEntityClone> {
         val sourceMin = minVector(operation.sourceMin, operation.sourceMax)
         val sourceMax = maxVector(operation.sourceMin, operation.sourceMax)
+        val queryBox = Box(
+            sourceMin.x.toDouble(),
+            sourceMin.y.toDouble(),
+            sourceMin.z.toDouble(),
+            sourceMax.x + 1.0,
+            sourceMax.y + 1.25,
+            sourceMax.z + 1.0,
+        )
+        val entityMatcher = operation.entitySelection.matcher(sourceMin, sourceMax)
         val seen = linkedSetOf<UUID>()
-        val clones = operation.entityUuids
+        val clones = world.getOtherEntities(null, queryBox)
             .asSequence()
-            .mapNotNull { world.getEntity(it) }
+            .filter { entity ->
+                entity !is PlayerEntity &&
+                    !entity.isRemoved &&
+                    entityMatcher.containsFeet(entity.x, entity.y, entity.z)
+            }
             .map(::rootEntity)
             .filter { entity ->
                 entity !is PlayerEntity &&

@@ -27,9 +27,18 @@ object PaperEntityMoveService {
             sourceMax.y + 1.25,
             sourceMax.z + 1.0,
         )
+        val entityMatcher = operation.entitySelection.matcher(sourceMin, sourceMax)
         val seen = linkedSetOf<UUID>()
         return world.getNearbyEntities(queryBox)
             .asSequence()
+            .filter { entity ->
+                if (entity is Player || !entity.isValid) {
+                    false
+                } else {
+                    val location = entity.location
+                    entityMatcher.containsFeet(location.x, location.y, location.z)
+                }
+            }
             .map(::rootEntity)
             .filter { entity ->
                 entity !is Player &&

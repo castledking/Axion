@@ -133,6 +133,7 @@ object VersionCompatImpl : VersionCompat {
         origins: Collection<BlockPos>,
         color: Int,
         alpha: Int,
+        scale: Float,
     ): Boolean {
         if (ShaderPackCompat.shouldDisableDirectGpuPreview()) return false
         val session = ChunkedPreviewLifecycle.acquire(sessionId)
@@ -274,6 +275,25 @@ object VersionCompatImpl : VersionCompat {
 
     fun notifyPlayer(player: net.minecraft.client.player.LocalPlayer?, text: Text, overlay: Boolean) {
         if (overlay) player?.sendOverlayMessage(text) else player?.sendSystemMessage(text)
+    }
+
+    fun sendGameModeCommand(client: MinecraftClient, gameModeId: String) {
+        client.connection?.sendCommand("gamemode $gameModeId")
+    }
+
+    fun changeLocalGameMode(client: MinecraftClient, gameModeId: String): Boolean {
+        val server = client.getSingleplayerServer() ?: return false
+        val playerId = client.player?.uuid ?: return false
+        val gameMode = when (gameModeId.lowercase()) {
+            "survival" -> net.minecraft.world.level.GameType.SURVIVAL
+            "creative" -> net.minecraft.world.level.GameType.CREATIVE
+            "spectator" -> net.minecraft.world.level.GameType.SPECTATOR
+            else -> return false
+        }
+        server.execute {
+            server.playerList.getPlayer(playerId)?.setGameMode(gameMode)
+        }
+        return true
     }
 
     fun hasLocalServer(client: MinecraftClient): Boolean = client.hasSingleplayerServer()
@@ -584,6 +604,32 @@ object VersionCompatImpl : VersionCompat {
     ) {
         context.delegate.blit(RenderPipelines.GUI_TEXTURED, texture, x, y, 0.0f, 0.0f, width, height, width, height)
     }
+
+    fun renderVanillaButton(
+        context: DrawContext,
+        button: net.minecraft.client.gui.widget.ButtonWidget,
+        mouseX: Int,
+        mouseY: Int,
+        delta: Float,
+    ) {
+        button.extractRenderState(context.delegate, mouseX, mouseY, delta)
+    }
+
+    @Suppress("UNUSED_PARAMETER")
+    fun clickVanillaButton(
+        client: MinecraftClient,
+        button: net.minecraft.client.gui.widget.ButtonWidget,
+        mouseX: Double,
+        mouseY: Double,
+        mouseButton: Int,
+    ): Boolean = button.mouseClicked(
+        net.minecraft.client.input.MouseButtonEvent(
+            mouseX,
+            mouseY,
+            net.minecraft.client.input.MouseButtonInfo(mouseButton, 0),
+        ),
+        false,
+    )
 
     fun drawGuiTextureRegion(
         context: DrawContext,

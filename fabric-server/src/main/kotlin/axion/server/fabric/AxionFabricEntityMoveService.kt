@@ -28,9 +28,15 @@ object AxionFabricEntityMoveService {
             sourceMax.y + 1.25,
             sourceMax.z + 1.0,
         )
+        val entityMatcher = operation.entitySelection.matcher(sourceMin, sourceMax)
         val seen = linkedSetOf<UUID>()
         return world.getOtherEntities(null, queryBox)
             .asSequence()
+            .filter { entity ->
+                entity !is PlayerEntity &&
+                    !entity.isRemoved &&
+                    entityMatcher.containsFeet(entity.x, entity.y, entity.z)
+            }
             .map(::rootEntity)
             .filter { entity ->
                 entity !is PlayerEntity &&

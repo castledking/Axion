@@ -36,15 +36,9 @@ object PlacementToolController {
         }
     }
 
-    fun currentPreview(): ClonePreviewState? = when (val state = AxionClientState.placementToolState) {
-        CloneToolState.Idle,
-        is CloneToolState.FirstCornerSet,
-        is CloneToolState.RegionDefined,
-            -> null
-
-        is CloneToolState.PreviewingOffset -> state.preview
-        is CloneToolState.AwaitingConfirm -> state.preview
-    }
+    fun currentPreview(): ClonePreviewState? = PlacementPreviewPolicy.activePreview(
+        AxionClientState.placementToolState,
+    )
 
     fun handlePrimaryAction(client: MinecraftClient): Boolean {
         if (!isPlacementActive()) {
@@ -191,6 +185,13 @@ object PlacementToolController {
         return true
     }
 
+    fun canMirrorPreview(): Boolean = when (AxionClientState.placementToolState) {
+        is CloneToolState.PreviewingOffset,
+        is CloneToolState.AwaitingConfirm,
+            -> true
+        else -> false
+    }
+
     fun reset() {
         val state = CloneToolState.Idle
         AxionClientState.updatePlacementToolState(state)
@@ -223,21 +224,23 @@ object PlacementToolController {
         return true
     }
 
-    private fun estimateOperationSize(operation: axion.common.operation.EditOperation): Int {
+    private fun estimateOperationSize(operation: axion.common.operation.EditOperation): Long {
         // Quick estimation by counting placements (each placement is roughly 100+ bytes serialized)
         return when (operation) {
-            is axion.common.operation.SymmetryPlacementOperation -> operation.placements.size * 150
-            is axion.common.operation.CompositeOperation -> {
-                operation.operations.sumOf { op ->
-                    when (op) {
-                        is axion.common.operation.SymmetryPlacementOperation -> op.placements.size * 150
-                        else -> 100 // estimate for other operation types
-                    }
-                }
-            }
-            else -> 1000 // conservative estimate for other operations
+            is axion.common.operation.SymmetryPlacementOperation -> operation.placements.size.toLong() * 150L
+            is axion.common.operation.CloneEntitiesOperation -> entitySelectionWireEstimate(operation.entitySelection)
+            is axion.common.operation.MoveEntitiesOperation -> entitySelectionWireEstimate(operation.entitySelection)
+            is axion.common.operation.CompositeOperation -> operation.operations.sumOf(::estimateOperationSize)
+            else -> 1_000L // conservative estimate for other operations
         }
     }
+
+    private fun entitySelectionWireEstimate(selection: axion.protocol.EntitySelectionMask): Long =
+        128L + if (selection.mode == axion.protocol.EntitySelectionMode.SPARSE_OFFSETS) {
+            selection.offsets.size.toLong() * 12L
+        } else {
+            0L
+        }
 
     private fun expandSelectionFace(client: MinecraftClient, region: BlockRegion): Boolean {
         val expandedRegion = SelectionController.expandRegionToCurrentTarget(client, region) ?: return false
