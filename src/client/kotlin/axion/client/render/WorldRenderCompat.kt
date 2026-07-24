@@ -16,12 +16,23 @@ class AxionWorldRenderContext private constructor(
 
     constructor(consumers: Immediate, matrices: MatrixStack) : this(null, consumers, matrices)
 
+    // Every renderer calls consumers() separately, and on 26.2 the adapter owns
+    // the per-render-type batches that are flushed at the end of the frame.
+    // Adapting once per context is what keeps those batches from being dropped.
+    private var adaptedConsumers: Any? = null
+
     fun consumers(): Any {
         fallbackConsumers?.let { return it }
+        adaptedConsumers?.let { return it }
         val currentDelegate = delegate ?: error("World render delegate unavailable")
-        // Try both old (consumers) and new (bufferSource) method names for cross-version compatibility
-        return invokeNullable("consumers") ?: invokeNullable("bufferSource")
-        ?: error("World render consumers unavailable in ${currentDelegate.javaClass.name}")
+        // consumers/bufferSource cover 1.21.x through 26.1. 26.2 deleted
+        // MultiBufferSource and exposes a SubmitNodeCollector instead, which
+        // adaptConsumers wraps into something with getBuffer.
+        val raw = invokeNullable("consumers")
+            ?: invokeNullable("bufferSource")
+            ?: invokeNullable("submitNodeCollector")
+            ?: error("World render consumers unavailable in ${currentDelegate.javaClass.name}")
+        return adaptConsumers(raw).also { adaptedConsumers = it }
     }
 
     fun matrices(): MatrixStack {
@@ -172,6 +183,16 @@ object WorldRenderCompat {
         logger.warn("[Axion/Render] No Fabric render event available — using mixin fallback path")
     }
 
+    /**
+     * END_MAIN is the correct phase on every range, including 26.2.
+     *
+     * An earlier attempt moved 26.2 to BEFORE_GIZMOS on the theory that END_MAIN
+     * fires too late for submit nodes. It does not: selection fills, outlines and
+     * the symmetry gizmo all render from END_MAIN through submitCustomGeometry.
+     * Moving earlier actively breaks the GPU preview, which is not a submit node
+     * at all -- it is a direct render pass onto the main target, so the world
+     * rendering that still follows BEFORE_GIZMOS overwrites it.
+     */
     private fun tryRegisterEndMainListener(): Boolean {
         if (fabricEndMainAvailable) return true
         val registered = registerBatchedListener("END_MAIN", "EndMain") { rawContext ->

@@ -15,3 +15,10 @@ fun Any.getBuffer(renderType: RenderType): VertexConsumer {
     } ?: error("getBuffer method not found on ${this.javaClass.name}")
     return method.invoke(this, renderType) as? VertexConsumer ?: error("getBuffer returned non-VertexConsumer")
 }
+
+/**
+ * 26.2 deleted MultiBufferSource and hands renderers a SubmitNodeCollector, so
+ * that range wraps it into something with getBuffer. 26.1 still gets a real
+ * BufferSource from the render context, so this is identity.
+ */
+fun adaptConsumers(raw: Any): Any = raw

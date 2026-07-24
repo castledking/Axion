@@ -9,7 +9,7 @@ import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 
 object VertexRenderingCompat {
-    private val drawOutlineMethod: Method by lazy {
+    private val drawOutlineMethod: Method? by lazy {
         net.minecraft.client.render.VertexRendering::class.java.methods.firstOrNull { method ->
             if (!Modifier.isStatic(method.modifiers) || method.returnType != Void.TYPE) {
                 return@firstOrNull false
@@ -44,10 +44,15 @@ object VertexRenderingCompat {
 
                 else -> false
             }
-        } ?: error("Missing VertexRendering.drawOutline overload")
+        }
     }
 
-    private val useManualOutline: Boolean = false
+    // 26.2 deleted ShapeRenderer, so there is no vanilla outline helper to
+    // reflect at. The manual path below writes the twelve cuboid edges straight
+    // into whatever consumer it is handed, which is exactly what that range
+    // needs — its consumer is a recording one that replays through
+    // submitCustomGeometry on the correct render type.
+    private val useManualOutline: Boolean by lazy { drawOutlineMethod == null }
 
     private val lineWidthMethod: Method? by lazy {
         VertexConsumer::class.java.methods.firstOrNull { method ->
@@ -103,10 +108,11 @@ object VertexRenderingCompat {
             drawOutlineManual(matrixStack, consumer, shape, cameraX, cameraY, cameraZ, color, lineWidth)
             return
         }
-        if (drawOutlineMethod.parameterCount == 8) {
-            drawOutlineMethod.invoke(null, matrixStack, consumer, shape, cameraX, cameraY, cameraZ, color, lineWidth)
+        val method = drawOutlineMethod ?: return
+        if (method.parameterCount == 8) {
+            method.invoke(null, matrixStack, consumer, shape, cameraX, cameraY, cameraZ, color, lineWidth)
         } else {
-            drawOutlineMethod.invoke(null, matrixStack, consumer, shape, cameraX, cameraY, cameraZ, color)
+            method.invoke(null, matrixStack, consumer, shape, cameraX, cameraY, cameraZ, color)
         }
     }
 
@@ -121,10 +127,11 @@ object VertexRenderingCompat {
             drawOutlineManual(matrixStack, consumer, shape, 0.0, 0.0, 0.0, color, lineWidth)
             return
         }
-        if (drawOutlineMethod.parameterCount == 8) {
-            drawOutlineMethod.invoke(null, matrixStack, consumer, shape, 0.0, 0.0, 0.0, color, lineWidth)
+        val method = drawOutlineMethod ?: return
+        if (method.parameterCount == 8) {
+            method.invoke(null, matrixStack, consumer, shape, 0.0, 0.0, 0.0, color, lineWidth)
         } else {
-            drawOutlineMethod.invoke(null, matrixStack, consumer, shape, 0.0, 0.0, 0.0, color)
+            method.invoke(null, matrixStack, consumer, shape, 0.0, 0.0, 0.0, color)
         }
     }
 

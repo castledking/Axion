@@ -19,6 +19,7 @@ import axion.client.tool.SmearToolController
 import axion.client.tool.StackToolState
 import axion.client.tool.StackToolController
 import axion.common.model.AxionSubtool
+import axion.common.model.ClipboardState
 import axion.client.selection.SelectionController
 import axion.client.compat.toImmutable
 import axion.client.selection.blockPosOrNull
@@ -163,24 +164,39 @@ object AxionInteractionRouter {
             AxionSubtool.MOVE,
                 -> eraseDefinedRegion(
                     (AxionClientState.placementToolState as? CloneToolState.RegionDefined)
-                        ?.let { RegionEraseService.Target(it.region, it.clipboardBuffer) },
+                        ?.let { RegionEraseService.Target(it.region, it.clipboardBuffer) }
+                        ?: magicSelectionTarget(),
                     PlacementToolController::reset,
                 )
 
             AxionSubtool.STACK -> eraseDefinedRegion(
                 (AxionClientState.stackToolState as? StackToolState.RegionDefined)
-                    ?.let { RegionEraseService.Target(it.region, it.clipboardBuffer) },
+                    ?.let { RegionEraseService.Target(it.region, it.clipboardBuffer) }
+                    ?: magicSelectionTarget(),
                 StackToolController::reset,
             )
 
             AxionSubtool.SMEAR -> eraseDefinedRegion(
                 (AxionClientState.smearToolState as? SmearToolState.RegionDefined)
-                    ?.let { RegionEraseService.Target(it.region, it.clipboardBuffer) },
+                    ?.let { RegionEraseService.Target(it.region, it.clipboardBuffer) }
+                    ?: magicSelectionTarget(),
                 SmearToolController::reset,
             )
 
             AxionSubtool.EXTRUDE -> false
         }
+    }
+
+    /**
+     * Magic Select stores its region on the clipboard rather than in the tool's
+     * own state, so Stack/Clone/Smear/Move never reach [CloneToolState.RegionDefined]
+     * and friends when the region came from a magic selection. Without this the
+     * delete key silently does nothing for exactly the selections that are
+     * quickest to make. Erase already works this way.
+     */
+    private fun magicSelectionTarget(): RegionEraseService.Target? {
+        val magic = AxionClientState.clipboardState as? ClipboardState.MagicSelection ?: return null
+        return RegionEraseService.Target(magic.region, magic.clipboardBuffer)
     }
 
     private fun eraseDefinedRegion(target: RegionEraseService.Target?, reset: () -> Unit): Boolean {

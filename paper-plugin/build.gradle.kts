@@ -6,8 +6,13 @@ plugins {
 group = rootProject.group
 version = rootProject.version
 val minecraftVersion = rootProject.property("minecraft_version") as String
-val isSupportedVersion = minecraftVersion in setOf("1.21.1", "1.21.3", "1.21.4", "1.21.5", "1.21.6", "1.21.7", "1.21.8", "1.21.9", "1.21.10", "1.21.11") || minecraftVersion.startsWith("26.1")
-val javaTargetVersion = if (minecraftVersion.startsWith("26.1")) 25 else 21
+// Every 26.x release requires Java 25, and paperweight runs paperclip on this
+// toolchain — pinning 21 here makes the setup fail with "Minecraft 26.1 and
+// newer requires running the server with Java 25 or above" long before anything
+// is compiled.
+val isMc26x = minecraftVersion.startsWith("26.")
+val isSupportedVersion = minecraftVersion in setOf("1.21.1", "1.21.3", "1.21.4", "1.21.5", "1.21.6", "1.21.7", "1.21.8", "1.21.9", "1.21.10", "1.21.11") || isMc26x
+val javaTargetVersion = if (isMc26x) 25 else 21
 
 base {
     archivesName.set("axion-plugin")

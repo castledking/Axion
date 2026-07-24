@@ -74,13 +74,13 @@ enum class MagicSelectRule(
     WOOL(
         id = "wool",
         displayName = "##wool",
-        icons = listOf(Items.WHITE_WOOL),
+        icons = listOf(MAGIC_SELECT_WOOL_ICON),
         matcher = ruleTagMatcher { it.isIn(BlockTags.WOOL) },
     ),
     CARPETS(
         id = "carpets",
         displayName = "##carpets",
-        icons = listOf(Items.WHITE_CARPET),
+        icons = listOf(MAGIC_SELECT_CARPET_ICON),
         matcher = ruleTagMatcher { it.isIn(BlockTags.WOOL_CARPETS) },
     ),
     DOORS(
@@ -117,7 +117,7 @@ enum class MagicSelectRule(
         id = "saplings",
         displayName = "##saplings",
         icons = listOf(Items.OAK_SAPLING),
-        matcher = ruleTagMatcher { it.isIn(BlockTags.SAPLINGS) },
+        matcher = ruleTagMatcher { it.isIn(MAGIC_SELECT_SAPLINGS_TAG) },
     ),
     RAILS(
         id = "rails",
@@ -140,7 +140,7 @@ enum class MagicSelectRule(
     BEDS(
         id = "beds",
         displayName = "##beds",
-        icons = listOf(Items.RED_BED),
+        icons = listOf(MAGIC_SELECT_BED_ICON),
         matcher = ruleTagMatcher { it.isIn(BlockTags.BEDS) },
     ),
     CANDLES(

@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
-SUPPORTED_VERSION_LIST=("1.21" "1.21.1" "1.21.2" "1.21.3" "1.21.4" "1.21.5" "1.21.6" "1.21.7" "1.21.8" "1.21.9" "1.21.10" "1.21.11" "26.1")
+SUPPORTED_VERSION_LIST=("1.21" "1.21.1" "1.21.2" "1.21.3" "1.21.4" "1.21.5" "1.21.6" "1.21.7" "1.21.8" "1.21.9" "1.21.10" "1.21.11" "26.1" "26.2")
 
 # Parse command line arguments
 VERSION_ARG=""
@@ -71,7 +71,8 @@ if [[ "$ARGS_PROVIDED" == "false" && $# -eq 0 ]]; then
     echo " 10) 1.21.9"
     echo " 11) 1.21.10"
     echo " 12) 1.21.11"
-    echo " 13) 26.1 (default)"
+    echo " 13) 26.1"
+    echo " 14) 26.2 (default)"
     echo " 14) All versions"
     read -p "Enter choice [1-14 or comma-separated]: " version_choice
 
@@ -94,6 +95,7 @@ if [[ "$ARGS_PROVIDED" == "false" && $# -eq 0 ]]; then
                 11) selected_versions+=("1.21.10") ;;
                 12) selected_versions+=("1.21.11") ;;
                 13) selected_versions+=("26.1") ;;
+                14) selected_versions+=("26.2") ;;
                 14) selected_versions+=("all") ;;
                 *) ;;
             esac
@@ -115,8 +117,9 @@ if [[ "$ARGS_PROVIDED" == "false" && $# -eq 0 ]]; then
             11) VERSION_ARG="1.21.10" ;;
             12) VERSION_ARG="1.21.11" ;;
             13) VERSION_ARG="26.1" ;;
+            14) VERSION_ARG="26.2" ;;
             14) VERSION_ARG="all" ;;
-            *) VERSION_ARG="26.1" ;;
+            *) VERSION_ARG="26.2" ;;
         esac
     fi
 
@@ -158,9 +161,9 @@ if [[ "$ARGS_PROVIDED" == "false" && $# -eq 0 ]]; then
     echo ""
 fi
 
-# Default to 26.1 if no version specified
+# Default to 26.2 if no version specified
 if [[ -z "$VERSION_ARG" ]]; then
-    VERSION_ARG="26.1"
+    VERSION_ARG="26.2"
 fi
 
 # Display usage
@@ -168,8 +171,8 @@ if [[ "$VERSION_ARG" == "-h" || "$VERSION_ARG" == "--help" ]]; then
     echo "Usage: ./run-axion.sh [VERSIONS] [OPTIONS]"
     echo ""
     echo "VERSIONS: Minecraft version, comma-separated versions, or all"
-    echo "  Supported: 1.21, 1.21.1, 1.21.2, 1.21.3, 1.21.4, 1.21.5, 1.21.6, 1.21.7, 1.21.8, 1.21.9, 1.21.10, 1.21.11, 26.1"
-    echo "  Default: 26.1"
+    echo "  Supported: 1.21, 1.21.1, 1.21.2, 1.21.3, 1.21.4, 1.21.5, 1.21.6, 1.21.7, 1.21.8, 1.21.9, 1.21.10, 1.21.11, 26.1, 26.2"
+    echo "  Default: 26.2"
     echo ""
     echo "OPTIONS:"
     echo "  paper, --paper      Also start Paper server(s)"
@@ -188,13 +191,13 @@ if [[ "$VERSION_ARG" == "-h" || "$VERSION_ARG" == "--help" ]]; then
     echo "  Running ./run-axion.sh without arguments shows an interactive prompt"
     echo ""
     echo "Examples:"
-    echo "  ./run-axion.sh 26.1"
+    echo "  ./run-axion.sh 26.2"
     echo "  ./run-axion.sh 1.21,1.21.1"
     echo "  ./run-axion.sh 1.21.6,1.21.7 paper"
     echo "  ./run-axion.sh all paper fabric quickplay"
     echo "  ./run-axion.sh all build"
-    echo "  WITH_PAPER=true QUICKPLAY=true ./run-axion.sh 26.1"
-    echo "  BUILD_FIRST=true ./run-axion.sh 26.1"
+    echo "  WITH_PAPER=true QUICKPLAY=true ./run-axion.sh 26.2"
+    echo "  BUILD_FIRST=true ./run-axion.sh 26.2"
     exit 0
 fi
 
@@ -260,9 +263,12 @@ build_version() {
         26.1|26.1.x)
             ./build-axion.sh mc26_1_x
             ;;
+        26.2|26.2.x)
+            ./build-axion.sh mc26_2_x
+            ;;
         *)
             echo "Unknown version for build: $1" >&2
-            echo "Supported versions: 1.21, 1.21.1, 1.21.2, 1.21.3, 1.21.4, 1.21.5, 1.21.6, 1.21.7, 1.21.8, 1.21.9, 1.21.10, 1.21.11, 26.1" >&2
+            echo "Supported versions: 1.21, 1.21.1, 1.21.2, 1.21.3, 1.21.4, 1.21.5, 1.21.6, 1.21.7, 1.21.8, 1.21.9, 1.21.10, 1.21.11, 26.1, 26.2" >&2
             exit 1
             ;;
     esac
@@ -284,6 +290,7 @@ resolve_mc_version() {
         1.21.10) echo "1.21.10" ;;
         1.21.11) echo "1.21.11" ;;
         26.1|26.1.x) echo "26.1.2" ;;
+        26.2|26.2.x) echo "26.2" ;;
         *) echo "" ;;
     esac
 }
@@ -303,6 +310,7 @@ resolve_yarn_mappings() {
         "1.21.10") echo "1.21.10+build.3" ;;
         "1.21.11") echo "1.21.11+build.4" ;;
         "26.1"|"26.1.2") echo "" ;;
+        "26.2") echo "" ;;
         *) return 1 ;;
     esac
 }
@@ -322,6 +330,7 @@ resolve_loader_version() {
         "1.21.10") echo "0.17.3" ;;
         "1.21.11") echo "0.18.4" ;;
         "26.1"|"26.1.2") echo "0.19.2" ;;
+        "26.2") echo "0.19.3" ;;
         *) return 1 ;;
     esac
 }
@@ -341,6 +350,7 @@ resolve_fabric_version() {
         "1.21.10") echo "0.138.4+1.21.10" ;;
         "1.21.11") echo "0.141.3+1.21.11" ;;
         "26.1"|"26.1.2") echo "0.145.1+26.1" ;;
+        "26.2") echo "0.155.2+26.2" ;;
         *) return 1 ;;
     esac
 }
@@ -360,6 +370,7 @@ resolve_fabric_kotlin_version() {
         "1.21.10") echo "1.13.9+kotlin.2.3.10" ;;
         "1.21.11") echo "1.13.9+kotlin.2.3.10" ;;
         "26.1"|"26.1.2") echo "1.13.11+kotlin.2.3.21" ;;
+        "26.2") echo "1.13.11+kotlin.2.3.21" ;;
         *) return 1 ;;
     esac
 }
@@ -379,6 +390,7 @@ resolve_modmenu_version() {
         "1.21.10") echo "16.0.1" ;;
         "1.21.11") echo "17.0.0-beta.2" ;;
         "26.1"|"26.1.2") echo "18.0.0-beta.1" ;;
+        "26.2") echo "20.0.1" ;;
         *) return 1 ;;
     esac
 }
@@ -386,6 +398,7 @@ resolve_modmenu_version() {
 resolve_loom_version() {
     case "$1" in
         "26.1"|"26.1.2") echo "1.16-SNAPSHOT" ;;
+        "26.2") echo "1.16.3" ;;
         *) echo "1.15.4" ;;
     esac
 }
@@ -405,6 +418,7 @@ resolve_paper_version() {
         1.21.10) echo "1.21.10-R0.1-SNAPSHOT" ;;
         1.21.11) echo "1.21.11-R0.1-SNAPSHOT" ;;
         26.1|26.1.x) echo "26.1.2.build.63-stable" ;;
+        26.2|26.2.x) echo "26.2.build.65-beta" ;;
         *) echo "" ;;
     esac
 }
@@ -423,6 +437,7 @@ resolve_range_tag() {
         1.21.10) echo "mc1.21.10" ;;
         1.21.11) echo "mc1.21.9-1.21.11" ;;
         26.1|26.1.x) echo "mc26.1.x" ;;
+        26.2|26.2.x) echo "mc26.2.x" ;;
         *) echo "" ;;
     esac
 }
@@ -504,6 +519,7 @@ start_paper_server() {
         1.21.10) port=25572 ;;
         1.21.11) port=25573 ;;
         26.1|26.1.x) port=25574 ;;
+        26.2|26.2.x) port=25577 ;;
         *) port=25565 ;;
     esac
 
@@ -532,6 +548,7 @@ start_paper_server() {
             1.21.10) paper_url="https://fill-data.papermc.io/v1/objects/158703f75a26f842ea656b3dc6d75bf3d1ec176b97a2c36384d0b80b3871af53/paper-1.21.10-130.jar" ;;
             1.21.11) paper_url="https://fill-data.papermc.io/v1/objects/e708e8c132dc143ffd73528cccb9532e2eb17628b1a0eee74469bf466c7003f8/paper-1.21.11-116.jar" ;;
             26.1|26.1.x) paper_url="https://fill-data.papermc.io/v1/objects/b51d49a5f62446b7cfc01e6c29e48e0ce6abd35a783134aace1047b839b178ef/paper-26.1.2-63.jar" ;;
+            26.2|26.2.x) paper_url="https://fill.papermc.io/v3/projects/paper/versions/26.2/builds/65/downloads/server:default" ;;
             *) echo "    ERROR: Unknown version $version for Paper download" >&2; return 1 ;;
         esac
 
@@ -1176,6 +1193,7 @@ servers = [
     ("1.21.10", "127.0.0.1:25572"),
     ("1.21.11 Paper", "127.0.0.1:25573"),
     ("26.1.x", "127.0.0.1:25574"),
+    ("26.2.x", "127.0.0.1:25577"),
 ]
 if fabric_port:
     servers.append(("1.21.11 Fabric", f"127.0.0.1:{fabric_port}"))
@@ -1269,6 +1287,7 @@ get_port() {
         1.21.10) echo "25572" ;;
         1.21.11) echo "25573" ;;
         26.1|26.1.x) echo "25574" ;;
+        26.2|26.2.x) echo "25577" ;;
         *) echo "25565" ;;
     esac
 }
@@ -1319,7 +1338,7 @@ start_client() {
     mc_version="$(resolve_mc_version "$version")"
     if [[ -z "$mc_version" ]]; then
         echo "  ERROR: Unknown version: $version" >&2
-        echo "  Supported versions: 1.21, 1.21.1, 1.21.2, 1.21.3, 1.21.4, 1.21.5, 1.21.6, 1.21.7, 1.21.8, 1.21.9, 1.21.10, 1.21.11, 26.1" >&2
+        echo "  Supported versions: 1.21, 1.21.1, 1.21.2, 1.21.3, 1.21.4, 1.21.5, 1.21.6, 1.21.7, 1.21.8, 1.21.9, 1.21.10, 1.21.11, 26.1, 26.2" >&2
         exit 1
     fi
 

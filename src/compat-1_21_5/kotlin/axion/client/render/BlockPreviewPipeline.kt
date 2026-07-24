@@ -101,6 +101,18 @@ object BlockPreviewPipeline {
         scene: SelectionScene,
     ): Boolean {
         if (scene.sparse && scene.selectionClipboard != null && scene.origins.isNotEmpty()) {
+            // A cuboid region selection wants the Axiom look: the fill hugs the
+            // blocks that are actually in the region, so empty space stays clear
+            // and the GPU preview reads through it, but the outline stays a clean
+            // bounding box rather than tracing every block edge.
+            scene.aggregateBox?.let { box ->
+                PulsingCuboidRenderer.renderOutlineBox(
+                    context = context,
+                    box = box,
+                    outlineColor = scene.outlineColor,
+                    lineWidth = scene.lineWidth,
+                )
+            }
             return when (scene.style) {
                 SelectionStyle.SELECTION -> ClipboardSelectionRenderer.renderStyledSelection(
                     context = context,
@@ -113,6 +125,7 @@ object BlockPreviewPipeline {
                     pulseFillColor = scene.pulseFillColor,
                     pulseMinAlpha = scene.pulseMinAlpha,
                     pulseMaxAlpha = scene.pulseMaxAlpha,
+                    drawContourOutline = scene.aggregateBox == null,
                 )
 
                 SelectionStyle.PULSE -> scene.origins.any { origin ->

@@ -5,7 +5,7 @@ VERSION=$1
 
 if [ -z "$VERSION" ]; then
     echo "Usage: ./switch-version.sh <version>"
-    echo "Supported versions: 1.20.6, 1.21.0, 1.21.1, 1.21.2, 1.21.3, 1.21.4, 1.21.5, 1.21.6, 1.21.7, 1.21.11, 26.1"
+    echo "Supported versions: 1.20.6, 1.21.0, 1.21.1, 1.21.2, 1.21.3, 1.21.4, 1.21.5, 1.21.6, 1.21.7, 1.21.11, 26.2"
     exit 1
 fi
 

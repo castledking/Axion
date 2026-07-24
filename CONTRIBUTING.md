@@ -87,6 +87,7 @@ The current compatibility source sets are:
 - `compat-1_21_9_10`: Minecraft `1.21.9 - 1.21.10`
 - `compat-1_21_11`: Minecraft `1.21.11`
 - `compat-26_1`: Minecraft `26.1 - 26.1.2`
+- `compat-26_2`: Minecraft `26.2 - 26.2.x`
 
 ## Compatibility Rules
 

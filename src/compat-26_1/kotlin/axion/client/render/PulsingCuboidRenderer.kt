@@ -14,6 +14,7 @@ import net.minecraft.util.math.Vec3d
 import net.minecraft.util.shape.VoxelShapes
 import kotlin.math.ceil
 import kotlin.math.roundToInt
+import kotlin.math.abs
 import kotlin.math.sin
 import kotlin.math.sqrt
 
@@ -21,7 +22,9 @@ object PulsingCuboidRenderer {
     private const val DEFAULT_MIN_ALPHA: Int = 52
     private const val DEFAULT_MAX_ALPHA: Int = 76
     private const val PULSE_PERIOD_MILLIS: Double = 2200.0
-    private const val SELECTION_PULSE_PERIOD_MILLIS: Double = 3200.0
+    // Shared by the box fill and the per-cell contour overlay so the two can
+    // never drift out of phase with each other.
+    const val SELECTION_PULSE_PERIOD_MILLIS: Double = 5200.0
 
     // Beam outlines are sized in world units, so scale them with view distance
     // to keep a roughly constant on-screen width like a real line primitive.
@@ -134,27 +137,17 @@ object PulsingCuboidRenderer {
 
         val offset = if (context.needsCameraOffset()) cameraPos else Vec3d(0.0, 0.0, 0.0)
 
-        renderFilledBox(
-            matrixStack = matrixStack,
-            consumer = filledConsumer,
-            layer = fillLayer,
-            cameraPos = offset,
-            box = baseBox,
-            alpha = baseAlpha,
-            color = baseFillColor,
-        )
+        // One fill phasing baseFillColor -> transparent -> pulseFillColor, rather
+        // than a constant base with a pulse stacked on top. See selectionPulsePhase.
+        val fillPhase = selectionPulsePhase(SELECTION_PULSE_PERIOD_MILLIS)
         renderFilledBox(
             matrixStack = matrixStack,
             consumer = filledConsumer,
             layer = fillLayer,
             cameraPos = offset,
             box = pulseBox,
-            alpha = pulsingAlphaF(
-                minAlpha = pulseMinAlpha,
-                maxAlpha = pulseMaxAlpha,
-                periodMillis = SELECTION_PULSE_PERIOD_MILLIS,
-            ),
-            color = pulseFillColor,
+            alpha = pulseMaxAlpha * abs(fillPhase),
+            color = if (fillPhase >= 0f) pulseFillColor else baseFillColor,
         )
         renderXrayOutline(
             matrixStack = matrixStack,
@@ -392,6 +385,23 @@ object PulsingCuboidRenderer {
      * Uses the monotonic clock: wall-clock time can be stepped by NTP mid-pulse,
      * which shows up as the box snapping to a different brightness.
      */
+    /**
+     * Signed pulse phase in -1..1.
+     *
+     * The selection used to draw a constant base fill with a second pulse fill
+     * stacked on top. Two translucent layers can never reach zero alpha, so the
+     * selection always read as a muddy blend of both colours, and each layer the
+     * view passes through compounds -- which is what made deep selections look
+     * blurred. A signed phase drives a single fill that reaches each colour at
+     * full strength and passes cleanly through fully transparent at the
+     * crossover.
+     */
+    fun selectionPulsePhase(periodMillis: Double = PULSE_PERIOD_MILLIS): Float {
+        val periodNanos = (periodMillis * 1_000_000.0).toLong().coerceAtLeast(1L)
+        val progress = System.nanoTime().mod(periodNanos).toDouble() / periodNanos
+        return sin(progress * Math.PI * 2.0).toFloat()
+    }
+
     fun pulsingAlphaF(
         minAlpha: Int,
         maxAlpha: Int,

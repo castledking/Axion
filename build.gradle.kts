@@ -40,14 +40,21 @@ val rangeMc1215 = minecraftVersion == "1.21.5"
 val rangeLegacy = minecraftVersion.startsWith("1.21.") && minecraftPatch in 6..8
 val rangeModern = minecraftVersion.startsWith("1.21.") && minecraftPatch >= 9
 val rangeMc261x = minecraftVersion.startsWith("26.1")
+val rangeMc262x = minecraftVersion.startsWith("26.2")
+// Both 26.x ranges build for Java 25 in the official (Mojang) namespace with no
+// remap step, so they share the toolchain shape. They do not share a rendering
+// API — 26.2 deleted MultiBufferSource outright — so they keep separate compat
+// trees and ship as separate jars.
+val rangeMc26x = rangeMc261x || rangeMc262x
 val exactMc1216 = minecraftVersion == "1.21.6"
 val exactMc1217 = minecraftVersion == "1.21.7"
 val exactMc1218 = minecraftVersion == "1.21.8"
 val exactMc1219 = minecraftVersion == "1.21.9"
 val exactMc12110 = minecraftVersion == "1.21.10"
-val javaTargetVersion = if (rangeMc261x) 25 else 21
+val javaTargetVersion = if (rangeMc26x) 25 else 21
+val mc26CompatDir = if (rangeMc262x) "src/compat-26_2" else "src/compat-26_1"
 
-if (rangeMc261x) {
+if (rangeMc26x) {
     apply(plugin = "net.fabricmc.fabric-loom")
 } else {
     apply(plugin = "fabric-loom")
@@ -68,6 +75,11 @@ val minecraftVersionRange = (findProperty("axion_minecraft_version_range") as St
     rangeLegacy -> ">=1.21.6 <=1.21.8"
     rangeModern -> ">=1.21.9 <=1.21.11"
     rangeMc261x -> ">=26.1 <=26.1.2"
+    // Open at the patch level so 26.2.1+ is picked up without a rebuild, but
+    // closed before 26.3: 26.2 deleted MultiBufferSource and the whole
+    // immediate-mode render surface relative to 26.1, so the next minor is
+    // likely to break this jar the same way rather than run it.
+    rangeMc262x -> ">=26.2 <26.3"
     else -> ">=1.21.5"
 }
 val loaderVersionRange = when {
@@ -153,11 +165,11 @@ sourceSets.named("client") {
     } else if (exactMc1219 || exactMc12110) {
         // 1.21.9 and 1.21.10 are byte-identical at the source level.
         kotlin.srcDir("src/compat-1_21_9_10/kotlin")
-    } else if (rangeMc261x) {
-        // 26.1.x Fabric builds in the official namespace and uses the
-        // compatibility aliases in src/compat-26_1.
-        kotlin.srcDir("src/compat-26_1/kotlin")
-        // InGameHud does not exist in 26.1 (HUD is HudElement-based)
+    } else if (rangeMc26x) {
+        // 26.x Fabric builds in the official namespace and uses the
+        // compatibility aliases in src/compat-26_1 / src/compat-26_2.
+        kotlin.srcDir("$mc26CompatDir/kotlin")
+        // InGameHud does not exist in 26.x (HUD is HudElement-based)
         kotlin.exclude("axion/mixin/client/InGameHudMixin*")
     } else {
         // 1.21.9+: registry-manager-based serialization, has MouseInput / WorldRenderState
@@ -165,9 +177,9 @@ sourceSets.named("client") {
     }
 }
 
-if (rangeMc261x) {
+if (rangeMc26x) {
     sourceSets.named("main") {
-        kotlin.srcDir("src/compat-26_1/kotlin")
+        kotlin.srcDir("$mc26CompatDir/kotlin")
         kotlin.exclude("axion/client/**")
         kotlin.exclude("axion/mixin/**")
         kotlin.exclude("net/fabricmc/**")
@@ -194,24 +206,26 @@ dependencies {
     implementation(project(":protocol"))
     add("minecraft", "com.mojang:minecraft:${property("minecraft_version")}")
     val yarnMappings = (findProperty("yarn_mappings") as String?)?.trim().orEmpty()
-    if (!rangeMc261x) {
+    if (!rangeMc26x) {
         if (yarnMappings.isNotEmpty()) {
             add("mappings", "net.fabricmc:yarn:${yarnMappings}:v2")
         } else {
             add("mappings", extensions.getByType<LoomGradleExtensionAPI>().officialMojangMappings())
         }
     }
-    if (rangeMc261x) {
+    if (rangeMc26x) {
         implementation("net.fabricmc:fabric-loader:${property("loader_version")}")
         implementation("net.fabricmc.fabric-api:fabric-api:${property("fabric_version")}")
         implementation("net.fabricmc:fabric-language-kotlin:${property("fabric_kotlin_version")}")
         compileOnly("com.terraformersmc:modmenu:${property("modmenu_version")}")
         runtimeOnly("com.terraformersmc:modmenu:${property("modmenu_version")}")
-        // Force lifecycle-events to a version that includes EntityLoadData interface
-        // (needed for Loom's interface injection in 26.1.2+)
-        constraints {
-            implementation("net.fabricmc.fabric-api:fabric-lifecycle-events-v1:4.1.0+6d50a0854c") {
-                because("EntityLoadData was removed in 4.0.6 builds but is required for 26.1.2 interface injection")
+        if (rangeMc261x) {
+            // Force lifecycle-events to a version that includes EntityLoadData interface
+            // (needed for Loom's interface injection in 26.1.2+)
+            constraints {
+                implementation("net.fabricmc.fabric-api:fabric-lifecycle-events-v1:4.1.0+6d50a0854c") {
+                    because("EntityLoadData was removed in 4.0.6 builds but is required for 26.1.2 interface injection")
+                }
             }
         }
     } else {
@@ -274,7 +288,7 @@ tasks.named<ProcessResources>("processClientResources") {
             }
         }
     }
-    if (rangeMc261x) {
+    if (rangeMc26x) {
         filesMatching("axion.client.mixins.json") {
             filter { line ->
                 when {
@@ -337,6 +351,21 @@ val verifyIntegratedNoClipWiring by tasks.registering {
         check(mixinConfig.readText().contains("\"ServerEntityMixin\"")) {
             "Integrated-server no-clip mixin is not enabled for Minecraft $minecraftVersion"
         }
+
+        if (rangeMc262x) {
+            // 26.2 renamed the HUD class Gui -> Hud and handed the name Gui to
+            // the new screen manager. @Mixin(Gui::class) therefore still
+            // compiles and still resolves on 26.2 — it just binds the wrong
+            // class, never applies, and leaves the vanilla hotbar drawn under
+            // Axion's. Nothing else in the build can catch that.
+            val hotbarMixin = file(
+                "src/compat-26_2/kotlin/axion/mixin/client/GuiMixin.kt",
+            ).readText()
+            check("@Mixin(Hud::class)" in hotbarMixin) {
+                "Minecraft $minecraftVersion hotbar mixin must target Hud; " +
+                    "Gui is the screen manager there and the mixin would silently never apply"
+            }
+        }
     }
 }
 
@@ -346,7 +375,7 @@ val gpuPreviewCompatDir = when {
     rangeMc1215 -> "src/compat-1_21_5"
     rangeLegacy -> "src/compat-1_21_6_8"
     exactMc1219 || exactMc12110 -> "src/compat-1_21_9_10"
-    rangeMc261x -> "src/compat-26_1"
+    rangeMc26x -> mc26CompatDir
     else -> "src/compat-1_21_11"
 }
 
@@ -358,6 +387,7 @@ val allPreviewCompatDirs = listOf(
     "src/compat-1_21_9_10",
     "src/compat-1_21_11",
     "src/compat-26_1",
+    "src/compat-26_2",
 )
 
 val verifyXraySelectionRenderingCoverage by tasks.registering {
@@ -456,13 +486,21 @@ val verifyMoveSourceReplacementCoverage by tasks.registering {
             val placementSource = placementRenderer.readText()
             expectedTagFiles += placementRenderer.canonicalFile
 
+            // 26.2 collapsed the sixteen per-colour block constants into
+            // ColorCollection accessors, so the same block is spelled
+            // differently there.
+            val lightGrayGlass = if (compatDir == "src/compat-26_2") {
+                "Blocks.STAINED_GLASS.lightGray().defaultState"
+            } else {
+                "Blocks.LIGHT_GRAY_STAINED_GLASS.defaultState"
+            }
             listOf(
                 "PlacementToolController.currentPreview() ?: return",
                 "renderMoveSourceReplacement(context, preview)",
                 "PlacementPreviewPolicy.shouldRenderMoveSourceReplacement(preview)",
                 "preview.sourceRegion.minCorner()",
                 "preview.sourceClipboardBuffer",
-                "Blocks.LIGHT_GRAY_STAINED_GLASS.defaultState",
+                lightGrayGlass,
                 "sessionTag = \"move-source-replacement\"",
             ).forEach { requiredSource ->
                 check(requiredSource in placementSource) {
@@ -477,6 +515,9 @@ val verifyMoveSourceReplacementCoverage by tasks.registering {
             }
             normalizedMoveSourceRenderers += moveSourceRenderer
                 .replace("forceChunked = true,", "")
+                // Fold 26.2's ColorCollection spelling back to the shared one so
+                // the renderers still have to agree on everything that matters.
+                .replace("Blocks.STAINED_GLASS.lightGray()", "Blocks.LIGHT_GRAY_STAINED_GLASS")
                 .replace(Regex("\\s+"), " ")
                 .trim()
 
@@ -516,6 +557,23 @@ val verifyMoveSourceReplacementCoverage by tasks.registering {
                 ).readText()
                 check("_polygonOffset(-1.0f, -1.0f)" in previewDrawer) {
                     "26.1 Move source replacement lacks a GPU depth bias"
+                }
+            } else if (compatDir == "src/compat-26_2") {
+                // 26.2 makes the render backend switchable and defaults to
+                // Vulkan, so the bias cannot ride global GL state any more — it
+                // belongs to the pipeline's DepthStencilState. The reversed
+                // depth buffer also flips its sign, which no test can catch.
+                val previewDrawer = file(
+                    "$compatDir/kotlin/axion/client/render/gpu/AxionPreviewBlockDrawer.kt",
+                ).readText()
+                check("com.mojang.blaze3d.opengl" !in previewDrawer && "_polygonOffset(" !in previewDrawer) {
+                    "26.2 Move source replacement still biases depth through raw OpenGL"
+                }
+                val previewPipeline = file(
+                    "$compatDir/kotlin/axion/client/compat/VersionCompatImpl.kt",
+                ).readText()
+                check("PREVIEW_DEPTH_BIAS" in previewPipeline) {
+                    "26.2 Move source replacement lacks a pipeline-borne GPU depth bias"
                 }
             } else {
                 val chunkedSession = file(
@@ -622,7 +680,7 @@ val verifyGpuPreviewCoverage by tasks.registering {
             }
         }
 
-        if (rangeMc261x) {
+        if (rangeMc26x) {
             val drawer = file(
                 "$gpuPreviewCompatDir/kotlin/axion/client/render/gpu/AxionPreviewBlockDrawer.kt",
             ).readText()
@@ -632,18 +690,40 @@ val verifyGpuPreviewCoverage by tasks.registering {
             check("RenderLayerCompat.translucentMovingBlock()" !in drawer) {
                 "Minecraft $minecraftVersion GPU previews regressed to the invisible moving-block pipeline"
             }
-            check("MATRICES_PROJECTION_SNIPPET" in versionCompat) {
+            // 26.1 bundled the transform/projection uniforms into the private
+            // MATRICES_PROJECTION_SNIPPET; 26.2 declares them as a shared
+            // BindGroupLayout instead.
+            val previewUniforms = if (rangeMc262x) {
+                "BindGroupLayouts.MATRICES_PROJECTION"
+            } else {
+                "MATRICES_PROJECTION_SNIPPET"
+            }
+            check(previewUniforms in versionCompat) {
                 "Minecraft $minecraftVersion preview pipeline is missing transform/projection uniforms"
             }
-            check("DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, false)" in versionCompat) {
+            // The invariant is writeDepth = false. 26.2 reversed the depth
+            // buffer, so the accompanying compare op flips with it — asserting
+            // 26.1's spelling there would defend the wrong value.
+            val previewDepthTest = if (rangeMc262x) {
+                "CompareOp.GREATER_THAN_OR_EQUAL,\n                        false,"
+            } else {
+                "DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, false)"
+            }
+            check(previewDepthTest in versionCompat) {
                 "Minecraft $minecraftVersion preview pipeline can write depth over later world rendering"
+            }
+            if (rangeMc262x) {
+                check("CompareOp.LESS_THAN_OR_EQUAL" !in versionCompat) {
+                    "Minecraft $minecraftVersion has a reversed depth buffer; " +
+                        "LESS_THAN_OR_EQUAL hides the preview behind world geometry"
+                }
             }
 
             val renderLayerCompat = file(
                 "src/client/kotlin/axion/client/render/RenderLayerCompat.kt",
             ).readText()
             check("createRenderSetup" in renderLayerCompat && "findXrayPipelineSnippet" in renderLayerCompat) {
-                "Minecraft $minecraftVersion x-ray selection layer lacks the 26.1 RenderSetup/uniform compatibility path"
+                "Minecraft $minecraftVersion x-ray selection layer lacks the RenderSetup/uniform compatibility path"
             }
         }
 
@@ -678,6 +758,7 @@ val rangeFileTag = (findProperty("axion_artifact_tag") as String?)?.trim()?.take
     rangeLegacy -> "mc1.21.6-1.21.8"
     rangeModern -> "mc1.21.9-1.21.11"
     rangeMc261x -> "mc26.1.x"
+    rangeMc262x -> "mc26.2.x"
     else -> "mc${minecraftVersion}"
 }
 
@@ -690,7 +771,7 @@ tasks.jar {
         dependsOn(":fabric-server:compileKotlin")
     }
     archiveFileName.set(
-        if (rangeMc261x) {
+        if (rangeMc26x) {
             "Axion-v${modVersion}-${rangeFileTag}.jar"
         } else {
             "Axion-v${modVersion}-${rangeFileTag}-dev.jar"
@@ -705,7 +786,7 @@ tasks.jar {
     exclude("net/minecraft/client/render/state/WorldRenderState.class")
 }
 
-if (!rangeMc261x) {
+if (!rangeMc26x) {
     tasks.named<AbstractArchiveTask>("remapJar") {
         archiveFileName.set("Axion-v${modVersion}-${rangeFileTag}.jar")
     }
@@ -749,12 +830,20 @@ tasks.register("runClient261") {
     }
 }
 
+tasks.register("runClient262") {
+    group = "axion"
+    description = "Run Minecraft 26.2.x client with Axion"
+    doLast {
+        logger.lifecycle("Use Loom's generated runClient task with -Pminecraft_version=26.2.")
+    }
+}
+
 // Unified run task that accepts a target version.
 // Use -PtargetVersion=1.21.5 (NOT -Pversion, which clashes with Gradle's project.version).
 tasks.register("runClientVersion") {
     group = "axion"
-    description = "Run client for specified version (use -PtargetVersion=1.21.5,1.21.7,1.21.11,26.1)"
-    val target = project.findProperty("targetVersion") as String? ?: "26.1"
+    description = "Run client for specified version (use -PtargetVersion=1.21.5,1.21.7,1.21.11,26.1,26.2)"
+    val target = project.findProperty("targetVersion") as String? ?: "26.2"
 
     dependsOn(
         when (target) {
@@ -762,7 +851,8 @@ tasks.register("runClientVersion") {
             "1.21.7" -> "runClient1217"
             "1.21.11" -> "runClient12111"
             "26.1" -> "runClient261"
-            else -> throw IllegalArgumentException("Unsupported version: $target. Use 1.21.5, 1.21.7, 1.21.11, or 26.1")
+            "26.2" -> "runClient262"
+            else -> throw IllegalArgumentException("Unsupported version: $target. Use 1.21.5, 1.21.7, 1.21.11, 26.1, or 26.2")
         },
     )
     doLast {
@@ -781,6 +871,7 @@ tasks.register("setupPaperServer") {
         "1.21.7" -> "1.21.7-R0.1-SNAPSHOT"
         "1.21.11" -> "1.21.11-R0.1-SNAPSHOT"
         "26.1" -> property("paper_version") as String
+        "26.2" -> property("paper_version") as String
         else -> property("paper_version") as String
     }
     val rangeTag = when {
@@ -789,6 +880,7 @@ tasks.register("setupPaperServer") {
         version == "1.21.7" -> "mc1.21.6-1.21.8"
         version == "1.21.11" -> "mc1.21.9-1.21.11"
         version.startsWith("26.1") -> "mc26.1.x"
+        version.startsWith("26.2") -> "mc26.2.x"
         else -> "mc${version}"
     }
     val runDir = file("run/paper/$version")
@@ -811,6 +903,7 @@ tasks.register("setupPaperServer") {
                 "1.21.7" -> "https://fill-data.papermc.io/v1/objects/83838188699cb2837e55b890fb1a1d39ad0710285ed633fbf9fc14e9f47ce078/paper-1.21.7-32.jar"
                 "1.21.11" -> "https://fill-data.papermc.io/v1/objects/e708e8c132dc143ffd73528cccb9532e2eb17628b1a0eee74469bf466c7003f8/paper-1.21.11-116.jar"
                 "26.1" -> "https://fill-data.papermc.io/v1/objects/b51d49a5f62446b7cfc01e6c29e48e0ce6abd35a783134aace1047b839b178ef/paper-26.1.2-63.jar"
+                "26.2" -> "https://fill.papermc.io/v3/projects/paper/versions/26.2/builds/65/downloads/server:default"
                 else -> throw IllegalArgumentException("Unknown version: $version")
             }
 
@@ -842,6 +935,7 @@ tasks.register("setupPaperServer") {
                 "1.21.7" -> 25568
                 "1.21.11" -> 25569
                 "26.1" -> 25570
+                "26.2" -> 25571
                 else -> 25565
             }
             println("Creating server.properties (port $port)...")

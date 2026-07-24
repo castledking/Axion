@@ -108,7 +108,18 @@ object RenderLayerCompat {
             createXrayQuadsLayer()
         }.onFailure { throwable ->
             if (loggedWarnings.add("xrayQuads")) {
-                logger.warn("[RenderLayerCompat] Failed to create xrayQuads layer; falling back to lightning", throwable)
+                // The fallback is not cosmetic: lightning() writes depth, so the
+                // selection fill, the outline and the symmetry anchor all start
+                // occluding the GPU preview instead of showing through it. This
+                // is the first thing to check when x-ray surfaces look wrong on
+                // a new Minecraft version.
+                logger.error(
+                    "[RenderLayerCompat] Failed to build the no-depth xrayQuads pipeline; " +
+                        "falling back to lightning, which WRITES DEPTH. Selection fills, outlines " +
+                        "and the symmetry anchor will hide the block preview instead of showing " +
+                        "through blocks.",
+                    throwable,
+                )
             }
         }.getOrElse { lightning() }.also { layerCache["xrayQuads"] = it }
     }
@@ -396,7 +407,7 @@ object RenderLayerCompat {
         builder = configureBlend(builder)
         builder = invokeIfPresent(builder, "withCull", false)
         builder = configureNoDepth(builder)
-        builder = invokeBuilder(builder, "withVertexFormat", positionColorVertexFormat(), quadsDrawMode())
+        builder = configureVertexFormat(builder)
         return builder.javaClass.getMethod("build").invoke(builder).let(::registerPipelineIfPossible)
     }
 
@@ -480,6 +491,25 @@ object RenderLayerCompat {
         val colorTargetClass = Class.forName("com.mojang.blaze3d.pipeline.ColorTargetState")
         val colorTarget = colorTargetClass.getConstructor(blendFunction.javaClass).newInstance(blendFunction)
         return invokeBuilder(builder, "withColorTargetState", colorTarget)
+    }
+
+    /**
+     * 26.2 split `withVertexFormat(format, mode)` into `withVertexBinding(index,
+     * format)` plus `withPrimitiveTopology(topology)`.
+     *
+     * This matters more than a rename: when it fails the whole pipeline throws,
+     * `xrayQuads()` silently falls back to `lightning()` — which *writes depth*
+     * — and every x-ray surface (selection fill, outline, symmetry anchor)
+     * starts occluding the GPU preview instead of showing through it.
+     */
+    private fun configureVertexFormat(builder: Any): Any {
+        val format = positionColorVertexFormat()
+        val topology = quadsDrawMode()
+        invokeIfPresent(builder, "withVertexFormat", format, topology)?.let { return it }
+
+        val bound = invokeIfPresent(builder, "withVertexBinding", 0, format)
+            ?: error("Missing RenderPipeline.Builder.withVertexFormat/withVertexBinding")
+        return invokeBuilder(bound, "withPrimitiveTopology", topology)
     }
 
     private fun configureNoDepth(builder: Any): Any {
@@ -649,6 +679,8 @@ object RenderLayerCompat {
             "net.minecraft.class_293\$class_5596",
             "com.mojang.blaze3d.vertex.VertexFormat\$DrawMode",
             "com.mojang.blaze3d.vertex.VertexFormat\$class_5596",
+            // 26.2 promoted the draw mode out of VertexFormat entirely.
+            "com.mojang.blaze3d.PrimitiveTopology",
         ).forEach { owner ->
             runCatching {
                 return mappedStaticField(
@@ -659,7 +691,8 @@ object RenderLayerCompat {
             }
         }
         return staticFieldOrNull("com.mojang.blaze3d.vertex.VertexFormat\$DrawMode", "QUADS")
-            ?: staticField("com.mojang.blaze3d.vertex.VertexFormat\$Mode", "QUADS")
+            ?: staticFieldOrNull("com.mojang.blaze3d.vertex.VertexFormat\$Mode", "QUADS")
+            ?: staticField("com.mojang.blaze3d.PrimitiveTopology", "QUADS")
     }
 
     private fun invokeBuilder(builder: Any, methodName: String, vararg args: Any): Any {

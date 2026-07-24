@@ -15,9 +15,12 @@ version = rootProject.version
 val minecraftVersion = rootProject.property("minecraft_version") as String
 val modVersion = project.version.toString()
 val isSupportedVersion = minecraftVersion == "1.21.11"
-val javaTargetVersion = if (minecraftVersion.startsWith("26.1")) 25 else 21
+// 26.x ships in the official (Mojang) namespace, so there is nothing to remap
+// and no mappings dependency to add.
+val isMc26x = minecraftVersion.startsWith("26.")
+val javaTargetVersion = if (isMc26x) 25 else 21
 
-if (minecraftVersion.startsWith("26.1")) {
+if (isMc26x) {
     apply(plugin = "net.fabricmc.fabric-loom")
 } else {
     apply(plugin = "fabric-loom")
@@ -49,14 +52,14 @@ dependencies {
     implementation(project(":protocol"))
     add("minecraft", "com.mojang:minecraft:${rootProject.property("minecraft_version")}")
     val yarnMappings = (rootProject.findProperty("yarn_mappings") as String?)?.trim().orEmpty()
-    if (!minecraftVersion.startsWith("26.1")) {
+    if (!isMc26x) {
         if (yarnMappings.isNotEmpty()) {
             add("mappings", "net.fabricmc:yarn:${yarnMappings}:v2")
         } else {
             add("mappings", extensions.getByType<LoomGradleExtensionAPI>().officialMojangMappings())
         }
     }
-    if (minecraftVersion.startsWith("26.1")) {
+    if (isMc26x) {
         implementation("net.fabricmc:fabric-loader:${rootProject.property("loader_version")}")
         implementation("net.fabricmc.fabric-api:fabric-api:${rootProject.property("fabric_version")}")
         implementation("net.fabricmc:fabric-language-kotlin:${rootProject.property("fabric_kotlin_version")}")
@@ -92,7 +95,7 @@ tasks.jar {
     from(project(":protocol").layout.buildDirectory.dir("classes/kotlin/main"))
 }
 
-if (!minecraftVersion.startsWith("26.1")) {
+if (!isMc26x) {
     tasks.named<AbstractArchiveTask>("remapJar") {
         archiveFileName.set("AxionFabricServer-v${project.version}-mc${minecraftVersion}.jar")
     }

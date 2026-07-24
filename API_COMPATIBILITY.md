@@ -6,7 +6,13 @@ This document maps API differences across supported Minecraft versions and docum
 
 - **1.21.5 - 1.21.7**: Primary support with full feature parity
 - **1.21.8 - 1.21.11**: Extended support with GPU rendering enhancements
-- **26.1.x**: Latest Minecraft version (ongoing port)
+- **26.1.x**: Official (Mojang) namespace, no remap — `src/compat-26_1`
+- **26.2.x**: Latest Minecraft version — `src/compat-26_2`
+
+26.1 and 26.2 ship as separate jars and do not share a rendering API: 26.2
+deleted `MultiBufferSource` and `ShapeRenderer` outright and moved to the
+submit-node system. The paths cited below are 26.1's; `src/compat-26_2` mirrors
+the same layout. See `docs/porting/26.2.md` for the full delta.
 
 ## VersionCompat Interface Methods
 

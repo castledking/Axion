@@ -19,6 +19,8 @@ import net.minecraft.util.math.Direction
 import net.minecraft.util.shape.VoxelShape
 import net.minecraft.util.shape.VoxelShapes
 import java.util.WeakHashMap
+import kotlin.math.max
+import kotlin.math.roundToInt
 
 object ClipboardSelectionRenderer {
     private const val BASE_OVERLAY_SCALE: Float = 0.996f
@@ -28,8 +30,11 @@ object ClipboardSelectionRenderer {
     private const val SELECTION_BASE_FILL_COLOR: Int = 0xFFCC5656.toInt()
     private const val SELECTION_BASE_FILL_ALPHA: Int = 1
     private const val SELECTION_PULSE_FILL_COLOR: Int = 0xFF7C98FF.toInt()
-    private const val SELECTION_PULSE_MIN_ALPHA: Int = 4
-    private const val SELECTION_PULSE_MAX_ALPHA: Int = 8
+    private const val SELECTION_PULSE_MIN_ALPHA: Int = 0
+    // Peak alpha of the phased fill. The pulse now passes through fully
+    // transparent at the crossover, so the peaks can be far stronger than the
+    // old always-on stack without the selection ever going muddy.
+    private const val SELECTION_PULSE_MAX_ALPHA: Int = 26
     private const val STATIC_FILL_ALPHA: Int = 52
     private val geometryCache = WeakHashMap<ClipboardBuffer, CachedGeometry>()
     private val sparseClipboardCache = WeakHashMap<ClipboardBuffer, ClipboardBuffer>()
@@ -165,6 +170,7 @@ object ClipboardSelectionRenderer {
         pulseFillColor: Int?,
         pulseMinAlpha: Int,
         pulseMaxAlpha: Int,
+        drawContourOutline: Boolean = true,
     ): Boolean {
         return renderSelectionAtOrigins(
             context = context,
@@ -177,6 +183,7 @@ object ClipboardSelectionRenderer {
             pulseFillColor = pulseFillColor,
             pulseMinAlpha = pulseMinAlpha,
             pulseMaxAlpha = pulseMaxAlpha,
+            drawContourOutline = drawContourOutline,
         )
     }
 
@@ -322,6 +329,7 @@ object ClipboardSelectionRenderer {
         pulseFillColor: Int?,
         pulseMinAlpha: Int,
         pulseMaxAlpha: Int,
+        drawContourOutline: Boolean = true,
     ): Boolean {
         if (origins.isEmpty() || clipboard.cells.isEmpty()) {
             return false
@@ -341,14 +349,22 @@ object ClipboardSelectionRenderer {
         } else {
             null
         }
+        // Same signed-phase model as the box fill: show one colour at a time and
+        // pass through fully transparent, rather than stacking a constant base
+        // overlay under a pulsing one. Halves the translucent surfaces the view
+        // looks through, which is what made deep selections read as blurred.
+        val overlayPhase = PulsingCuboidRenderer.selectionPulsePhase(
+            PulsingCuboidRenderer.SELECTION_PULSE_PERIOD_MILLIS,
+        )
         val pulseAlpha = if (pulseFillColor != null && pulseMaxAlpha > 0) {
-            PulsingCuboidRenderer.pulsingAlpha(
-                minAlpha = pulseMinAlpha,
-                maxAlpha = pulseMaxAlpha,
-                periodMillis = 3200.0,
-            )
+            (pulseMaxAlpha * max(0f, overlayPhase)).roundToInt()
         } else {
             0
+        }
+        val phasedBaseAlpha = if (pulseFillColor != null && pulseMaxAlpha > 0) {
+            (pulseMaxAlpha * max(0f, -overlayPhase)).roundToInt()
+        } else {
+            baseAlpha
         }
         val pulseOverlay = if (renderPulseOverlay) {
             pulseFillColor?.let { overlayClipboard(clipboard, glassStateFor(it), surfaceOnly = true) }
@@ -356,12 +372,12 @@ object ClipboardSelectionRenderer {
             null
         }
 
-        if (baseOverlay != null && baseAlpha > 0) {
+        if (baseOverlay != null && phasedBaseAlpha > 0) {
             GhostBlockPreviewRenderer.render(
                 context = context,
                 clipboard = baseOverlay,
                 origins = origins,
-                alpha = baseAlpha,
+                alpha = phasedBaseAlpha,
                 textured = true,
                 scale = BASE_OVERLAY_SCALE,
                 sessionTag = "selection-base",
@@ -378,6 +394,11 @@ object ClipboardSelectionRenderer {
                 sessionTag = "selection-pulse",
             )
         }
+
+        // A region selection keeps its clean bounding outline and only takes the
+        // contour *fill* from here; tracing every block edge as well would be
+        // noise. Magic Select has no bounding box, so it still outlines contours.
+        if (!drawContourOutline) return true
 
         val lineConsumer = consumers.getBuffer(RenderLayerCompat.lines())
         val mergedShape = geometry.shape
