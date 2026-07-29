@@ -8,6 +8,7 @@ import axion.protocol.ClientHello
 import axion.protocol.FlightSpeedRequest
 import axion.protocol.GameModeChangeRequest
 import axion.protocol.NoClipStateRequest
+import axion.protocol.NoUpdatesStateRequest
 import axion.protocol.OperationBatchRequest
 import axion.protocol.OperationBatchResult
 import axion.protocol.RedoRequest
@@ -21,6 +22,7 @@ class AxionPluginMessaging(
     private val plugin: AxionPaperPlugin,
     private val policyService: AxionPolicyService,
     private val noClipService: AxionNoClipService,
+    private val noUpdatesService: AxionNoUpdatesService,
     private val flightSpeedService: AxionFlightSpeedService,
 ) : PluginMessageListener {
     private val auditEnabled = plugin.config.getBoolean("audit.enabled", true)
@@ -35,7 +37,7 @@ class AxionPluginMessaging(
         enabled = auditEnabled,
         slowThresholdMillis = plugin.config.getLong("audit.slow-threshold-ms", 200L),
     )
-    private val operationService = AxionOperationService(policyService)
+    private val operationService = AxionOperationService(policyService, noUpdatesService)
     private var nextTransferId: Long = 1L
 
     override fun onPluginMessageReceived(channel: String, player: Player, message: ByteArray) {
@@ -47,6 +49,7 @@ class AxionPluginMessaging(
         when (decoded) {
             is ClientHello -> handleHello(player, decoded)
             is NoClipStateRequest -> handleNoClipState(player, decoded)
+            is NoUpdatesStateRequest -> handleNoUpdatesState(player, decoded)
             is FlightSpeedRequest -> handleFlightSpeed(player, decoded)
             is GameModeChangeRequest -> handleGameModeChange(player, decoded)
             is OperationBatchRequest -> handleOperationBatch(player, decoded)
@@ -96,6 +99,10 @@ class AxionPluginMessaging(
 
     private fun handleNoClipState(player: Player, request: NoClipStateRequest) {
         noClipService.setArmed(player, request.armed)
+    }
+
+    private fun handleNoUpdatesState(player: Player, request: NoUpdatesStateRequest) {
+        noUpdatesService.setArmed(player, request.armed)
     }
 
     private fun handleFlightSpeed(player: Player, request: FlightSpeedRequest) {

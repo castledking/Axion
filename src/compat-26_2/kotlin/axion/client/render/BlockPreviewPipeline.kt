@@ -17,6 +17,7 @@ object BlockPreviewPipeline {
     data class OverlayScene(
         val origins: List<BlockPos>,
         val clipboard: axion.common.model.ClipboardBuffer,
+        val fallbackClipboard: axion.common.model.ClipboardBuffer = ClipboardSelectionRenderer.surfaceClipboard(clipboard),
         val color: Int,
         val alpha: Int,
         val scale: Float,
@@ -39,7 +40,6 @@ object BlockPreviewPipeline {
         val pulseFillColor: Int? = null,
         val pulseMinAlpha: Int = 0,
         val pulseMaxAlpha: Int = 0,
-        val shellFillColor: Int = 0xFFFFFFFF.toInt(),
     )
 
     data class Scene(
@@ -71,6 +71,7 @@ object BlockPreviewPipeline {
             context = context,
             clipboard = scene.clipboard,
             origins = scene.origins,
+            fallbackClipboard = scene.fallbackClipboard,
             color = scene.color,
             alpha = scene.alpha,
             textured = scene.textured,
@@ -169,7 +170,6 @@ object BlockPreviewPipeline {
                     lineWidth = scene.lineWidth,
                     minAlpha = scene.pulseMinAlpha,
                     maxAlpha = scene.pulseMaxAlpha,
-                    fillColor = scene.shellFillColor,
                 )
             }
             return true
@@ -201,8 +201,9 @@ object BlockPreviewPipeline {
 
         GhostBlockPreviewRenderer.render(
             context = context,
-            clipboard = scene.fallbackGhostClipboard,
+            clipboard = scene.shellClipboard,
             origins = scene.origins,
+            fallbackClipboard = scene.fallbackGhostClipboard,
             color = scene.ghostColor,
             alpha = scene.ghostAlpha,
             textured = true,
@@ -225,10 +226,10 @@ object BlockPreviewPipeline {
                     outlineColor = scene.outlineColor,
                     lineWidth = scene.lineWidth,
                     baseFillColor = 0xFFCC5656.toInt(),
-                    baseAlpha = 1,
+                    baseAlpha = PreviewVisualPolicy.PLACEMENT_PULSE_MIN_ALPHA,
                     pulseFillColor = 0xFF7C98FF.toInt(),
-                    pulseMinAlpha = 4,
-                    pulseMaxAlpha = 8,
+                    pulseMinAlpha = PreviewVisualPolicy.PLACEMENT_PULSE_MIN_ALPHA,
+                    pulseMaxAlpha = PreviewVisualPolicy.PLACEMENT_PULSE_MAX_ALPHA,
                 )
             } else {
                 PulsingCuboidRenderer.renderOutlineBox(

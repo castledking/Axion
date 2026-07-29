@@ -14,11 +14,11 @@ object PlacementPreviewRenderer {
     private const val CLONE_DESTINATION_COLOR: Int = 0xFFFFB347.toInt()
     private const val MOVE_DESTINATION_COLOR: Int = 0xFF7EE6A6.toInt()
     private const val LINE_WIDTH: Float = 1.75f
-    private const val DEFAULT_GHOST_ALPHA: Int = 86
-    private const val MOVE_SOURCE_GHOST_ALPHA: Int = 220
-    private const val MOVE_DESTINATION_GHOST_ALPHA: Int = 82
-    private const val SPARSE_DESTINATION_GHOST_ALPHA: Int = 112
-    private const val MOVE_SOURCE_GHOST_SCALE: Float = 1.015f
+    private const val DEFAULT_GHOST_ALPHA: Int = PreviewVisualPolicy.CULLED_DESTINATION_ALPHA
+    private const val MOVE_SOURCE_GHOST_ALPHA: Int = PreviewVisualPolicy.CULLED_MOVE_SOURCE_ALPHA
+    private const val MOVE_DESTINATION_GHOST_ALPHA: Int = PreviewVisualPolicy.CULLED_DESTINATION_ALPHA
+    private const val SPARSE_DESTINATION_GHOST_ALPHA: Int = PreviewVisualPolicy.CULLED_SPARSE_DESTINATION_ALPHA
+    private const val MOVE_SOURCE_GHOST_SCALE: Float = 1.0f
     // Blocks are drawn at full size. The chunked GPU preview ignores this scale
     // entirely, so any shrink only applies on the CPU fallback (which is what a
     // shader pack forces us onto) and there it pulls every block off its
@@ -29,6 +29,7 @@ object PlacementPreviewRenderer {
     private const val MAX_MOVE_DESTINATION_GHOST_CELLS: Int = 4_000_000
     private const val MAX_CLONE_DESTINATION_GHOST_CELLS: Int = 4_000_000
     private val moveSourceClipboardCache = java.util.WeakHashMap<ClipboardBuffer, ClipboardBuffer>()
+    private val moveSourceSurfaceClipboardCache = java.util.WeakHashMap<ClipboardBuffer, ClipboardBuffer>()
 
     fun render(context: AxionWorldRenderContext) {
         val preview = PlacementToolController.currentPreview() ?: return
@@ -45,7 +46,7 @@ object PlacementPreviewRenderer {
         )
         val detailedMovePreview = preview.mode != PlacementToolMode.MOVE ||
             destinationSelectionClipboard.nonAirCells().size <= MAX_MOVE_DETAILED_SELECTION_CELLS
-        val renderDestinationGhost = detailedMovePreview && destinationGhostClipboard.nonAirCells().size <= when (preview.mode) {
+        val renderDestinationGhost = detailedMovePreview && destinationSelectionClipboard.nonAirCells().size <= when (preview.mode) {
             PlacementToolMode.MOVE -> MAX_MOVE_DESTINATION_GHOST_CELLS
             PlacementToolMode.CLONE -> MAX_CLONE_DESTINATION_GHOST_CELLS
         }
@@ -110,12 +111,19 @@ object PlacementPreviewRenderer {
             return
         }
 
-        val sourceClipboard = moveSourceClipboard(preview.sourceClipboardBuffer) ?: return
+        val sourceOccupancyClipboard = ClipboardSelectionRenderer.sparseClipboard(preview.sourceClipboardBuffer)
+        if (sourceOccupancyClipboard.nonAirCells().size > MAX_MOVE_SOURCE_CELLS) return
+        val sourceClipboard = moveSourceClipboard(sourceOccupancyClipboard) ?: return
+        val sourceSurfaceClipboard = moveSourceSurfaceClipboard(sourceOccupancyClipboard) ?: return
         BlockPreviewPipeline.renderOverlay(
             context = context,
             scene = BlockPreviewPipeline.OverlayScene(
                 origins = listOf(preview.sourceRegion.minCorner()),
+                // The full glass occupancy is retained as a neighbor halo so
+                // vanilla removes shared faces. Only occupancy-boundary cells
+                // become geometry, keeping terrain visible through the shell.
                 clipboard = sourceClipboard,
+                fallbackClipboard = sourceSurfaceClipboard,
                 color = MOVE_SOURCE_COLOR,
                 alpha = MOVE_SOURCE_GHOST_ALPHA,
                 scale = MOVE_SOURCE_GHOST_SCALE,
@@ -128,20 +136,29 @@ object PlacementPreviewRenderer {
 
     private fun moveSourceClipboard(source: ClipboardBuffer): ClipboardBuffer? {
         val cached = moveSourceClipboardCache.getOrPut(source) {
-            val visibleSource = ClipboardSelectionRenderer.surfaceClipboard(
-                ClipboardSelectionRenderer.sparseClipboard(source),
-            )
-            val visibleCells = visibleSource.nonAirCells()
-            if (visibleCells.size > MAX_MOVE_SOURCE_CELLS) {
-                ClipboardBuffer(size = visibleSource.size, cells = emptyList())
+            val selectedCells = source.nonAirCells()
+            if (selectedCells.size > MAX_MOVE_SOURCE_CELLS) {
+                ClipboardBuffer(size = source.size, cells = emptyList())
             } else {
                 ClipboardBuffer(
-                    size = visibleSource.size,
-                    cells = visibleCells.map { cell ->
+                    size = source.size,
+                    cells = selectedCells.map { cell ->
                         cell.copy(state = Blocks.STAINED_GLASS.lightGray().defaultState)
                     },
                 )
             }
+        }
+        return cached.takeIf { it.cells.isNotEmpty() }
+    }
+
+    private fun moveSourceSurfaceClipboard(source: ClipboardBuffer): ClipboardBuffer? {
+        val cached = moveSourceSurfaceClipboardCache.getOrPut(source) {
+            ClipboardBuffer(
+                size = source.size,
+                cells = PreviewSurfaceTopology.retainBoundaryCells(source.nonAirCells()).map { cell ->
+                    cell.copy(state = Blocks.STAINED_GLASS.lightGray().defaultState)
+                },
+            )
         }
         return cached.takeIf { it.cells.isNotEmpty() }
     }

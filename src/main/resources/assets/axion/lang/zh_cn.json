@@ -17,6 +17,7 @@
   "key.axion.redo_action": "Axion 重做",
   "key.axion.open_config_screen": "打开 Axion 配置",
   "key.axion.toggle_same_block_magic_select": "切换同方块魔法选择",
+  "key.axion.toggle_phantom": "切换 Axion 幽灵模式",
   "axion.config.title": "Axion 配置",
   "axion.config.main_modifier.description": "选择 Axion 用于 Ctrl 快捷键的主修饰键。",
   "axion.config.main_modifier.mac_only": "此选项仅在 macOS 上可用。",

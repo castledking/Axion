@@ -2,8 +2,10 @@ package axion.client.render
 
 import axion.client.compat.CameraAccess
 import axion.client.compat.VersionCompatImpl
+import axion.client.network.AxionServerConnection
 import axion.client.selection.SelectionBounds
 import axion.common.model.ClipboardBuffer
+import net.minecraft.block.Blocks
 import net.minecraft.client.MinecraftClient
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Box
@@ -25,8 +27,9 @@ object GhostBlockPreviewRenderer {
         context: AxionWorldRenderContext,
         clipboard: ClipboardBuffer,
         origins: Collection<BlockPos>,
+        fallbackClipboard: ClipboardBuffer = ClipboardSelectionRenderer.surfaceClipboard(clipboard),
         color: Int = 0xFFFFFFFF.toInt(),
-        alpha: Int = 44,
+        alpha: Int = PreviewVisualPolicy.CULLED_DESTINATION_ALPHA,
         textured: Boolean = false,
         fullBlock: Boolean = false,
         scale: Float = 1.0f,
@@ -34,8 +37,27 @@ object GhostBlockPreviewRenderer {
         forceChunked: Boolean = false,
         allowChunked: Boolean = true,
     ) {
-        val cells = clipboard.nonAirCells()
-        if (origins.isEmpty() || cells.isEmpty()) {
+        val remotePaperSession = PreviewBlockIdentityPolicy.shouldNormalizeRemoteIdentity(
+            AxionServerConnection.isRemoteAuthoritativeAvailable(),
+            sessionTag,
+        )
+        // The custom translucent pipeline supplies opacity. Keeping the
+        // neutral texture itself opaque makes the destination alpha exact and
+        // avoids multiplying many stained-glass texel alphas on Paper.
+        val neutralState = Blocks.LIGHT_GRAY_CONCRETE.defaultState
+        val renderClipboard = PreviewBlockIdentityPolicy.normalize(
+            clipboard = clipboard,
+            neutralState = neutralState,
+            remoteAxionSessionAvailable = remotePaperSession,
+        )
+        val renderFallbackClipboard = PreviewBlockIdentityPolicy.normalize(
+            clipboard = fallbackClipboard,
+            neutralState = neutralState,
+            remoteAxionSessionAvailable = remotePaperSession,
+        )
+        val occupiedCells = renderClipboard.nonAirCells()
+        val fallbackCells = renderFallbackClipboard.nonAirCells()
+        if (origins.isEmpty() || occupiedCells.isEmpty() || fallbackCells.isEmpty()) {
             return
         }
 
@@ -44,7 +66,8 @@ object GhostBlockPreviewRenderer {
                 val handled = VersionCompatImpl.renderChunkedPreview(
                     "ghost:$sessionTag",
                     context,
-                    clipboard,
+                    renderClipboard,
+                    renderFallbackClipboard,
                     origins,
                     color,
                     alpha.coerceIn(0, 255),
@@ -56,14 +79,15 @@ object GhostBlockPreviewRenderer {
             }
         }
 
-        val maxOrigins = maxOriginsFor(cells.size)
+        val maxOrigins = maxOriginsFor(fallbackCells.size)
         if (maxOrigins <= 0) {
             return
         }
 
         if (textured) {
             val region = ChunkedPreviewRegion.getOrBuild(
-                clipboard = clipboard,
+                clipboard = renderClipboard,
+                surfaceClipboard = renderFallbackClipboard,
                 origins = origins.take(maxOrigins),
                 maxQuads = MAX_TEXTURED_QUADS,
             )
@@ -83,12 +107,12 @@ object GhostBlockPreviewRenderer {
         val cameraPos = CameraAccess.getPos(camera)
         val offset = if (context.needsCameraOffset()) cameraPos else Vec3d(0.0, 0.0, 0.0)
         val matrices = context.matrices()
-        val layer = RenderLayerCompat.debugQuads()
+        val layer = RenderLayerCompat.shaderSafeQuads()
         val consumer = context.consumers().getBuffer(layer)
         val fillAlpha = alpha.coerceIn(0, 255)
 
         origins.take(maxOrigins).forEach { origin ->
-            cells.forEach { cell ->
+            fallbackCells.forEach { cell ->
                 val pos = origin.add(cell.offset)
                 val box = scaledBox(SelectionBounds.blockBox(pos), scale)
                 PulsingCuboidRenderer.renderFilledBox(

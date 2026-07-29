@@ -154,12 +154,12 @@ object VertexRenderingCompat {
 
         for (obj in boxes) {
             val box = obj as? Box ?: continue
-            val minX = (box.minX - cameraX).toFloat()
-            val minY = (box.minY - cameraY).toFloat()
-            val minZ = (box.minZ - cameraZ).toFloat()
-            val maxX = (box.maxX - cameraX).toFloat()
-            val maxY = (box.maxY - cameraY).toFloat()
-            val maxZ = (box.maxZ - cameraZ).toFloat()
+            val minX = outlineCoordinate(box.minX, cameraX)
+            val minY = outlineCoordinate(box.minY, cameraY)
+            val minZ = outlineCoordinate(box.minZ, cameraZ)
+            val maxX = outlineCoordinate(box.maxX, cameraX)
+            val maxY = outlineCoordinate(box.maxY, cameraY)
+            val maxZ = outlineCoordinate(box.maxZ, cameraZ)
 
             val nx = 0f
             val ny = 0f
@@ -182,6 +182,13 @@ object VertexRenderingCompat {
             emitLine(consumer, entry, minX, minY, maxZ, minX, maxY, maxZ, red, green, blue, alpha, lineWidth)
         }
     }
+
+    /**
+     * Matches vanilla ShapeRenderer's offset convention. Callers pass
+     * `-camera`, so adding the offset produces camera-relative coordinates.
+     */
+    fun outlineCoordinate(coordinate: Double, offset: Double): Float =
+        (coordinate + offset).toFloat()
 
     private fun emitLine(
         consumer: VertexConsumer,

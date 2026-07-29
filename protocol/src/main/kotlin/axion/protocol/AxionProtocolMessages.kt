@@ -103,6 +103,10 @@ data class GameModeChangeRequest(
     val gameMode: AxionGameMode,
 ) : AxionClientMessage
 
+data class NoUpdatesStateRequest(
+    val armed: Boolean,
+) : AxionClientMessage
+
 sealed interface AxionRemoteOperation {
     val type: AxionOperationType
 }

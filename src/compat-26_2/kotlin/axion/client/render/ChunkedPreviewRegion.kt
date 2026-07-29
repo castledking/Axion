@@ -1,5 +1,6 @@
 package axion.client.render
 
+import axion.client.render.gpu.PreviewStateHalo
 import axion.client.selection.SelectionBounds
 import axion.common.model.ClipboardBuffer
 import net.minecraft.block.BlockState
@@ -33,6 +34,7 @@ data class ChunkedPreviewRegion(
 
         private data class CacheKey(
             val clipboard: ClipboardBuffer,
+            val surfaceClipboard: ClipboardBuffer,
             val origins: List<Long>,
             val maxQuads: Int,
         )
@@ -43,24 +45,27 @@ data class ChunkedPreviewRegion(
 
         fun getOrBuild(
             clipboard: ClipboardBuffer,
+            surfaceClipboard: ClipboardBuffer = ClipboardSelectionRenderer.surfaceClipboard(clipboard),
             origins: Collection<BlockPos>,
             maxQuads: Int,
         ): ChunkedPreviewRegion {
             val originKeys = origins.asSequence().map { it.asLong() }.sorted().toList()
             val key = CacheKey(
                 clipboard = clipboard,
+                surfaceClipboard = surfaceClipboard,
                 origins = originKeys,
                 maxQuads = maxQuads,
             )
             return synchronized(cache) {
                 cache.getOrPut(key) {
-                    build(clipboard, originKeys, maxQuads)
+                    build(clipboard, surfaceClipboard, originKeys, maxQuads)
                 }
             }
         }
 
         private fun build(
             clipboard: ClipboardBuffer,
+            surfaceClipboard: ClipboardBuffer,
             originKeys: List<Long>,
             maxQuads: Int,
         ): ChunkedPreviewRegion {
@@ -81,14 +86,16 @@ data class ChunkedPreviewRegion(
             val chunkShapes = LinkedHashMap<Long, VoxelShape>()
             val statesByPosition = LinkedHashMap<Long, BlockState>()
             val surfaceBlocks = ArrayList<PreviewBlock>()
-            val surfaceClipboard = ClipboardSelectionRenderer.surfaceClipboard(clipboard)
+            val surfaceCells = surfaceClipboard.nonAirCells()
+            val stateHalo = PreviewStateHalo.retain(clipboard.nonAirCells(), surfaceCells)
             origins.forEach { origin ->
-                clipboard.nonAirCells().forEach { cell ->
+                stateHalo.forEach { cell ->
                     val pos = origin.add(cell.offset)
                     statesByPosition[pos.asLong()] = cell.state
                 }
-                surfaceClipboard.nonAirCells().forEach { cell ->
+                surfaceCells.forEach { cell ->
                     val pos = origin.add(cell.offset)
+                    statesByPosition[pos.asLong()] = cell.state
                     val chunkKey = BlockPos.asLong(pos.x shr 4, 0, pos.z shr 4)
                     val current = chunkShapes[chunkKey] ?: VoxelShapes.empty()
                     chunkShapes[chunkKey] = VoxelShapes.union(

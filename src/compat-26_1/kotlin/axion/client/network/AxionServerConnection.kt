@@ -10,6 +10,7 @@ import axion.protocol.AxionProtocol
 import axion.protocol.AxionTransportCodec
 import axion.protocol.ClientHello
 import axion.protocol.NoClipStateRequest
+import axion.protocol.NoUpdatesStateRequest
 import axion.protocol.OperationBatchResult
 import axion.protocol.RedoRequest
 import axion.protocol.ServerHello
@@ -34,6 +35,7 @@ object AxionServerConnection {
     private var nextTransferId: Long = 1L
     private var lastStatusMessage: String? = null
     private var lastSentNoClipArmed: Boolean? = null
+    private var lastSentNoUpdatesArmed: Boolean? = null
 
     fun initialize() {
         VersionCompatImpl.registerAxionPayloadChannel(AxionPluginPayload.ID, AxionPluginPayload.CODEC)
@@ -45,12 +47,14 @@ object AxionServerConnection {
             if (VersionCompatImpl.hasLocalServer(client)) {
                 state = State.Disconnected
                 lastSentNoClipArmed = null
+                lastSentNoUpdatesArmed = null
                 nextTransferId = 1L
                 return@onPlayJoin
             }
 
             state = State.AwaitingHello
             lastSentNoClipArmed = null
+                lastSentNoUpdatesArmed = null
             nextTransferId = 1L
             send(
                 ClientHello(
@@ -64,12 +68,16 @@ object AxionServerConnection {
             state = State.Disconnected
             lastStatusMessage = null
             lastSentNoClipArmed = null
+                lastSentNoUpdatesArmed = null
             nextTransferId = 1L
             AxionRequestTracker.clear()
             AxionServerMessageAssembler.clear()
-            axion.client.render.AxionPreviewBufferCache.invalidate()
-            axion.client.render.AxionPreviewTemplateCache.invalidate()
-            VersionCompatImpl.runOnRenderThread(client) { }
+            axion.client.render.ClientThreadCleanupScheduler.schedule(
+                enqueueOnClientThread = { task -> VersionCompatImpl.runOnRenderThread(client, task) },
+                // Both 26.x adapters target the same chunked lifecycle. Close
+                // it once, and only after the client/render executor takes over.
+                cleanup = { axion.client.render.AxionPreviewBufferCache.invalidate() },
+            )
         }
     }
 
@@ -127,6 +135,27 @@ object AxionServerConnection {
         lastSentNoClipArmed = armed
         sendClientMessage(
             NoClipStateRequest(armed = armed),
+        )
+    }
+
+    fun syncNoUpdatesState(armed: Boolean) {
+        when (state) {
+            State.Disconnected,
+            State.Unsupported,
+                -> return
+
+            State.AwaitingHello,
+            is State.Available,
+                -> Unit
+        }
+
+        if (lastSentNoUpdatesArmed == armed) {
+            return
+        }
+
+        lastSentNoUpdatesArmed = armed
+        sendClientMessage(
+            NoUpdatesStateRequest(armed = armed),
         )
     }
 

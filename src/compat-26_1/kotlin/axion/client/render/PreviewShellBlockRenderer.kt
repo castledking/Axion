@@ -8,6 +8,7 @@ object PreviewShellBlockRenderer {
         context: AxionWorldRenderContext,
         clipboard: ClipboardBuffer,
         origins: Collection<BlockPos>,
+        surfaceClipboard: ClipboardBuffer = ClipboardSelectionRenderer.surfaceClipboard(clipboard),
         color: Int,
         alpha: Int,
         scale: Float = 1.0f,
@@ -18,6 +19,7 @@ object PreviewShellBlockRenderer {
 
         val region = ChunkedPreviewRegion.getOrBuild(
             clipboard = clipboard,
+            surfaceClipboard = surfaceClipboard,
             origins = origins,
             maxQuads = 8192,
         )

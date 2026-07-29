@@ -21,7 +21,6 @@ import axion.client.compat.add
 import net.minecraft.util.shape.VoxelShape
 import net.minecraft.util.shape.VoxelShapes
 import java.util.WeakHashMap
-import kotlin.math.max
 import kotlin.math.roundToInt
 
 object ClipboardSelectionRenderer {
@@ -32,11 +31,11 @@ object ClipboardSelectionRenderer {
     private const val SELECTION_BASE_FILL_COLOR: Int = 0xFFCC5656.toInt()
     private const val SELECTION_BASE_FILL_ALPHA: Int = 1
     private const val SELECTION_PULSE_FILL_COLOR: Int = 0xFF7C98FF.toInt()
-    private const val SELECTION_PULSE_MIN_ALPHA: Int = 0
-    // Peak alpha of the phased fill. The pulse now passes through fully
-    // transparent at the crossover, so the peaks can be far stronger than the
-    // old always-on stack without the selection ever going muddy.
-    private const val SELECTION_PULSE_MAX_ALPHA: Int = 26
+    private const val SELECTION_PULSE_MIN_ALPHA: Int = PreviewVisualPolicy.PLACEMENT_PULSE_MIN_ALPHA
+    // Peak alpha of the phased fill. The pulse now fades to a visible floor at
+    // the crossover, so its peaks can be stronger than the old always-on stack
+    // without the selection becoming muddy.
+    private const val SELECTION_PULSE_MAX_ALPHA: Int = PreviewVisualPolicy.PLACEMENT_PULSE_MAX_ALPHA
     private const val STATIC_FILL_ALPHA: Int = 52
     private val geometryCache = WeakHashMap<ClipboardBuffer, CachedGeometry>()
     private val sparseClipboardCache = WeakHashMap<ClipboardBuffer, ClipboardBuffer>()
@@ -63,7 +62,10 @@ object ClipboardSelectionRenderer {
     // Above this, build exact merged boundary edges instead of using
     // VoxelShapes.union. That preserves the selected block set without the
     // visible per-block segmentation or O(n^2) shape merge cost.
-    private const val MAX_SINGLE_SHAPE_UNION_CELLS: Int = 256
+    // 26.x changed the shape-outline submission path across patch releases.
+    // Explicit boundary edges are linear, render on the first frame, and use
+    // unambiguous world-minus-camera coordinates for small selections too.
+    private const val MAX_SINGLE_SHAPE_UNION_CELLS: Int = 0
 
     private data class CachedGeometry(
         val shape: VoxelShape?,
@@ -236,7 +238,7 @@ object ClipboardSelectionRenderer {
         val cameraPos = CameraAccess.getPos(camera)
         val consumers = context.consumers()
         val matrixStack = context.matrices()
-        val fillLayer = RenderLayerCompat.debugQuads()
+        val fillLayer = RenderLayerCompat.shaderSafeQuads()
         val fillConsumer = consumers.getBuffer(fillLayer)
 
         // Fast path: render simple boxes without expensive VoxelShape union for large selections
@@ -306,17 +308,19 @@ object ClipboardSelectionRenderer {
     }
 
     fun sparseClipboard(source: ClipboardBuffer): ClipboardBuffer {
+        val nonAir = source.nonAirCells()
+        if (nonAir.size == source.cells.size) return source
         return sparseClipboardCache.getOrPut(source) {
-            val nonAir = source.nonAirCells()
-            if (nonAir.size == source.cells.size) source else ClipboardBuffer(size = source.size, cells = nonAir)
+            ClipboardBuffer(size = source.size, cells = nonAir)
         }
     }
 
     fun surfaceClipboard(source: ClipboardBuffer): ClipboardBuffer {
+        val occupiedCells = source.nonAirCells()
+        val surface = surfaceCells(source)
+        if (surface.size == occupiedCells.size) return source
         return surfaceClipboardCache.getOrPut(source) {
-            val occupiedCells = source.nonAirCells()
-            val surface = surfaceCells(source)
-            if (surface.size == occupiedCells.size) source else ClipboardBuffer(size = source.size, cells = surface)
+            ClipboardBuffer(size = source.size, cells = surface)
         }
     }
 
@@ -352,22 +356,17 @@ object ClipboardSelectionRenderer {
             null
         }
         // Same signed-phase model as the box fill: show one colour at a time and
-        // pass through fully transparent, rather than stacking a constant base
-        // overlay under a pulsing one. Halves the translucent surfaces the view
-        // looks through, which is what made deep selections read as blurred.
+        // fade to a visible floor, rather than stacking a constant base overlay
+        // under a pulsing one. Halves the translucent surfaces the view looks
+        // through, which is what made deep selections read as blurred.
         val overlayPhase = PulsingCuboidRenderer.selectionPulsePhase(
             PulsingCuboidRenderer.SELECTION_PULSE_PERIOD_MILLIS,
         )
-        val pulseAlpha = if (pulseFillColor != null && pulseMaxAlpha > 0) {
-            (pulseMaxAlpha * max(0f, overlayPhase)).roundToInt()
-        } else {
-            0
-        }
-        val phasedBaseAlpha = if (pulseFillColor != null && pulseMaxAlpha > 0) {
-            (pulseMaxAlpha * max(0f, -overlayPhase)).roundToInt()
-        } else {
-            baseAlpha
-        }
+        val phasedAlpha = if (pulseFillColor != null && pulseMaxAlpha > 0) {
+            PreviewVisualPolicy.pulseAlpha(maxOf(baseAlpha, pulseMinAlpha), pulseMaxAlpha, overlayPhase).roundToInt()
+        } else baseAlpha
+        val pulseAlpha = if (pulseFillColor != null && overlayPhase >= 0f) phasedAlpha else 0
+        val phasedBaseAlpha = if (pulseFillColor == null || overlayPhase < 0f) phasedAlpha else 0
         val pulseOverlay = if (renderPulseOverlay) {
             pulseFillColor?.let { overlayClipboard(clipboard, glassStateFor(it), surfaceOnly = true) }
         } else {

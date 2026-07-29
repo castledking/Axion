@@ -3,16 +3,22 @@
   "package": "axion.mixin.client",
   "compatibilityLevel": "JAVA_21",
   "client": [
+    "AbstractPressurePlateBlockMixin",
     "CameraNoClipMixin",
     "ClientPlayerEntityMixin",
+    "CobwebBlockMixin",
     "EntityMixin",
     "GuiMixin",
     "InGameHudMixin",
     "InGameOverlayRendererMixin",
     "MinecraftClientMixin",
     "MouseMixin",
+    "MoveSourceChunkRendererRegionMixin",
     "PlayerEntityPoseMixin",
+    "RedstoneOreBlockMixin",
+    "SculkSensorBlockMixin",
     "ServerEntityMixin",
+    "TripwireBlockMixin",
     "WorldRendererFallbackMixin"
   ],
   "injectors": {

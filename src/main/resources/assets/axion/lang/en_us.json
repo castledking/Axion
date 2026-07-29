@@ -17,6 +17,7 @@
   "key.axion.redo_action": "Axion Redo",
   "key.axion.open_config_screen": "Open Axion Config",
   "key.axion.toggle_same_block_magic_select": "Toggle Same Block Magic Select",
+  "key.axion.toggle_phantom": "Toggle Axion Phantom",
   "axion.config.title": "Axion Configuration",
   "axion.config.main_modifier.description": "Choose which main modifier Axion uses for Ctrl-based shortcuts.",
   "axion.config.main_modifier.mac_only": "This option is only available on macOS.",

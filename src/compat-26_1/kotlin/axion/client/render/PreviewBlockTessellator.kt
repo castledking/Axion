@@ -1,6 +1,7 @@
 package axion.client.render
 
 import axion.client.compat.CameraAccess
+import axion.client.compat.VersionCompatImpl
 import axion.client.render.gpu.PreviewOcclusionCompat
 import axion.client.render.gpu.PreviewOcclusionPolicy
 import net.minecraft.block.BlockRenderType
@@ -37,7 +38,9 @@ object PreviewBlockTessellator {
         val modelSet = client.modelManager.blockStateModelSet
         val cameraPos = CameraAccess.getPos(camera)
         val consumer = TintedAlphaVertexConsumer(
-            context.consumers().getBuffer(RenderLayerCompat.blockTranslucentCull()),
+            context.consumers().getBuffer(
+                VersionCompatImpl.getBufferedPreviewShellLayer(RenderLayerCompat.blockTranslucentCull()),
+            ),
             alpha / 255.0f,
             color,
         )
@@ -95,8 +98,15 @@ object PreviewBlockTessellator {
                     renderingPos.x, renderingPos.y, renderingPos.z,
                 )
             ) {
+                val renderingState = statesByPosition[renderingPos.asLong()]
                 val neighborState = statesByPosition[pos.asLong()]
-                if (PreviewOcclusionPolicy.isFaceExposed(neighborState, PreviewOcclusionCompat::isOpaqueFullCube)) {
+                if (PreviewOcclusionPolicy.shouldReplaceNeighborWithAir(
+                        rendering = renderingState,
+                        neighbor = neighborState,
+                        isSameOcclusionGroup = { first, second -> first.block == second.block },
+                        isOpaqueFullCube = PreviewOcclusionCompat::isOpaqueFullCube,
+                    )
+                ) {
                     return airState
                 }
             }

@@ -6,4 +6,6 @@ data class GlobalModeState(
     val infiniteReachEnabled: Boolean = false,
     val bulldozerEnabled: Boolean = false,
     val fastPlaceEnabled: Boolean = false,
+    val phantomEnabled: Boolean = false,
+    val noUpdatesEnabled: Boolean = false,
 )

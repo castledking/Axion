@@ -9,6 +9,8 @@ class AxionPaperPlugin : JavaPlugin() {
         private set
     lateinit var noClipService: AxionNoClipService
         private set
+    lateinit var noUpdatesService: AxionNoUpdatesService
+        private set
     lateinit var flightSpeedService: AxionFlightSpeedService
         private set
 
@@ -20,6 +22,7 @@ class AxionPaperPlugin : JavaPlugin() {
 
     override fun onLoad() {
         noClipService = AxionNoClipService(this)
+        noUpdatesService = AxionNoUpdatesService()
         flightSpeedService = AxionFlightSpeedService(this)
     }
 
@@ -29,11 +32,14 @@ class AxionPaperPlugin : JavaPlugin() {
         if (!::noClipService.isInitialized) {
             noClipService = AxionNoClipService(this)
         }
+        if (!::noUpdatesService.isInitialized) {
+            noUpdatesService = AxionNoUpdatesService()
+        }
         if (!::flightSpeedService.isInitialized) {
             flightSpeedService = AxionFlightSpeedService(this)
         }
         installConfiguredProtectionAdapters()
-        messaging = AxionPluginMessaging(this, policyService, noClipService, flightSpeedService)
+        messaging = AxionPluginMessaging(this, policyService, noClipService, noUpdatesService, flightSpeedService)
         lifecycleManager.registerEventHandler(LifecycleEvents.COMMANDS) { event ->
             event.registrar().register(
                 pluginMeta,
@@ -79,7 +85,7 @@ class AxionPaperPlugin : JavaPlugin() {
         installConfiguredProtectionAdapters()
         if (::messaging.isInitialized) {
             server.messenger.unregisterIncomingPluginChannel(this, AxionProtocol.CHANNEL_ID, messaging)
-            messaging = AxionPluginMessaging(this, policyService, noClipService, flightSpeedService)
+            messaging = AxionPluginMessaging(this, policyService, noClipService, noUpdatesService, flightSpeedService)
             server.messenger.registerIncomingPluginChannel(this, AxionProtocol.CHANNEL_ID, messaging)
         }
     }

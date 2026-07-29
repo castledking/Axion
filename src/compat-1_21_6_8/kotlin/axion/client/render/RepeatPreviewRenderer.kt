@@ -16,9 +16,10 @@ import net.minecraft.world.World
 object RepeatPreviewRenderer {
     private const val MAX_REGION_OUTLINES: Int = 96
     private const val MAX_COLLISION_PULSE_BLOCKS: Int = 2048
+    private const val MAX_DESTINATION_OCCUPANCY_CELLS: Long = 4_000_000L
     private const val DESTINATION_GHOST_COLOR: Int = 0xFFFFFFFF.toInt()
-    private const val DEFAULT_GHOST_ALPHA: Int = 86
-    private const val SPARSE_GHOST_ALPHA: Int = 112
+    private const val DEFAULT_GHOST_ALPHA: Int = PreviewVisualPolicy.CULLED_DESTINATION_ALPHA
+    private const val SPARSE_GHOST_ALPHA: Int = PreviewVisualPolicy.CULLED_SPARSE_DESTINATION_ALPHA
     // Full size: see DESTINATION_GHOST_SCALE in PlacementPreviewRenderer -- a
     // per-block shrink only takes effect on the CPU fallback path and shows up
     // there as seams between neighbouring preview blocks.
@@ -49,7 +50,6 @@ object RepeatPreviewRenderer {
                     pulseFillColor = null,
                     pulseMinAlpha = 0,
                     pulseMaxAlpha = 166,
-                    shellFillColor = SOURCE_SELECTION_COLOR,
                 ),
             )
             if (!renderedSparseSource) {
@@ -68,8 +68,7 @@ object RepeatPreviewRenderer {
                         pulseFillColor = null,
                         pulseMinAlpha = 0,
                         pulseMaxAlpha = 166,
-                        shellFillColor = SOURCE_SELECTION_COLOR,
-                    ),
+                        ),
                 )
             }
         }
@@ -126,6 +125,22 @@ object RepeatPreviewRenderer {
         destinationColor: Int,
         lineWidth: Float,
     ) {
+        val occupiedCellCount = preview.clipboardBuffer.nonAirCells().size
+        if (!isDestinationGhostWithinBudget(occupiedCellCount, preview.repeatCount.toLong())) {
+            aggregateRegionForOffsets(
+                sourceRegion = preview.sourceRegion,
+                offsets = listOf(Vec3i.ZERO, preview.step),
+            )?.let { aggregateRegion ->
+                PulsingCuboidRenderer.renderOutlineBox(
+                    context = context,
+                    box = SelectionBounds.regionBox(aggregateRegion),
+                    outlineColor = destinationColor,
+                    lineWidth = lineWidth,
+                )
+            }
+            return
+        }
+
         val world = MinecraftClient.getInstance().world ?: return
         val layout = clippedSmearLayout(
             world = world,
@@ -143,7 +158,8 @@ object RepeatPreviewRenderer {
             context = context,
             scene = BlockPreviewPipeline.OverlayScene(
                 origins = if (nonAirCells.isNotEmpty()) listOf(layout.region.minCorner()) else emptyList(),
-                clipboard = ghostClipboard,
+                clipboard = selectionClipboard,
+                fallbackClipboard = ghostClipboard,
                 color = DESTINATION_GHOST_COLOR,
                 alpha = if (sparseDestination) SPARSE_GHOST_ALPHA else DEFAULT_GHOST_ALPHA,
                 scale = GHOST_SCALE,
@@ -189,16 +205,30 @@ object RepeatPreviewRenderer {
         mode: RegionRepeatPlacementService.Mode,
     ) {
         val selectionClipboard = ClipboardSelectionRenderer.sparseClipboard(clipboardBuffer)
-        val destinationGhostClipboard = ClipboardSelectionRenderer.surfaceClipboard(selectionClipboard)
+        val ghostInstanceCount = repeatCount.coerceAtLeast(0).toLong() + if (includeSourceOrigin) 1L else 0L
+        val renderGhost = isDestinationGhostWithinBudget(
+            occupiedCellCount = selectionClipboard.nonAirCells().size,
+            instanceCount = ghostInstanceCount,
+        )
+        val destinationGhostClipboard = if (renderGhost) {
+            ClipboardSelectionRenderer.surfaceClipboard(selectionClipboard)
+        } else {
+            selectionClipboard
+        }
         val sparseDestination = ClipboardSelectionRenderer.isSparse(sourceRegion, selectionClipboard)
         val ghostClipboard = destinationGhostClipboard
-        val smearOffsets = if (mode == RegionRepeatPlacementService.Mode.SMEAR) {
+        val smearOffsets = if (mode == RegionRepeatPlacementService.Mode.SMEAR && renderGhost) {
             RegionRepeatPlacementService.smearOffsets(step, repeatCount)
         } else {
             emptyList()
         }
         val aggregateRegion = if (mode == RegionRepeatPlacementService.Mode.SMEAR) {
-            aggregateRegionForOffsets(sourceRegion, listOf(Vec3i.ZERO) + smearOffsets)
+            val aggregateOffsets = if (renderGhost) {
+                listOf(Vec3i.ZERO) + smearOffsets
+            } else {
+                listOf(Vec3i.ZERO, step)
+            }
+            aggregateRegionForOffsets(sourceRegion, aggregateOffsets)
         } else {
             RepeatPreviewLayout.aggregateRegion(
                 sourceRegion = sourceRegion,
@@ -211,15 +241,17 @@ object RepeatPreviewRenderer {
         aggregateRegion?.let {
             val aggregateBox = if (renderOutline) SelectionBounds.regionBox(aggregateRegion) else null
             val destinationRegions = if (!forceAggregateOutline) {
-                if (mode == RegionRepeatPlacementService.Mode.SMEAR) {
+                if (mode == RegionRepeatPlacementService.Mode.SMEAR && renderGhost) {
                     destinationRegionsForOffsets(sourceRegion, smearOffsets.take(MAX_REGION_OUTLINES))
-                } else {
+                } else if (mode != RegionRepeatPlacementService.Mode.SMEAR) {
                     RepeatPreviewLayout.destinationRegions(
                         sourceRegion = sourceRegion,
                         step = step,
                         repeatCount = repeatCount,
                         maxRegions = MAX_REGION_OUTLINES,
                     )
+                } else {
+                    emptyList()
                 }
             } else {
                 emptyList()
@@ -227,32 +259,26 @@ object RepeatPreviewRenderer {
 
             val nonAirCells = ghostClipboard.nonAirCells()
             if (nonAirCells.isNotEmpty()) {
-                val maxLegacyGhostOrigins = maxOf(1, GhostBlockPreviewRenderer.maxOriginsFor(nonAirCells.size))
-                val canRenderAllGhostOrigins = repeatCount <= maxLegacyGhostOrigins
-                val baseGhostOrigins = if (forceAggregateOutline) {
-                    if (mode == RegionRepeatPlacementService.Mode.SMEAR) {
-                        destinationRegionsForOffsets(sourceRegion, smearOffsets).map { it.minCorner() }
-                    } else {
-                        RepeatPreviewLayout.destinationRegions(
-                            sourceRegion = sourceRegion,
-                            step = step,
-                            repeatCount = repeatCount,
-                            maxRegions = repeatCount,
-                        ).map { it.minCorner() }
-                    }
+                val maxLegacyGhostOrigins = if (renderGhost) {
+                    maxOf(1, GhostBlockPreviewRenderer.maxOriginsFor(nonAirCells.size))
                 } else {
-                    if (mode == RegionRepeatPlacementService.Mode.SMEAR) {
-                        destinationRegionsForOffsets(sourceRegion, smearOffsets).map { it.minCorner() }
-                    } else {
-                        RepeatPreviewLayout.destinationRegions(
-                            sourceRegion = sourceRegion,
-                            step = step,
-                            repeatCount = repeatCount,
-                            maxRegions = repeatCount,
-                        ).map { it.minCorner() }
-                    }
+                    0
                 }
-                val ghostOrigins = if (includeSourceOrigin) {
+                val canRenderAllGhostOrigins = renderGhost && repeatCount <= maxLegacyGhostOrigins
+                val baseGhostOrigins = when {
+                    !renderGhost -> emptyList()
+                    mode == RegionRepeatPlacementService.Mode.SMEAR ->
+                        destinationRegionsForOffsets(sourceRegion, smearOffsets).map { it.minCorner() }
+                    else -> RepeatPreviewLayout.destinationRegions(
+                        sourceRegion = sourceRegion,
+                        step = step,
+                        repeatCount = repeatCount,
+                        maxRegions = repeatCount,
+                    ).map { it.minCorner() }
+                }
+                val ghostOrigins = if (!renderGhost) {
+                    emptyList()
+                } else if (includeSourceOrigin) {
                     listOf(sourceRegion.normalized().minCorner()) + baseGhostOrigins
                 } else {
                     baseGhostOrigins
@@ -271,7 +297,7 @@ object RepeatPreviewRenderer {
                         ghostAlpha = if (sparseDestination) SPARSE_GHOST_ALPHA else DEFAULT_GHOST_ALPHA,
                         ghostScale = GHOST_SCALE,
                         aggregateBox = aggregateBox,
-                        renderGhost = true,
+                        renderGhost = renderGhost,
                         pulseSelection = mode == RegionRepeatPlacementService.Mode.STACK,
                     ),
                 )
@@ -316,6 +342,14 @@ object RepeatPreviewRenderer {
                 )
             }
         }
+    }
+
+    private fun isDestinationGhostWithinBudget(
+        occupiedCellCount: Int,
+        instanceCount: Long,
+    ): Boolean {
+        return occupiedCellCount.toLong() * instanceCount.coerceAtLeast(0L) <=
+            MAX_DESTINATION_OCCUPANCY_CELLS
     }
 
     private fun renderArrow(

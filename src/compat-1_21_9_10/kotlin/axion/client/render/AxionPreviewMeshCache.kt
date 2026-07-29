@@ -1,13 +1,11 @@
 package axion.client.render
 
-import axion.client.render.gpu.PreviewOcclusionCompat
-import axion.client.render.gpu.PreviewOcclusionPolicy
+import axion.client.render.gpu.PreviewStateHalo
 import axion.common.model.ClipboardBuffer
 import axion.common.model.ClipboardCell
 import net.minecraft.block.BlockRenderType
 import net.minecraft.block.BlockState
 import net.minecraft.util.math.BlockPos
-import net.minecraft.util.math.Direction
 import java.util.LinkedHashMap
 
 /**
@@ -26,6 +24,7 @@ object AxionPreviewMeshCache {
 
     private data class CacheKey(
         val clipboard: ClipboardBuffer,
+        val surfaceClipboard: ClipboardBuffer,
         val originKeys: List<Long>,
     )
 
@@ -43,31 +42,34 @@ object AxionPreviewMeshCache {
     fun getOrBuild(
         clipboard: ClipboardBuffer,
         origins: Collection<BlockPos>,
+        surfaceClipboard: ClipboardBuffer = ClipboardSelectionRenderer.surfaceClipboard(clipboard),
         color: Int,
         alpha: Int,
         scale: Float,
         maxBlocks: Int = 1536,
     ): CachedMesh? {
         val occupiedCells = clipboard.nonAirCells()
-        if (occupiedCells.isEmpty() || origins.isEmpty()) {
+        val surfaceCells = surfaceClipboard.nonAirCells()
+        if (occupiedCells.isEmpty() || surfaceCells.isEmpty() || origins.isEmpty()) {
             return null
         }
 
-        val maxOrigins = maxOf(1, maxBlocks / occupiedCells.size.coerceAtLeast(1))
+        val maxOrigins = maxOf(1, maxBlocks / surfaceCells.size.coerceAtLeast(1))
         val boundedOrigins = origins.asSequence().take(maxOrigins).toList()
         if (boundedOrigins.isEmpty()) {
             return null
         }
 
-        val originKeys = boundedOrigins.map { it.asLong() }.sorted()
+        val originKeys = boundedOrigins.map { it.asLong() }
         val key = CacheKey(
             clipboard = clipboard,
+            surfaceClipboard = surfaceClipboard,
             originKeys = originKeys,
         )
 
         return synchronized(cache) {
             cache.getOrPut(key) {
-                buildMesh(occupiedCells, boundedOrigins, maxBlocks)
+                buildMesh(occupiedCells, surfaceCells, boundedOrigins, maxBlocks)
             }
         }
     }
@@ -99,21 +101,22 @@ object AxionPreviewMeshCache {
 
     private fun buildMesh(
         occupiedCells: List<ClipboardCell>,
+        surfaceCells: List<ClipboardCell>,
         origins: List<BlockPos>,
         maxBlocks: Int,
     ): CachedMesh {
-        val surfaceCells = filterSurfaceCells(occupiedCells)
         val cellsToRender = if (surfaceCells.size * origins.size <= maxBlocks) {
             surfaceCells
         } else {
             downsampleCells(surfaceCells, maxOf(1, maxBlocks / origins.size.coerceAtLeast(1)))
         }
+        val stateHalo = PreviewStateHalo.retain(occupiedCells, cellsToRender)
 
         val blocks = ArrayList<PreviewBlockInfo>(cellsToRender.size * origins.size)
-        val statesByPosition = LinkedHashMap<Long, BlockState>(occupiedCells.size * origins.size)
+        val statesByPosition = LinkedHashMap<Long, BlockState>(stateHalo.size * origins.size)
 
         origins.forEach { origin ->
-            occupiedCells.forEach { cell ->
+            stateHalo.forEach { cell ->
                 val pos = cell.absolutePos(origin)
                 statesByPosition[pos.asLong()] = cell.state
             }
@@ -122,6 +125,7 @@ object AxionPreviewMeshCache {
         origins.forEach { origin ->
             cellsToRender.forEach { cell ->
                 val pos = cell.absolutePos(origin)
+                statesByPosition[pos.asLong()] = cell.state
                 if (cell.state.renderType == BlockRenderType.MODEL) {
                     blocks += PreviewBlockInfo(pos = pos, state = cell.state)
                 }
@@ -129,28 +133,6 @@ object AxionPreviewMeshCache {
         }
 
         return CachedMesh(blocks = blocks, statesByPosition = statesByPosition)
-    }
-
-    private fun filterSurfaceCells(cells: List<ClipboardCell>): List<ClipboardCell> {
-        val statesByOffset = HashMap<Long, BlockState>(cells.size)
-        cells.forEach { cell ->
-            statesByOffset[BlockPos.asLong(cell.offset.x, cell.offset.y, cell.offset.z)] = cell.state
-        }
-
-        return cells.filter { cell ->
-            if (cell.state.isAir) return@filter false
-            Direction.entries.any { face ->
-                val neighborKey = BlockPos.asLong(
-                    cell.offset.x + face.offsetX,
-                    cell.offset.y + face.offsetY,
-                    cell.offset.z + face.offsetZ,
-                )
-                PreviewOcclusionPolicy.isFaceExposed(
-                    statesByOffset[neighborKey],
-                    PreviewOcclusionCompat::isOpaqueFullCube,
-                )
-            }
-        }
     }
 
     private fun downsampleCells(cells: List<ClipboardCell>, maxCells: Int): List<ClipboardCell> {

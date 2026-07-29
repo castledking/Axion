@@ -1,5 +1,6 @@
 package axion.client
 
+import axion.client.render.MoveSourceRenderState
 import axion.common.model.ClipboardState
 import axion.common.model.GlobalModeState
 import axion.common.model.SelectionState
@@ -73,6 +74,7 @@ object AxionClientState {
 
     fun updatePlacementToolState(state: axion.client.tool.CloneToolState) {
         placementToolState = state
+        MoveSourceRenderState.synchronize(state)
     }
 
     fun updateEraseToolState(state: axion.client.tool.EraseToolState) {

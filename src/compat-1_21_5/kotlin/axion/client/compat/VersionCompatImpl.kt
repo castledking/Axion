@@ -183,10 +183,10 @@ object VersionCompatImpl : VersionCompat {
     fun sendAxionPayload(payload: AxionPluginPayload) = ClientPlayNetworking.send(payload)
     fun supportsChunkedPreview(): Boolean = !ShaderPackCompat.shouldDisableDirectGpuPreview()
 
-    fun renderChunkedPreview(sessionId: String, context: AxionWorldRenderContext, clipboard: ClipboardBuffer, origins: Collection<BlockPos>, color: Int, alpha: Int, scale: Float): Boolean {
+    fun renderChunkedPreview(sessionId: String, context: AxionWorldRenderContext, clipboard: ClipboardBuffer, surfaceClipboard: ClipboardBuffer, origins: Collection<BlockPos>, color: Int, alpha: Int, scale: Float): Boolean {
         if (ShaderPackCompat.shouldDisableDirectGpuPreview()) return false
         val session = ChunkedPreviewLifecycle.acquire(sessionId)
-        session.setFromClipboard(clipboard, origins, scale)
+        session.setFromClipboard(clipboard, surfaceClipboard, origins, scale)
         return session.render(context, color, alpha).handled
     }
 

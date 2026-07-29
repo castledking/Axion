@@ -26,10 +26,11 @@ import org.bukkit.entity.Player
 
 class AxionOperationService(
     private val policyService: AxionPolicyService,
+    private val noUpdatesService: AxionNoUpdatesService = AxionNoUpdatesService(),
 ) {
     private val history = AxionServerHistory()
     private val historyActions = AxionHistoryActionService(history, policyService)
-    private val interactionEventGateway = PaperInteractionEventGateway()
+    private val interactionEventGateway = PaperInteractionEventGateway(noUpdatesService = noUpdatesService)
 
     fun applyBatch(player: Player, request: OperationBatchRequest, timing: AxionTimingContext): OperationBatchResult {
         if (request.operations.isEmpty()) {

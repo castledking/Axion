@@ -9,8 +9,11 @@ import axion.client.hotbar.AxionToolHintHud
 import axion.client.input.AxionKeybindings
 import axion.client.network.AxionServerConnection
 import axion.client.input.AxionTickHandler
+import axion.client.tool.PlacementToolController
 import axion.common.compat.VersionCompat
 import axion.client.render.WorldRenderCompat
+import axion.client.render.MoveSourceRenderState
+import axion.client.render.ClientThreadCleanupScheduler
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 import net.minecraft.util.Identifier
@@ -48,8 +51,19 @@ object AxionClientBootstrap {
         ClientTickEvents.END_CLIENT_TICK.register(AxionTickHandler::onEndTick)
         logger.info("[Axion/Bootstrap] Client tick handler registered")
         ClientLifecycleEvents.CLIENT_STOPPING.register(SavedHotbarController::flushActiveHotbar)
+        ClientLifecycleEvents.CLIENT_STOPPING.register { MoveSourceRenderState.clear() }
         VersionCompatImpl.onPlayDisconnect { client ->
-            SavedHotbarController.flushActiveHotbar(client)
+            ClientThreadCleanupScheduler.schedule(
+                enqueueOnClientThread = { task -> VersionCompatImpl.runOnRenderThread(client, task) },
+                cleanup = {
+                    SavedHotbarController.flushActiveHotbar(client)
+                    // Drop the departing-world mask before reset synchronizes
+                    // the now-idle placement state; no chunk rebuild belongs in
+                    // disconnect teardown.
+                    MoveSourceRenderState.clear()
+                    PlacementToolController.reset()
+                },
+            )
         }
         logger.info("[Axion/Bootstrap] Saved hotbar flush handlers registered")
 

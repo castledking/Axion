@@ -71,7 +71,7 @@ object AxionHotbarHud {
         CapabilityEntry("Fast Place", 6, description = "Place blocks at maximum speed"),
         CapabilityEntry("Angel Placement", 7, supported = false, description = "Not yet implemented"),
         CapabilityEntry("No Clip", 8, description = "Phase through blocks while flying"),
-        CapabilityEntry("Phantom", 9, supported = false, description = "Not yet implemented"),
+        CapabilityEntry("Phantom", 9, description = "Walk over tripwires, pressure plates, and sculk sensors without triggering them"),
     )
 
     private fun capabilityState(index: Int): Boolean {
@@ -82,6 +82,7 @@ object AxionHotbarHud {
             5 -> state.infiniteReachEnabled
             6 -> state.fastPlaceEnabled
             8 -> state.noClipEnabled
+            9 -> state.phantomEnabled
             else -> false
         }
     }

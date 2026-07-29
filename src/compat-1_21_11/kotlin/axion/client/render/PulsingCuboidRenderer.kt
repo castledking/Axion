@@ -13,11 +13,12 @@ import net.minecraft.util.math.Vec3d
 import net.minecraft.util.shape.VoxelShapes
 import kotlin.math.ceil
 import kotlin.math.roundToInt
-import kotlin.math.abs
 import kotlin.math.sin
 import kotlin.math.sqrt
 
 object PulsingCuboidRenderer {
+    private val logger = org.slf4j.LoggerFactory.getLogger(PulsingCuboidRenderer::class.java)
+    private var loggedLayerFailure = false
     private const val DEFAULT_MIN_ALPHA: Int = 52
     private const val DEFAULT_MAX_ALPHA: Int = 76
     private const val PULSE_PERIOD_MILLIS: Double = 2200.0
@@ -30,6 +31,13 @@ object PulsingCuboidRenderer {
     private const val OUTLINE_THICKNESS_PER_UNIT: Double = 0.0013
     private const val MIN_OUTLINE_THICKNESS: Double = 0.01
     private const val MAX_OUTLINE_THICKNESS: Double = 0.06
+
+    // The shell shares the selection fill's colours and signed phase. It used to
+    // pulse *white* on its own timer via pulsingAlphaF; under an Iris pack the
+    // lightning program it rides is bloom/emissive, which turned that into a
+    // bright white flash whenever the red/blue fill crossed through transparent.
+    private const val SHELL_BASE_FILL_COLOR: Int = 0xFFCC5656.toInt()
+    private const val SHELL_PULSE_FILL_COLOR: Int = 0xFF7C98FF.toInt()
 
     fun render(
         context: AxionWorldRenderContext,
@@ -45,7 +53,7 @@ object PulsingCuboidRenderer {
         val cameraPos = CameraAccess.getPos(camera)
         val matrixStack = context.matrices()
         val fillLayer = try {
-            RenderLayerCompat.debugQuads()
+            RenderLayerCompat.shaderSafeQuads()
         } catch (e: Exception) {
             return
         }
@@ -77,14 +85,18 @@ object PulsingCuboidRenderer {
         lineWidth: Float,
         minAlpha: Int = DEFAULT_MIN_ALPHA,
         maxAlpha: Int = DEFAULT_MAX_ALPHA,
-        fillColor: Int = 0xFFFFFFFF.toInt(),
+        baseFillColor: Int = SHELL_BASE_FILL_COLOR,
+        pulseFillColor: Int = SHELL_PULSE_FILL_COLOR,
     ) {
         val client = MinecraftClient.getInstance()
         val camera = client.gameRenderer.camera ?: return
         val consumers = context.consumers()
         val cameraPos = CameraAccess.getPos(camera)
         val matrixStack = context.matrices()
-        val alpha = pulsingAlphaF(minAlpha, maxAlpha)
+        // Same signed phase as the selection fill: one colour at a time,
+        // fading to the configured visible floor at the crossover.
+        val shellPhase = selectionPulsePhase(SELECTION_PULSE_PERIOD_MILLIS)
+        val alpha = PreviewVisualPolicy.pulseAlpha(minAlpha, maxAlpha, shellPhase)
         val fillLayer = try {
             RenderLayerCompat.lightning()
         } catch (e: Exception) {
@@ -99,7 +111,7 @@ object PulsingCuboidRenderer {
             cameraPos = cameraPos,
             box = SelectionBounds.outlineBox(box),
             alpha = alpha,
-            color = fillColor,
+            color = if (shellPhase >= 0f) pulseFillColor else baseFillColor,
         )
 
         VertexRenderingCompat.drawOutline(
@@ -140,7 +152,7 @@ object PulsingCuboidRenderer {
                 // consumer path, so there is no separate GPU pass left to
                 // occlude -- and 1.21.11's debug-quad pipeline is translucent
                 // with depth writes off, so it cannot mask the preview either.
-                RenderLayerCompat.debugQuads()
+                RenderLayerCompat.lightning()
             } else {
                 // Persistent GPU previews draw after this cuboid is queued. Using
                 // the vanilla debug layer here would write the cuboid's near face
@@ -148,12 +160,16 @@ object PulsingCuboidRenderer {
                 RenderLayerCompat.xrayQuads()
             }
         } catch (e: Exception) {
+            if (!loggedLayerFailure) {
+                loggedLayerFailure = true
+                logger.error("[AxionSelection] selection fill layer creation threw; selection will not render", e)
+            }
             return
         }
         val filledConsumer = consumers.getBuffer(fillLayer)
 
-        // One fill phasing baseFillColor -> transparent -> pulseFillColor, rather
-        // than a constant base with a pulse stacked on top. See selectionPulsePhase.
+        // One fill phasing baseFillColor -> visible floor -> pulseFillColor,
+        // rather than a constant base with a pulse stacked on top.
         val fillPhase = selectionPulsePhase(SELECTION_PULSE_PERIOD_MILLIS)
         renderFilledBox(
             matrixStack = matrixStack,
@@ -161,7 +177,11 @@ object PulsingCuboidRenderer {
             layer = fillLayer,
             cameraPos = cameraPos,
             box = pulseBox,
-            alpha = pulseMaxAlpha * abs(fillPhase),
+            alpha = PreviewVisualPolicy.pulseAlpha(
+                minAlpha = maxOf(baseAlpha, pulseMinAlpha),
+                maxAlpha = pulseMaxAlpha,
+                signedPhase = fillPhase,
+            ),
             color = if (fillPhase >= 0f) pulseFillColor else baseFillColor,
         )
         renderXrayOutline(
@@ -189,7 +209,7 @@ object PulsingCuboidRenderer {
 
         val fillLayer = try {
             if (ShaderPackCompat.isShaderPackActive()) {
-                RenderLayerCompat.debugQuads()
+                RenderLayerCompat.lightning()
             } else {
                 RenderLayerCompat.xrayQuads()
             }
@@ -280,8 +300,8 @@ object PulsingCuboidRenderer {
     /**
      * Fractional-alpha variant used by the pulses.
      *
-     * Vertex alpha is a byte, so a pulse over a narrow range (the placement
-     * selection breathes between 4 and 8) only has a handful of distinct steps,
+     * Vertex alpha is a byte, so a pulse over a narrow configured range only
+     * has a handful of distinct steps,
      * and the sine spends most of its time near the extremes where it changes
      * slowest -- so the pulse visibly jumps between levels instead of easing.
      * Blending adds `rgb * alpha`, so rounding alpha *up* and scaling RGB down
@@ -297,11 +317,24 @@ object PulsingCuboidRenderer {
         alpha: Float,
         color: Int = 0xFFFFFFFF.toInt(),
     ) {
-        val alphaByte = ceil(alpha).toInt().coerceIn(0, 255)
+        // The fractional-alpha ease rounds alpha *up* and scales RGB down, so
+        // near the pulse crossover it emits quads with alpha 1 and near-black
+        // RGB. Vanilla blending renders that as invisible, but shader-pack
+        // programs make their own assumptions about vertex colour (some
+        // un-premultiply by alpha, some bloom on ratios), and that degenerate
+        // combination can blow out to a solid white flash. Under a pack, use
+        // plain byte alpha with unscaled RGB: sub-1 alpha draws nothing. The
+        // selection pulse policy itself keeps its fills above a visible floor.
+        val shaderPackActive = ShaderPackCompat.isShaderPackActive()
+        val alphaByte = if (shaderPackActive) {
+            alpha.roundToInt().coerceIn(0, 255)
+        } else {
+            ceil(alpha).toInt().coerceIn(0, 255)
+        }
         if (alphaByte == 0) {
             return
         }
-        val colorScale = (alpha / alphaByte).coerceIn(0f, 1f)
+        val colorScale = if (shaderPackActive) 1f else (alpha / alphaByte).coerceIn(0f, 1f)
         val minX = (box.minX - cameraPos.x).toFloat()
         val minY = (box.minY - cameraPos.y).toFloat()
         val minZ = (box.minZ - cameraPos.z).toFloat()
@@ -315,12 +348,32 @@ object PulsingCuboidRenderer {
 
         val drawMode = layer.drawMode
 
-        emitFace(consumer, drawMode, entry, minX, minY, minZ, maxX, minY, minZ, maxX, maxY, minZ, minX, maxY, minZ, 0f, 0f, -1f, red, green, blue, alphaByte)
-        emitFace(consumer, drawMode, entry, minX, minY, maxZ, minX, maxY, maxZ, maxX, maxY, maxZ, maxX, minY, maxZ, 0f, 0f, 1f, red, green, blue, alphaByte)
-        emitFace(consumer, drawMode, entry, minX, minY, minZ, minX, maxY, minZ, minX, maxY, maxZ, minX, minY, maxZ, -1f, 0f, 0f, red, green, blue, alphaByte)
-        emitFace(consumer, drawMode, entry, maxX, minY, minZ, maxX, minY, maxZ, maxX, maxY, maxZ, maxX, maxY, minZ, 1f, 0f, 0f, red, green, blue, alphaByte)
-        emitFace(consumer, drawMode, entry, minX, maxY, minZ, maxX, maxY, minZ, maxX, maxY, maxZ, minX, maxY, maxZ, 0f, 1f, 0f, red, green, blue, alphaByte)
-        emitFace(consumer, drawMode, entry, minX, minY, minZ, minX, minY, maxZ, maxX, minY, maxZ, maxX, minY, minZ, 0f, -1f, 0f, red, green, blue, alphaByte)
+        // Cull back faces. Vertices are camera-relative, so the camera is at the
+        // origin and a face is only visible when the camera is on its outer side
+        // (its plane coordinate has the matching sign). Emitting all six stacks
+        // the far translucent walls behind the near ones and muddies the fill;
+        // this leaves only the walls actually facing the viewer, so you look
+        // cleanly into the selection like Axiom's box. When the camera is level
+        // with the box on an axis, neither wall on it is drawn -- you see through.
+        if (minZ > 0f) emitFace(consumer, drawMode, entry, minX, minY, minZ, maxX, minY, minZ, maxX, maxY, minZ, minX, maxY, minZ, 0f, 0f, -1f, red, green, blue, alphaByte)
+        if (maxZ < 0f) emitFace(consumer, drawMode, entry, minX, minY, maxZ, minX, maxY, maxZ, maxX, maxY, maxZ, maxX, minY, maxZ, 0f, 0f, 1f, red, green, blue, alphaByte)
+        if (minX > 0f) emitFace(consumer, drawMode, entry, minX, minY, minZ, minX, maxY, minZ, minX, maxY, maxZ, minX, minY, maxZ, -1f, 0f, 0f, red, green, blue, alphaByte)
+        if (maxX < 0f) emitFace(consumer, drawMode, entry, maxX, minY, minZ, maxX, minY, maxZ, maxX, maxY, maxZ, maxX, maxY, minZ, 1f, 0f, 0f, red, green, blue, alphaByte)
+        if (maxY < 0f) emitFace(consumer, drawMode, entry, minX, maxY, minZ, maxX, maxY, minZ, maxX, maxY, maxZ, minX, maxY, maxZ, 0f, 1f, 0f, red, green, blue, alphaByte)
+        if (minY > 0f) emitFace(consumer, drawMode, entry, minX, minY, minZ, minX, minY, maxZ, maxX, minY, maxZ, maxX, minY, minZ, 0f, -1f, 0f, red, green, blue, alphaByte)
+
+        // Lightning culls back faces, so it needs paired windings for a shell
+        // that remains visible from inside and outside. Debug/x-ray layers are
+        // already no-cull and deliberately keep one winding to avoid blending
+        // the same translucent plane twice.
+        if (RenderLayerCompat.requiresReverseWinding(layer)) {
+            emitFace(consumer, drawMode, entry, minX, maxY, minZ, maxX, maxY, minZ, maxX, minY, minZ, minX, minY, minZ, 0f, 0f, 1f, red, green, blue, alphaByte)
+            emitFace(consumer, drawMode, entry, maxX, minY, maxZ, maxX, maxY, maxZ, minX, maxY, maxZ, minX, minY, maxZ, 0f, 0f, -1f, red, green, blue, alphaByte)
+            emitFace(consumer, drawMode, entry, minX, minY, maxZ, minX, maxY, maxZ, minX, maxY, minZ, minX, minY, minZ, 1f, 0f, 0f, red, green, blue, alphaByte)
+            emitFace(consumer, drawMode, entry, maxX, maxY, minZ, maxX, maxY, maxZ, maxX, minY, maxZ, maxX, minY, minZ, -1f, 0f, 0f, red, green, blue, alphaByte)
+            emitFace(consumer, drawMode, entry, minX, maxY, maxZ, maxX, maxY, maxZ, maxX, maxY, minZ, minX, maxY, minZ, 0f, -1f, 0f, red, green, blue, alphaByte)
+            emitFace(consumer, drawMode, entry, maxX, minY, minZ, maxX, minY, maxZ, minX, minY, maxZ, minX, minY, minZ, 0f, 1f, 0f, red, green, blue, alphaByte)
+        }
     }
 
     private fun emitFace(
@@ -392,10 +445,6 @@ object PulsingCuboidRenderer {
         consumer.vertex(entry, x2, y2, z2).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
         consumer.vertex(entry, x3, y3, z3).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
         consumer.vertex(entry, x4, y4, z4).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
-        consumer.vertex(entry, x4, y4, z4).color(red, green, blue, alpha).normal(entry, -normalX, -normalY, -normalZ)
-        consumer.vertex(entry, x3, y3, z3).color(red, green, blue, alpha).normal(entry, -normalX, -normalY, -normalZ)
-        consumer.vertex(entry, x2, y2, z2).color(red, green, blue, alpha).normal(entry, -normalX, -normalY, -normalZ)
-        consumer.vertex(entry, x1, y1, z1).color(red, green, blue, alpha).normal(entry, -normalX, -normalY, -normalZ)
     }
 
     private fun emitTriangles(
@@ -423,8 +472,6 @@ object PulsingCuboidRenderer {
     ) {
         emitTriangle(consumer, entry, x1, y1, z1, x2, y2, z2, x3, y3, z3, normalX, normalY, normalZ, red, green, blue, alpha)
         emitTriangle(consumer, entry, x1, y1, z1, x3, y3, z3, x4, y4, z4, normalX, normalY, normalZ, red, green, blue, alpha)
-        emitTriangle(consumer, entry, x4, y4, z4, x3, y3, z3, x2, y2, z2, -normalX, -normalY, -normalZ, red, green, blue, alpha)
-        emitTriangle(consumer, entry, x4, y4, z4, x2, y2, z2, x1, y1, z1, -normalX, -normalY, -normalZ, red, green, blue, alpha)
     }
 
     private fun emitTriangle(
@@ -473,8 +520,8 @@ object PulsingCuboidRenderer {
      * selection always read as a muddy blend of both colours, and each layer the
      * view passes through compounds -- which is what made deep selections look
      * blurred. A signed phase drives a single fill that reaches each colour at
-     * full strength and passes cleanly through fully transparent at the
-     * crossover.
+     * full strength, while the visual policy keeps a visible alpha floor at
+     * the colour crossover.
      */
     fun selectionPulsePhase(periodMillis: Double = PULSE_PERIOD_MILLIS): Float {
         val periodNanos = (periodMillis * 1_000_000.0).toLong().coerceAtLeast(1L)

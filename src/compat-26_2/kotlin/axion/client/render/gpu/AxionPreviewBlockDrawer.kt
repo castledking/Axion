@@ -6,6 +6,7 @@ import axion.client.render.AxionPreviewBuffer
 import axion.client.render.ShaderPackCompat
 import com.mojang.blaze3d.buffers.GpuBufferSlice
 import com.mojang.blaze3d.systems.RenderSystem
+import com.mojang.blaze3d.textures.GpuTextureView
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap
 import net.minecraft.client.MinecraftClient
 import net.minecraft.util.math.Vec3d
@@ -37,17 +38,26 @@ object AxionPreviewBlockDrawer {
         sectionBuffers: Long2ObjectMap<AxionPreviewBuffer>,
         color: Int,
         alpha: Int,
-        translationDelta: Vec3i = Vec3i.ZERO,
-        baseModelView: Matrix4fc? = null,
-        cameraPosOverride: Vec3d? = null,
-        cullingModelView: Matrix4fc? = null,
-        projectionMatrix: Matrix4fc? = null,
+        translationDelta: Vec3i,
+        baseModelView: Matrix4fc,
+        cameraPosOverride: Vec3d?,
+        projection: GpuBufferSlice,
+        sceneDepth: GpuTextureView,
     ): ChunkedDrawResult {
         if (disabled || sectionBuffers.isEmpty()) return ChunkedDrawResult.FAILED
         if (ShaderPackCompat.shouldDisableDirectGpuPreview()) return ChunkedDrawResult.FAILED
 
         return try {
-            val result = doDrawChunked(sectionBuffers, color, alpha, translationDelta, baseModelView, cameraPosOverride)
+            val result = doDrawChunked(
+                sectionBuffers,
+                color,
+                alpha,
+                translationDelta,
+                baseModelView,
+                cameraPosOverride,
+                projection,
+                sceneDepth,
+            )
             if (result == ChunkedDrawResult.DREW && !loggedFirstSuccess) {
                 loggedFirstSuccess = true
                 logger.info("[Axion GPU] 26.2.x preview drawer active; drew {} section buffers.", sectionBuffers.size)
@@ -76,20 +86,24 @@ object AxionPreviewBlockDrawer {
         color: Int,
         alpha: Int,
         translationDelta: Vec3i,
-        baseModelView: Matrix4fc?,
+        baseModelView: Matrix4fc,
         cameraPosOverride: Vec3d?,
+        projection: GpuBufferSlice,
+        sceneDepth: GpuTextureView,
     ): ChunkedDrawResult {
         val client = MinecraftClient.getInstance()
         val device = RenderSystem.getDevice()
         val mainTarget = client.framebuffer
         val colorView = mainTarget.colorTextureView ?: return ChunkedDrawResult.FAILED
-        val depthView = mainTarget.depthTextureView ?: return ChunkedDrawResult.FAILED
         val camera = client.gameRenderer.camera
         val cameraPos = cameraPosOverride ?: CameraAccess.getPos(camera)
-        val baseMv = RenderSystem.getModelViewMatrixCopy()
+        val baseMv = Matrix4f(baseModelView)
         val normalMatrix = Matrix4f(baseMv).invert().transpose()
         val drawList = SectionDrawList.buildAll(sectionBuffers)
         if (drawList.isEmpty()) return ChunkedDrawResult.NO_BUFFERS
+        check(drawList.size == 1) {
+            "26.2.x translucent preview must be submitted as one globally sorted mesh"
+        }
 
         val r = ((color shr 16) and 0xFF) / 255f
         val g = ((color shr 8) and 0xFF) / 255f
@@ -129,15 +143,13 @@ object AxionPreviewBlockDrawer {
             // 26.2 widened the clear colour from a packed OptionalInt to an
             // Optional<Vector4fc>; empty still means "do not clear".
             java.util.Optional.empty(),
-            depthView,
+            sceneDepth,
             OptionalDouble.empty(),
         )
         try {
             val firstBuffer = drawList.first().buffer
-            // The depth bias that used to be set here through GlStateManager is
-            // baked into the preview shell pipeline for 26.2 — see
-            // VersionCompatImpl.PREVIEW_DEPTH_BIAS_*. It travels with the
-            // pipeline, so it needs no unwinding and it works on any backend.
+            // Depth visibility is part of the preview pipeline, not mutable GL
+            // state, so this remains backend-independent and needs no unwinding.
             pass.setPipeline(
                 VersionCompatImpl.getPreviewShellPipeline(
                     firstBuffer.vertexFormatValue,
@@ -145,6 +157,7 @@ object AxionPreviewBlockDrawer {
                 ),
             )
             RenderSystem.bindDefaultUniforms(pass)
+            pass.setUniform("Projection", projection)
 
             VersionCompatImpl.getBlockAtlasTextureView(client)?.let { atlasView ->
                 VersionCompatImpl.bindTextureToRenderPass(pass, "Sampler0", atlasView)

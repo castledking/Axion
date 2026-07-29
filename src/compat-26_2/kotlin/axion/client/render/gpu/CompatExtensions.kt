@@ -14,4 +14,4 @@ fun PoseStack.push() = pushPose()
 fun PoseStack.pop() = popPose()
 fun PoseStack.peek(): PoseStack.Pose = last()
 
-val BlockState.isOpaqueFullCube: Boolean get() = canOcclude()
+val BlockState.isOpaqueFullCube: Boolean get() = PreviewOcclusionCompat.isOpaqueFullCube(this)

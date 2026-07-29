@@ -14,6 +14,7 @@ MOD_VERSION="${MOD_VERSION:-$(awk -F= '/^mod_version=/{print $2}' gradle.propert
 #   range "legacy"   → covers 1.21.6 .. 1.21.8, compiled against 1.21.7
 #   range "modern"  → covers 1.21.9 .. 1.21.11, compiled against 1.21.11
 #   range "mc26_1_x" → covers 26.1 .. 26.1.2, compiled against 26.1
+#   validation "mc26_1_2" → exact 26.1.2 API/renderer compile (not a ninth release jar)
 #   range "mc26_2_x" → covers 26.2 .. 26.2.x, compiled against 26.2
 # Within each range, cross-version mixin compatibility is handled by `require = 0`
 # dual-signature injections.
@@ -40,6 +41,7 @@ resolve_compile_version() {
     "mc1_21_9") echo "1.21.9" ;;
     "mc1_21_10") echo "1.21.10" ;;
     "mc1_21_11") echo "1.21.11" ;;
+    "mc26_1_2") echo "26.1.2" ;;
     "legacy") echo "1.21.7" ;;
     "modern") echo "1.21.11" ;;
     "mc26_1_x") echo "26.1" ;;
@@ -60,7 +62,7 @@ resolve_yarn_mappings() {
     "1.21.9") echo "1.21.9+build.1" ;;
     "1.21.10") echo "1.21.10+build.3" ;;
     "1.21.11") echo "1.21.11+build.4" ;;
-    "26.1") echo "" ;;
+    "26.1" | "26.1.2") echo "" ;;
     "26.2") echo "" ;;
     *) return 1 ;;
     esac
@@ -79,6 +81,7 @@ resolve_loader_version() {
     "1.21.10") echo "0.17.3" ;;
     "1.21.11") echo "0.18.4" ;;
     "26.1") echo "0.19.2" ;;
+    "26.1.2") echo "0.19.2" ;;
     "26.2") echo "0.19.3" ;;
     *) return 1 ;;
     esac
@@ -97,6 +100,7 @@ resolve_fabric_version() {
     "1.21.10") echo "0.138.4+1.21.10" ;;
     "1.21.11") echo "0.141.3+1.21.11" ;;
     "26.1") echo "0.145.1+26.1" ;;
+    "26.1.2") echo "0.150.0+26.1.2" ;;
     "26.2") echo "0.155.2+26.2" ;;
     *) return 1 ;;
     esac
@@ -115,6 +119,7 @@ resolve_fabric_kotlin_version() {
     "1.21.10") echo "1.13.9+kotlin.2.3.10" ;;
     "1.21.11") echo "1.13.9+kotlin.2.3.10" ;;
     "26.1") echo "1.13.11+kotlin.2.3.21" ;;
+    "26.1.2") echo "1.13.11+kotlin.2.3.21" ;;
     "26.2") echo "1.13.11+kotlin.2.3.21" ;;
     *) return 1 ;;
     esac
@@ -133,6 +138,7 @@ resolve_modmenu_version() {
     "1.21.10") echo "17.0.0-alpha.1" ;;
     "1.21.11") echo "17.0.0-beta.2" ;;
     "26.1") echo "18.0.0-beta.1" ;;
+    "26.1.2") echo "18.0.0-beta.1" ;;
     "26.2") echo "20.0.1" ;;
     *) return 1 ;;
     esac
@@ -312,6 +318,7 @@ resolve_paper_version() {
     "1.21.10") echo "1.21.10-R0.1-SNAPSHOT" ;;
     "1.21.11") echo "1.21.11-R0.1-SNAPSHOT" ;;
     "26.1") echo "26.1.2.build.63-stable" ;;
+    "26.1.2") echo "26.1.2.build.63-stable" ;;
     "26.2") echo "26.2.build.65-beta" ;;
     *) return 1 ;;
     esac
@@ -319,7 +326,7 @@ resolve_paper_version() {
 
 resolve_loom_version() {
     case "$1" in
-    "26.1") echo "1.16-SNAPSHOT" ;;
+    "26.1" | "26.1.2") echo "1.16-SNAPSHOT" ;;
     "26.2") echo "1.16.3" ;;
     *) echo "1.15.4" ;;
     esac
@@ -327,7 +334,7 @@ resolve_loom_version() {
 
 resolve_paperweight_version() {
     case "$1" in
-    "26.1") echo "2.0.0-SNAPSHOT" ;;
+    "26.1" | "26.1.2") echo "2.0.0-SNAPSHOT" ;;
     "26.2") echo "2.0.0-SNAPSHOT" ;;
     *) echo "2.0.0-beta.19" ;;
     esac
@@ -345,6 +352,7 @@ resolve_range_tag() {
     "mc1_21_9") echo "mc1.21.9" ;;
     "mc1_21_10") echo "mc1.21.10" ;;
     "modern") echo "mc1.21.9-1.21.11" ;;
+    "mc26_1_2") echo "mc26.1.2" ;;
     "mc26_1_x") echo "mc26.1.x" ;;
     "mc26_2_x") echo "mc26.2.x" ;;
     *) return 1 ;;
@@ -363,6 +371,7 @@ resolve_metadata_version_range() {
     "mc1_21_9") echo "1.21.9" ;;
     "mc1_21_10") echo "1.21.10" ;;
     "modern") echo ">=1.21.9 <=1.21.11" ;;
+    "mc26_1_2") echo "26.1.2" ;;
     "mc26_1_x") echo ">=26.1 <=26.1.2" ;;
     "mc26_2_x") echo ">=26.2 <26.3" ;;
     *) return 1 ;;
@@ -543,9 +552,11 @@ build_range() {
         verifyFabricServerRangeCompatibility
         verifyMoveSourceReplacementCoverage
         verifyXraySelectionRenderingCoverage
+        verifyPreviewVisualCoverage
+        verifyMagicSelectFirstRenderCoverage
         verifyIntegratedNoClipWiring
     )
-    if [[ "$range" == "mc26_1_x" || "$range" == "mc26_2_x" ]]; then
+    if [[ "$compile_version" == 26.* ]]; then
         echo "    Fabric client/mod 26.x builds in the official namespace; using jar instead of remapJar."
         gradle_tasks=(
             jar
@@ -554,6 +565,8 @@ build_range() {
             verifyFabricServerRangeCompatibility
             verifyMoveSourceReplacementCoverage
             verifyXraySelectionRenderingCoverage
+            verifyPreviewVisualCoverage
+            verifyMagicSelectFirstRenderCoverage
             verifyIntegratedNoClipWiring
         )
     fi
@@ -625,7 +638,8 @@ print_menu() {
     echo "  10) Exact Minecraft 1.21.8"
     echo "  11) Exact Minecraft 1.21.9"
     echo "  12) Exact Minecraft 1.21.10"
-    echo "  13) All ranges"
+    echo "  13) Exact Minecraft 26.1.2 (validation artifact)"
+    echo "  14) All ranges"
     echo "  q) Cancel"
 }
 
@@ -673,7 +687,10 @@ case "$choice" in
  12 | 1.21.10 | mc1.21.10 | mc1_21_10 | MC1_21_10)
     build_range "mc1_21_10"
     ;;
- 13 | all | ALL | both | BOTH)
+ 13 | 26.1.2 | mc26.1.2 | mc26_1_2 | MC26_1_2)
+    build_range "mc26_1_2"
+    ;;
+ 14 | all | ALL | both | BOTH)
     for range in "${SUPPORTED_RANGES[@]}"; do
         build_range "$range"
     done

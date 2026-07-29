@@ -104,6 +104,18 @@ object AxionKeybindings {
         category,
     )
 
+    val togglePhantom: KeyBinding = KeyBindingCompat.create(
+        "key.${AxionMod.MOD_ID}.toggle_phantom",
+        GLFW.GLFW_KEY_UNKNOWN,
+        category,
+    )
+
+    val toggleNoUpdates: KeyBinding = KeyBindingCompat.create(
+        "key.${AxionMod.MOD_ID}.toggle_no_updates",
+        GLFW.GLFW_KEY_UNKNOWN,
+        category,
+    )
+
     fun register() {
         KeyBindingHelper.registerKeyBinding(selectAxionTool)
         KeyBindingHelper.registerKeyBinding(nextSubtool)
@@ -121,5 +133,7 @@ object AxionKeybindings {
         KeyBindingHelper.registerKeyBinding(redoAction)
         KeyBindingHelper.registerKeyBinding(openConfigScreen)
         KeyBindingHelper.registerKeyBinding(toggleSameBlockMagicSelect)
+        KeyBindingHelper.registerKeyBinding(togglePhantom)
+        KeyBindingHelper.registerKeyBinding(toggleNoUpdates)
     }
 }

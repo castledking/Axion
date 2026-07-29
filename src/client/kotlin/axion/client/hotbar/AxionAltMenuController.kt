@@ -385,7 +385,7 @@ object AxionAltMenuController {
 
     private val CAPABILITY_NAMES = mapOf(
         0 to "Bulldozer", 1 to "Replace Mode", 5 to "Infinite Reach",
-        6 to "Fast Place", 8 to "No Clip",
+        6 to "Fast Place", 8 to "No Clip", 9 to "Phantom",
     )
 
     private fun capabilityEnabled(index: Int): Boolean {
@@ -396,6 +396,7 @@ object AxionAltMenuController {
             5 -> state.infiniteReachEnabled
             6 -> state.fastPlaceEnabled
             8 -> state.noClipEnabled
+            9 -> state.phantomEnabled
             else -> false
         }
     }
@@ -420,6 +421,7 @@ object AxionAltMenuController {
                     5 -> state.copy(infiniteReachEnabled = !state.infiniteReachEnabled)
                     6 -> state.copy(fastPlaceEnabled = !state.fastPlaceEnabled)
                     8 -> state.copy(noClipEnabled = !state.noClipEnabled)
+                    9 -> state.copy(phantomEnabled = !state.phantomEnabled)
                     else -> return true
                 }
                 if (nextState != state) {

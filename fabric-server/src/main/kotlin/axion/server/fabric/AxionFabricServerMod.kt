@@ -64,11 +64,13 @@ class AxionFabricServerMod : DedicatedServerModInitializer {
     }
 
     private val noClipService = AxionFabricNoClipService()
-    private val networking = AxionFabricServerNetworking(LOGGER, noClipService)
+    private val noUpdatesService = AxionFabricNoUpdatesService()
+    private val networking = AxionFabricServerNetworking(LOGGER, noClipService, noUpdatesService)
 
     override fun onInitializeServer() {
         LOGGER.info("Initializing Axion Fabric server support")
         noClipService.initialize()
+        noUpdatesService.initialize()
         networking.initialize()
         ServerLifecycleEvents.SERVER_STARTED.register(ServerLifecycleEvents.ServerStarted { server ->
             if (AxionFabricDevMode.isEnabled(server)) {

@@ -1,6 +1,7 @@
 package axion.client.tool
 
 import axion.client.AxionClientState
+import axion.client.render.MoveSourceRenderState
 import axion.client.selection.SelectionController
 import axion.client.selection.blockPosOrNull
 import axion.client.symmetry.SymmetryAwareOperationDispatcher
@@ -17,6 +18,10 @@ object PlacementToolController {
     private val dispatcher = SymmetryAwareOperationDispatcher()
 
     fun onEndTick(client: MinecraftClient) {
+        if (MoveSourceRenderState.clearIfWorldChanged(client.world)) {
+            reset()
+            return
+        }
         val state = AxionClientState.placementToolState
         if (!isPlacementActive()) {
             if (state !is CloneToolState.Idle) {

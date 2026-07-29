@@ -306,6 +306,7 @@ object VersionCompatImpl : VersionCompat {
         sessionId: String,
         context: AxionWorldRenderContext,
         clipboard: ClipboardBuffer,
+        surfaceClipboard: ClipboardBuffer,
         origins: Collection<BlockPos>,
         color: Int,
         alpha: Int,
@@ -313,7 +314,7 @@ object VersionCompatImpl : VersionCompat {
     ): Boolean {
         if (ShaderPackCompat.shouldDisableDirectGpuPreview()) return false
         val session = ChunkedPreviewLifecycle.acquire(sessionId)
-            session.setFromClipboard(clipboard, origins, scale)
+        session.setFromClipboard(clipboard, surfaceClipboard, origins, scale)
         return session.render(context, color, alpha).handled
     }
 

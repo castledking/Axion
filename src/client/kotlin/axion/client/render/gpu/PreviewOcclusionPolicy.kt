@@ -8,6 +8,22 @@ object PreviewOcclusionPolicy {
         return neighbor == null || !isOpaqueFullCube(neighbor)
     }
 
+    /**
+     * Decides whether a preview neighbor should be reported as air so vanilla
+     * emits the touching face. Identical translucent blocks must remain in the
+     * view: vanilla glass/leaf side-culling then removes their shared face.
+     */
+    inline fun <T> shouldReplaceNeighborWithAir(
+        rendering: T?,
+        neighbor: T?,
+        isSameOcclusionGroup: (T, T) -> Boolean,
+        isOpaqueFullCube: (T) -> Boolean,
+    ): Boolean {
+        if (neighbor == null) return true
+        if (rendering != null && isSameOcclusionGroup(rendering, neighbor)) return false
+        return !isOpaqueFullCube(neighbor)
+    }
+
     fun isDirectNeighbor(
         x: Int,
         y: Int,

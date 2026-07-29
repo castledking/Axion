@@ -302,7 +302,11 @@ tasks.named<ProcessResources>("processClientResources") {
     } else {
         filesMatching("axion.client.mixins.json") {
             filter { line ->
-                if (line.contains("\"GuiMixin\"")) null else line
+                when {
+                    line.contains("\"GameRendererPostOutlineMixin\"") -> null
+                    line.contains("\"GuiMixin\"") -> null
+                    else -> line
+                }
             }
         }
     }
@@ -449,6 +453,767 @@ val verifyXraySelectionRenderingCoverage by tasks.registering {
     }
 }
 
+val verifyPreviewVisualCoverage by tasks.registering {
+    group = "verification"
+    description = "Guards preview topology, transparency, pulse, and two-sided rendering in every compatibility branch."
+
+    doLast {
+        val visualPolicy = file(
+            "src/client/kotlin/axion/client/render/PreviewVisualPolicy.kt",
+        ).readText()
+        check(
+            "const val XRAY_BLOCK_PREVIEWS: Boolean = true" in visualPolicy ||
+                "const val XRAY_BLOCK_PREVIEWS: Boolean = false" in visualPolicy,
+        ) {
+            "XRAY_BLOCK_PREVIEWS must be explicitly true or false"
+        }
+
+        val culledPreviewCompatDirs = setOf(
+            "src/compat-1_21_0_1",
+            "src/compat-1_21_4",
+            "src/compat-1_21_5",
+            "src/compat-1_21_6_8",
+            "src/compat-26_1",
+            "src/compat-26_2",
+        )
+        allPreviewCompatDirs.forEach { compatDir ->
+            val pipelineFile = file(
+                "$compatDir/kotlin/axion/client/render/BlockPreviewPipeline.kt",
+            )
+            val pipelineSource = pipelineFile.readText()
+            val destinationGhostCall = pipelineSource
+                .substringAfter("fun renderDestination(", missingDelimiterValue = "")
+                .substringAfter("GhostBlockPreviewRenderer.render(", missingDelimiterValue = "")
+                .substringBefore("return true", missingDelimiterValue = "")
+            check("clipboard = scene.shellClipboard" in destinationGhostCall) {
+                "Destination preview discards full occupancy before face culling in $pipelineFile"
+            }
+            check("fallbackClipboard = scene.fallbackGhostClipboard" in destinationGhostCall) {
+                "Destination preview does not keep its surface-only emergency fallback in $pipelineFile"
+            }
+
+            val ghostFile = file(
+                "$compatDir/kotlin/axion/client/render/GhostBlockPreviewRenderer.kt",
+            )
+            val ghostSource = ghostFile.readText()
+            val normalizedRemoteIdentity =
+                compatDir == "src/compat-26_1" || compatDir == "src/compat-26_2"
+            val ghostOccupancySource = if (normalizedRemoteIdentity) {
+                "fallbackCells = renderFallbackClipboard.nonAirCells()"
+            } else {
+                "fallbackCells = fallbackClipboard.nonAirCells()"
+            }
+            val chunkedClipboardSource = if (normalizedRemoteIdentity) {
+                "renderClipboard,\n                    renderFallbackClipboard,\n                    origins"
+            } else {
+                "clipboard,\n                    fallbackClipboard,\n                    origins"
+            }
+            listOf(
+                "fallbackClipboard: ClipboardBuffer",
+                ghostOccupancySource,
+                chunkedClipboardSource,
+            ).forEach { requiredSource ->
+                check(requiredSource in ghostSource) {
+                    "Ghost preview loses its separate occupancy/surface inputs in $ghostFile: missing $requiredSource"
+                }
+            }
+
+            val chunkedSessionFile = file(
+                "$compatDir/kotlin/axion/client/render/gpu/ChunkedPreviewSession.kt",
+            )
+            val chunkedSessionSource = chunkedSessionFile.readText()
+            listOf(
+                "surfaceClipboard: ClipboardBuffer",
+                "val surfaceCells = surfaceClipboard.nonAirCells()",
+                "val stateHalo = PreviewStateHalo.retain(occupiedCells, surfaceCells)",
+                "surfaceCells.forEach { cell ->",
+                "stateHalo.forEach { cell ->",
+            ).forEach { requiredSource ->
+                check(requiredSource in chunkedSessionSource) {
+                    "Chunked preview topology is incomplete in $chunkedSessionFile: missing $requiredSource"
+                }
+            }
+            check(
+                "private val occupancy" !in chunkedSessionSource &&
+                    "ClipboardSelectionRenderer.surfaceClipboard" !in chunkedSessionSource
+            ) {
+                "Chunked preview in $chunkedSessionFile duplicates full occupancy or recomputes its supplied surface"
+            }
+
+            if (compatDir == "src/compat-26_1" || compatDir == "src/compat-26_2") {
+                val fallbackCacheFile = file(
+                    "$compatDir/kotlin/axion/client/render/ChunkedPreviewRegion.kt",
+                )
+                val fallbackCacheSource = fallbackCacheFile.readText()
+                listOf(
+                    "val surfaceClipboard: ClipboardBuffer",
+                    "surfaceClipboard = surfaceClipboard",
+                    "val stateHalo = PreviewStateHalo.retain(clipboard.nonAirCells(), surfaceCells)",
+                    "stateHalo.forEach { cell ->",
+                ).forEach { requiredSource ->
+                    check(requiredSource in fallbackCacheSource) {
+                        "26.x CPU fallback retains full interior state maps in $fallbackCacheFile: missing $requiredSource"
+                    }
+                }
+                check("clipboard.nonAirCells().forEach" !in fallbackCacheSource) {
+                    "26.x CPU fallback still expands every interior cell in $fallbackCacheFile"
+                }
+                check("surfaceClipboard = renderFallbackClipboard" in ghostSource) {
+                    "26.x Ghost renderer drops the surface input before its CPU fallback in $ghostFile"
+                }
+
+                val occlusionCompatFile = file(
+                    "$compatDir/kotlin/axion/client/render/gpu/PreviewOcclusionCompat.kt",
+                )
+                val occlusionCompatSource = occlusionCompatFile.readText()
+                listOf(
+                    "getOcclusionShape()",
+                    "Shapes.joinIsNotEmpty(",
+                    "BooleanOp.ONLY_FIRST",
+                ).forEach { requiredSource ->
+                    check(requiredSource in occlusionCompatSource) {
+                        "26.x preview surface culling treats partial occluders as full cubes in " +
+                            "$occlusionCompatFile: missing $requiredSource"
+                    }
+                }
+                val fallbackTessellator = file(
+                    "$compatDir/kotlin/axion/client/render/PreviewBlockTessellator.kt",
+                ).readText()
+                check("PreviewOcclusionPolicy.shouldReplaceNeighborWithAir(" in fallbackTessellator) {
+                    "26.x CPU preview fallback exposes identical translucent neighbors in $compatDir"
+                }
+                check("PreviewOcclusionPolicy.shouldReplaceNeighborWithAir(" in chunkedSessionSource) {
+                    "26.x chunked preview exposes identical translucent neighbors in $compatDir"
+                }
+            } else {
+                val fallbackCacheFile = file(
+                    "$compatDir/kotlin/axion/client/render/AxionPreviewMeshCache.kt",
+                )
+                val fallbackCacheSource = fallbackCacheFile.readText()
+                listOf(
+                    "val surfaceClipboard: ClipboardBuffer",
+                    "maxBlocks / surfaceCells.size.coerceAtLeast(1)",
+                    "val stateHalo = PreviewStateHalo.retain(occupiedCells, cellsToRender)",
+                    "stateHalo.forEach { cell ->",
+                ).forEach { requiredSource ->
+                    check(requiredSource in fallbackCacheSource) {
+                        "Legacy CPU fallback retains full interior state maps in $fallbackCacheFile: missing $requiredSource"
+                    }
+                }
+                check(
+                    "filterSurfaceCells" !in fallbackCacheSource &&
+                        "occupiedCells.forEach { cell ->" !in fallbackCacheSource
+                ) {
+                    "Legacy CPU fallback still recomputes or expands full occupancy in $fallbackCacheFile"
+                }
+
+                val previewShellFile = file(
+                    "$compatDir/kotlin/axion/client/render/PreviewShellBlockRenderer.kt",
+                )
+                val previewShellSource = previewShellFile.readText()
+                check(
+                    "surfaceClipboard: ClipboardBuffer" in previewShellSource &&
+                        "surfaceClipboard = surfaceClipboard" in previewShellSource
+                ) {
+                    "Legacy shell fallback drops its supplied surface in $previewShellFile"
+                }
+                val blockTessellator = file(
+                    "$compatDir/kotlin/axion/client/render/AxionBlockTessellator.kt",
+                ).readText()
+                check(
+                    blockTessellator.split("PreviewOcclusionPolicy.shouldReplaceNeighborWithAir(").size - 1 >= 2
+                ) {
+                    "Legacy preview views expose identical translucent neighbors in $compatDir"
+                }
+            }
+
+            val versionCompatFile = file(
+                "$compatDir/kotlin/axion/client/compat/VersionCompatImpl.kt",
+            )
+            val versionCompatSource = versionCompatFile.readText()
+            check(
+                "surfaceClipboard: ClipboardBuffer" in versionCompatSource &&
+                    "session.setFromClipboard(clipboard, surfaceClipboard, origins" in versionCompatSource
+            ) {
+                "Version bridge drops the preview surface/state-halo input in $versionCompatFile"
+            }
+
+            val placementFile = file(
+                "$compatDir/kotlin/axion/client/render/PlacementPreviewRenderer.kt",
+            )
+            val placementSource = placementFile.readText()
+            check(
+                "detailedMovePreview && destinationSelectionClipboard.nonAirCells().size <=" in placementSource
+            ) {
+                "Placement preview budgets only its surface rather than full occupancy in $placementFile"
+            }
+            val destinationAlphaPolicy = if (compatDir in culledPreviewCompatDirs) {
+                "PreviewVisualPolicy.CULLED_DESTINATION_ALPHA"
+            } else {
+                "PreviewVisualPolicy.DESTINATION_ALPHA"
+            }
+            val moveDestinationAlphaPolicy = if (compatDir in culledPreviewCompatDirs) {
+                "PreviewVisualPolicy.CULLED_DESTINATION_ALPHA"
+            } else {
+                "PreviewVisualPolicy.MOVE_DESTINATION_ALPHA"
+            }
+            val sparseDestinationAlphaPolicy = if (compatDir in culledPreviewCompatDirs) {
+                "PreviewVisualPolicy.CULLED_SPARSE_DESTINATION_ALPHA"
+            } else {
+                "PreviewVisualPolicy.SPARSE_DESTINATION_ALPHA"
+            }
+            val moveSourceAlphaPolicy = if (compatDir in culledPreviewCompatDirs) {
+                "PreviewVisualPolicy.CULLED_MOVE_SOURCE_ALPHA"
+            } else {
+                "PreviewVisualPolicy.MOVE_SOURCE_ALPHA"
+            }
+            listOf(
+                destinationAlphaPolicy,
+                moveDestinationAlphaPolicy,
+                sparseDestinationAlphaPolicy,
+                moveSourceAlphaPolicy,
+            ).forEach { requiredSource ->
+                check(requiredSource in placementSource) {
+                    "Placement preview visual policy differs in $placementFile: missing $requiredSource"
+                }
+            }
+            if (compatDir !in culledPreviewCompatDirs) {
+                check(
+                    "ShaderPackCompat.shouldDisableDirectGpuPreview()" in placementSource &&
+                        "AxionPreviewBlockDrawer.isDisabled()" in placementSource &&
+                        "PreviewVisualPolicy.CULLED_MOVE_SOURCE_ALPHA" in placementSource
+                ) {
+                    "No-cull source glass does not switch to its one-crossing alpha on a culled fallback in $placementFile"
+                }
+            }
+
+            val repeatFile = file(
+                "$compatDir/kotlin/axion/client/render/RepeatPreviewRenderer.kt",
+            )
+            val repeatSource = repeatFile.readText()
+            listOf(
+                "MAX_DESTINATION_OCCUPANCY_CELLS",
+                "private fun isDestinationGhostWithinBudget(",
+                "occupiedCellCount.toLong() * instanceCount.coerceAtLeast(0L)",
+                "renderGhost = renderGhost",
+            ).forEach { requiredSource ->
+                check(requiredSource in repeatSource) {
+                    "Repeat preview occupancy budget is incomplete in $repeatFile: missing $requiredSource"
+                }
+            }
+            val clippedSmearBody = repeatSource
+                .substringAfter("private fun renderClippedSmear(", missingDelimiterValue = "")
+                .substringBefore("private fun renderStandardRepeat(", missingDelimiterValue = "")
+            val clippedSmearBudgetIndex = clippedSmearBody.indexOf(
+                "if (!isDestinationGhostWithinBudget(occupiedCellCount, preview.repeatCount.toLong()))",
+            )
+            val clippedSmearLayoutIndex = clippedSmearBody.indexOf("val layout = clippedSmearLayout(")
+            check(clippedSmearBudgetIndex >= 0 && clippedSmearLayoutIndex > clippedSmearBudgetIndex) {
+                "Clipped SMEAR builds its offset/candidate layout before applying the occupancy budget in $repeatFile"
+            }
+            check("PulsingCuboidRenderer.renderOutlineBox(" in clippedSmearBody) {
+                "Over-budget clipped SMEAR drops its lightweight outline fallback in $repeatFile"
+            }
+            listOf(
+                "val ghostClipboard = ClipboardSelectionRenderer.surfaceClipboard(selectionClipboard)",
+                "clipboard = selectionClipboard",
+                "fallbackClipboard = ghostClipboard",
+            ).forEach { requiredSource ->
+                check(requiredSource in clippedSmearBody) {
+                    "Clipped SMEAR loses its full-occupancy/surface split in $repeatFile: missing $requiredSource"
+                }
+            }
+
+            val repeatSegmentBody = repeatSource
+                .substringAfter("private fun renderRepeatSegment(", missingDelimiterValue = "")
+                .substringBefore("private fun isDestinationGhostWithinBudget(", missingDelimiterValue = "")
+            val standardBudgetIndex = repeatSegmentBody.indexOf(
+                "val renderGhost = isDestinationGhostWithinBudget(",
+            )
+            val surfaceBuildIndex = repeatSegmentBody.indexOf(
+                "ClipboardSelectionRenderer.surfaceClipboard(selectionClipboard)",
+            )
+            val smearOffsetBuildIndex = repeatSegmentBody.indexOf(
+                "RegionRepeatPlacementService.smearOffsets(step, repeatCount)",
+            )
+            val ghostOriginBuildIndex = repeatSegmentBody.indexOf("val baseGhostOrigins =")
+            check(
+                standardBudgetIndex >= 0 &&
+                    surfaceBuildIndex > standardBudgetIndex &&
+                    smearOffsetBuildIndex > standardBudgetIndex &&
+                    ghostOriginBuildIndex > standardBudgetIndex
+            ) {
+                "Standard repeat materializes surfaces, offsets, or origins before applying the occupancy budget in $repeatFile"
+            }
+            check(
+                "!renderGhost -> emptyList()" in repeatSegmentBody &&
+                    "val ghostOrigins = if (!renderGhost)" in repeatSegmentBody
+            ) {
+                "Over-budget standard repeat still constructs destination origin lists in $repeatFile"
+            }
+            listOf(
+                destinationAlphaPolicy,
+                sparseDestinationAlphaPolicy,
+            ).forEach { requiredSource ->
+                check(requiredSource in repeatSource) {
+                    "Repeat preview visual policy differs in $repeatFile: missing $requiredSource"
+                }
+            }
+
+            val pulsingFile = file(
+                "$compatDir/kotlin/axion/client/render/PulsingCuboidRenderer.kt",
+            )
+            val pulsingSource = pulsingFile.readText()
+            val selectionBoxBody = pulsingSource
+                .substringAfter("fun renderSelectionBox(")
+                .substringBefore("fun renderOutlineBox(")
+            check("PreviewVisualPolicy.pulseAlpha(" in selectionBoxBody) {
+                "Placement pulse can disappear at its color crossover in $pulsingFile"
+            }
+            val emitQuadBody = pulsingSource
+                .substringAfter("private fun emitQuad(", missingDelimiterValue = "")
+                .substringBefore("private fun emitTriangles(", missingDelimiterValue = "")
+            val emitTrianglesBody = pulsingSource
+                .substringAfter("private fun emitTriangles(", missingDelimiterValue = "")
+                .substringBefore("private fun emitTriangle(", missingDelimiterValue = "")
+            check("-normalX" !in emitQuadBody && "-normalX" !in emitTrianglesBody) {
+                "Filled boxes unconditionally emit reverse windings and compound opacity in $pulsingFile"
+            }
+            val reverseWindingBody = pulsingSource
+                .substringAfter("if (RenderLayerCompat.requiresReverseWinding(layer)) {", missingDelimiterValue = "")
+                .substringBefore("\n        }\n    }\n\n    private fun emitFace", missingDelimiterValue = "")
+            check(reverseWindingBody.split("emitFace(").size - 1 == 6) {
+                "Cull-enabled filled boxes are not two-sided in $pulsingFile"
+            }
+
+            val selectionStateFile = file(
+                "$compatDir/kotlin/axion/client/render/SelectionStateRenderer.kt",
+            )
+            val idleSelectionBody = selectionStateFile.readText()
+                .substringAfter("SelectionState.Idle -> {", missingDelimiterValue = "")
+                .substringBefore("is SelectionState.FirstCornerSet", missingDelimiterValue = "")
+            listOf(
+                "pendingMagicSelection.region.minCorner()",
+                "pendingMagicSelection.clipboardBuffer",
+                "sparse = true",
+            ).forEach { requiredSource ->
+                check(requiredSource in idleSelectionBody) {
+                    "First Magic Select result is not routed to the renderer in $selectionStateFile: missing $requiredSource"
+                }
+            }
+        }
+
+        val haloSource = file(
+            "src/client/kotlin/axion/client/render/gpu/PreviewStateHalo.kt",
+        ).readText()
+        listOf(
+            "BlockPos.asLong(x - 1, y, z)",
+            "BlockPos.asLong(x + 1, y, z)",
+            "BlockPos.asLong(x, y - 1, z)",
+            "BlockPos.asLong(x, y + 1, z)",
+            "BlockPos.asLong(x, y, z - 1)",
+            "BlockPos.asLong(x, y, z + 1)",
+        ).forEach { requiredNeighbor ->
+            check(requiredNeighbor in haloSource) {
+                "Preview state halo no longer retains every direct surface neighbor: missing $requiredNeighbor"
+            }
+        }
+
+        val topologySource = file(
+            "src/client/kotlin/axion/client/render/PreviewSurfaceTopology.kt",
+        ).readText()
+        check(
+            "retainBoundaryCells(" in topologySource &&
+                "retainBoundaryOffsets(" in topologySource
+        ) {
+            "Translucent source previews have no occupancy-only boundary extractor"
+        }
+
+        listOf(
+            "src/compat-1_21_9_10",
+            "src/compat-1_21_11",
+            "src/compat-26_1",
+            "src/compat-26_2",
+        ).forEach { compatDir ->
+            val versionCompat = file(
+                "$compatDir/kotlin/axion/client/compat/VersionCompatImpl.kt",
+            ).readText()
+            val previewPipeline = versionCompat
+                .substringAfter("fun getPreviewShellPipeline(")
+                .substringBefore("fun playSoundClient(")
+            check(
+                ".withCull(PreviewVisualPolicy.CULL_GHOST_BACK_FACES)" in previewPipeline &&
+                    ".withCull(true)" !in previewPipeline
+            ) {
+                "Ghost shell is view-angle dependent in $compatDir because back faces are culled"
+            }
+        }
+
+        listOf("src/compat-26_1", "src/compat-26_2").forEach { compatDir ->
+            val versionCompatFile = file(
+                "$compatDir/kotlin/axion/client/compat/VersionCompatImpl.kt",
+            )
+            val versionCompat = versionCompatFile.readText()
+            val bufferedLayer = versionCompat
+                .substringAfter("fun getBufferedPreviewShellLayer(", missingDelimiterValue = "")
+                .substringBefore("fun playSoundClient(", missingDelimiterValue = "")
+            listOf(
+                "if (ShaderPackCompat.isShaderPackActive()) return baseLayer",
+                "getPreviewShellPipeline(",
+                ".withTexture(\"Sampler0\", TextureAtlas.LOCATION_BLOCKS, blockAtlasSampler)",
+                ".sortOnUpload()",
+                "RenderLayerCompat.createPipelineLayer(",
+            ).forEach { requiredSource ->
+                check(requiredSource in bufferedLayer) {
+                    "Buffered preview fallback loses its pipeline/atlas contract in $versionCompatFile: " +
+                        "missing $requiredSource"
+                }
+            }
+
+            listOf(
+                "$compatDir/kotlin/axion/client/render/PreviewBlockTessellator.kt",
+                "$compatDir/kotlin/axion/client/render/gpu/ChunkedPreviewSession.kt",
+            ).forEach { fallbackPath ->
+                val fallbackFile = file(fallbackPath)
+                val fallbackSource = fallbackFile.readText()
+                check("VersionCompatImpl.getBufferedPreviewShellLayer(" in fallbackSource) {
+                    "CPU textured fallback bypasses the no-cull preview layer in $fallbackFile"
+                }
+                check(
+                    "getBuffer(RenderLayerCompat.blockTranslucentCull())" !in fallbackSource
+                ) {
+                    "CPU textured fallback still draws through a depth-writing culled layer in $fallbackFile"
+                }
+            }
+
+            val ghostRenderer = file(
+                "$compatDir/kotlin/axion/client/render/GhostBlockPreviewRenderer.kt",
+            ).readText()
+            val neutralConcrete = if (compatDir == "src/compat-26_2") {
+                "Blocks.CONCRETE.lightGray().defaultState"
+            } else {
+                "Blocks.LIGHT_GRAY_CONCRETE.defaultState"
+            }
+            check(
+                "PreviewBlockIdentityPolicy.shouldNormalizeRemoteIdentity(" in ghostRenderer &&
+                    neutralConcrete in ghostRenderer
+            ) {
+                "Paper destination preview in $compatDir can multiply its opacity by stained-glass texture alpha"
+            }
+        }
+
+        val renderLayerCompat = file(
+            "src/client/kotlin/axion/client/render/RenderLayerCompat.kt",
+        ).readText()
+        val pipelineLayerFactory = renderLayerCompat
+            .substringAfter("fun createPipelineLayer(", missingDelimiterValue = "")
+            .substringBefore("private val renderLayerFactoryClasses", missingDelimiterValue = "")
+        listOf(
+            "RenderLayer::class.java.declaredMethods.firstOrNull",
+            "method.parameterCount == 2",
+            "factory.isAccessible = true",
+            "factory.invoke(null, name, renderSetup) as RenderLayer",
+        ).forEach { requiredSource ->
+            check(requiredSource in pipelineLayerFactory) {
+                "Buffered preview relies on Loom-only RenderLayer factory visibility: missing $requiredSource"
+            }
+        }
+
+        val previewFragmentShader = file(
+            "src/main/resources/assets/axion/shaders/core/preview_shell.fsh",
+        ).readText()
+        check(
+            "if (texColor.a < 0.1)" in previewFragmentShader &&
+                "if (color.a < 0.1)" !in previewFragmentShader
+        ) {
+            "Preview shader alpha-cutout must not discard low-alpha CPU fallback vertices"
+        }
+
+        val preview261 = file(
+            "src/compat-26_1/kotlin/axion/client/compat/VersionCompatImpl.kt",
+        ).readText()
+        val depthPolicy261 = preview261
+            .substringAfter("private val previewDepthState =", missingDelimiterValue = "")
+            .substringBefore("private val bufferedPreviewShellLayers", missingDelimiterValue = "")
+        listOf(
+            "if (PreviewVisualPolicy.XRAY_BLOCK_PREVIEWS)",
+            "DepthStencilState(CompareOp.ALWAYS_PASS, false, 0.0f, 0.0f)",
+            "DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, false, -1.0f, -1.0f)",
+        ).forEach { requiredSource ->
+            check(requiredSource in depthPolicy261) {
+                "26.1 preview depth policy is incomplete: missing $requiredSource"
+            }
+        }
+        check(".withDepthStencilState(previewDepthState)" in preview261) {
+            "26.1 preview pipeline bypasses the shared x-ray/scene-depth policy"
+        }
+        val drawer261 = file(
+            "src/compat-26_1/kotlin/axion/client/render/gpu/AxionPreviewBlockDrawer.kt",
+        ).readText()
+        check("_polygonOffset(" !in drawer261 && "_enablePolygonOffset(" !in drawer261) {
+            "26.1 preview visibility must not depend on mutable OpenGL state"
+        }
+
+        val preview262 = file(
+            "src/compat-26_2/kotlin/axion/client/compat/VersionCompatImpl.kt",
+        ).readText()
+        val depthPolicy262 = preview262
+            .substringAfter("private val previewDepthState =", missingDelimiterValue = "")
+            .substringBefore("private val previewShellPipelines", missingDelimiterValue = "")
+        listOf(
+            "if (PreviewVisualPolicy.XRAY_BLOCK_PREVIEWS)",
+            "DepthStencilState(CompareOp.ALWAYS_PASS, false, 0.0f, 0.0f)",
+            "DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL, false, 1.0f, 1.0f)",
+        ).forEach { requiredSource ->
+            check(requiredSource in depthPolicy262) {
+                "26.2 reversed-depth preview policy is incomplete: missing $requiredSource"
+            }
+        }
+        check(".withDepthStencilState(previewDepthState)" in preview262) {
+            "26.2 preview pipeline bypasses the shared x-ray/scene-depth policy"
+        }
+
+        listOf("src/compat-1_21_9_10", "src/compat-1_21_11").forEach { compatDir ->
+            val versionCompat = file(
+                "$compatDir/kotlin/axion/client/compat/VersionCompatImpl.kt",
+            ).readText()
+            val depthPolicy = versionCompat
+                .substringAfter("private val previewDepthTest =", missingDelimiterValue = "")
+                .substringBefore("fun getPreviewShellPipeline", missingDelimiterValue = "")
+            listOf(
+                "if (PreviewVisualPolicy.XRAY_BLOCK_PREVIEWS)",
+                "DepthTestFunction.NO_DEPTH_TEST",
+                "DepthTestFunction.LEQUAL_DEPTH_TEST",
+            ).forEach { requiredSource ->
+                check(requiredSource in depthPolicy) {
+                    "Modern preview depth policy is incomplete in $compatDir: missing $requiredSource"
+                }
+            }
+            check(".withDepthTestFunction(previewDepthTest)" in versionCompat) {
+                "Modern preview pipeline bypasses the shared depth policy in $compatDir"
+            }
+        }
+
+        mapOf(
+            "src/compat-1_21_0_1" to "val layer = RenderLayerCompat.blockTranslucentCull()",
+            "src/compat-1_21_4" to "val layer = RenderLayerCompat.blockTranslucentCull()",
+            "src/compat-1_21_5" to "pass.setPipeline(RenderPipelines.RENDERTYPE_TRANSLUCENT_MOVING_BLOCK)",
+            "src/compat-1_21_6_8" to "return RenderPipelines.RENDERTYPE_TRANSLUCENT_MOVING_BLOCK",
+        ).forEach { (compatDir, requiredDepthRoute) ->
+            val depthRouteSource = if (compatDir == "src/compat-1_21_6_8") {
+                file("$compatDir/kotlin/axion/client/compat/VersionCompatImpl.kt").readText()
+            } else {
+                file("$compatDir/kotlin/axion/client/render/gpu/AxionPreviewBlockDrawer.kt").readText()
+            }
+            check(requiredDepthRoute in depthRouteSource) {
+                "Legacy preview no longer uses its depth-tested vanilla route in $compatDir"
+            }
+        }
+
+        // 26.x draws previews immediately from the world render context,
+        // using the live context pose matrix and the framebuffer depth.
+        listOf("src/compat-26_1", "src/compat-26_2").forEach { compatDir ->
+            val sessionFile = file(
+                "$compatDir/kotlin/axion/client/render/gpu/ChunkedPreviewSession.kt",
+            )
+            val session = sessionFile.readText()
+            listOf(
+                "camera.rotation().conjugate(Quaternionf())",
+                "RenderSystem.getProjectionMatrixBuffer()",
+                "client.framebuffer.depthTextureView",
+            ).forEach { requiredSource ->
+                check(requiredSource in session) {
+                    "26.x preview matrix/depth capture is missing in " +
+                        "$sessionFile: $requiredSource"
+                }
+            }
+
+            val lifecycleFile = file(
+                "$compatDir/kotlin/axion/client/render/gpu/ChunkedPreviewLifecycle.kt",
+            )
+            val lifecycle = lifecycleFile.readText()
+            listOf(
+                "val projection: GpuBufferSlice",
+                "fun enqueuePostWorldDraw(",
+                "fun captureSceneDepthBeforeHand()",
+                "preservedSceneDepth.capture(MinecraftClient.getInstance().framebuffer)",
+                "queuedSceneDepth: GpuTextureView?",
+                "fun flushPostWorldDraws()",
+            ).forEach { requiredSource ->
+                check(requiredSource in lifecycle) {
+                    "26.x post-world preview queue is incomplete in $lifecycleFile: missing $requiredSource"
+                }
+            }
+
+            val drawerFile = file(
+                "$compatDir/kotlin/axion/client/render/gpu/AxionPreviewBlockDrawer.kt",
+            )
+            val drawer = drawerFile.readText()
+            listOf(
+                "val baseMv = Matrix4f(baseModelView)",
+                "pass.setUniform(\"Projection\", projection)",
+                "sceneDepth: GpuTextureView",
+            ).forEach { requiredSource ->
+                check(requiredSource in drawer) {
+                    "26.x post-outline preview loses a captured world uniform in " +
+                        "$drawerFile: missing $requiredSource"
+                }
+            }
+            check("mainTarget.depthTextureView" !in drawer) {
+                "26.x late preview reattaches main depth after vanilla has cleared it in $drawerFile"
+            }
+
+            val preservedDepthFile = file(
+                "$compatDir/kotlin/axion/client/render/gpu/PreservedSceneDepth.kt",
+            )
+            val preservedDepth = preservedDepthFile.readText()
+            listOf(
+                "GpuTexture.USAGE_COPY_DST",
+                "GpuTexture.USAGE_RENDER_ATTACHMENT",
+                "sourceTexture.getWidth(0)",
+                "sourceTexture.getHeight(0)",
+                "copyTextureToTexture(",
+                "textureView?.close()",
+                "texture?.close()",
+            ).forEach { requiredSource ->
+                check(requiredSource in preservedDepth) {
+                    "26.x preserved scene-depth resource is incomplete in " +
+                        "$preservedDepthFile: missing $requiredSource"
+                }
+            }
+
+            val mixinFile = file(
+                "$compatDir/kotlin/axion/mixin/client/GameRendererPostOutlineMixin.kt",
+            )
+            check(mixinFile.isFile) {
+                "26.x has no post-entity-outline preview hook: $mixinFile"
+            }
+            val mixin = mixinFile.readText()
+            listOf(
+                "renderLevel(Lnet/minecraft/client/DeltaTracker;)V",
+                "CommandEncoder;clearDepthTexture(Lcom/mojang/blaze3d/textures/GpuTexture;D)V",
+                "shift = At.Shift.BEFORE",
+                "ChunkedPreviewLifecycle.captureSceneDepthBeforeHand()",
+                "LevelRenderer;doEntityOutline()V",
+                "shift = At.Shift.AFTER",
+                "ChunkedPreviewLifecycle.flushPostWorldDraws()",
+            ).forEach { requiredSource ->
+                check(requiredSource in mixin) {
+                    "26.x post-entity-outline preview hook is incomplete in " +
+                        "$mixinFile: missing $requiredSource"
+                }
+            }
+        }
+        check("\"GameRendererPostOutlineMixin\"" in file("src/client/resources/axion.client.mixins.json").readText()) {
+            "26.x post-entity-outline preview mixin is not enabled"
+        }
+        check(
+            "line.contains(\"\\\"GameRendererPostOutlineMixin\\\"\") -> null" in
+                file("build.gradle.kts").readText()
+        ) {
+            "The 26.x-only post-outline mixin is not filtered out of legacy jars"
+        }
+
+        val normalizedReloadInvalidators = mutableSetOf<String>()
+        listOf("src/compat-26_1", "src/compat-26_2").forEach { compatDir ->
+            val reloadInvalidatorFile = file(
+                "$compatDir/kotlin/axion/client/compat/PreviewResourceReloadInvalidation.kt",
+            )
+            check(reloadInvalidatorFile.isFile) {
+                "26.x preview meshes are not invalidated after resource/model reloads in $compatDir"
+            }
+            val reloadInvalidator = reloadInvalidatorFile.readText()
+            listOf(
+                "ResourceLoader.get(PackType.CLIENT_RESOURCES)",
+                "ResourceManagerReloadListener {",
+                "ChunkedPreviewLifecycle.closeAll()",
+                "AxionPreviewBlockDrawer.resetFailureState()",
+                "resourceLoader.addListenerOrdering(ResourceReloaderKeys.AFTER_VANILLA, listenerId)",
+                "registered.compareAndSet(false, true)",
+            ).forEach { requiredSource ->
+                check(requiredSource in reloadInvalidator) {
+                    "26.x preview resource-reload invalidation is incomplete in " +
+                        "$reloadInvalidatorFile: missing $requiredSource"
+                }
+            }
+            val closeIndex = reloadInvalidator.indexOf("ChunkedPreviewLifecycle.closeAll()")
+            val resetIndex = reloadInvalidator.indexOf("AxionPreviewBlockDrawer.resetFailureState()")
+            check(closeIndex >= 0 && resetIndex > closeIndex) {
+                "26.x resource reload must close stale meshes before re-enabling the GPU drawer in $reloadInvalidatorFile"
+            }
+            normalizedReloadInvalidators += reloadInvalidator
+                .replace(Regex("\\s+"), " ")
+                .trim()
+
+            val versionInitFile = file(
+                "$compatDir/kotlin/axion/client/compat/VersionCompatInit.kt",
+            )
+            check("PreviewResourceReloadInvalidation.register()" in versionInitFile.readText()) {
+                "26.x resource-reload invalidation is never registered in $versionInitFile"
+            }
+        }
+        check(normalizedReloadInvalidators.size == 1) {
+            "26.1 and 26.2 resource-reload invalidation contracts have diverged"
+        }
+    }
+}
+
+val verifyMagicSelectFirstRenderCoverage by tasks.registering {
+    group = "verification"
+    description = "Guards the 26.x small Magic Select outline path from delayed/off-screen rendering."
+
+    doLast {
+        val outlineCompat = file(
+            "src/client/kotlin/axion/client/render/VertexRenderingCompat.kt",
+        ).readText()
+        val coordinateTransform = outlineCompat
+            .substringAfter("fun outlineCoordinate(")
+            .substringBefore("fun drawFilledBox(")
+        check("coordinate + offset" in coordinateTransform && "coordinate - offset" !in coordinateTransform) {
+            "Manual small-selection outlines apply the camera offset with the wrong sign"
+        }
+
+        listOf("src/compat-26_1", "src/compat-26_2").forEach { compatDir ->
+            val selectionRenderer = file(
+                "$compatDir/kotlin/axion/client/render/ClipboardSelectionRenderer.kt",
+            ).readText()
+            check("MAX_SINGLE_SHAPE_UNION_CELLS: Int = 0" in selectionRenderer) {
+                "Small Magic Select outlines in $compatDir still use the version-sensitive merged-shape route"
+            }
+            check("computeBoundaryEdges(clipboard)" in selectionRenderer) {
+                "Magic Select in $compatDir lacks its immediate explicit-boundary outline route"
+            }
+            val boundaryCall = selectionRenderer
+                .substringAfter("is ComponentOutline.BoundaryEdges -> {", missingDelimiterValue = "")
+                .substringBefore("\n                            }", missingDelimiterValue = "")
+            listOf(
+                "cameraX = cameraPos.x",
+                "cameraY = cameraPos.y",
+                "cameraZ = cameraPos.z",
+            ).forEach { requiredCameraArg ->
+                check(requiredCameraArg in boundaryCall) {
+                    "Magic Select boundary call has the wrong camera convention in $compatDir: missing $requiredCameraArg"
+                }
+            }
+            val boundaryRenderer = selectionRenderer
+                .substringAfter("private fun renderBoundaryEdges(")
+                .substringBefore("private fun emitLineVertex(")
+            listOf(
+                "originX + edge.x1 - cameraX",
+                "originY + edge.y1 - cameraY",
+                "originZ + edge.z1 - cameraZ",
+                "originX + edge.x2 - cameraX",
+                "originY + edge.y2 - cameraY",
+                "originZ + edge.z2 - cameraZ",
+            ).forEach { requiredTransform ->
+                check(requiredTransform in boundaryRenderer) {
+                    "Magic Select boundary coordinates are not camera-relative in $compatDir: missing $requiredTransform"
+                }
+            }
+        }
+    }
+}
+
 val verifyFabricServerRangeCompatibility by tasks.registering {
     group = "verification"
     description = "Guards the 1.21.9-1.21.11 Fabric server bundle from 1.21.11-only permission APIs."
@@ -478,6 +1243,83 @@ val verifyMoveSourceReplacementCoverage by tasks.registering {
     doLast {
         val expectedTagFiles = mutableSetOf<File>()
         val normalizedMoveSourceRenderers = mutableSetOf<String>()
+        val moveSourceStateFile = file(
+            "src/client/kotlin/axion/client/render/MoveSourceRenderState.kt",
+        )
+        check(moveSourceStateFile.isFile) {
+            "Move source replacement has no shared selected-block suppression state"
+        }
+        val moveSourceState = moveSourceStateFile.readText()
+        listOf(
+            "PlacementPreviewPolicy.activePreview(state)",
+            "it.mode == PlacementToolMode.MOVE",
+            "preview.sourceClipboardBuffer.nonAirCells()",
+            "cell.absolutePos(sourceOrigin)",
+            "fun shouldSuppress(worldIdentity: Any, pos: BlockPos): Boolean",
+            "current.world === worldIdentity",
+            "MoveSourceRenderInvalidator.invalidate(",
+            "fun clearIfWorldChanged(",
+        ).forEach { requiredSource ->
+            check(requiredSource in moveSourceState) {
+                "Move source suppression state is incomplete: missing $requiredSource"
+            }
+        }
+        check("sourceRegion.minCorner()" in moveSourceState) {
+            "Move source suppression offsets are not anchored to the selected source region"
+        }
+        check(
+            "sourceRegion.minCorner().." !in moveSourceState &&
+                "sourceRegion.maxCorner()" !in moveSourceState
+        ) {
+            "Move source suppression uses the bounding box instead of selected non-air cells"
+        }
+        listOf(
+            "private data class Snapshot(",
+            "val world: ClientWorld",
+            "val positions: LongOpenHashSet",
+            "@Volatile",
+            "private var snapshot: Snapshot? = null",
+            "previous.world === world",
+            "if (current.world === world) return false",
+            "val dirtySections = HashSet<SectionCoordinate>(sections)",
+            "dirtySections += previous.sections",
+            "MoveSourceRenderInvalidator.invalidate(world, dirtySections)",
+        ).forEach { requiredSource ->
+            check(requiredSource in moveSourceState) {
+                "Move source suppression publication/lifecycle is incomplete: missing $requiredSource"
+            }
+        }
+        check(
+            "snapshot?.positions?.add" !in moveSourceState &&
+                "snapshot?.positions?.remove" !in moveSourceState &&
+                "snapshot?.positions?.clear" !in moveSourceState
+        ) {
+            "Published MOVE source positions are mutated after worker-thread publication"
+        }
+        val nextSnapshotBody = moveSourceState
+            .substringAfter("val nextSnapshot = Snapshot(", missingDelimiterValue = "")
+        val publishIndex = nextSnapshotBody.indexOf("snapshot = nextSnapshot")
+        val dirtyUnionIndex = nextSnapshotBody.indexOf("val dirtySections = HashSet<SectionCoordinate>(sections)")
+        val invalidateIndex = nextSnapshotBody.indexOf(
+            "MoveSourceRenderInvalidator.invalidate(world, dirtySections)",
+        )
+        check(
+            publishIndex >= 0 &&
+                dirtyUnionIndex > publishIndex &&
+                invalidateIndex > dirtyUnionIndex
+        ) {
+            "MOVE source snapshot must be atomically published before old/new sections are rebuilt"
+        }
+        val clearBranch = moveSourceState
+            .substringAfter("if (world == null || preview == null) {", missingDelimiterValue = "")
+            .substringBefore("val sourceOrigin =", missingDelimiterValue = "")
+        check(
+            "snapshot = null" in clearBranch &&
+                "world === previous.world" in clearBranch &&
+                "MoveSourceRenderInvalidator.invalidate(world, previous.sections)" in clearBranch
+        ) {
+            "Clearing a MOVE preview does not reveal the old source sections in the same world"
+        }
 
         allPreviewCompatDirs.forEach { compatDir ->
             val placementRenderer = file(
@@ -500,6 +1342,9 @@ val verifyMoveSourceReplacementCoverage by tasks.registering {
                 "PlacementPreviewPolicy.shouldRenderMoveSourceReplacement(preview)",
                 "preview.sourceRegion.minCorner()",
                 "preview.sourceClipboardBuffer",
+                "val sourceSurfaceClipboard = moveSourceSurfaceClipboard(sourceOccupancyClipboard)",
+                "fallbackClipboard = sourceSurfaceClipboard",
+                "MOVE_SOURCE_GHOST_SCALE: Float = 1.0f",
                 lightGrayGlass,
                 "sessionTag = \"move-source-replacement\"",
             ).forEach { requiredSource ->
@@ -520,6 +1365,15 @@ val verifyMoveSourceReplacementCoverage by tasks.registering {
                 .replace("Blocks.STAINED_GLASS.lightGray()", "Blocks.LIGHT_GRAY_STAINED_GLASS")
                 .replace(Regex("\\s+"), " ")
                 .trim()
+            val moveSourceClipboard = placementSource
+                .substringAfter("private fun moveSourceClipboard(")
+            check(
+                "val selectedCells = source.nonAirCells()" in moveSourceClipboard &&
+                    "surfaceClipboard(" !in moveSourceClipboard &&
+                    "PreviewSurfaceTopology.retainBoundaryCells(source.nonAirCells())" in moveSourceClipboard
+            ) {
+                "Move replacement must split full glass occupancy from occupancy-boundary geometry in $placementRenderer"
+            }
 
             val selectionRenderer = file(
                 "$compatDir/kotlin/axion/client/render/ClipboardSelectionRenderer.kt",
@@ -551,29 +1405,117 @@ val verifyMoveSourceReplacementCoverage by tasks.registering {
                 "Chunked preview routing drops overlay scale in $compatDir"
             }
 
+            val suppressionMixin = file(
+                "$compatDir/kotlin/axion/mixin/client/MoveSourceChunkRendererRegionMixin.kt",
+            )
+            check(suppressionMixin.isFile) {
+                "Move source blocks remain in the world chunk mesh for $compatDir"
+            }
+            val suppressionSource = suppressionMixin.readText()
+            listOf(
+                "@Inject(",
+                "method = [\"getBlockState\"]",
+                "method = [\"getFluidState\"]",
+                "method = [\"getBlockEntity\"]",
+                "at = [At(\"HEAD\")]",
+                "cancellable = true",
+                "@Shadow",
+                "@Final",
+                "MoveSourceRenderState.shouldSuppress(",
+                "Blocks.AIR.defaultState",
+                "Blocks.AIR.defaultState.fluidState",
+                "cir.returnValue = null",
+            ).forEach { requiredSource ->
+                check(requiredSource in suppressionSource) {
+                    "Move source chunk suppression is incomplete in $suppressionMixin: missing $requiredSource"
+                }
+            }
+            val regionWorldField = if (compatDir == "src/compat-26_1" || compatDir == "src/compat-26_2") {
+                "private lateinit var level: ClientWorld" to
+                    "MoveSourceRenderState.shouldSuppress(level, pos)"
+            } else {
+                "private lateinit var world: World" to
+                    "MoveSourceRenderState.shouldSuppress(world, pos)"
+            }
+            check(
+                regionWorldField.first in suppressionSource &&
+                    suppressionSource.split(regionWorldField.second).size - 1 == 3
+            ) {
+                "Every MOVE source channel must be scoped to the chunk region's world in $suppressionMixin"
+            }
+
+            val invalidator = file(
+                "$compatDir/kotlin/axion/client/render/MoveSourceRenderInvalidator.kt",
+            )
+            check(invalidator.isFile) {
+                "Move source mask changes do not rebuild affected render sections in $compatDir"
+            }
+            val invalidatorSource = invalidator.readText()
+            val invalidationCall = when (compatDir) {
+                "src/compat-1_21_0_1" ->
+                    "world.scheduleBlockRenders(section.x, section.y, section.z)"
+                "src/compat-26_1", "src/compat-26_2" ->
+                    "world.setSectionDirtyWithNeighbors(section.x, section.y, section.z)"
+                else ->
+                    "world.scheduleChunkRenders("
+            }
+            check(invalidationCall in invalidatorSource) {
+                "Move source mask changes use the wrong section invalidation API in $invalidator"
+            }
+            if (
+                compatDir != "src/compat-1_21_0_1" &&
+                compatDir != "src/compat-26_1" &&
+                compatDir != "src/compat-26_2"
+            ) {
+                listOf(
+                    "section.x - 1",
+                    "section.y - 1",
+                    "section.z - 1",
+                    "section.x + 1",
+                    "section.y + 1",
+                    "section.z + 1",
+                ).forEach { requiredNeighbor ->
+                    check(requiredNeighbor in invalidatorSource) {
+                        "MOVE source invalidation misses neighbor render sections in " +
+                            "$invalidator: missing $requiredNeighbor"
+                    }
+                }
+            }
+
             if (compatDir == "src/compat-26_1") {
                 val previewDrawer = file(
                     "$compatDir/kotlin/axion/client/render/gpu/AxionPreviewBlockDrawer.kt",
                 ).readText()
-                check("_polygonOffset(-1.0f, -1.0f)" in previewDrawer) {
-                    "26.1 Move source replacement lacks a GPU depth bias"
+                val previewPipeline = file(
+                    "$compatDir/kotlin/axion/client/compat/VersionCompatImpl.kt",
+                ).readText()
+                check(
+                    "DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, false, -1.0f, -1.0f)" in previewPipeline &&
+                        ".withDepthStencilState(previewDepthState)" in previewPipeline
+                ) {
+                    "26.1 Move source replacement bypasses the scene-depth policy"
+                }
+                check("_polygonOffset(" !in previewDrawer && "com.mojang.blaze3d.opengl" !in previewDrawer) {
+                    "26.1 Move source replacement still relies on mutable OpenGL depth state"
                 }
             } else if (compatDir == "src/compat-26_2") {
-                // 26.2 makes the render backend switchable and defaults to
-                // Vulkan, so the bias cannot ride global GL state any more — it
-                // belongs to the pipeline's DepthStencilState. The reversed
-                // depth buffer also flips its sign, which no test can catch.
+                // Source masking removes the original terrain cells; the
+                // replacement glass still reads preserved scene depth so real
+                // foreground terrain hides it.
                 val previewDrawer = file(
                     "$compatDir/kotlin/axion/client/render/gpu/AxionPreviewBlockDrawer.kt",
                 ).readText()
                 check("com.mojang.blaze3d.opengl" !in previewDrawer && "_polygonOffset(" !in previewDrawer) {
-                    "26.2 Move source replacement still biases depth through raw OpenGL"
+                    "26.2 Move source replacement still controls depth through raw OpenGL"
                 }
                 val previewPipeline = file(
                     "$compatDir/kotlin/axion/client/compat/VersionCompatImpl.kt",
                 ).readText()
-                check("PREVIEW_DEPTH_BIAS" in previewPipeline) {
-                    "26.2 Move source replacement lacks a pipeline-borne GPU depth bias"
+                check(
+                    "DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL, false, 1.0f, 1.0f)" in previewPipeline &&
+                        ".withDepthStencilState(previewDepthState)" in previewPipeline
+                ) {
+                    "26.2 Move source replacement bypasses the reversed scene-depth policy"
                 }
             } else {
                 val chunkedSession = file(
@@ -616,6 +1558,90 @@ val verifyMoveSourceReplacementCoverage by tasks.registering {
         ).forEach { requiredSource ->
             check(requiredSource in magicSelectionScrollBranch) {
                 "Magic Select no longer forwards $requiredSource into the post-scroll placement preview"
+            }
+        }
+
+        val clientState = file(
+            "src/client/kotlin/axion/client/AxionClientState.kt",
+        ).readText()
+        val placementStateUpdate = clientState
+            .substringAfter("fun updatePlacementToolState(")
+            .substringBefore("fun updateEraseToolState(")
+        check("MoveSourceRenderState.synchronize(state)" in placementStateUpdate) {
+            "MOVE source suppression does not follow every placement preview lifecycle transition"
+        }
+
+        val placementControllerTick = placementController
+            .substringAfter("fun onEndTick(")
+            .substringBefore("fun currentPreview(")
+        check("MoveSourceRenderState.clearIfWorldChanged(client.world)" in placementControllerTick) {
+            "MOVE source suppression can leak across client-world changes"
+        }
+
+        val clientBootstrap = file(
+            "src/client/kotlin/axion/client/AxionClientBootstrap.kt",
+        ).readText()
+        check(
+            "CLIENT_STOPPING.register { MoveSourceRenderState.clear() }" in clientBootstrap &&
+                "MoveSourceRenderState.clear()" in clientBootstrap
+                    .substringAfter("VersionCompatImpl.onPlayDisconnect {")
+                    .substringBefore("logger.info(")
+        ) {
+            "MOVE source suppression is not cleared on client stop and disconnect"
+        }
+
+        listOf(
+            "src/client/resources/axion.client.mixins.json",
+            "src/client/resources/axion.client.mixins-1.21.5.json",
+        ).forEach { mixinConfigPath ->
+            check("\"MoveSourceChunkRendererRegionMixin\"" in file(mixinConfigPath).readText()) {
+                "MOVE source chunk suppression mixin is not enabled in $mixinConfigPath"
+            }
+        }
+
+        val disconnectHandler = file(
+            "src/client/kotlin/axion/client/AxionClientBootstrap.kt",
+        ).readText()
+            .substringAfter("VersionCompatImpl.onPlayDisconnect")
+            .substringBefore("Saved hotbar flush handlers registered")
+        check(
+            "PlacementToolController.reset()" in disconnectHandler &&
+                "MoveSourceRenderState.clear()" in disconnectHandler &&
+                "ClientThreadCleanupScheduler.schedule(" in disconnectHandler
+        ) {
+            "Disconnect teardown must run on the client thread and clear both the MOVE preview state and its render mask"
+        }
+        check(
+            disconnectHandler.indexOf("MoveSourceRenderState.clear()") <
+                disconnectHandler.indexOf("PlacementToolController.reset()")
+        ) {
+            "Disconnect teardown must clear the old-world MOVE mask before reset can schedule chunk rebuilds"
+        }
+
+        listOf(
+            "src/compat-1_21_0_1",
+            "src/compat-1_21_4",
+            "src/compat-1_21_5",
+            "src/compat-1_21_6_8",
+            "src/compat-1_21_9_10",
+            "src/compat-1_21_11",
+            "src/compat-26_1",
+            "src/compat-26_2",
+        ).forEach { compatDir ->
+            val connection = file(
+                "$compatDir/kotlin/axion/client/network/AxionServerConnection.kt",
+            ).readText()
+            val disconnect = connection
+                .substringAfter("VersionCompatImpl.onPlayDisconnect")
+                .substringBefore("fun state()")
+            val scheduledCleanup = disconnect
+                .substringAfter("ClientThreadCleanupScheduler.schedule(", missingDelimiterValue = "")
+            check(
+                scheduledCleanup.isNotEmpty() &&
+                    "enqueueOnClientThread = { task -> VersionCompatImpl.runOnRenderThread(client, task) }" in scheduledCleanup &&
+                    "AxionPreviewBufferCache.invalidate()" in scheduledCleanup
+            ) {
+                "Preview caches can be destroyed off the render context in $compatDir"
             }
         }
     }
@@ -690,6 +1716,45 @@ val verifyGpuPreviewCoverage by tasks.registering {
             check("RenderLayerCompat.translucentMovingBlock()" !in drawer) {
                 "Minecraft $minecraftVersion GPU previews regressed to the invisible moving-block pipeline"
             }
+            check("check(drawList.size == 1)" in drawer) {
+                "Minecraft $minecraftVersion can submit independently sorted translucent section meshes"
+            }
+
+            val chunkedSession = file(
+                "$gpuPreviewCompatDir/kotlin/axion/client/render/gpu/ChunkedPreviewSession.kt",
+            ).readText()
+            listOf(
+                "PreviewTranslucencySortPolicy.effectiveCamera(",
+                "PreviewTranslucencySortPolicy.globalMeshPlan(",
+                "buildGlobalBuffer(meshPlan.anchor",
+                "builtBuffer.sortQuads(",
+                "VertexSorting.byDistance(sortX, sortY, sortZ)",
+                "resortBuffers(effectiveCamera)",
+                "chunkBuffers.put(anchorKey, replacement)",
+                "chunkBuffers.size == meshPlan.batchCount",
+                "builtBuffer.close()",
+                "builtSection.allocator.close()",
+            ).forEach { requiredSource ->
+                check(requiredSource in chunkedSession) {
+                    "Minecraft $minecraftVersion preview mesh loses global translucency sorting or allocator ownership: " +
+                        "missing $requiredSource"
+                }
+            }
+
+            val previewBuffer = file(
+                "$gpuPreviewCompatDir/kotlin/axion/client/render/AxionPreviewBuffer.kt",
+            ).readText()
+            listOf(
+                "MeshData.SortState?",
+                "buildSortedIndexBuffer(",
+                "PreviewTranslucencySortPolicy.shouldResort(",
+                "sortedIndices.close()",
+                "allocator.close()",
+            ).forEach { requiredSource ->
+                check(requiredSource in previewBuffer) {
+                    "Minecraft $minecraftVersion preview index buffers cannot be safely re-sorted: missing $requiredSource"
+                }
+            }
             // 26.1 bundled the transform/projection uniforms into the private
             // MATRICES_PROJECTION_SNIPPET; 26.2 declares them as a shared
             // BindGroupLayout instead.
@@ -701,22 +1766,19 @@ val verifyGpuPreviewCoverage by tasks.registering {
             check(previewUniforms in versionCompat) {
                 "Minecraft $minecraftVersion preview pipeline is missing transform/projection uniforms"
             }
-            // The invariant is writeDepth = false. 26.2 reversed the depth
-            // buffer, so the accompanying compare op flips with it — asserting
-            // 26.1's spelling there would defend the wrong value.
-            val previewDepthTest = if (rangeMc262x) {
-                "CompareOp.GREATER_THAN_OR_EQUAL,\n                        false,"
+            // Textured previews read scene depth but never write it. 26.2 uses
+            // reversed Z, so the accepted comparison and bias direction flip.
+            val expectedDepthState = if (rangeMc262x) {
+                "DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL, false, 1.0f, 1.0f)"
             } else {
-                "DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, false)"
+                "DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, false, -1.0f, -1.0f)"
             }
-            check(previewDepthTest in versionCompat) {
-                "Minecraft $minecraftVersion preview pipeline can write depth over later world rendering"
-            }
-            if (rangeMc262x) {
-                check("CompareOp.LESS_THAN_OR_EQUAL" !in versionCompat) {
-                    "Minecraft $minecraftVersion has a reversed depth buffer; " +
-                        "LESS_THAN_OR_EQUAL hides the preview behind world geometry"
-                }
+            check(
+                "if (PreviewVisualPolicy.XRAY_BLOCK_PREVIEWS)" in versionCompat &&
+                    expectedDepthState in versionCompat &&
+                    ".withDepthStencilState(previewDepthState)" in versionCompat
+            ) {
+                "Minecraft $minecraftVersion preview pipeline bypasses scene-depth policy"
             }
 
             val renderLayerCompat = file(
@@ -747,6 +1809,8 @@ tasks.named("check") {
     dependsOn(verifyFabricServerRangeCompatibility)
     dependsOn(verifyMoveSourceReplacementCoverage)
     dependsOn(verifyXraySelectionRenderingCoverage)
+    dependsOn(verifyPreviewVisualCoverage)
+    dependsOn(verifyMagicSelectFirstRenderCoverage)
 }
 
 // Range-style filename, e.g. "mc1.21.9-1.21.11"

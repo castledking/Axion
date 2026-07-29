@@ -52,6 +52,11 @@ object AxionProtocolCodec {
                     data.writeByte(7)
                     data.writeUTF(message.gameMode.name)
                 }
+
+                is NoUpdatesStateRequest -> {
+                    data.writeByte(8)
+                    data.writeBoolean(message.armed)
+                }
             }
         }
         return output.toByteArray()
@@ -104,6 +109,10 @@ object AxionProtocolCodec {
 
                 7 -> GameModeChangeRequest(
                     gameMode = AxionGameMode.valueOf(data.readUTF()),
+                )
+
+                8 -> NoUpdatesStateRequest(
+                    armed = data.readBoolean(),
                 )
 
                 else -> null

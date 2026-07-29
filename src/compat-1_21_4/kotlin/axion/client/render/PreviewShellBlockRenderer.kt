@@ -18,6 +18,7 @@ object PreviewShellBlockRenderer {
         context: AxionWorldRenderContext,
         clipboard: ClipboardBuffer,
         origins: Collection<BlockPos>,
+        surfaceClipboard: ClipboardBuffer = ClipboardSelectionRenderer.surfaceClipboard(clipboard),
         color: Int,
         alpha: Int,
         scale: Float = 1.0f,
@@ -36,6 +37,7 @@ object PreviewShellBlockRenderer {
         val cachedMesh = AxionPreviewMeshCache.getOrBuild(
             clipboard = clipboard,
             origins = origins,
+            surfaceClipboard = surfaceClipboard,
             color = color,
             alpha = alpha,
             scale = scale,

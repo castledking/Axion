@@ -12,6 +12,7 @@ import axion.protocol.ClientHello
 import axion.protocol.FlightSpeedRequest
 import axion.protocol.GameModeChangeRequest
 import axion.protocol.NoClipStateRequest
+import axion.protocol.NoUpdatesStateRequest
 import axion.protocol.OperationBatchRequest
 import axion.protocol.OperationBatchResult
 import axion.protocol.RedoRequest
@@ -30,6 +31,7 @@ import org.slf4j.Logger
 class AxionFabricServerNetworking(
     private val logger: Logger,
     private val noClipService: AxionFabricNoClipService,
+    private val noUpdatesService: AxionFabricNoUpdatesService,
 ) {
     private var nextTransferId: Long = 1L
     private val history = AxionFabricServerHistory()
@@ -46,6 +48,7 @@ class AxionFabricServerNetworking(
                 when (decoded) {
                     is ClientHello -> handleHello(context.player(), decoded)
                     is NoClipStateRequest -> noClipService.setArmed(context.player(), decoded.armed)
+                    is NoUpdatesStateRequest -> noUpdatesService.setArmed(context.player(), decoded.armed)
                     is FlightSpeedRequest -> handleFlightSpeed(context.player(), decoded)
                     is GameModeChangeRequest -> handleGameModeChange(context.server(), context.player(), decoded)
                     is OperationBatchRequest -> handleOperationBatch(context.player(), decoded)
@@ -57,11 +60,13 @@ class AxionFabricServerNetworking(
 
         ServerPlayConnectionEvents.DISCONNECT.register(ServerPlayConnectionEvents.Disconnect { handler, _ ->
             noClipService.clear(handler.player)
+            noUpdatesService.clear(handler.player)
         })
     }
 
     fun stop(server: MinecraftServer) {
         noClipService.stop(server)
+        noUpdatesService.stop(server)
     }
 
     private fun decodeClientMessage(message: ByteArray): AxionClientMessage? {

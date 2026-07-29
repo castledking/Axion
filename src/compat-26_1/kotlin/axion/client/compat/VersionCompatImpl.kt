@@ -1,6 +1,8 @@
 package axion.client.compat
 
 import axion.client.render.AxionWorldRenderContext
+import axion.client.render.PreviewVisualPolicy
+import axion.client.render.RenderLayerCompat
 import axion.client.render.ShaderPackCompat
 import axion.client.render.gpu.ChunkedPreviewLifecycle
 import axion.client.render.gpu.SectionDrawEntry
@@ -13,6 +15,8 @@ import com.mojang.blaze3d.pipeline.RenderPipeline
 import com.mojang.blaze3d.platform.CompareOp
 import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.systems.RenderPass
+import com.mojang.blaze3d.textures.AddressMode
+import com.mojang.blaze3d.textures.FilterMode
 import com.mojang.blaze3d.textures.GpuTextureView
 import com.mojang.blaze3d.vertex.VertexFormat
 import net.minecraft.block.Block
@@ -56,6 +60,7 @@ import net.minecraft.util.Identifier
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Vec3d
 import net.minecraft.client.renderer.texture.TextureAtlas
+import net.minecraft.client.renderer.rendertype.RenderSetup
 import net.minecraft.util.ProblemReporter
 import net.minecraft.world.entity.EntityProcessor
 import net.minecraft.world.level.storage.TagValueInput
@@ -130,6 +135,7 @@ object VersionCompatImpl : VersionCompat {
         sessionId: String,
         context: AxionWorldRenderContext,
         clipboard: ClipboardBuffer,
+        surfaceClipboard: ClipboardBuffer,
         origins: Collection<BlockPos>,
         color: Int,
         alpha: Int,
@@ -137,7 +143,7 @@ object VersionCompatImpl : VersionCompat {
     ): Boolean {
         if (ShaderPackCompat.shouldDisableDirectGpuPreview()) return false
         val session = ChunkedPreviewLifecycle.acquire(sessionId)
-        session.setFromClipboard(clipboard, origins)
+        session.setFromClipboard(clipboard, surfaceClipboard, origins)
         return session.render(context, color, alpha).handled
     }
 
@@ -208,6 +214,23 @@ object VersionCompatImpl : VersionCompat {
     }
 
     private val previewShellPipelines = ConcurrentHashMap<net.minecraft.client.render.DrawMode, RenderPipeline>()
+    private val previewDepthState = if (PreviewVisualPolicy.XRAY_BLOCK_PREVIEWS) {
+        DepthStencilState(CompareOp.ALWAYS_PASS, false, 0.0f, 0.0f)
+    } else {
+        // Same camera-facing offset as the old GL polygon offset, expressed in
+        // the pipeline so OpenGL and every future backend agree.
+        DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, false, -1.0f, -1.0f)
+    }
+    private val bufferedPreviewShellLayers = ConcurrentHashMap<RenderLayer, RenderLayer>()
+    private val blockAtlasSampler = java.util.function.Supplier {
+        RenderSystem.getSamplerCache().getSampler(
+            AddressMode.CLAMP_TO_EDGE,
+            AddressMode.CLAMP_TO_EDGE,
+            FilterMode.LINEAR,
+            FilterMode.NEAREST,
+            true,
+        )
+    }
 
     fun getPreviewShellPipeline(
         vertexFormat: VertexFormat,
@@ -220,10 +243,38 @@ object VersionCompatImpl : VersionCompat {
                 .withFragmentShader(Identifier.fromNamespaceAndPath("axion", "core/preview_shell"))
                 .withSampler("Sampler0")
                 .withColorTargetState(ColorTargetState(BlendFunction.TRANSLUCENT))
-                .withDepthStencilState(DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, false))
-                .withCull(true)
+                // Read scene depth so foreground terrain hides the translucent
+                // preview. Depth writes remain off so the preview never hides
+                // later world/UI rendering. XRAY_BLOCK_PREVIEWS is the explicit
+                // opt-in escape hatch for the old through-wall behavior.
+                .withDepthStencilState(previewDepthState)
+                .withCull(PreviewVisualPolicy.CULL_GHOST_BACK_FACES)
                 .withVertexFormat(vertexFormat, drawMode)
                 .build()
+        }
+    }
+
+    /**
+     * Buffered counterpart to the direct preview pipeline.
+     *
+     * CPU fallback tessellation still needs a RenderLayer so Minecraft can batch
+     * and submit its vertices. Wrapping the existing preview pipeline keeps the
+     * same no-cull/depth-policy/no-depth-write contract while RenderSetup supplies
+     * the block atlas and vanilla's translucent upload sorting.
+     */
+    fun getBufferedPreviewShellLayer(baseLayer: RenderLayer): RenderLayer {
+        // Iris only maps vanilla RenderLayer instances to a shader-pack
+        // program. Preserve the known-good vanilla fallback while a pack is
+        // active; the custom layer is for Minecraft's normal renderer.
+        if (ShaderPackCompat.isShaderPackActive()) return baseLayer
+        return bufferedPreviewShellLayers.computeIfAbsent(baseLayer) { layer ->
+            val setup = RenderSetup.builder(
+                getPreviewShellPipeline(layer.format(), layer.mode()),
+            )
+                .withTexture("Sampler0", TextureAtlas.LOCATION_BLOCKS, blockAtlasSampler)
+                .sortOnUpload()
+                .createRenderSetup()
+            RenderLayerCompat.createPipelineLayer("axion_preview_shell_cpu", setup)
         }
     }
 

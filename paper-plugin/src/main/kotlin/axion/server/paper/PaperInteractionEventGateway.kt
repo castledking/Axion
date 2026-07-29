@@ -7,6 +7,8 @@ import axion.protocol.IntVector3
 import net.minecraft.core.BlockPos
 import org.bukkit.Bukkit
 import org.bukkit.World
+import org.bukkit.craftbukkit.CraftWorld
+import org.bukkit.craftbukkit.block.data.CraftBlockData
 import org.bukkit.entity.Player
 import org.bukkit.event.Event
 import org.bukkit.event.block.BlockBreakEvent
@@ -20,6 +22,7 @@ import org.bukkit.inventory.EquipmentSlot
  */
 internal class PaperInteractionEventGateway(
     private val callEvent: (Event) -> Unit = { event -> Bukkit.getPluginManager().callEvent(event) },
+    private val noUpdatesService: AxionNoUpdatesService = AxionNoUpdatesService(),
 ) {
     fun applyClear(
         player: Player,
@@ -106,7 +109,11 @@ internal class PaperInteractionEventGateway(
             }
         }
 
-        applyTarget()
+        if (noUpdatesService.isArmed(player)) {
+            nmsWrite(world, pos, targetState)
+        } else {
+            applyTarget()
+        }
 
         if (PaperInteractionEventKind.PLACE in eventKinds) {
             // The remote protocol identifies the destination but not the clicked support face.
@@ -126,6 +133,13 @@ internal class PaperInteractionEventGateway(
                 deny("Block placement was denied by a server plugin", pos)
             }
         }
+    }
+
+    private fun nmsWrite(world: World, pos: IntVector3, targetState: String) {
+        val level = (world as CraftWorld).handle
+        val blockPos = BlockPos(pos.x, pos.y, pos.z)
+        val nmsState = (Bukkit.createBlockData(targetState) as CraftBlockData).state
+        level.setBlock(blockPos, nmsState, 62)
     }
 
     private fun deny(message: String, pos: IntVector3): Nothing {

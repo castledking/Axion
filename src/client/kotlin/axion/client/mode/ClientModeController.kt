@@ -623,6 +623,14 @@ object ClientModeController {
         while (AxionKeybindings.toggleFastPlace.wasPressed()) {
             toggleFastPlace(client)
         }
+
+        while (AxionKeybindings.togglePhantom.wasPressed()) {
+            togglePhantom(client)
+        }
+
+        while (AxionKeybindings.toggleNoUpdates.wasPressed()) {
+            toggleNoUpdates(client)
+        }
     }
 
     fun shouldSuppressPrimary(client: MinecraftClient): Boolean {
@@ -912,6 +920,23 @@ object ClientModeController {
         )
         AxionClientState.updateGlobalModes(nextState)
         showToast(client, "Fast Place", nextState.fastPlaceEnabled)
+    }
+
+    private fun togglePhantom(client: MinecraftClient) {
+        val nextState = AxionClientState.globalModeState.copy(
+            phantomEnabled = !AxionClientState.globalModeState.phantomEnabled,
+        )
+        AxionClientState.updateGlobalModes(nextState)
+        showToast(client, "Phantom", nextState.phantomEnabled)
+    }
+
+    private fun toggleNoUpdates(client: MinecraftClient) {
+        val nextState = AxionClientState.globalModeState.copy(
+            noUpdatesEnabled = !AxionClientState.globalModeState.noUpdatesEnabled,
+        )
+        AxionClientState.updateGlobalModes(nextState)
+        AxionServerConnection.syncNoUpdatesState(nextState.noUpdatesEnabled)
+        showToast(client, "No Updates", nextState.noUpdatesEnabled)
     }
 
     private fun applyNoClip(client: MinecraftClient) {

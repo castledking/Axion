@@ -145,8 +145,15 @@ object AxionBlockTessellator {
                     renderingPos.x, renderingPos.y, renderingPos.z,
                 )
             ) {
+                val renderingState = statesByPosition[renderingPos.asLong()]
                 val neighborState = statesByPosition[pos.asLong()]
-                if (PreviewOcclusionPolicy.isFaceExposed(neighborState, PreviewOcclusionCompat::isOpaqueFullCube)) {
+                if (PreviewOcclusionPolicy.shouldReplaceNeighborWithAir(
+                        rendering = renderingState,
+                        neighbor = neighborState,
+                        isSameOcclusionGroup = { first, second -> first.block == second.block },
+                        isOpaqueFullCube = PreviewOcclusionCompat::isOpaqueFullCube,
+                    )
+                ) {
                     return airState
                 }
             }
@@ -194,8 +201,15 @@ object AxionBlockTessellator {
                     renderingPos.x, renderingPos.y, renderingPos.z,
                 )
             ) {
+                val renderingState = statesByPosition[renderingPos.asLong()]
                 val neighborState = statesByPosition[pos.asLong()]
-                if (PreviewOcclusionPolicy.isFaceExposed(neighborState, PreviewOcclusionCompat::isOpaqueFullCube)) {
+                if (PreviewOcclusionPolicy.shouldReplaceNeighborWithAir(
+                        rendering = renderingState,
+                        neighbor = neighborState,
+                        isSameOcclusionGroup = { first, second -> first.block == second.block },
+                        isOpaqueFullCube = PreviewOcclusionCompat::isOpaqueFullCube,
+                    )
+                ) {
                     return airState
                 }
             }

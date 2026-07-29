@@ -102,6 +102,14 @@ object RenderLayerCompat {
         fieldNames = emptyList(),
     )
 
+    /**
+     * Vanilla's lightning pipeline culls back faces. Raw cuboid fills need a
+     * reverse winding on that layer to remain visible from either side, while
+     * the no-cull debug/x-ray layers must keep a single winding so alpha is not
+     * blended twice on the same plane.
+     */
+    fun requiresReverseWinding(layer: RenderLayer): Boolean = layer === lightning()
+
     fun xrayQuads(): RenderLayer {
         layerCache["xrayQuads"]?.let { return it }
         return runCatching {
@@ -130,6 +138,23 @@ object RenderLayerCompat {
         fieldNames = emptyList(),
     )
 
+    /**
+     * Translucent quad layer for selection fills and ghost overlays.
+     *
+     * Iris has no shader program for the vanilla `debug_quads` pipeline and, when
+     * a pack is loaded, throws `Missing program minecraft:pipeline/debug_quads`
+     * the moment that layer is drawn -- so the selection silently vanishes under
+     * shaders. `lightning()` uses the `rendertype_lightning` program, which Iris
+     * does override, so it renders under a pack (its depth test is on, so it no
+     * longer shows through terrain, but it is visible -- the priority here).
+     *
+     * Without a pack, `debug_quads` is depth-write-off and shows through terrain,
+     * which is what the x-ray look wants, so keep it.
+     */
+    fun shaderSafeQuads(): RenderLayer {
+        return if (ShaderPackCompat.isShaderPackActive()) lightning() else debugQuads()
+    }
+
     fun debugFilledBox(): RenderLayer = resolve(
         key = "debugFilledBox",
         namedMethodNames = listOf("debugFilledBox", "getDebugFilledBox"),
@@ -153,6 +178,24 @@ object RenderLayerCompat {
         namedMethodNames = listOf("blockTranslucentCull", "getBlockTranslucentCull", "translucentMovingBlock", "getTranslucentMovingBlock"),
         fieldNames = emptyList(),
     )
+
+    /**
+     * Creates a pipeline-backed layer without relying on the source visibility
+     * of RenderLayer.create(String, RenderSetup). Mojang keeps that factory
+     * package-private in the shipped 26.x classes even though Loom widens it in
+     * the development compile classpath.
+     */
+    fun createPipelineLayer(name: String, renderSetup: Any): RenderLayer {
+        val factory = RenderLayer::class.java.declaredMethods.firstOrNull { method ->
+            Modifier.isStatic(method.modifiers) &&
+                RenderLayer::class.java.isAssignableFrom(method.returnType) &&
+                method.parameterCount == 2 &&
+                method.parameterTypes[0] == String::class.java &&
+                method.parameterTypes[1].isInstance(renderSetup)
+        } ?: error("Missing pipeline-backed RenderLayer factory")
+        factory.isAccessible = true
+        return factory.invoke(null, name, renderSetup) as RenderLayer
+    }
 
     private val renderLayerFactoryClasses: List<Class<*>> by lazy {
         buildList {

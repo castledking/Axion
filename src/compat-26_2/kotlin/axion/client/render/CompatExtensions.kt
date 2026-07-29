@@ -9,6 +9,7 @@ import net.minecraft.core.Vec3i
 import net.minecraft.world.level.block.Block
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.phys.shapes.VoxelShape
+import axion.client.render.gpu.PreviewOcclusionCompat
 
 // --- MinecraftClient / Minecraft ---
 val Minecraft.world get() = level
@@ -63,7 +64,7 @@ val net.minecraft.world.entity.Entity.rotationVecClient: net.minecraft.world.phy
 val Block.defaultState: BlockState get() = defaultBlockState()
 
 // --- BlockState ---
-val BlockState.isOpaqueFullCube: Boolean get() = canOcclude()
+val BlockState.isOpaqueFullCube: Boolean get() = PreviewOcclusionCompat.isOpaqueFullCube(this)
 val BlockState.soundGroup get() = soundType
 
 /**

@@ -4,7 +4,10 @@ import com.mojang.blaze3d.buffers.GpuBuffer
 import com.mojang.blaze3d.systems.RenderPass
 import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.vertex.MeshData
+import com.mojang.blaze3d.vertex.ByteBufferBuilder
+import com.mojang.blaze3d.vertex.VertexSorting
 import com.mojang.blaze3d.vertex.VertexFormat
+import axion.client.render.gpu.PreviewTranslucencySortPolicy
 import net.minecraft.client.render.DrawMode
 import java.util.function.Supplier
 
@@ -17,6 +20,10 @@ class AxionPreviewBuffer : AutoCloseable {
     private var drawMode: DrawMode = DrawMode.TRIANGLES
     private var vertexFormat: VertexFormat = RenderLayerCompat.blockTranslucentCull().format()
     private var uploaded: Boolean = false
+    private var quadSortState: MeshData.SortState? = null
+    private var lastSortX: Float = Float.NaN
+    private var lastSortY: Float = Float.NaN
+    private var lastSortZ: Float = Float.NaN
 
     val isUploaded: Boolean get() = uploaded
     val vertexBufferGpu: GpuBuffer? get() = vertexBuffer?.takeUnless { it.isClosed }
@@ -26,7 +33,13 @@ class AxionPreviewBuffer : AutoCloseable {
     val vertexFormatValue: VertexFormat get() = vertexFormat
     val drawModeValue: DrawMode get() = drawMode
 
-    fun upload(meshData: MeshData) {
+    fun upload(
+        meshData: MeshData,
+        sortState: MeshData.SortState?,
+        sortX: Float,
+        sortY: Float,
+        sortZ: Float,
+    ) {
         val params = meshData.drawState()
         val vertexData = meshData.vertexBuffer()
         val indexData = meshData.indexBuffer()
@@ -68,7 +81,60 @@ class AxionPreviewBuffer : AutoCloseable {
         indexCount = params.indexCount()
         drawMode = params.primitiveTopology()
         indexType = params.indexType()
+        quadSortState = sortState
+        lastSortX = sortX
+        lastSortY = sortY
+        lastSortZ = sortZ
         uploaded = true
+    }
+
+    /** Rebuild only the translucent index order; vertex data stays resident. */
+    fun resort(sortX: Float, sortY: Float, sortZ: Float) {
+        val currentSortState = quadSortState ?: return
+        if (!PreviewTranslucencySortPolicy.shouldResort(
+                lastSortX,
+                lastSortY,
+                lastSortZ,
+                sortX,
+                sortY,
+                sortZ,
+            )
+        ) return
+
+        val indexBytes = indexCount.toLong() * indexType.bytes.toLong()
+        require(indexBytes <= Int.MAX_VALUE) {
+            "Preview index buffer exceeds the JVM native-buffer limit: $indexBytes bytes"
+        }
+        val allocator = ByteBufferBuilder(indexBytes.coerceAtLeast(1L).toInt())
+        val sortedIndices = try {
+            currentSortState.buildSortedIndexBuffer(
+                allocator,
+                VertexSorting.byDistance(sortX, sortY, sortZ),
+            )
+        } catch (t: Throwable) {
+            allocator.close()
+            throw t
+        }
+        if (sortedIndices == null) {
+            allocator.close()
+            return
+        }
+        try {
+            val nextIndexBuffer = RenderSystem.getDevice().createBuffer(
+                LABEL_INDEX,
+                GpuBuffer.USAGE_INDEX or GpuBuffer.USAGE_MAP_WRITE or GpuBuffer.USAGE_COPY_DST,
+                sortedIndices.byteBuffer(),
+            )
+            val previousIndexBuffer = indexBuffer
+            indexBuffer = nextIndexBuffer
+            previousIndexBuffer?.close()
+            lastSortX = sortX
+            lastSortY = sortY
+            lastSortZ = sortZ
+        } finally {
+            sortedIndices.close()
+            allocator.close()
+        }
     }
 
     fun drawIndexed(renderPass: RenderPass) {
@@ -115,6 +181,10 @@ class AxionPreviewBuffer : AutoCloseable {
         uploaded = false
         indexCount = 0
         vertexCount = 0
+        quadSortState = null
+        lastSortX = Float.NaN
+        lastSortY = Float.NaN
+        lastSortZ = Float.NaN
     }
 
     companion object {

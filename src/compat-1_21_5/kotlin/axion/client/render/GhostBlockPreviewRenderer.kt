@@ -22,7 +22,7 @@ object GhostBlockPreviewRenderer {
     private const val LOG_INTERVAL_MS: Long = 1000
     private var lastLogTime: Long = 0
 
-    private const val GHOST_ALPHA: Int = 44
+    private const val GHOST_ALPHA: Int = PreviewVisualPolicy.CULLED_DESTINATION_ALPHA
     private const val MAX_GHOST_BLOCKS: Int = 65536
     private const val MAX_TEXTURED_GHOST_BLOCKS: Int = 32768
     private const val DEFAULT_GHOST_COLOR: Int = 0xFFFFFFFF.toInt()
@@ -48,6 +48,7 @@ object GhostBlockPreviewRenderer {
         context: AxionWorldRenderContext,
         clipboard: ClipboardBuffer,
         origins: Collection<BlockPos>,
+        fallbackClipboard: ClipboardBuffer = ClipboardSelectionRenderer.surfaceClipboard(clipboard),
         color: Int = DEFAULT_GHOST_COLOR,
         alpha: Int = GHOST_ALPHA,
         textured: Boolean = false,
@@ -62,7 +63,8 @@ object GhostBlockPreviewRenderer {
         }
 
         val allOccupiedCells = clipboard.nonAirCells()
-        if (allOccupiedCells.isEmpty()) {
+        val fallbackCells = fallbackClipboard.nonAirCells()
+        if (allOccupiedCells.isEmpty() || fallbackCells.isEmpty()) {
             return
         }
 
@@ -84,6 +86,7 @@ object GhostBlockPreviewRenderer {
                     "ghost:$sessionTag",
                     context,
                     clipboard,
+                    fallbackClipboard,
                     origins,
                     color,
                     alpha,
@@ -106,9 +109,9 @@ object GhostBlockPreviewRenderer {
         }
 
         val occupiedCells = if (textured) {
-            downsampleCells(allOccupiedCells, MAX_TEXTURED_GHOST_BLOCKS)
+            downsampleCells(fallbackCells, MAX_TEXTURED_GHOST_BLOCKS)
         } else {
-            allOccupiedCells
+            fallbackCells
         }
         val maxOrigins = maxOriginsFor(occupiedCells.size)
         if (maxOrigins <= 0) {
@@ -120,7 +123,7 @@ object GhostBlockPreviewRenderer {
         }
 
         if (textured) {
-            renderTextured(context, clipboard, boundedOrigins, alpha, scale, color)
+            renderTextured(context, clipboard, fallbackClipboard, boundedOrigins, alpha, scale, color)
             return
         }
 
@@ -128,7 +131,7 @@ object GhostBlockPreviewRenderer {
         val world = client.world ?: return
         val camera = client.gameRenderer.camera ?: return
         val consumers = context.consumers()
-        val fillLayer = RenderLayerCompat.debugQuads()
+        val fillLayer = RenderLayerCompat.shaderSafeQuads()
         val consumer = consumers.getBuffer(fillLayer)
         val cameraPos = CameraAccess.getPos(camera)
         val matrixStack = context.matrices()
@@ -177,7 +180,7 @@ object GhostBlockPreviewRenderer {
         val world = client.world ?: return
         val camera = client.gameRenderer.camera ?: return
         val consumers = context.consumers()
-        val fillLayer = RenderLayerCompat.debugQuads()
+        val fillLayer = RenderLayerCompat.shaderSafeQuads()
         val consumer = consumers.getBuffer(fillLayer)
         val cameraPos = CameraAccess.getPos(camera)
         val matrixStack = context.matrices()
@@ -191,6 +194,7 @@ object GhostBlockPreviewRenderer {
     private fun renderTextured(
         context: AxionWorldRenderContext,
         clipboard: ClipboardBuffer,
+        fallbackClipboard: ClipboardBuffer,
         origins: List<BlockPos>,
         alpha: Int,
         scale: Float,
@@ -211,6 +215,7 @@ object GhostBlockPreviewRenderer {
         val cachedMesh = AxionPreviewMeshCache.getOrBuild(
             clipboard = clipboard,
             origins = origins,
+            surfaceClipboard = fallbackClipboard,
             color = color,
             alpha = alpha,
             scale = scale,
@@ -239,7 +244,7 @@ object GhostBlockPreviewRenderer {
         }
 
         // Final fallback: entity rendering
-        val occupiedCells = clipboard.nonAirCells()
+        val occupiedCells = fallbackClipboard.nonAirCells()
         val consumers = context.consumers()
         val blockRenderManager = client.blockRenderManager
         val alphaConsumers = TintedAlphaVertexConsumerProvider(consumers as VertexConsumerProvider, alphaScale, color)

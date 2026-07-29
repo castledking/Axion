@@ -1,6 +1,7 @@
 package axion.client.compat
 
 import axion.client.render.AxionWorldRenderContext
+import axion.client.render.PreviewVisualPolicy
 import axion.client.render.ShaderPackCompat
 import axion.client.render.gpu.ChunkedPreviewLifecycle
 import axion.client.render.gpu.SectionDrawEntry
@@ -333,6 +334,7 @@ object VersionCompatImpl : VersionCompat {
         sessionId: String,
         context: AxionWorldRenderContext,
         clipboard: ClipboardBuffer,
+        surfaceClipboard: ClipboardBuffer,
         origins: Collection<BlockPos>,
         color: Int,
         alpha: Int,
@@ -341,7 +343,7 @@ object VersionCompatImpl : VersionCompat {
         return try {
             if (ShaderPackCompat.shouldDisableDirectGpuPreview()) return false
             val session = ChunkedPreviewLifecycle.acquire(sessionId)
-            session.setFromClipboard(clipboard, origins, scale)
+            session.setFromClipboard(clipboard, surfaceClipboard, origins, scale)
             session.render(context, color, alpha).handled
         } catch (t: Throwable) {
             logger.warn("[Axion GPU] renderChunkedPreview failed for session={} — falling back to CPU path", sessionId, t)
@@ -653,6 +655,11 @@ object VersionCompatImpl : VersionCompat {
     }
 
     private var loggedPipelineCreation = false
+    private val previewDepthTest = if (PreviewVisualPolicy.XRAY_BLOCK_PREVIEWS) {
+        DepthTestFunction.NO_DEPTH_TEST
+    } else {
+        DepthTestFunction.LEQUAL_DEPTH_TEST
+    }
 
     fun getPreviewShellPipeline(vertexFormat: VertexFormat, drawMode: VertexFormat.DrawMode): RenderPipeline? {
         return try {
@@ -663,9 +670,9 @@ object VersionCompatImpl : VersionCompat {
                     .withFragmentShader(Identifier.of("axion", "core/preview_shell"))
                     .withSampler("Sampler0")
                     .withBlend(BlendFunction.TRANSLUCENT)
-                    .withDepthTestFunction(DepthTestFunction.LEQUAL_DEPTH_TEST)
+                    .withDepthTestFunction(previewDepthTest)
                     .withDepthWrite(false)
-                    .withCull(true)
+                    .withCull(PreviewVisualPolicy.CULL_GHOST_BACK_FACES)
                     .withVertexFormat(vertexFormat, drawMode)
                     .build()
             }
