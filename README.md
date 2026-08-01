@@ -8,7 +8,7 @@ applies and validates those edits on multiplayer servers.
 
 <p align="center">
   <a href="https://github.com/castledking/Axion/actions/workflows/build.yml"><img alt="Build Verification" src="https://github.com/castledking/Axion/actions/workflows/build.yml/badge.svg?branch=main"></a>
-  <a href="https://castled.codes/axion/dl"><img alt="Download Axion" src="https://img.shields.io/badge/Download-Axion-818cf8?style=flat-square"></a>
+  <a href="https://castled.codes/axion/downloads"><img alt="Download Axion" src="https://img.shields.io/badge/Download-Axion-818cf8?style=flat-square"></a>
   <a href="https://github.com/castledking/Axion/wiki"><img alt="Wiki" src="https://img.shields.io/badge/GitHub-Wiki-181717?style=flat-square&logo=github"></a>
   <a href="https://discord.com/invite/pCKdCX6nYr"><img alt="Discord" src="https://img.shields.io/badge/Discord-Community-5865F2?style=flat-square&logo=discord&logoColor=white"></a>
 </p>
