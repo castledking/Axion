@@ -180,7 +180,7 @@ class AxionPolicyService(
             maxExtrudeWrites = getInt(worldSection, "max-extrude-writes", getInt(defaultSection, "max-extrude-writes", 32_768)),
             historyBudget = HistoryBudget(
                 maxEntries = getInt(worldSection, "history.max-entries", getInt(defaultSection, "history.max-entries", 100)),
-                maxBytes = getInt(worldSection, "history.max-bytes", getInt(defaultSection, "history.max-bytes", 64 * 1024 * 1024)),
+                maxBytes = getInt(worldSection, "history.max-bytes", getInt(defaultSection, "history.max-bytes", 256 * 1024 * 1024)),
             ),
             largeEditMultiplier = getInt(worldSection, "large-edit-multiplier", getInt(defaultSection, "large-edit-multiplier", 4))
                 .coerceAtLeast(1),

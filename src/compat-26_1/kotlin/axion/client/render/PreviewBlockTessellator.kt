@@ -26,6 +26,7 @@ object PreviewBlockTessellator {
         region: ChunkedPreviewRegion,
         color: Int,
         alpha: Int,
+        ignoreTextureAlpha: Boolean,
     ): Boolean {
         if (region.surfaceBlocks.isEmpty()) {
             return false
@@ -39,7 +40,10 @@ object PreviewBlockTessellator {
         val cameraPos = CameraAccess.getPos(camera)
         val consumer = TintedAlphaVertexConsumer(
             context.consumers().getBuffer(
-                VersionCompatImpl.getBufferedPreviewShellLayer(RenderLayerCompat.blockTranslucentCull()),
+                VersionCompatImpl.getBufferedPreviewShellLayer(
+                    RenderLayerCompat.blockTranslucentCull(),
+                    ignoreTextureAlpha,
+                ),
             ),
             alpha / 255.0f,
             color,

@@ -13,7 +13,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo
 
 @Mixin(RedstoneOreBlock::class)
 class RedstoneOreBlockMixin {
-    @Inject(method = ["onSteppedOn"], at = [At("HEAD")], cancellable = true)
+    @Inject(method = ["onSteppedOn"], at = [At("HEAD")], cancellable = true, require = 0)
     fun axionPhantomCancelRedstoneOre(world: World, pos: BlockPos, state: BlockState, entity: Entity, ci: CallbackInfo) {
         if (PhantomService.isEnabledFor(entity)) {
             ci.cancel()

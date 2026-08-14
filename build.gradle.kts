@@ -171,6 +171,11 @@ sourceSets.named("client") {
         kotlin.srcDir("$mc26CompatDir/kotlin")
         // InGameHud does not exist in 26.x (HUD is HudElement-based)
         kotlin.exclude("axion/mixin/client/InGameHudMixin*")
+        // onEntityCollision removed in 26.x — replaced by stepOn on Block
+        kotlin.exclude("axion/mixin/client/AbstractPressurePlateBlockMixin*")
+        kotlin.exclude("axion/mixin/client/CobwebBlockMixin*")
+        kotlin.exclude("axion/mixin/client/TripwireBlockMixin*")
+
     } else {
         // 1.21.9+: registry-manager-based serialization, has MouseInput / WorldRenderState
         kotlin.srcDir("src/compat-1_21_11/kotlin")
@@ -289,15 +294,26 @@ tasks.named<ProcessResources>("processClientResources") {
         }
     }
     if (rangeMc26x) {
-        filesMatching("axion.client.mixins.json") {
-            filter { line ->
-                when {
-                    line.contains("\"InGameHudMixin\"") -> null
-                    line.contains("\"WorldRendererFallbackMixin\"") -> null
-                    line.contains("\"ServerEntityMixin\",") -> line.replace("\"ServerEntityMixin\",", "\"ServerEntityMixin\"")
-                    else -> line
-                }
-            }
+        doLast {
+            val mixinConfig = layout.buildDirectory.file(
+                "resources/client/axion.client.mixins.json",
+            ).get().asFile
+            val parsed = groovy.json.JsonSlurper().parse(mixinConfig) as Map<*, *>
+            val normalized = linkedMapOf<String, Any?>()
+            parsed.forEach { (key, value) -> normalized[key.toString()] = value }
+            val excludedMixins = setOf(
+                "InGameHudMixin",
+                "WorldRendererFallbackMixin",
+                "AbstractPressurePlateBlockMixin",
+                "CobwebBlockMixin",
+                "TripwireBlockMixin",
+            )
+            val clientMixins = normalized["client"] as? List<*>
+                ?: throw GradleException("Mixin config has no client array: $mixinConfig")
+            normalized["client"] = clientMixins.filterNot { it in excludedMixins }
+            mixinConfig.writeText(
+                groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(normalized)) + "\n",
+            )
         }
     } else {
         filesMatching("axion.client.mixins.json") {
@@ -342,6 +358,35 @@ val verifyIntegratedNoClipWiring by tasks.registering {
     doLast {
         val clientClasses = layout.buildDirectory.dir("classes/kotlin/client").get().asFile
         val mixinConfig = layout.buildDirectory.file("resources/client/axion.client.mixins.json").get().asFile
+        val parsedMixinConfig = try {
+            groovy.json.JsonSlurper().parse(mixinConfig) as Map<*, *>
+        } catch (exception: Exception) {
+            throw GradleException(
+                "Processed mixin config is invalid for Minecraft $minecraftVersion: $mixinConfig",
+                exception,
+            )
+        }
+        val clientMixins = (parsedMixinConfig["client"] as? List<*>)
+            ?.filterIsInstance<String>()
+            ?: throw GradleException("Processed mixin config has no client array: $mixinConfig")
+        if (rangeMc26x) {
+            check("ServerEntityMixin" in clientMixins && "SodiumMoveSourceLevelSliceMixin" in clientMixins) {
+                "Processed 26.x mixin config dropped a required client mixin: $mixinConfig"
+            }
+            check(
+                clientMixins.none {
+                    it in setOf(
+                        "InGameHudMixin",
+                        "WorldRendererFallbackMixin",
+                        "AbstractPressurePlateBlockMixin",
+                        "CobwebBlockMixin",
+                        "TripwireBlockMixin",
+                    )
+                },
+            ) {
+                "Processed 26.x mixin config retained a legacy-only client mixin: $mixinConfig"
+            }
+        }
         val requiredClasses = listOf(
             "axion/client/compat/NoClipService.class",
             "axion/mixin/client/ServerEntityMixin.class",
@@ -468,15 +513,39 @@ val verifyPreviewVisualCoverage by tasks.registering {
             "XRAY_BLOCK_PREVIEWS must be explicitly true or false"
         }
 
-        val culledPreviewCompatDirs = setOf(
-            "src/compat-1_21_0_1",
-            "src/compat-1_21_4",
-            "src/compat-1_21_5",
-            "src/compat-1_21_6_8",
-            "src/compat-26_1",
-            "src/compat-26_2",
-        )
+        listOf(
+            "src/client/resources/axion.client.mixins.json",
+            "src/client/resources/axion.client.mixins-1.21.5.json",
+        ).forEach { mixinConfigPath ->
+            check("\"PreviewCloudRendererMixin\"" !in file(mixinConfigPath).readText()) {
+                "Cloud rendering must not be cancelled globally by $mixinConfigPath"
+            }
+        }
+
         allPreviewCompatDirs.forEach { compatDir ->
+            val cloudMixin = file(
+                "$compatDir/kotlin/axion/mixin/client/PreviewCloudRendererMixin.kt",
+            )
+            check(!cloudMixin.exists()) {
+                "Cloud rendering is still cancelled globally by $cloudMixin"
+            }
+
+            val versionCompat = file(
+                "$compatDir/kotlin/axion/client/compat/VersionCompatImpl.kt",
+            ).readText()
+            when (compatDir) {
+                "src/compat-1_21_9_10", "src/compat-1_21_11" ->
+                    check(".withDepthWrite(true)" in versionCompat) {
+                        "Preview depth does not mask later cloud pixels in $compatDir"
+                    }
+                "src/compat-26_1", "src/compat-26_2" ->
+                    check(
+                        Regex("DepthStencilState\\(CompareOp\\.[A-Z_]+, true,").containsMatchIn(versionCompat),
+                    ) {
+                        "Preview depth does not mask later cloud pixels in $compatDir"
+                    }
+            }
+
             val pipelineFile = file(
                 "$compatDir/kotlin/axion/client/render/BlockPreviewPipeline.kt",
             )
@@ -647,26 +716,10 @@ val verifyPreviewVisualCoverage by tasks.registering {
             ) {
                 "Placement preview budgets only its surface rather than full occupancy in $placementFile"
             }
-            val destinationAlphaPolicy = if (compatDir in culledPreviewCompatDirs) {
-                "PreviewVisualPolicy.CULLED_DESTINATION_ALPHA"
-            } else {
-                "PreviewVisualPolicy.DESTINATION_ALPHA"
-            }
-            val moveDestinationAlphaPolicy = if (compatDir in culledPreviewCompatDirs) {
-                "PreviewVisualPolicy.CULLED_DESTINATION_ALPHA"
-            } else {
-                "PreviewVisualPolicy.MOVE_DESTINATION_ALPHA"
-            }
-            val sparseDestinationAlphaPolicy = if (compatDir in culledPreviewCompatDirs) {
-                "PreviewVisualPolicy.CULLED_SPARSE_DESTINATION_ALPHA"
-            } else {
-                "PreviewVisualPolicy.SPARSE_DESTINATION_ALPHA"
-            }
-            val moveSourceAlphaPolicy = if (compatDir in culledPreviewCompatDirs) {
-                "PreviewVisualPolicy.CULLED_MOVE_SOURCE_ALPHA"
-            } else {
-                "PreviewVisualPolicy.MOVE_SOURCE_ALPHA"
-            }
+            val destinationAlphaPolicy = "PreviewVisualPolicy.CULLED_DESTINATION_ALPHA"
+            val moveDestinationAlphaPolicy = "PreviewVisualPolicy.CULLED_DESTINATION_ALPHA"
+            val sparseDestinationAlphaPolicy = "PreviewVisualPolicy.CULLED_SPARSE_DESTINATION_ALPHA"
+            val moveSourceAlphaPolicy = "PreviewVisualPolicy.CULLED_MOVE_SOURCE_ALPHA"
             listOf(
                 destinationAlphaPolicy,
                 moveDestinationAlphaPolicy,
@@ -677,16 +730,6 @@ val verifyPreviewVisualCoverage by tasks.registering {
                     "Placement preview visual policy differs in $placementFile: missing $requiredSource"
                 }
             }
-            if (compatDir !in culledPreviewCompatDirs) {
-                check(
-                    "ShaderPackCompat.shouldDisableDirectGpuPreview()" in placementSource &&
-                        "AxionPreviewBlockDrawer.isDisabled()" in placementSource &&
-                        "PreviewVisualPolicy.CULLED_MOVE_SOURCE_ALPHA" in placementSource
-                ) {
-                    "No-cull source glass does not switch to its one-crossing alpha on a culled fallback in $placementFile"
-                }
-            }
-
             val repeatFile = file(
                 "$compatDir/kotlin/axion/client/render/RepeatPreviewRenderer.kt",
             )
@@ -886,19 +929,19 @@ val verifyPreviewVisualCoverage by tasks.registering {
                 }
             }
 
+            // A destination ghost's alpha is solved for an exact number of shell
+            // crossings, so a translucent block's texel alpha must not compound
+            // into it. That used to be enforced by rewriting every cell to
+            // opaque grey concrete on Paper, which cost the player all texture
+            // information; the shell shader now drops texel alpha instead.
             val ghostRenderer = file(
                 "$compatDir/kotlin/axion/client/render/GhostBlockPreviewRenderer.kt",
             ).readText()
-            val neutralConcrete = if (compatDir == "src/compat-26_2") {
-                "Blocks.CONCRETE.lightGray().defaultState"
-            } else {
-                "Blocks.LIGHT_GRAY_CONCRETE.defaultState"
+            check("PreviewVisualPolicy.ignoresTextureAlpha(" in ghostRenderer) {
+                "Destination preview in $compatDir can multiply its opacity by stained-glass texture alpha"
             }
-            check(
-                "PreviewBlockIdentityPolicy.shouldNormalizeRemoteIdentity(" in ghostRenderer &&
-                    neutralConcrete in ghostRenderer
-            ) {
-                "Paper destination preview in $compatDir can multiply its opacity by stained-glass texture alpha"
+            check("PreviewBlockIdentityPolicy.normalize(" !in ghostRenderer) {
+                "Destination preview in $compatDir is back to hiding real block identities behind neutral concrete"
             }
         }
 
@@ -928,6 +971,12 @@ val verifyPreviewVisualCoverage by tasks.registering {
         ) {
             "Preview shader alpha-cutout must not discard low-alpha CPU fallback vertices"
         }
+        check(
+            "#ifdef IGNORE_TEXTURE_ALPHA" in previewFragmentShader &&
+                "color.a = vertexColor.a * ColorModulator.a;" in previewFragmentShader
+        ) {
+            "Preview shader cannot separate a ghost's policy alpha from the sampled texel alpha"
+        }
 
         val preview261 = file(
             "src/compat-26_1/kotlin/axion/client/compat/VersionCompatImpl.kt",
@@ -937,8 +986,8 @@ val verifyPreviewVisualCoverage by tasks.registering {
             .substringBefore("private val bufferedPreviewShellLayers", missingDelimiterValue = "")
         listOf(
             "if (PreviewVisualPolicy.XRAY_BLOCK_PREVIEWS)",
-            "DepthStencilState(CompareOp.ALWAYS_PASS, false, 0.0f, 0.0f)",
-            "DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, false, -1.0f, -1.0f)",
+            "DepthStencilState(CompareOp.ALWAYS_PASS, true, 0.0f, 0.0f)",
+            "DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, true, -1.0f, -1.0f)",
         ).forEach { requiredSource ->
             check(requiredSource in depthPolicy261) {
                 "26.1 preview depth policy is incomplete: missing $requiredSource"
@@ -962,8 +1011,8 @@ val verifyPreviewVisualCoverage by tasks.registering {
             .substringBefore("private val previewShellPipelines", missingDelimiterValue = "")
         listOf(
             "if (PreviewVisualPolicy.XRAY_BLOCK_PREVIEWS)",
-            "DepthStencilState(CompareOp.ALWAYS_PASS, false, 0.0f, 0.0f)",
-            "DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL, false, 1.0f, 1.0f)",
+            "DepthStencilState(CompareOp.ALWAYS_PASS, true, 0.0f, 0.0f)",
+            "DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL, true, 1.0f, 1.0f)",
         ).forEach { requiredSource ->
             check(requiredSource in depthPolicy262) {
                 "26.2 reversed-depth preview policy is incomplete: missing $requiredSource"
@@ -1296,6 +1345,28 @@ val verifyMoveSourceReplacementCoverage by tasks.registering {
         ) {
             "Published MOVE source positions are mutated after worker-thread publication"
         }
+
+        val sodiumMixinFile = file(
+            "src/client/kotlin/axion/mixin/client/SodiumMoveSourceLevelSliceMixin.kt",
+        )
+        check(sodiumMixinFile.isFile) {
+            "Sodium bypasses the vanilla MOVE source suppression mixin"
+        }
+        val sodiumMixin = sodiumMixinFile.readText()
+        listOf(
+            "@Pseudo",
+            "net.caffeinemc.mods.sodium.client.world.LevelSlice",
+            "value = \"getBlockState\"",
+            "args = [Int::class, Int::class, Int::class]",
+            "at = [At(\"HEAD\")]",
+            "cancellable = true",
+            "require = 0",
+            "MoveSourceRenderState.suppressedState(level, x, y, z)",
+        ).forEach { requiredSource ->
+            check(requiredSource in sodiumMixin) {
+                "Sodium MOVE source suppression is incomplete: missing $requiredSource"
+            }
+        }
         val nextSnapshotBody = moveSourceState
             .substringAfter("val nextSnapshot = Snapshot(", missingDelimiterValue = "")
         val publishIndex = nextSnapshotBody.indexOf("snapshot = nextSnapshot")
@@ -1319,6 +1390,20 @@ val verifyMoveSourceReplacementCoverage by tasks.registering {
                 "MoveSourceRenderInvalidator.invalidate(world, previous.sections)" in clearBranch
         ) {
             "Clearing a MOVE preview does not reveal the old source sections in the same world"
+        }
+
+        // The preview shell shader carries no lightmap, so ambient occlusion is
+        // the only thing that can darken a preview — and it is computed against
+        // the full-occupancy neighbour halo, which for the move source is the
+        // replaced volume itself. With AO on, the glass renders as a black slab.
+        val identityPolicy = file(
+            "src/client/kotlin/axion/client/render/PreviewBlockIdentityPolicy.kt",
+        ).readText()
+        check("fun usesAmbientOcclusion(previewId: String)" in identityPolicy) {
+            "Move source glass has no ambient-occlusion policy to keep sky light reading through it"
+        }
+        check("MOVE_SOURCE_SESSION_TAG" in identityPolicy.substringAfter("fun usesAmbientOcclusion(")) {
+            "Ambient-occlusion policy no longer singles out the move-source replacement"
         }
 
         allPreviewCompatDirs.forEach { compatDir ->
@@ -1490,7 +1575,7 @@ val verifyMoveSourceReplacementCoverage by tasks.registering {
                     "$compatDir/kotlin/axion/client/compat/VersionCompatImpl.kt",
                 ).readText()
                 check(
-                    "DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, false, -1.0f, -1.0f)" in previewPipeline &&
+                    "DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, true, -1.0f, -1.0f)" in previewPipeline &&
                         ".withDepthStencilState(previewDepthState)" in previewPipeline
                 ) {
                     "26.1 Move source replacement bypasses the scene-depth policy"
@@ -1512,7 +1597,7 @@ val verifyMoveSourceReplacementCoverage by tasks.registering {
                     "$compatDir/kotlin/axion/client/compat/VersionCompatImpl.kt",
                 ).readText()
                 check(
-                    "DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL, false, 1.0f, 1.0f)" in previewPipeline &&
+                    "DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL, true, 1.0f, 1.0f)" in previewPipeline &&
                         ".withDepthStencilState(previewDepthState)" in previewPipeline
                 ) {
                     "26.2 Move source replacement bypasses the reversed scene-depth policy"
@@ -1594,8 +1679,12 @@ val verifyMoveSourceReplacementCoverage by tasks.registering {
             "src/client/resources/axion.client.mixins.json",
             "src/client/resources/axion.client.mixins-1.21.5.json",
         ).forEach { mixinConfigPath ->
-            check("\"MoveSourceChunkRendererRegionMixin\"" in file(mixinConfigPath).readText()) {
+            val mixinConfig = file(mixinConfigPath).readText()
+            check("\"MoveSourceChunkRendererRegionMixin\"" in mixinConfig) {
                 "MOVE source chunk suppression mixin is not enabled in $mixinConfigPath"
+            }
+            check("\"SodiumMoveSourceLevelSliceMixin\"" in mixinConfig) {
+                "Sodium MOVE source suppression mixin is not enabled in $mixinConfigPath"
             }
         }
 
@@ -1672,7 +1761,6 @@ val verifyGpuPreviewCoverage by tasks.registering {
         check(!disabledRoute.containsMatchIn(versionCompat)) {
             "GPU preview routing is explicitly disabled for Minecraft $minecraftVersion"
         }
-
         val placementRenderer = file(
             "$gpuPreviewCompatDir/kotlin/axion/client/render/PlacementPreviewRenderer.kt",
         ).readText()
@@ -1707,6 +1795,23 @@ val verifyGpuPreviewCoverage by tasks.registering {
         }
 
         if (rangeMc26x) {
+            // AtlasManager keeps two maps: atlasByTexture (keyed by the texture
+            // path) and atlasById. getAtlasOrThrow reads the id map, so passing
+            // TextureAtlas.LOCATION_BLOCKS throws, the preview never binds its
+            // sampler, and the GL backend silently draws against whatever the
+            // slot already held — correct-looking under vanilla, black under any
+            // mod that stops leaving the atlas there. RenderSetup.withTexture
+            // does want the texture path, so only the lookup must use the id.
+            val atlasLookup = versionCompat
+                .substringAfter("fun getBlockAtlasTextureView(", missingDelimiterValue = "")
+                .substringBefore("\n    /**", missingDelimiterValue = "")
+            check("getAtlasOrThrow(AtlasIds.BLOCKS)" in atlasLookup) {
+                "Minecraft $minecraftVersion preview pass resolves the block atlas by texture path, not atlas id"
+            }
+            check(".withTexture(\"Sampler0\", TextureAtlas.LOCATION_BLOCKS" in versionCompat) {
+                "Minecraft $minecraftVersion buffered preview layer must name the atlas texture path, not the atlas id"
+            }
+
             val drawer = file(
                 "$gpuPreviewCompatDir/kotlin/axion/client/render/gpu/AxionPreviewBlockDrawer.kt",
             ).readText()
@@ -1766,12 +1871,14 @@ val verifyGpuPreviewCoverage by tasks.registering {
             check(previewUniforms in versionCompat) {
                 "Minecraft $minecraftVersion preview pipeline is missing transform/projection uniforms"
             }
-            // Textured previews read scene depth but never write it. 26.2 uses
-            // reversed Z, so the accepted comparison and bias direction flip.
+            // Textured previews read and write their surface depth. This keeps
+            // later cloud pixels out of the preview without cancelling clouds
+            // elsewhere. 26.2 uses reversed Z, so the accepted comparison and
+            // bias direction flip.
             val expectedDepthState = if (rangeMc262x) {
-                "DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL, false, 1.0f, 1.0f)"
+                "DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL, true, 1.0f, 1.0f)"
             } else {
-                "DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, false, -1.0f, -1.0f)"
+                "DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, true, -1.0f, -1.0f)"
             }
             check(
                 "if (PreviewVisualPolicy.XRAY_BLOCK_PREVIEWS)" in versionCompat &&
@@ -1803,6 +1910,78 @@ val verifyGpuPreviewCoverage by tasks.registering {
     }
 }
 
+val verifyAuthoritativeHistoryReplay by tasks.registering {
+    group = "verification"
+    description = "Verifies that undo/redo survives world drift and large confirmed edits"
+
+    doLast {
+        listOf(
+            "paper-plugin/src/main/kotlin/axion/server/paper/AxionHistoryActionService.kt",
+            "fabric-server/src/main/kotlin/axion/server/fabric/AxionFabricHistoryActionService.kt",
+        ).forEach { servicePath ->
+            val source = file(servicePath).readText()
+            check("World no longer matches the undo target" !in source) {
+                "Undo still rejects a whole transaction after a recorded cell changes in $servicePath"
+            }
+            check("World no longer matches the redo target" !in source) {
+                "Redo still rejects a whole transaction after a recorded cell changes in $servicePath"
+            }
+            check(
+                !servicePath.startsWith("paper-plugin/") ||
+                    ("validateUndo(" in source && "validateRedo(" in source)
+            ) {
+                "Paper authoritative replay bypasses permission or region checks in $servicePath"
+            }
+            val undoBody = source.substringAfter("fun undo(").substringBefore("fun redo(")
+            check(undoBody.indexOf("history.commitUndo(") > undoBody.indexOf("transaction.changes.asReversed()")) {
+                "Undo consumes its history entry before the recorded world state is restored in $servicePath"
+            }
+            val redoBody = source.substringAfter("fun redo(")
+            check(redoBody.indexOf("history.commitRedo(") > redoBody.indexOf("transaction.changes")) {
+                "Redo consumes its history entry before the recorded world state is restored in $servicePath"
+            }
+        }
+
+        val transport = file(
+            "protocol/src/main/kotlin/axion/protocol/AxionTransportCodec.kt",
+        ).readText()
+        check("MAX_SERIALIZED_BYTES: Int = 256 * 1024 * 1024" in transport) {
+            "Confirm transport limit is not 256 MiB"
+        }
+        check("MAX_CHUNKS: Int =" in transport && "MAX_SERIALIZED_BYTES" in transport.substringAfter("MAX_CHUNKS: Int =")) {
+            "Chunk-count limit does not scale with the serialized confirm limit"
+        }
+        check(
+            "max-bytes: 268435456" in file("paper-plugin/src/main/resources/config.yml").readText() &&
+                "256 * 1024 * 1024" in file(
+                    "paper-plugin/src/main/kotlin/axion/server/paper/AxionPolicyService.kt",
+                ).readText()
+        ) {
+            "Paper's default history budget was not raised to 256 MiB"
+        }
+
+        listOf(
+            "src/client/kotlin/axion/client/history/HistoryManager.kt",
+            "fabric-server/src/main/kotlin/axion/server/fabric/AxionFabricServerHistory.kt",
+        ).forEach { historyPath ->
+            val source = file(historyPath).readText()
+            check("256 * 1024 * 1024" in source) {
+                "History budget was not raised alongside confirmation transport in $historyPath"
+            }
+        }
+        listOf(
+            "src/client/kotlin/axion/client/history/HistoryManager.kt",
+            "paper-plugin/src/main/kotlin/axion/server/paper/AxionServerHistory.kt",
+            "fabric-server/src/main/kotlin/axion/server/fabric/AxionFabricServerHistory.kt",
+        ).forEach { historyPath ->
+            val source = file(historyPath).readText()
+            check("protectedTransactionId" in source || "protectedEntryId" in source) {
+                "Newest oversized edit can still evict itself from undo history in $historyPath"
+            }
+        }
+    }
+}
+
 tasks.named("check") {
     dependsOn(verifyIntegratedNoClipWiring)
     dependsOn(verifyGpuPreviewCoverage)
@@ -1811,6 +1990,7 @@ tasks.named("check") {
     dependsOn(verifyXraySelectionRenderingCoverage)
     dependsOn(verifyPreviewVisualCoverage)
     dependsOn(verifyMagicSelectFirstRenderCoverage)
+    dependsOn(verifyAuthoritativeHistoryReplay)
 }
 
 // Range-style filename, e.g. "mc1.21.9-1.21.11"

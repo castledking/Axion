@@ -2,17 +2,13 @@ package axion.server.paper
 
 import axion.protocol.OperationBatchResult
 import net.minecraft.core.BlockPos
-import org.bukkit.Bukkit
 import org.bukkit.World
 import org.bukkit.entity.Player
-import org.slf4j.LoggerFactory
 
 class AxionHistoryActionService(
     private val history: AxionServerHistory,
     private val policyService: AxionPolicyService,
 ) {
-    private val logger = LoggerFactory.getLogger(AxionHistoryActionService::class.java)
-
     fun undo(player: Player, requestId: Long, transactionId: Long, timing: AxionTimingContext): OperationBatchResult {
         val transaction = history.peekUndo(player.uniqueId, transactionId)
             ?: return rejected(
@@ -39,16 +35,6 @@ class AxionHistoryActionService(
             timing = timing,
         )?.let { return rejected(requestId, it) }
 
-        if (!validateCurrentWorld(world, transaction, expectNewState = true)) {
-            return rejected(requestId, AxionRejection(
-                    code = axion.protocol.AxionResultCode.WORLD_MISMATCH,
-                    source = axion.protocol.AxionResultSource.HISTORY,
-                    message = "World no longer matches the undo target",
-                ))
-        }
-
-        history.commitUndo(player.uniqueId, transactionId)
-
         val appliedChanges = transaction.changes.asReversed().map { change ->
             applyState(world, change.pos, change.oldState, change.oldBlockEntityData)
             change.copy(
@@ -61,6 +47,7 @@ class AxionHistoryActionService(
         PaperEntityMoveService.applyMoves(world, transaction.entityMoves, reverse = true)
         PaperEntityCloneService.respawn(world, transaction.entityDeletes)
         PaperEntityCloneService.remove(world, transaction.entityClones)
+        history.commitUndo(player.uniqueId, transactionId)
 
         return OperationBatchResult(
             requestId = requestId,
@@ -99,16 +86,6 @@ class AxionHistoryActionService(
             timing = timing,
         )?.let { return rejected(requestId, it) }
 
-        if (!validateCurrentWorld(world, transaction, expectNewState = false)) {
-            return rejected(requestId, AxionRejection(
-                    code = axion.protocol.AxionResultCode.WORLD_MISMATCH,
-                    source = axion.protocol.AxionResultSource.HISTORY,
-                    message = "World no longer matches the redo target",
-                ))
-        }
-
-        history.commitRedo(player.uniqueId, transactionId)
-
         val appliedChanges = transaction.changes.map { change ->
             applyState(world, change.pos, change.newState, change.newBlockEntityData)
             change
@@ -116,6 +93,7 @@ class AxionHistoryActionService(
         PaperEntityMoveService.applyMoves(world, transaction.entityMoves, reverse = false)
         PaperEntityCloneService.respawn(world, transaction.entityClones)
         PaperEntityDeleteService.apply(world, transaction.entityDeletes)
+        history.commitRedo(player.uniqueId, transactionId)
 
         return OperationBatchResult(
             requestId = requestId,
@@ -126,69 +104,6 @@ class AxionHistoryActionService(
             actionLabel = "Redo ${transaction.label}",
             changes = appliedChanges,
         )
-    }
-
-    private fun validateCurrentWorld(
-        world: World,
-        transaction: ServerHistoryTransaction,
-        expectNewState: Boolean,
-    ): Boolean {
-        transaction.changes.forEach { change ->
-            val expected = if (expectNewState) change.newState else change.oldState
-            val target = if (expectNewState) change.oldState else change.newState
-            // Block entities and some transient block properties can legitimately drift after an
-            // edit due to timers, inventories, fluid updates, power state, or server-side
-            // normalization. Prefer an exact block-state match, but allow same-material matches
-            // so immediate redo remains reliable after a valid undo.
-            val current = world.getBlockAt(change.pos.x, change.pos.y, change.pos.z).blockData
-            if (!stateMatchesExpected(current = current, expected = expected)) {
-                if (!stateMatchesExpected(current = current, expected = target)) {
-                    logger.warn(
-                        "Axion {} mismatch for transaction {} [{}] in world {} at {},{},{}: current='{}' expected='{}'",
-                        if (expectNewState) "undo" else "redo",
-                        transaction.id,
-                        transaction.label,
-                        world.name,
-                        change.pos.x,
-                        change.pos.y,
-                        change.pos.z,
-                        current.getAsString(false),
-                        expected,
-                    )
-                    return false
-                }
-            }
-        }
-        return true
-    }
-
-    private fun stateMatchesExpected(current: org.bukkit.block.data.BlockData, expected: String): Boolean {
-        val currentString = current.getAsString(false)
-        if (currentString == expected) {
-            return true
-        }
-
-        // Property-stripped comparison: ignore transient connection/physics
-        // properties (fence north/south/east/west, stair shape, redstone
-        // power, etc.) before deciding the states differ.
-        val strippedCurrent = axion.protocol.BlockDriftPolicy.stripTransientProperties(currentString)
-        val strippedExpected = axion.protocol.BlockDriftPolicy.stripTransientProperties(expected)
-        if (strippedCurrent == strippedExpected) {
-            return true
-        }
-
-        val expectedData = runCatching { Bukkit.createBlockData(expected) }.getOrNull() ?: return false
-        if (current.material == expectedData.material) {
-            return true
-        }
-
-        // Allow native Minecraft block decay drift (e.g. grass_block -> dirt
-        // when light is blocked, snow melt, leaves disconnected from wood,
-        // ice melt, torch-support removed). The undo will rewrite to the
-        // original oldState anyway, so accepting these drifts is safe.
-        val expectedId = expectedData.material.key.toString()
-        val currentId = current.material.key.toString()
-        return axion.protocol.BlockDriftPolicy.acceptsDecay(expectedId, currentId)
     }
 
     private fun applyState(world: World, pos: axion.protocol.IntVector3, state: String, blockEntityPayload: String?) {

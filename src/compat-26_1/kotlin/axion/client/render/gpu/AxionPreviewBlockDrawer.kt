@@ -44,6 +44,7 @@ object AxionPreviewBlockDrawer {
         cameraPosOverride: Vec3d?,
         projection: GpuBufferSlice,
         sceneDepth: GpuTextureView,
+        ignoreTextureAlpha: Boolean,
     ): ChunkedDrawResult {
         if (disabled || sectionBuffers.isEmpty()) return ChunkedDrawResult.FAILED
         if (ShaderPackCompat.shouldDisableDirectGpuPreview()) return ChunkedDrawResult.FAILED
@@ -58,6 +59,7 @@ object AxionPreviewBlockDrawer {
                 cameraPosOverride,
                 projection,
                 sceneDepth,
+                ignoreTextureAlpha,
             )
             if (result == ChunkedDrawResult.DREW && !loggedFirstSuccess) {
                 loggedFirstSuccess = true
@@ -91,6 +93,7 @@ object AxionPreviewBlockDrawer {
         cameraPosOverride: Vec3d?,
         projection: GpuBufferSlice,
         sceneDepth: GpuTextureView,
+        ignoreTextureAlpha: Boolean,
     ): ChunkedDrawResult {
         val client = MinecraftClient.getInstance()
         val device = RenderSystem.getDevice()
@@ -151,13 +154,16 @@ object AxionPreviewBlockDrawer {
                 VersionCompatImpl.getPreviewShellPipeline(
                     firstBuffer.vertexFormatValue,
                     firstBuffer.drawModeValue,
+                    ignoreTextureAlpha,
                 ),
             )
             RenderSystem.bindDefaultUniforms(pass)
             pass.setUniform("Projection", projection)
 
-            VersionCompatImpl.getBlockAtlasTextureView(client)?.let { atlasView ->
-                VersionCompatImpl.bindTextureToRenderPass(pass, "Sampler0", atlasView)
+            val atlasView = VersionCompatImpl.getBlockAtlasTextureView(client)
+                ?: return ChunkedDrawResult.FAILED
+            if (!VersionCompatImpl.bindTextureToRenderPass(pass, "Sampler0", atlasView)) {
+                return ChunkedDrawResult.FAILED
             }
 
             val batched = VersionCompatImpl.drawMultipleIndexedPreview(pass, drawList, uniformSlices)

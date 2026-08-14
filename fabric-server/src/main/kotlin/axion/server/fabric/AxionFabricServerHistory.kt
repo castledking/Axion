@@ -14,7 +14,7 @@ class AxionFabricServerHistory {
         val history = history(playerId)
         history.undo.addLast(transaction)
         history.redo.clear()
-        trim(history)
+        trim(history, protectedTransactionId = transaction.id)
     }
 
     fun peekUndo(playerId: UUID, transactionId: Long): FabricHistoryTransaction? {
@@ -30,7 +30,7 @@ class AxionFabricServerHistory {
         }
         history.undo.removeLast()
         history.redo.addLast(current)
-        trim(history)
+        trim(history, protectedTransactionId = current.id)
         return current
     }
 
@@ -47,7 +47,7 @@ class AxionFabricServerHistory {
         }
         history.redo.removeLast()
         history.undo.addLast(current)
-        trim(history)
+        trim(history, protectedTransactionId = current.id)
         return current
     }
 
@@ -55,52 +55,56 @@ class AxionFabricServerHistory {
         return histories.getOrPut(playerId) { PlayerHistory() }
     }
 
-    private fun trim(history: PlayerHistory) {
+    private fun trim(history: PlayerHistory, protectedTransactionId: Long) {
         while (history.undo.size + history.redo.size > MAX_ENTRIES) {
-            if (history.redo.isNotEmpty()) {
-                history.redo.removeFirst()
-            } else if (history.undo.isNotEmpty()) {
-                history.undo.removeFirst()
-            } else {
+            if (!removeOldestUnprotected(history, protectedTransactionId)) {
                 break
             }
         }
 
-        while (estimatedBytes(history) > MAX_TOTAL_BYTES) {
-            if (history.redo.isNotEmpty()) {
-                history.redo.removeFirst()
-            } else if (history.undo.isNotEmpty()) {
-                history.undo.removeFirst()
-            } else {
+        while (estimatedBytes(history) > MAX_TOTAL_BYTES.toLong()) {
+            if (!removeOldestUnprotected(history, protectedTransactionId)) {
                 break
             }
         }
     }
 
-    private fun estimatedBytes(history: PlayerHistory): Int {
+    private fun removeOldestUnprotected(history: PlayerHistory, protectedTransactionId: Long): Boolean {
+        if (history.redo.firstOrNull()?.id != null && history.redo.first().id != protectedTransactionId) {
+            history.redo.removeFirst()
+            return true
+        }
+        if (history.undo.firstOrNull()?.id != null && history.undo.first().id != protectedTransactionId) {
+            history.undo.removeFirst()
+            return true
+        }
+        return false
+    }
+
+    private fun estimatedBytes(history: PlayerHistory): Long {
         return history.undo.sumOf(::estimateTransactionBytes) + history.redo.sumOf(::estimateTransactionBytes)
     }
 
-    private fun estimateTransactionBytes(transaction: FabricHistoryTransaction): Int {
-        return 32 +
-            transaction.label.length * 2 +
-            transaction.worldKey.length * 2 +
+    private fun estimateTransactionBytes(transaction: FabricHistoryTransaction): Long {
+        return 32L +
+            transaction.label.length * 2L +
+            transaction.worldKey.length * 2L +
             transaction.changes.sumOf(::estimateChangeBytes) +
-            transaction.entityMoves.size * 128 +
+            transaction.entityMoves.size * 128L +
             transaction.entityClones.sumOf(::estimateCloneBytes) +
             transaction.entityDeletes.sumOf(::estimateCloneBytes)
     }
 
-    private fun estimateChangeBytes(change: CommittedBlockChangePayload): Int {
-        return 32 +
-            change.oldState.length * 2 +
-            change.newState.length * 2 +
-            (change.oldBlockEntityData?.length ?: 0) * 2 +
-            (change.newBlockEntityData?.length ?: 0) * 2
+    private fun estimateChangeBytes(change: CommittedBlockChangePayload): Long {
+        return 32L +
+            change.oldState.length * 2L +
+            change.newState.length * 2L +
+            (change.oldBlockEntityData?.length ?: 0) * 2L +
+            (change.newBlockEntityData?.length ?: 0) * 2L
     }
 
-    private fun estimateCloneBytes(change: FabricCommittedEntityClone): Int {
-        return 96 + change.entityData.length * 2
+    private fun estimateCloneBytes(change: FabricCommittedEntityClone): Long {
+        return 96L + change.entityData.length * 2L
     }
 
     private data class PlayerHistory(
@@ -110,7 +114,7 @@ class AxionFabricServerHistory {
 
     companion object {
         private const val MAX_ENTRIES: Int = 100
-        private const val MAX_TOTAL_BYTES: Int = 64 * 1024 * 1024
+        private const val MAX_TOTAL_BYTES: Int = 256 * 1024 * 1024
     }
 }
 

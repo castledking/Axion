@@ -3,6 +3,7 @@ package axion.client.render.gpu
 import axion.client.compat.CameraAccess
 import axion.client.compat.VersionCompatImpl
 import axion.client.render.AxionPreviewBuffer
+import axion.client.render.PreviewDrawDiagnostics
 import axion.client.render.ShaderPackCompat
 import com.mojang.blaze3d.buffers.GpuBufferSlice
 import com.mojang.blaze3d.systems.RenderSystem
@@ -43,6 +44,7 @@ object AxionPreviewBlockDrawer {
         cameraPosOverride: Vec3d?,
         projection: GpuBufferSlice,
         sceneDepth: GpuTextureView,
+        ignoreTextureAlpha: Boolean,
     ): ChunkedDrawResult {
         if (disabled || sectionBuffers.isEmpty()) return ChunkedDrawResult.FAILED
         if (ShaderPackCompat.shouldDisableDirectGpuPreview()) return ChunkedDrawResult.FAILED
@@ -57,6 +59,7 @@ object AxionPreviewBlockDrawer {
                 cameraPosOverride,
                 projection,
                 sceneDepth,
+                ignoreTextureAlpha,
             )
             if (result == ChunkedDrawResult.DREW && !loggedFirstSuccess) {
                 loggedFirstSuccess = true
@@ -90,6 +93,7 @@ object AxionPreviewBlockDrawer {
         cameraPosOverride: Vec3d?,
         projection: GpuBufferSlice,
         sceneDepth: GpuTextureView,
+        ignoreTextureAlpha: Boolean,
     ): ChunkedDrawResult {
         val client = MinecraftClient.getInstance()
         val device = RenderSystem.getDevice()
@@ -154,13 +158,20 @@ object AxionPreviewBlockDrawer {
                 VersionCompatImpl.getPreviewShellPipeline(
                     firstBuffer.vertexFormatValue,
                     firstBuffer.drawModeValue,
+                    ignoreTextureAlpha,
                 ),
             )
             RenderSystem.bindDefaultUniforms(pass)
             pass.setUniform("Projection", projection)
 
-            VersionCompatImpl.getBlockAtlasTextureView(client)?.let { atlasView ->
-                VersionCompatImpl.bindTextureToRenderPass(pass, "Sampler0", atlasView)
+            val atlasView = VersionCompatImpl.getBlockAtlasTextureView(client)
+            if (atlasView == null) {
+                PreviewDrawDiagnostics.record("abort" to "no block atlas texture view")
+                return ChunkedDrawResult.FAILED
+            }
+            if (!VersionCompatImpl.bindTextureToRenderPass(pass, "Sampler0", atlasView)) {
+                PreviewDrawDiagnostics.record("abort" to "no block atlas sampler")
+                return ChunkedDrawResult.FAILED
             }
 
             val batched = VersionCompatImpl.drawMultipleIndexedPreview(pass, drawList, uniformSlices)
@@ -169,6 +180,30 @@ object AxionPreviewBlockDrawer {
                     pass.setUniform("DynamicTransforms", uniformSlices[i])
                     drawList[i].buffer.drawIndexed(pass)
                 }
+            }
+
+            if (PreviewDrawDiagnostics.isEnabled) {
+                val entry = drawList.first()
+                PreviewDrawDiagnostics.record(
+                    "pipeline" to PreviewDrawDiagnostics.identity(
+                        VersionCompatImpl.getPreviewShellPipeline(
+                            firstBuffer.vertexFormatValue,
+                            firstBuffer.drawModeValue,
+                            ignoreTextureAlpha,
+                        ),
+                    ),
+                    "format" to firstBuffer.vertexFormatValue,
+                    "topology" to firstBuffer.drawModeValue,
+                    "atlasView" to PreviewDrawDiagnostics.identity(atlasView),
+                    "colorView" to PreviewDrawDiagnostics.identity(colorView),
+                    "sceneDepth" to PreviewDrawDiagnostics.identity(sceneDepth),
+                    "vertexBuffer" to PreviewDrawDiagnostics.identity(entry.buffer.vertexBufferGpu),
+                    "indexBuffer" to PreviewDrawDiagnostics.identity(entry.buffer.indexBufferGpu),
+                    "indexCount" to entry.indexCount,
+                    "indexType" to entry.indexType,
+                    "batched" to batched,
+                    "tint" to colorTint,
+                )
             }
             return ChunkedDrawResult.DREW
         } finally {

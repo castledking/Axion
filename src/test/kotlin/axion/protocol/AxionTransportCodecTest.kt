@@ -6,6 +6,15 @@ import kotlin.test.assertTrue
 
 class AxionTransportCodecTest {
     @Test
+    fun `confirmation transport allows 256 MiB and enough chunks to carry it`() {
+        assertEquals(256, AxionTransportCodec.MAX_SERIALIZED_BYTES / 1024 / 1024)
+        assertTrue(
+            AxionTransportCodec.MAX_CHUNKS.toLong() * AxionTransportCodec.MAX_CHUNK_BYTES >=
+                AxionTransportCodec.MAX_SERIALIZED_BYTES.toLong(),
+        )
+    }
+
+    @Test
     fun `small client message round trips through framed transport`() {
         val message = NoClipStateRequest(armed = true)
 

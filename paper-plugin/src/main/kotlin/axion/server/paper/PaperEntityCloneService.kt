@@ -208,10 +208,35 @@ object PaperEntityCloneService {
         val arguments = if (loadMethod.parameterCount == 3) {
             arrayOf(tag, level, callback)
         } else {
-            val spawnReason = loadMethod.parameterTypes[2].getField("COMMAND").get(null)
+            val spawnReason = commandSpawnArgument(loadMethod.parameterTypes[2]) ?: return null
             arrayOf(tag, level, spawnReason, callback)
         }
         return loadMethod.invoke(null, *arguments) as? net.minecraft.world.entity.Entity
+    }
+
+    /**
+     * Builds the "spawned by a command" argument for whichever shape the third
+     * parameter takes.
+     *
+     * Up to 26.1 it is the `EntitySpawnReason` enum, so the `COMMAND` constant
+     * is the argument. 26.2 wraps it: the parameter became
+     * `EntitySpawnRequest(EntitySpawnReason reason, boolean ignoreChecks)`,
+     * which has no `COMMAND` field — reading one threw, the caller's
+     * `runCatching` swallowed it, and entity cloning silently no-opped on 26.2
+     * Paper. `false` for `ignoreChecks` is what vanilla's own `/summon` passes.
+     */
+    internal fun commandSpawnArgument(parameterType: Class<*>): Any? {
+        runCatching { return parameterType.getField("COMMAND").get(null) }
+
+        val constructor = parameterType.constructors.firstOrNull { candidate ->
+            candidate.parameterCount == 2 &&
+                candidate.parameterTypes[1] == java.lang.Boolean.TYPE &&
+                candidate.parameterTypes[0].isEnum
+        } ?: return null
+        val reason = runCatching {
+            constructor.parameterTypes[0].getField("COMMAND").get(null)
+        }.getOrNull() ?: return null
+        return runCatching { constructor.newInstance(reason, false) }.getOrNull()
     }
 
     private fun stripUuids(tag: CompoundTag) {

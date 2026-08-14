@@ -33,6 +33,24 @@ object PreviewBlockIdentityPolicy {
         sessionTag: String,
     ): Boolean = remoteAxionSessionAvailable && sessionTag != MOVE_SOURCE_SESSION_TAG
 
+    /**
+     * Whether a preview's mesh should be tessellated with ambient occlusion.
+     *
+     * The preview shell shader carries no lightmap, so a preview's only shading
+     * is its baked vertex colour: face shade multiplied by ambient occlusion.
+     * That makes AO the sole source of darkness in a preview, and it is computed
+     * against the full-occupancy neighbour halo the renderers keep purely so
+     * vanilla culls shared faces. For the move-source glass the halo is the
+     * replaced volume itself, so every boundary face is treated as buried and
+     * the replacement renders as a near-black slab over lit terrain.
+     *
+     * Disabling AO there lets the glass read as glass with sky light behind it.
+     * Destination ghosts keep AO: their halo is the shape being previewed, and
+     * the self-shadowing is what makes the shape legible in mid-air.
+     */
+    fun usesAmbientOcclusion(previewId: String): Boolean =
+        !previewId.endsWith(MOVE_SOURCE_SESSION_TAG)
+
     @Synchronized
     fun normalize(
         clipboard: ClipboardBuffer,

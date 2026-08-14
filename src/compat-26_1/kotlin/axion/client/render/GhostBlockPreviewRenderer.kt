@@ -37,24 +37,15 @@ object GhostBlockPreviewRenderer {
         forceChunked: Boolean = false,
         allowChunked: Boolean = true,
     ) {
-        val remotePaperSession = PreviewBlockIdentityPolicy.shouldNormalizeRemoteIdentity(
-            AxionServerConnection.isRemoteAuthoritativeAvailable(),
-            sessionTag,
-        )
-        // The custom translucent pipeline supplies opacity. Keeping the
-        // neutral texture itself opaque makes the destination alpha exact and
-        // avoids multiplying many stained-glass texel alphas on Paper.
-        val neutralState = Blocks.LIGHT_GRAY_CONCRETE.defaultState
-        val renderClipboard = PreviewBlockIdentityPolicy.normalize(
-            clipboard = clipboard,
-            neutralState = neutralState,
-            remoteAxionSessionAvailable = remotePaperSession,
-        )
-        val renderFallbackClipboard = PreviewBlockIdentityPolicy.normalize(
-            clipboard = fallbackClipboard,
-            neutralState = neutralState,
-            remoteAxionSessionAvailable = remotePaperSession,
-        )
+        // Destination ghosts used to be rewritten to opaque light-grey
+        // concrete on a remote Axion session, purely so a translucent block's
+        // texel alpha could not compound into the shell's policy alpha. The
+        // shell shader now drops texel alpha itself
+        // (PreviewVisualPolicy.IGNORE_TEXTURE_ALPHA_DEFINE), so the real
+        // captured blocks can be shown. They are read from the client's own
+        // world, so this reveals nothing the player is not already rendering.
+        val renderClipboard = clipboard
+        val renderFallbackClipboard = fallbackClipboard
         val occupiedCells = renderClipboard.nonAirCells()
         val fallbackCells = renderFallbackClipboard.nonAirCells()
         if (origins.isEmpty() || occupiedCells.isEmpty() || fallbackCells.isEmpty()) {
@@ -96,6 +87,7 @@ object GhostBlockPreviewRenderer {
                 region = region,
                 color = color,
                 alpha = alpha.coerceIn(0, 255),
+                ignoreTextureAlpha = PreviewVisualPolicy.ignoresTextureAlpha(sessionTag),
             )
             if (renderedTextured) {
                 return

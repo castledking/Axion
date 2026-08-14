@@ -28,6 +28,9 @@ object PreviewShellBlockRenderer {
             region = region,
             color = color,
             alpha = alpha,
+            // Shell previews are destination ghosts; their opacity is a
+            // policy constant, so texel alpha must not compound into it.
+            ignoreTextureAlpha = true,
         )
     }
 }

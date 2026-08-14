@@ -671,7 +671,10 @@ object VersionCompatImpl : VersionCompat {
                     .withSampler("Sampler0")
                     .withBlend(BlendFunction.TRANSLUCENT)
                     .withDepthTestFunction(previewDepthTest)
-                    .withDepthWrite(false)
+                    // END_MAIN runs before clouds. Writing only the preview's
+                    // surface depth keeps later cloud pixels out of the ghost
+                    // while leaving the rest of the cloud pass untouched.
+                    .withDepthWrite(true)
                     .withCull(PreviewVisualPolicy.CULL_GHOST_BACK_FACES)
                     .withVertexFormat(vertexFormat, drawMode)
                     .build()

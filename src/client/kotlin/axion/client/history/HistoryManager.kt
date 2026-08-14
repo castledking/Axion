@@ -17,7 +17,7 @@ import java.util.ArrayDeque
 
 object HistoryManager {
     private const val MAX_ENTRIES: Int = 100
-    private const val MAX_TOTAL_BYTES: Int = 64 * 1024 * 1024
+    private const val MAX_TOTAL_BYTES: Int = 256 * 1024 * 1024
 
     private val undoStack = ArrayDeque<HistoryEntry>()
     private val redoStack = ArrayDeque<HistoryEntry>()
@@ -121,7 +121,7 @@ object HistoryManager {
         undoStack.removeLast()
         redoStack.addLast(current)
         appliedEntry?.let { }
-        trimToBudget()
+        trimToBudget(protectedEntryId = current.id)
     }
 
     fun applyRemoteRedo(targetTransactionId: Long, appliedEntry: HistoryEntry?) {
@@ -133,7 +133,7 @@ object HistoryManager {
         redoStack.removeLast()
         undoStack.addLast(current)
         appliedEntry?.let { }
-        trimToBudget()
+        trimToBudget(protectedEntryId = current.id)
     }
 
     fun undo(world: World): Boolean {
@@ -155,7 +155,7 @@ object HistoryManager {
             return false
         }
         redoStack.addLast(entry)
-        trimToBudget()
+        trimToBudget(protectedEntryId = entry.id)
         return true
     }
 
@@ -178,14 +178,14 @@ object HistoryManager {
             return false
         }
         undoStack.addLast(entry)
-        trimToBudget()
+        trimToBudget(protectedEntryId = entry.id)
         return true
     }
 
     private fun push(entry: HistoryEntry) {
         undoStack.addLast(entry)
         redoStack.clear()
-        trimToBudget()
+        trimToBudget(protectedEntryId = entry.id)
     }
 
     private fun applyChanges(
@@ -222,50 +222,54 @@ object HistoryManager {
         )
     }
 
-    private fun trimToBudget() {
+    private fun trimToBudget(protectedEntryId: Long) {
         while (undoStack.size + redoStack.size > MAX_ENTRIES) {
-            if (redoStack.isNotEmpty()) {
-                redoStack.removeFirst()
-            } else if (undoStack.isNotEmpty()) {
-                undoStack.removeFirst()
-            } else {
+            if (!removeOldestUnprotected(protectedEntryId)) {
                 break
             }
         }
 
-        while (estimatedBytes() > MAX_TOTAL_BYTES) {
-            if (redoStack.isNotEmpty()) {
-                redoStack.removeFirst()
-            } else if (undoStack.isNotEmpty()) {
-                undoStack.removeFirst()
-            } else {
+        while (estimatedBytes() > MAX_TOTAL_BYTES.toLong()) {
+            if (!removeOldestUnprotected(protectedEntryId)) {
                 break
             }
         }
     }
 
-    private fun estimatedBytes(): Int {
+    private fun removeOldestUnprotected(protectedEntryId: Long): Boolean {
+        if (redoStack.firstOrNull()?.id != null && redoStack.first().id != protectedEntryId) {
+            redoStack.removeFirst()
+            return true
+        }
+        if (undoStack.firstOrNull()?.id != null && undoStack.first().id != protectedEntryId) {
+            undoStack.removeFirst()
+            return true
+        }
+        return false
+    }
+
+    private fun estimatedBytes(): Long {
         return undoStack.sumOf(::estimateEntryBytes) + redoStack.sumOf(::estimateEntryBytes)
     }
 
-    private fun estimateEntryBytes(entry: HistoryEntry): Int {
-        return 32 +
-            entry.label.length * 2 +
+    private fun estimateEntryBytes(entry: HistoryEntry): Long {
+        return 32L +
+            entry.label.length * 2L +
             entry.changes.sumOf(::estimateChangeBytes) +
-            entry.entityMoves.size * 80 +
+            entry.entityMoves.size * 80L +
             entry.entityClones.sumOf(::estimateCloneBytes) +
             entry.entityDeletes.sumOf(::estimateCloneBytes)
     }
 
-    private fun estimateChangeBytes(change: BlockChange): Int {
-        return 32 +
-            change.oldState.toString().length * 2 +
-            change.newState.toString().length * 2 +
-            (change.oldBlockEntityData?.nbt?.toString()?.length ?: 0) * 2 +
-            (change.newBlockEntityData?.nbt?.toString()?.length ?: 0) * 2
+    private fun estimateChangeBytes(change: BlockChange): Long {
+        return 32L +
+            change.oldState.toString().length * 2L +
+            change.newState.toString().length * 2L +
+            (change.oldBlockEntityData?.nbt?.toString()?.length ?: 0) * 2L +
+            (change.newBlockEntityData?.nbt?.toString()?.length ?: 0) * 2L
     }
 
-    private fun estimateCloneBytes(change: EntityCloneChange): Int {
-        return 96 + change.entityData.toString().length * 2
+    private fun estimateCloneBytes(change: EntityCloneChange): Long {
+        return 96L + change.entityData.toString().length * 2L
     }
 }

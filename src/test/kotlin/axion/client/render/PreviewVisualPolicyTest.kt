@@ -12,61 +12,71 @@ class PreviewVisualPolicyTest {
     }
 
     @Test
-    fun `closed destination shell leaves approximately twenty percent of the scene visible`() {
+    fun `culled destination shell leaves approximately twenty percent of the scene visible`() {
         val alpha = PreviewVisualPolicy.alphaForTransmission(
             PreviewVisualPolicy.TARGET_SCENE_TRANSMISSION,
-            PreviewVisualPolicy.CLOSED_SHELL_CROSSINGS,
+            PreviewVisualPolicy.VISIBLE_DESTINATION_SHELL_CROSSINGS,
         )
 
-        assertEquals(141, alpha)
+        assertEquals(204, alpha)
         assertEquals(alpha, PreviewVisualPolicy.DESTINATION_ALPHA)
         assertEquals(alpha, PreviewVisualPolicy.MOVE_DESTINATION_ALPHA)
+        assertEquals(alpha, PreviewVisualPolicy.CULLED_DESTINATION_ALPHA)
         assertEquals(
             PreviewVisualPolicy.TARGET_SCENE_TRANSMISSION,
-            PreviewVisualPolicy.compoundedTransmission(alpha, PreviewVisualPolicy.CLOSED_SHELL_CROSSINGS),
+            PreviewVisualPolicy.compoundedTransmission(
+                alpha,
+                PreviewVisualPolicy.VISIBLE_DESTINATION_SHELL_CROSSINGS,
+            ),
             absoluteTolerance = 0.002,
         )
     }
 
     @Test
-    fun `move source glass stays translucent after the world cells are masked`() {
-        assertTrue(PreviewVisualPolicy.MOVE_SOURCE_ALPHA < 128)
+    fun `destination ghosts drop texel alpha so their opacity stays the policy constant`() {
+        assertTrue(PreviewVisualPolicy.ignoresTextureAlpha("ghost:placement-destination"))
+        assertTrue(PreviewVisualPolicy.ignoresTextureAlpha("ghost:default"))
         assertEquals(
-            PreviewVisualPolicy.MOVE_SOURCE_TARGET_SCENE_TRANSMISSION,
-            PreviewVisualPolicy.compoundedTexturedTransmission(
-                PreviewVisualPolicy.MOVE_SOURCE_ALPHA,
-                PreviewVisualPolicy.STAINED_GLASS_MEAN_TEXTURE_ALPHA,
-                PreviewVisualPolicy.CLOSED_SHELL_CROSSINGS,
+            PreviewVisualPolicy.TARGET_SCENE_TRANSMISSION,
+            PreviewVisualPolicy.compoundedTransmission(
+                PreviewVisualPolicy.DESTINATION_ALPHA,
+                PreviewVisualPolicy.VISIBLE_DESTINATION_SHELL_CROSSINGS,
             ),
-            absoluteTolerance = 0.003,
-        )
-        assertEquals(
-            PreviewVisualPolicy.MOVE_SOURCE_TARGET_SCENE_TRANSMISSION,
-            PreviewVisualPolicy.compoundedTexturedTransmission(
-                PreviewVisualPolicy.CULLED_MOVE_SOURCE_ALPHA,
-                PreviewVisualPolicy.STAINED_GLASS_MEAN_TEXTURE_ALPHA,
-                1,
-            ),
-            absoluteTolerance = 0.003,
+            absoluteTolerance = 0.002,
         )
     }
 
     @Test
-    fun `sparse shells keep twenty percent transmission across culling modes`() {
-        val noCullExpected = PreviewVisualPolicy.alphaForTransmission(
-            PreviewVisualPolicy.TARGET_SCENE_TRANSMISSION,
-            PreviewVisualPolicy.CLOSED_SHELL_CROSSINGS,
+    fun `move source glass keeps vanilla texel alpha`() {
+        assertFalse(
+            PreviewVisualPolicy.ignoresTextureAlpha(
+                "ghost:${PreviewBlockIdentityPolicy.MOVE_SOURCE_SESSION_TAG}",
+            ),
         )
-        val culledExpected = PreviewVisualPolicy.alphaForTransmission(
+    }
+
+    @Test
+    fun `move source glass uses full modulator alpha so the vanilla texture controls opacity`() {
+        assertEquals(255, PreviewVisualPolicy.MOVE_SOURCE_ALPHA)
+        assertEquals(
+            PreviewVisualPolicy.MOVE_SOURCE_ALPHA,
+            PreviewVisualPolicy.CULLED_MOVE_SOURCE_ALPHA,
+        )
+    }
+
+    @Test
+    fun `all destination shells match the 26_1_2 transparency`() {
+        val expected = PreviewVisualPolicy.alphaForTransmission(
             PreviewVisualPolicy.TARGET_SCENE_TRANSMISSION,
-            1,
+            PreviewVisualPolicy.VISIBLE_DESTINATION_SHELL_CROSSINGS,
         )
 
-        assertEquals(141, noCullExpected)
-        assertEquals(204, culledExpected)
-        assertEquals(noCullExpected, PreviewVisualPolicy.SPARSE_DESTINATION_ALPHA)
-        assertEquals(culledExpected, PreviewVisualPolicy.CULLED_DESTINATION_ALPHA)
-        assertEquals(culledExpected, PreviewVisualPolicy.CULLED_SPARSE_DESTINATION_ALPHA)
+        assertEquals(204, expected)
+        assertEquals(expected, PreviewVisualPolicy.DESTINATION_ALPHA)
+        assertEquals(expected, PreviewVisualPolicy.MOVE_DESTINATION_ALPHA)
+        assertEquals(expected, PreviewVisualPolicy.SPARSE_DESTINATION_ALPHA)
+        assertEquals(expected, PreviewVisualPolicy.CULLED_DESTINATION_ALPHA)
+        assertEquals(expected, PreviewVisualPolicy.CULLED_SPARSE_DESTINATION_ALPHA)
     }
 
     @Test

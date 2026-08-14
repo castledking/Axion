@@ -14,18 +14,10 @@ object PlacementPreviewRenderer {
     private const val CLONE_DESTINATION_COLOR: Int = 0xFFFFB347.toInt()
     private const val MOVE_DESTINATION_COLOR: Int = 0xFF7EE6A6.toInt()
     private const val LINE_WIDTH: Float = 1.75f
-    private const val DEFAULT_GHOST_ALPHA: Int = PreviewVisualPolicy.DESTINATION_ALPHA
-    private val MOVE_SOURCE_GHOST_ALPHA: Int
-        get() = if (
-            ShaderPackCompat.shouldDisableDirectGpuPreview() ||
-            axion.client.render.gpu.AxionPreviewBlockDrawer.isDisabled()
-        ) {
-            PreviewVisualPolicy.CULLED_MOVE_SOURCE_ALPHA
-        } else {
-            PreviewVisualPolicy.MOVE_SOURCE_ALPHA
-        }
-    private const val MOVE_DESTINATION_GHOST_ALPHA: Int = PreviewVisualPolicy.MOVE_DESTINATION_ALPHA
-    private const val SPARSE_DESTINATION_GHOST_ALPHA: Int = PreviewVisualPolicy.SPARSE_DESTINATION_ALPHA
+    private const val DEFAULT_GHOST_ALPHA: Int = PreviewVisualPolicy.CULLED_DESTINATION_ALPHA
+    private const val MOVE_SOURCE_GHOST_ALPHA: Int = PreviewVisualPolicy.CULLED_MOVE_SOURCE_ALPHA
+    private const val MOVE_DESTINATION_GHOST_ALPHA: Int = PreviewVisualPolicy.CULLED_DESTINATION_ALPHA
+    private const val SPARSE_DESTINATION_GHOST_ALPHA: Int = PreviewVisualPolicy.CULLED_SPARSE_DESTINATION_ALPHA
     private const val MOVE_SOURCE_GHOST_SCALE: Float = 1.0f
     // Blocks are drawn at full size. The chunked GPU preview ignores this scale
     // entirely, so any shrink only applies on the CPU fallback (which is what a

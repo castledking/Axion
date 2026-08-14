@@ -208,13 +208,19 @@ The `VersionCompat` interface provides a common abstraction for operations that 
 - **Reflection strategy:** All GPU method lookups use name + arity matching (`methods.firstOrNull { name == X && parameterTypes.size == N }`) instead of `getMethod()` with exact parameter types. This is required because the compat module is compiled against 1.21.11, and `getMethod()` fails on 1.21.9/1.21.10 when runtime parameter types don't match the compile-time class identity (e.g., `GpuTextureView` class loaded at runtime vs compiled against)
 
 #### GPU Rendering (26.1.x)
-- `supportsChunkedPreview()`: Returns `true`
+- `supportsChunkedPreview()`: Returns `true` under the standard renderer; active Iris shader packs keep the existing CPU compatibility fallback
 - `renderChunkedPreview()`: Implemented using the 26.1.x `ChunkedPreviewLifecycle`
 - `drawMultipleIndexedPreview()`: Uses `RenderPass.Draw` entries and `pass.drawMultipleIndexed(...)`
 - `writeDynamicUniforms()`: Uses `dynamicUniforms.writeTransform(mvMatrix, colorTint, zeroVec, normalMatrix)`; the `lineWidth` parameter is ignored because 26.1.x no longer uses the same dynamic uniform shape as 1.21.11
-- `getBlockAtlasTextureView()`: Uses `client.atlasManager.getAtlasOrThrow(TextureAtlas.LOCATION_BLOCKS)`, then binds `atlas.textureView` with `atlas.sampler`
+- `getBlockAtlasTextureView()`: Uses `client.atlasManager.getAtlasOrThrow(AtlasIds.BLOCKS)`, then binds `atlas.textureView` with `atlas.sampler`; `getAtlasOrThrow` is keyed by atlas ID, not the block-atlas texture path
 - GPU preview drawing must use `RenderSystem.getModelViewMatrix()` for the active model-view transform; using the matrix stack alone caused previews to render offset from the world and disappear when camera direction changed
 - Chunked preview sessions exist in `src/compat-26_1/kotlin/axion/client/render/gpu/`
+
+#### GPU Rendering (26.2.x)
+- Uses the same persistent chunked-preview lifecycle as 26.1.x, with 26.2's `BindGroupLayouts`, split vertex binding/topology API, and reversed-depth comparison
+- The direct pass binds the block atlas through `AtlasIds.BLOCKS`; the old texture-path lookup threw before the sampler could bind and made the renderer fall back to CPU
+- Destination previews use Axion's `preview_shell` vertex/fragment shaders and a globally sorted GPU-resident mesh
+- Active Iris shader packs retain the shared CPU compatibility fallback
 
 #### 26.1.x Preview Block Render View
 - 26.1.x block tessellation needs a `BlockAndTintGetter`, not the older 1.21.x render-view shape.

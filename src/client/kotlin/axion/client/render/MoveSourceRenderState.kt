@@ -5,6 +5,8 @@ import axion.client.tool.PlacementPreviewPolicy
 import axion.client.tool.PlacementToolMode
 import axion.common.model.ClipboardBuffer
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet
+import net.minecraft.block.BlockState
+import net.minecraft.block.Blocks
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.world.ClientWorld
 import net.minecraft.util.math.BlockPos
@@ -41,8 +43,16 @@ object MoveSourceRenderState {
     }
 
     fun shouldSuppress(worldIdentity: Any, pos: BlockPos): Boolean {
+        return shouldSuppress(worldIdentity, pos.x, pos.y, pos.z)
+    }
+
+    fun shouldSuppress(worldIdentity: Any, x: Int, y: Int, z: Int): Boolean {
         val current = snapshot ?: return false
-        return current.world === worldIdentity && current.positions.contains(pos.asLong())
+        return current.world === worldIdentity && current.positions.contains(BlockPos.asLong(x, y, z))
+    }
+
+    fun suppressedState(worldIdentity: Any, x: Int, y: Int, z: Int): BlockState? {
+        return if (shouldSuppress(worldIdentity, x, y, z)) Blocks.AIR.defaultState else null
     }
 
     /**

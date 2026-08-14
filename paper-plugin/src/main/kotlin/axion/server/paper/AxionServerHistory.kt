@@ -14,7 +14,7 @@ class AxionServerHistory {
         val history = history(playerId)
         history.undo.addLast(transaction)
         history.redo.clear()
-        trim(history, budget)
+        trim(history, budget, protectedTransactionId = transaction.id)
     }
 
     fun peekUndo(playerId: UUID, transactionId: Long): ServerHistoryTransaction? {
@@ -35,7 +35,7 @@ class AxionServerHistory {
 
         history.undo.removeLast()
         history.redo.addLast(current)
-        trim(history, current.historyBudget)
+        trim(history, current.historyBudget, protectedTransactionId = current.id)
         return current
     }
 
@@ -57,7 +57,7 @@ class AxionServerHistory {
 
         history.redo.removeLast()
         history.undo.addLast(current)
-        trim(history, current.historyBudget)
+        trim(history, current.historyBudget, protectedTransactionId = current.id)
         return current
     }
 
@@ -65,51 +65,59 @@ class AxionServerHistory {
         return histories.getOrPut(playerId) { PlayerHistory() }
     }
 
-    private fun trim(history: PlayerHistory, budget: HistoryBudget) {
+    private fun trim(
+        history: PlayerHistory,
+        budget: HistoryBudget,
+        protectedTransactionId: Long,
+    ) {
         while (history.undo.size + history.redo.size > budget.maxEntries) {
-            if (history.redo.isNotEmpty()) {
-                history.redo.removeFirst()
-            } else if (history.undo.isNotEmpty()) {
-                history.undo.removeFirst()
-            } else {
+            if (!removeOldestUnprotected(history, protectedTransactionId)) {
                 break
             }
         }
 
-        while (estimatedBytes(history) > budget.maxBytes) {
-            if (history.redo.isNotEmpty()) {
-                history.redo.removeFirst()
-            } else if (history.undo.isNotEmpty()) {
-                history.undo.removeFirst()
-            } else {
+        while (estimatedBytes(history) > budget.maxBytes.toLong()) {
+            if (!removeOldestUnprotected(history, protectedTransactionId)) {
                 break
             }
         }
     }
 
-    private fun estimatedBytes(history: PlayerHistory): Int {
+    private fun removeOldestUnprotected(history: PlayerHistory, protectedTransactionId: Long): Boolean {
+        if (history.redo.firstOrNull()?.id != null && history.redo.first().id != protectedTransactionId) {
+            history.redo.removeFirst()
+            return true
+        }
+        if (history.undo.firstOrNull()?.id != null && history.undo.first().id != protectedTransactionId) {
+            history.undo.removeFirst()
+            return true
+        }
+        return false
+    }
+
+    private fun estimatedBytes(history: PlayerHistory): Long {
         return history.undo.sumOf(::estimateTransactionBytes) + history.redo.sumOf(::estimateTransactionBytes)
     }
 
-    private fun estimateTransactionBytes(transaction: ServerHistoryTransaction): Int {
-        return 32 +
-            transaction.label.length * 2 +
+    private fun estimateTransactionBytes(transaction: ServerHistoryTransaction): Long {
+        return 32L +
+            transaction.label.length * 2L +
             transaction.changes.sumOf(::estimateChangeBytes) +
-            transaction.entityMoves.size * 80 +
+            transaction.entityMoves.size * 80L +
             transaction.entityClones.sumOf(::estimateCloneBytes) +
             transaction.entityDeletes.sumOf(::estimateCloneBytes)
     }
 
-    private fun estimateChangeBytes(change: axion.protocol.CommittedBlockChangePayload): Int {
-        return 32 +
-            change.oldState.length * 2 +
-            change.newState.length * 2 +
-            (change.oldBlockEntityData?.length ?: 0) * 2 +
-            (change.newBlockEntityData?.length ?: 0) * 2
+    private fun estimateChangeBytes(change: axion.protocol.CommittedBlockChangePayload): Long {
+        return 32L +
+            change.oldState.length * 2L +
+            change.newState.length * 2L +
+            (change.oldBlockEntityData?.length ?: 0) * 2L +
+            (change.newBlockEntityData?.length ?: 0) * 2L
     }
 
-    private fun estimateCloneBytes(change: CommittedEntityClone): Int {
-        return 96 + change.entityData.length * 2
+    private fun estimateCloneBytes(change: CommittedEntityClone): Long {
+        return 96L + change.entityData.length * 2L
     }
 
     private data class PlayerHistory(

@@ -26,6 +26,14 @@ object ShaderPackCompat {
      * Returns true when an Iris shader pack is active. Direct GPU preview draws
      * (separate render pass on the main framebuffer) do not composite correctly
      * with Iris, so callers should route through the legacy consumer path instead.
+     *
+     * Sodium was briefly gated here too, on the theory that it left a foreign
+     * texture bound. It does not: the preview pass simply never bound its own
+     * atlas, because `AtlasManager.getAtlasOrThrow` keys on the atlas id and was
+     * being handed the texture path. Under vanilla the block atlas happened to
+     * still be in the sampler slot from terrain rendering, so the missing bind
+     * was invisible; Sodium only removed the coincidence. Do not add a mod-id
+     * gate back here without a reproduction that survives a correct bind.
      */
     fun shouldDisableDirectGpuPreview(): Boolean {
         val shaderPackActive = isShaderPackActive()

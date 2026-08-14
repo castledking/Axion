@@ -27,7 +27,7 @@ object AxionToolSelectionController {
             return
         }
 
-        AxionClientState.updateSelectedSubtool(subtool)
+        switchSubtool(subtool)
     }
 
     fun syncWithPlayerSlot(selectedSlot: Int) {
@@ -79,7 +79,22 @@ object AxionToolSelectionController {
             return
         }
 
-        AxionClientState.updateSelectedSubtool(AxionClientState.selectedSubtool.cycle(step))
+        switchSubtool(AxionClientState.selectedSubtool.cycle(step))
+    }
+
+    /**
+     * Changes the active subtool, carrying any pre-preview region selection over
+     * to the new tool. Refused once a region tool is actively previewing, so a
+     * scrolled edit cannot be interrupted by a stray subtool change. Extrude's
+     * passive hover preview remains switchable.
+     */
+    private fun switchSubtool(subtool: AxionSubtool) {
+        val current = AxionClientState.selectedSubtool
+        if (!ToolSelectionHandoff.handOff(from = current, to = subtool)) {
+            return
+        }
+
+        AxionClientState.updateSelectedSubtool(subtool)
     }
 
     fun handleHotbarScroll(currentVanillaSlot: Int, scrollAmount: Double, altHeld: Boolean): ScrollOutcome {

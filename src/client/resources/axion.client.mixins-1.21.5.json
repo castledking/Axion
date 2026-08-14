@@ -18,6 +18,7 @@
     "RedstoneOreBlockMixin",
     "SculkSensorBlockMixin",
     "ServerEntityMixin",
+    "SodiumMoveSourceLevelSliceMixin",
     "TripwireBlockMixin",
     "WorldRendererFallbackMixin"
   ],

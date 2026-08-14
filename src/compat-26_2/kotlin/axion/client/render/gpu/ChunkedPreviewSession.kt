@@ -4,6 +4,8 @@ import axion.client.compat.CameraAccess
 import axion.client.compat.VersionCompatImpl
 import axion.client.render.AxionPreviewBuffer
 import axion.client.render.AxionWorldRenderContext
+import axion.client.render.PreviewBlockIdentityPolicy
+import axion.client.render.PreviewVisualPolicy
 import axion.client.render.RenderLayerCompat
 import axion.client.render.ShaderPackCompat
 import axion.client.render.TintedAlphaVertexConsumer
@@ -114,13 +116,17 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
             translationDelta.z,
         )
 
-        refreshDirtyBuffers(world, effectiveCamera)
-        if (chunkBuffers.isEmpty()) return ChunkedDrawResult.NO_BUFFERS
-
+        // Checked before the rebuild: the legacy path tessellates from `store`
+        // and `states` every frame, so uploading GPU buffers it will never draw
+        // is pure waste. Leaving the sections dirty also means they rebuild if
+        // the direct path becomes usable again.
         if (ShaderPackCompat.shouldDisableDirectGpuPreview()) {
             renderLegacy(context, world, color, alpha, translationDelta)
             return ChunkedDrawResult.DREW
         }
+
+        refreshDirtyBuffers(world, effectiveCamera)
+        if (chunkBuffers.isEmpty()) return ChunkedDrawResult.NO_BUFFERS
 
         resortBuffers(effectiveCamera)
 
@@ -156,11 +162,18 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
         val client = MinecraftClient.getInstance()
         val camera = client.gameRenderer.camera
         val cameraPos = CameraAccess.getPos(camera)
-        val blockRenderer = BlockRenderManager(true, true, client.blockColors)
+        val blockRenderer = BlockRenderManager(
+            PreviewBlockIdentityPolicy.usesAmbientOcclusion(previewId),
+            true,
+            client.blockColors,
+        )
         val modelSet = client.modelManager.blockStateModelSet
         val consumer = TintedAlphaVertexConsumer(
             context.consumers().getBuffer(
-                VersionCompatImpl.getBufferedPreviewShellLayer(RenderLayerCompat.blockTranslucentCull()),
+                VersionCompatImpl.getBufferedPreviewShellLayer(
+                    RenderLayerCompat.blockTranslucentCull(),
+                    PreviewVisualPolicy.ignoresTextureAlpha(previewId),
+                ),
             ),
             alpha / 255.0f,
             color,
@@ -215,6 +228,7 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
         return AxionPreviewBlockDrawer.drawChunked(
             chunkBuffers, color, alpha, translationDelta,
             baseModelView, cameraPos, projection, sceneDepth,
+            PreviewVisualPolicy.ignoresTextureAlpha(previewId),
         )
     }
 
@@ -343,7 +357,11 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
         statesByPosition: Map<Long, BlockState>,
     ): PendingSectionMesh? {
         val client = MinecraftClient.getInstance()
-        val blockRenderer = BlockRenderManager(true, true, client.blockColors)
+        val blockRenderer = BlockRenderManager(
+            PreviewBlockIdentityPolicy.usesAmbientOcclusion(previewId),
+            true,
+            client.blockColors,
+        )
         val modelSet = client.modelManager.blockStateModelSet
         val layer = RenderLayerCompat.blockTranslucentCull()
         // 26.2 dropped RenderType.bufferSize() — buffers are managed by the

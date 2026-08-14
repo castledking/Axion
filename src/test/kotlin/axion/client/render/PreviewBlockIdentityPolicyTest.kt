@@ -57,4 +57,20 @@ class PreviewBlockIdentityPolicyTest {
             ),
         )
     }
+
+    @Test
+    fun `move-source glass skips ambient occlusion so sky light reads through the replacement`() {
+        assertEquals(
+            false,
+            PreviewBlockIdentityPolicy.usesAmbientOcclusion(
+                "ghost:${PreviewBlockIdentityPolicy.MOVE_SOURCE_SESSION_TAG}",
+            ),
+        )
+    }
+
+    @Test
+    fun `destination ghosts keep ambient occlusion so the previewed shape stays legible`() {
+        assertEquals(true, PreviewBlockIdentityPolicy.usesAmbientOcclusion("ghost:placement-destination"))
+        assertEquals(true, PreviewBlockIdentityPolicy.usesAmbientOcclusion("ghost:default"))
+    }
 }

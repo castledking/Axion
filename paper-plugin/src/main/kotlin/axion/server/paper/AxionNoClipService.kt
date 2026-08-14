@@ -1,38 +1,43 @@
 package axion.server.paper
 
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask
 import net.minecraft.server.level.ServerPlayer
 import org.bukkit.Bukkit
 import org.bukkit.GameMode
 import org.bukkit.craftbukkit.entity.CraftPlayer
 import org.bukkit.entity.Player
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 class AxionNoClipService(
     private val plugin: AxionPaperPlugin,
 ) {
-    private val armedPlayers: MutableSet<UUID> = linkedSetOf()
-    private var taskId: Int = -1
+    private val armedPlayers: MutableSet<UUID> = ConcurrentHashMap.newKeySet()
+    private val tickTasks = ConcurrentHashMap<UUID, ScheduledTask>()
+
+    @Volatile
+    private var running = false
 
     fun start() {
-        if (taskId != -1) {
-            return
-        }
-
-        taskId = Bukkit.getScheduler().scheduleSyncRepeatingTask(plugin, Runnable {
-            armedPlayers.toList().forEach { playerId ->
-                Bukkit.getPlayer(playerId)?.let(::applyState)
+        // Region threading has no server-wide sync tick to hook, so each armed
+        // player is ticked on their own region from setArmed().
+        running = true
+        Bukkit.getOnlinePlayers().forEach { player ->
+            if (armedPlayers.contains(player.uniqueId)) {
+                startTicking(player)
             }
-        }, 1L, 1L)
+        }
     }
 
     fun stop() {
-        if (taskId != -1) {
-            Bukkit.getScheduler().cancelTask(taskId)
-            taskId = -1
-        }
+        running = false
+        tickTasks.values.forEach(ScheduledTask::cancel)
+        tickTasks.clear()
 
         Bukkit.getOnlinePlayers().forEach { player ->
-            setNoPhysics(player, active = false)
+            AxionRegionSupport.runForEntity(plugin, player) {
+                setNoPhysics(player, active = false)
+            }
         }
         armedPlayers.clear()
     }
@@ -40,14 +45,17 @@ class AxionNoClipService(
     fun setArmed(player: Player, armed: Boolean) {
         if (armed) {
             armedPlayers += player.uniqueId
+            startTicking(player)
         } else {
             armedPlayers -= player.uniqueId
+            stopTicking(player.uniqueId)
         }
         applyState(player)
     }
 
     fun clear(player: Player) {
         armedPlayers -= player.uniqueId
+        stopTicking(player.uniqueId)
         setNoPhysics(player, active = false)
     }
 
@@ -66,6 +74,34 @@ class AxionNoClipService(
 
     private fun applyState(player: Player) {
         setNoPhysics(player, active = shouldEnableNoPhysics(player))
+    }
+
+    private fun startTicking(player: Player) {
+        val playerId = player.uniqueId
+        if (!running || tickTasks.containsKey(playerId)) {
+            return
+        }
+
+        val task = AxionRegionSupport.tickEntity(
+            plugin,
+            player,
+            period = 1L,
+            retired = { tickTasks.remove(playerId) },
+        ) {
+            if (armedPlayers.contains(playerId)) {
+                applyState(player)
+            } else {
+                stopTicking(playerId)
+            }
+        } ?: return
+
+        if (tickTasks.putIfAbsent(playerId, task) != null) {
+            task.cancel()
+        }
+    }
+
+    private fun stopTicking(playerId: UUID) {
+        tickTasks.remove(playerId)?.cancel()
     }
 
     private fun setNoPhysics(player: Player, active: Boolean) {

@@ -22,7 +22,7 @@ object GhostBlockPreviewRenderer {
     private const val LOG_INTERVAL_MS: Long = 1000
     private var lastLogTime: Long = 0
 
-    private const val GHOST_ALPHA: Int = PreviewVisualPolicy.DESTINATION_ALPHA
+    private const val GHOST_ALPHA: Int = PreviewVisualPolicy.CULLED_DESTINATION_ALPHA
     private const val MAX_GHOST_BLOCKS: Int = 65536
     private const val MAX_TEXTURED_GHOST_BLOCKS: Int = 32768
     private const val DEFAULT_GHOST_COLOR: Int = 0xFFFFFFFF.toInt()

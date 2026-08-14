@@ -10,6 +10,7 @@ import org.bukkit.Material
 import org.bukkit.World
 import org.bukkit.entity.Player
 import org.bukkit.plugin.Plugin
+import java.lang.reflect.Field
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 import java.util.IdentityHashMap
@@ -54,6 +55,7 @@ class GriefPreventionRegionAccessPolicy private constructor(
             ?: error("GriefPrevention not present")
         private val pluginClass: Class<*> = plugin.javaClass
         private val dataStore: Any = resolveDataStore(plugin)
+        private val ignoreClaimsAccessor: Pair<Method, Field> = reflectIgnoreClaimsAccessor(dataStore)
         private val allowBuildMethod: Method = pluginClass.methods.firstOrNull { method ->
             method.name == "allowBuild" &&
                 method.parameterCount == 3 &&
@@ -114,7 +116,14 @@ class GriefPreventionRegionAccessPolicy private constructor(
             getClaimAtArity = resolvedArity
         }
 
+        fun isIgnoringClaims(player: Player): Boolean =
+            reflectIsIgnoringClaims(dataStore, player.uniqueId, ignoreClaimsAccessor)
+
         fun firstDenied(player: Player, world: World, touchedPositions: Set<IntVector3>): ClaimDenial? {
+            if (isIgnoringClaims(player)) {
+                return null
+            }
+
             val claimResults = IdentityHashMap<Any, String?>()
             touchedPositions.forEach { position ->
                 val location = Location(world, position.x.toDouble(), position.y.toDouble(), position.z.toDouble())
@@ -178,24 +187,41 @@ class GriefPreventionRegionAccessPolicy private constructor(
             }
             throw IllegalStateException("GriefPrevention dataStore field not found")
         }
-
-        private fun findField(type: Class<*>, name: String): java.lang.reflect.Field? {
-            var current: Class<*>? = type
-            while (current != null) {
-                runCatching { current.getDeclaredField(name) }
-                    .getOrNull()
-                    ?.let { return it }
-                runCatching { current.getField(name) }
-                    .getOrNull()
-                    ?.let { return it }
-                current = current.superclass
-            }
-            return null
-        }
     }
 
     private data class ClaimDenial(
         val position: IntVector3,
         val message: String,
     )
+}
+
+internal fun reflectIgnoreClaimsAccessor(dataStore: Any): Pair<Method, Field> {
+    val getPlayerDataMethod = dataStore.javaClass.getMethod("getPlayerData", java.util.UUID::class.java)
+    val ignoreClaimsField = findField(getPlayerDataMethod.returnType, "ignoreClaims")
+        ?: error("PlayerData ignoreClaims field not found")
+    ignoreClaimsField.isAccessible = true
+    return getPlayerDataMethod to ignoreClaimsField
+}
+
+internal fun reflectIsIgnoringClaims(
+    dataStore: Any,
+    playerId: java.util.UUID,
+    accessor: Pair<Method, Field>,
+): Boolean {
+    val playerData = accessor.first.invoke(dataStore, playerId) ?: return false
+    return accessor.second.getBoolean(playerData)
+}
+
+internal fun findField(type: Class<*>, name: String): java.lang.reflect.Field? {
+    var current: Class<*>? = type
+    while (current != null) {
+        runCatching { current.getDeclaredField(name) }
+            .getOrNull()
+            ?.let { return it }
+        runCatching { current.getField(name) }
+            .getOrNull()
+            ?.let { return it }
+        current = current.superclass
+    }
+    return null
 }

@@ -1,5 +1,6 @@
 package axion.server.paper
 
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask
 import net.minecraft.server.level.ServerPlayer
 import org.bukkit.Bukkit
 import org.bukkit.GameMode
@@ -10,15 +11,19 @@ import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.event.player.PlayerToggleFlightEvent
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.abs
 
 class AxionFlightSpeedService(
     private val plugin: AxionPaperPlugin,
 ) : Listener {
     // Track players with blessed high flight speeds
-    private val blessedPlayers: MutableSet<UUID> = LinkedHashSet()
-    private val playerSpeedMultipliers: MutableMap<UUID, Float> = LinkedHashMap()
-    private var taskId: Int = -1
+    private val blessedPlayers: MutableSet<UUID> = ConcurrentHashMap.newKeySet()
+    private val playerSpeedMultipliers = ConcurrentHashMap<UUID, Float>()
+    private val tickTasks = ConcurrentHashMap<UUID, ScheduledTask>()
+
+    @Volatile
+    private var running = false
 
     // Threshold for blessing - speeds above this get special handling
     private val BLESSING_THRESHOLD = 5.0f // 500%
@@ -27,35 +32,35 @@ class AxionFlightSpeedService(
     private val VANILLA_FLY_SPEED = 0.05f
 
     fun start() {
-        if (taskId != -1) {
-            return
-        }
-
-        // Register events
-        plugin.server.pluginManager.registerEvents(this, plugin)
-
-        // Periodic task to monitor and bless high-speed flyers
-        taskId = Bukkit.getScheduler().scheduleSyncRepeatingTask(plugin, Runnable {
-            blessedPlayers.toList().forEach { playerId ->
-                Bukkit.getPlayer(playerId)?.let { player ->
-                    applyBlessing(player)
-                }
+        // Blessed flyers are monitored per player on the region that owns them;
+        // region threading offers no server-wide sync task to hook.
+        running = true
+        Bukkit.getOnlinePlayers().forEach { player ->
+            if (blessedPlayers.contains(player.uniqueId)) {
+                startTicking(player)
             }
-        }, 1L, 1L)
+        }
 
         plugin.logger.info("Axion Flight Speed Service started")
     }
 
     fun stop() {
-        if (taskId != -1) {
-            Bukkit.getScheduler().cancelTask(taskId)
-            taskId = -1
-        }
+        running = false
+        tickTasks.values.forEach(ScheduledTask::cancel)
+        tickTasks.clear()
 
         // Clear all blessings
         blessedPlayers.toList().forEach { playerId ->
             Bukkit.getPlayer(playerId)?.let { player ->
-                removeBlessing(player)
+                val scheduled = AxionRegionSupport.runForEntity(plugin, player) {
+                    removeBlessing(player)
+                }
+                if (!scheduled) {
+                    // Plugin disable races region shutdown, and flight speed is
+                    // persisted in the player's data — write it back directly
+                    // rather than leaving a blessed speed saved to disk.
+                    runCatching { removeBlessing(player) }
+                }
             }
         }
 
@@ -73,9 +78,11 @@ class AxionFlightSpeedService(
 
         if (speedMultiplier >= BLESSING_THRESHOLD) {
             blessedPlayers += uuid
+            startTicking(player)
             applyBlessing(player)
         } else {
             blessedPlayers -= uuid
+            stopTicking(uuid)
             removeBlessing(player)
         }
     }
@@ -87,6 +94,7 @@ class AxionFlightSpeedService(
         val uuid = player.uniqueId
         blessedPlayers -= uuid
         playerSpeedMultipliers.remove(uuid)
+        stopTicking(uuid)
         removeBlessing(player)
     }
 
@@ -115,8 +123,37 @@ class AxionFlightSpeedService(
         if (!event.isFlying) {
             // Player stopped flying - remove blessing
             blessedPlayers -= player.uniqueId
+            stopTicking(player.uniqueId)
             removeBlessing(player)
         }
+    }
+
+    private fun startTicking(player: Player) {
+        val playerId = player.uniqueId
+        if (!running || tickTasks.containsKey(playerId)) {
+            return
+        }
+
+        val task = AxionRegionSupport.tickEntity(
+            plugin,
+            player,
+            period = 1L,
+            retired = { tickTasks.remove(playerId) },
+        ) {
+            if (blessedPlayers.contains(playerId)) {
+                applyBlessing(player)
+            } else {
+                stopTicking(playerId)
+            }
+        } ?: return
+
+        if (tickTasks.putIfAbsent(playerId, task) != null) {
+            task.cancel()
+        }
+    }
+
+    private fun stopTicking(playerId: UUID) {
+        tickTasks.remove(playerId)?.cancel()
     }
 
     private fun applyBlessing(player: Player) {

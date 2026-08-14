@@ -18,8 +18,8 @@ object RepeatPreviewRenderer {
     private const val MAX_COLLISION_PULSE_BLOCKS: Int = 2048
     private const val MAX_DESTINATION_OCCUPANCY_CELLS: Long = 4_000_000L
     private const val DESTINATION_GHOST_COLOR: Int = 0xFFFFFFFF.toInt()
-    private const val DEFAULT_GHOST_ALPHA: Int = PreviewVisualPolicy.DESTINATION_ALPHA
-    private const val SPARSE_GHOST_ALPHA: Int = PreviewVisualPolicy.SPARSE_DESTINATION_ALPHA
+    private const val DEFAULT_GHOST_ALPHA: Int = PreviewVisualPolicy.CULLED_DESTINATION_ALPHA
+    private const val SPARSE_GHOST_ALPHA: Int = PreviewVisualPolicy.CULLED_SPARSE_DESTINATION_ALPHA
     // Full size: see DESTINATION_GHOST_SCALE in PlacementPreviewRenderer -- a
     // per-block shrink only takes effect on the CPU fallback path and shows up
     // there as seams between neighbouring preview blocks.

@@ -61,6 +61,7 @@ import net.minecraft.util.Identifier
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Vec3d
 import net.minecraft.client.renderer.texture.TextureAtlas
+import net.minecraft.data.AtlasIds
 import net.minecraft.client.renderer.rendertype.RenderSetup
 import net.minecraft.util.ProblemReporter
 import net.minecraft.world.entity.EntityProcessor
@@ -71,6 +72,7 @@ import axion.common.compat.VersionCompat
 import java.util.concurrent.ConcurrentHashMap
 
 object VersionCompatImpl : VersionCompat {
+    private val logger = org.slf4j.LoggerFactory.getLogger(VersionCompatImpl::class.java)
     override fun getBlock(id: Identifier): Block? {
         return Registries.BLOCK.getOptional(id).orElse(null)
     }
@@ -197,19 +199,44 @@ object VersionCompatImpl : VersionCompat {
 
     private var currentAtlasSampler: com.mojang.blaze3d.textures.GpuSampler? = null
 
+    /**
+     * Resolves the stitched block atlas for the direct preview pass.
+     *
+     * `AtlasManager` keys two separate maps: `atlasByTexture` by the texture
+     * path and `atlasById` by the atlas id. `getAtlasOrThrow` reads the *id*
+     * map, so the natural-looking `TextureAtlas.LOCATION_BLOCKS`
+     * (`minecraft:textures/atlas/blocks.png`) is never a key there and throws
+     * `IllegalArgumentException` — which is why that constant is deprecated.
+     * The id is `AtlasIds.BLOCKS` (`minecraft:blocks`).
+     *
+     * `RenderSetup.withTexture` still wants the texture path, so the buffered
+     * preview layer a few lines below is correct as written and must not be
+     * changed to match this.
+     */
     fun getBlockAtlasTextureView(client: MinecraftClient): GpuTextureView? {
         return try {
-            val atlas = client.atlasManager.getAtlasOrThrow(TextureAtlas.LOCATION_BLOCKS)
+            val atlas = client.atlasManager.getAtlasOrThrow(AtlasIds.BLOCKS)
             currentAtlasSampler = atlas.sampler
             atlas.textureView
-        } catch (_: Exception) {
+        } catch (t: Throwable) {
+            logger.warn("[Axion GPU] Could not resolve the block atlas for the preview pass", t)
             null
         }
     }
 
-    fun bindTextureToRenderPass(pass: RenderPass, samplerName: String, textureView: GpuTextureView) {
-        val sampler = currentAtlasSampler ?: return
+    /**
+     * Binds the block atlas for the preview pass, reporting whether it took.
+     *
+     * The GL backend silently skips a sampler the pass never bound — its
+     * "missing texture" check only runs under render-pass validation, which is
+     * off in production — so an unbound Sampler0 draws the preview against
+     * whatever texture the slot happens to hold and reads as a near-black mass.
+     * The caller aborts on false so the engine-managed fallback renders instead.
+     */
+    fun bindTextureToRenderPass(pass: RenderPass, samplerName: String, textureView: GpuTextureView): Boolean {
+        val sampler = currentAtlasSampler ?: return false
         pass.bindTexture(samplerName, textureView, sampler)
+        return true
     }
 
     fun getRenderPipeline(layer: RenderLayer): RenderPipeline {
@@ -222,12 +249,17 @@ object VersionCompatImpl : VersionCompat {
     // destination faces stable without allowing previews through foreground
     // terrain.
     private val previewDepthState = if (PreviewVisualPolicy.XRAY_BLOCK_PREVIEWS) {
-        DepthStencilState(CompareOp.ALWAYS_PASS, false, 0.0f, 0.0f)
+        DepthStencilState(CompareOp.ALWAYS_PASS, true, 0.0f, 0.0f)
     } else {
-        DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL, false, 1.0f, 1.0f)
+        DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL, true, 1.0f, 1.0f)
     }
-    private val previewShellPipelines = ConcurrentHashMap<net.minecraft.client.render.DrawMode, RenderPipeline>()
-    private val bufferedPreviewShellLayers = ConcurrentHashMap<RenderLayer, RenderLayer>()
+    private data class PreviewShellKey(
+        val drawMode: net.minecraft.client.render.DrawMode,
+        val ignoreTextureAlpha: Boolean,
+    )
+
+    private val previewShellPipelines = ConcurrentHashMap<PreviewShellKey, RenderPipeline>()
+    private val bufferedPreviewShellLayers = ConcurrentHashMap<Pair<RenderLayer, Boolean>, RenderLayer>()
     private val blockAtlasSampler = java.util.function.Supplier {
         RenderSystem.getSamplerCache().getSampler(
             AddressMode.CLAMP_TO_EDGE,
@@ -238,11 +270,20 @@ object VersionCompatImpl : VersionCompat {
         )
     }
 
+    /**
+     * @param ignoreTextureAlpha drops the sampled texel alpha from the result so
+     * the shell's opacity is exactly the vertex/modulator alpha. Destination
+     * ghosts want this: their alpha is a policy constant derived for a known
+     * number of shell crossings, and compounding a translucent block's texel
+     * alpha into it makes the ghost patchily see-through. Move-source glass
+     * wants the opposite and passes false.
+     */
     fun getPreviewShellPipeline(
         vertexFormat: VertexFormat,
         drawMode: net.minecraft.client.render.DrawMode,
+        ignoreTextureAlpha: Boolean,
     ): RenderPipeline {
-        return previewShellPipelines.computeIfAbsent(drawMode) {
+        return previewShellPipelines.computeIfAbsent(PreviewShellKey(drawMode, ignoreTextureAlpha)) { key ->
             // 26.2 replaced the per-pipeline withUniform/withSampler calls (and
             // the private MATRICES_PROJECTION_SNIPPET they were bundled into)
             // with shared BindGroupLayouts. MATRICES_PROJECTION carries the
@@ -257,13 +298,18 @@ object VersionCompatImpl : VersionCompat {
                 .withBindGroupLayout(BindGroupLayouts.SAMPLER0)
                 .withColorTargetState(ColorTargetState(BlendFunction.TRANSLUCENT))
                 // Read reversed scene depth so foreground terrain hides the
-                // translucent preview. Depth writes remain off so the preview
-                // never hides later rendering.
+                // translucent preview. Its own surface depth masks only later
+                // passes such as clouds, which END_MAIN has not drawn yet.
                 .withDepthStencilState(previewDepthState)
                 .withCull(PreviewVisualPolicy.CULL_GHOST_BACK_FACES)
+                .also { builder ->
+                    if (key.ignoreTextureAlpha) {
+                        builder.withShaderDefine(PreviewVisualPolicy.IGNORE_TEXTURE_ALPHA_DEFINE)
+                    }
+                }
                 // withVertexFormat(fmt, mode) split into two calls in 26.2.
                 .withVertexBinding(0, vertexFormat)
-                .withPrimitiveTopology(drawMode)
+                .withPrimitiveTopology(key.drawMode)
                 .build()
         }
     }
@@ -273,22 +319,23 @@ object VersionCompatImpl : VersionCompat {
      *
      * CPU fallback tessellation still needs a RenderLayer so Minecraft can batch
      * and submit its vertices. Wrapping the existing preview pipeline keeps the
-     * same no-cull/depth-policy/no-depth-write contract while RenderSetup supplies
+     * same no-cull/depth-policy/depth-mask contract while RenderSetup supplies
      * the block atlas and vanilla's translucent upload sorting.
      */
-    fun getBufferedPreviewShellLayer(baseLayer: RenderLayer): RenderLayer {
+    fun getBufferedPreviewShellLayer(baseLayer: RenderLayer, ignoreTextureAlpha: Boolean): RenderLayer {
         // Iris only maps vanilla RenderLayer instances to a shader-pack
         // program. Preserve the known-good vanilla fallback while a pack is
         // active; the custom layer is for Minecraft's normal renderer.
         if (ShaderPackCompat.isShaderPackActive()) return baseLayer
-        return bufferedPreviewShellLayers.computeIfAbsent(baseLayer) { layer ->
+        return bufferedPreviewShellLayers.computeIfAbsent(baseLayer to ignoreTextureAlpha) { (layer, ignoreAlpha) ->
             val setup = RenderSetup.builder(
-                getPreviewShellPipeline(layer.format(), layer.primitiveTopology()),
+                getPreviewShellPipeline(layer.format(), layer.primitiveTopology(), ignoreAlpha),
             )
                 .withTexture("Sampler0", TextureAtlas.LOCATION_BLOCKS, blockAtlasSampler)
                 .sortOnUpload()
                 .createRenderSetup()
-            RenderLayerCompat.createPipelineLayer("axion_preview_shell_cpu", setup)
+            val name = if (ignoreAlpha) "axion_preview_shell_cpu" else "axion_preview_shell_cpu_textured_alpha"
+            RenderLayerCompat.createPipelineLayer(name, setup)
         }
     }
 
