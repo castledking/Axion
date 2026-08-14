@@ -23,6 +23,7 @@ object VanillaHudButtonStore {
     const val KEEP_EXISTING: String = "toolbar.keep_existing"
     const val COPY_ENTITIES: String = "toolbar.copy_entities"
     const val COPY_AIR: String = "toolbar.copy_air"
+    const val FINISH_TESTING: String = "toolbar.finish_testing"
 
     private data class ButtonSpec(
         val label: String,

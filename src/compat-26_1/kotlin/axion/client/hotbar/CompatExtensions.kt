@@ -88,3 +88,7 @@ val net.minecraft.client.OptionInstance<HumanoidArm>.value: HumanoidArm
 
 val Direction.vector: Vec3i
     get() = Vec3i(unitVec3i.x, unitVec3i.y, unitVec3i.z)
+
+fun MinecraftClient.scheduleStop() {
+    stop()
+}

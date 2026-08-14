@@ -134,6 +134,8 @@ object AxionHudLayout {
 
     fun middleClickToggleBounds(sideSlot: SlotBounds): ToggleButtonBounds = leftColumnToggleBounds(sideSlot, rowFromBottom = 3)
 
+    fun finishTestingBounds(sideSlot: SlotBounds): ToggleButtonBounds = leftColumnToggleBounds(sideSlot, rowFromBottom = 4)
+
     fun keepExistingToggleBounds(sideSlot: SlotBounds): ToggleButtonBounds = leftColumnToggleBounds(sideSlot, rowFromBottom = 2)
 
     fun copyEntitiesToggleBounds(sideSlot: SlotBounds): ToggleButtonBounds = leftColumnToggleBounds(sideSlot, rowFromBottom = 1)
@@ -203,6 +205,19 @@ object AxionHudLayout {
                 modeX += modeWidths[index] + ACTION_BUTTON_GAP
             }
         }
+    }
+
+    fun finishTestingSavedHotbarBounds(screenWidth: Int, screenHeight: Int, page: Int): ToggleButtonBounds {
+        val actionButtons = savedHotbarActionButtons(screenWidth, screenHeight, page)
+        val displayEntityPlaceholder = actionButtons.first {
+            it.action == SavedHotbarMenuAction.CREATE_DISPLAY_ENTITY
+        }
+        return ToggleButtonBounds(
+            x = displayEntityPlaceholder.x,
+            y = displayEntityPlaceholder.y,
+            width = displayEntityPlaceholder.width,
+            height = displayEntityPlaceholder.height,
+        )
     }
 
     fun savedHotbarPageButtons(screenWidth: Int, screenHeight: Int, page: Int): List<SavedHotbarPageButtonBounds> {

@@ -144,6 +144,12 @@ object AxionHotbarHud {
         )
 
         if (expandedTools) {
+            if (AxionDevTestSession.isActive) {
+                renderFinishTestingButton(
+                    context = context,
+                    sideSlot = sideSlot,
+                )
+            }
             renderMiddleClickToggle(
                 context = context,
                 sideSlot = sideSlot,
@@ -314,6 +320,16 @@ object AxionHotbarHud {
             val centerX = context.scaledWindowWidth / 2
             drawHotbarSwapperRegion(context, HOTBAR_GRID_BG, centerX - 91, context.scaledWindowHeight - 182)
             renderSavedHotbarActionButtons(context, client, page)
+            if (AxionDevTestSession.isActive) {
+                renderFinishTestingButton(
+                    context,
+                    AxionHudLayout.finishTestingSavedHotbarBounds(
+                        context.scaledWindowWidth,
+                        context.scaledWindowHeight,
+                        page,
+                    ),
+                )
+            }
 
             val hoveredSlot = findHoveredSlot(client, context.scaledWindowWidth, context.scaledWindowHeight, rowBounds)
 
@@ -363,7 +379,9 @@ object AxionHotbarHud {
             context.scaledWindowWidth,
             context.scaledWindowHeight,
             page,
-        ).forEach { bounds ->
+        ).filterNot { bounds ->
+            AxionDevTestSession.isActive && bounds.action == SavedHotbarMenuAction.CREATE_DISPLAY_ENTITY
+        }.forEach { bounds ->
             VanillaHudButtonStore.render(
                 context = context,
                 key = VanillaHudButtonStore.actionKey(bounds.action),
@@ -663,6 +681,28 @@ object AxionHotbarHud {
             bounds.width,
             bounds.height,
             selected = enabled,
+        )
+    }
+
+    private fun renderFinishTestingButton(
+        context: DrawContext,
+        sideSlot: AxionHudLayout.SlotBounds,
+    ) {
+        renderFinishTestingButton(context, AxionHudLayout.finishTestingBounds(sideSlot))
+    }
+
+    private fun renderFinishTestingButton(
+        context: DrawContext,
+        bounds: AxionHudLayout.ToggleButtonBounds,
+    ) {
+        VanillaHudButtonStore.render(
+            context,
+            VanillaHudButtonStore.FINISH_TESTING,
+            "Finish testing",
+            bounds.x,
+            bounds.y,
+            bounds.width,
+            bounds.height,
         )
     }
 

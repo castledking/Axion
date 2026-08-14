@@ -24,6 +24,7 @@ BUILD_FIRST="${BUILD_FIRST:-false}"
 BUILD_ONLY="${BUILD_ONLY:-false}"
 STARTED_SERVER_PIDS=()
 STARTED_CLIENT_PIDS=()
+CLIENT_MATRIX_MARKERS=()
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -73,8 +74,8 @@ if [[ "$ARGS_PROVIDED" == "false" && $# -eq 0 ]]; then
     echo " 12) 1.21.11"
     echo " 13) 26.1"
     echo " 14) 26.2 (default)"
-    echo " 14) All versions"
-    read -p "Enter choice [1-14 or comma-separated]: " version_choice
+    echo " 15) All versions"
+    read -r -p "Enter choice [1-15 or comma-separated]: " version_choice
 
     # Convert comma-separated choices to version list
     if [[ "$version_choice" == *,* ]]; then
@@ -96,7 +97,7 @@ if [[ "$ARGS_PROVIDED" == "false" && $# -eq 0 ]]; then
                 12) selected_versions+=("1.21.11") ;;
                 13) selected_versions+=("26.1") ;;
                 14) selected_versions+=("26.2") ;;
-                14) selected_versions+=("all") ;;
+                15) selected_versions+=("all") ;;
                 *) ;;
             esac
         done
@@ -118,33 +119,33 @@ if [[ "$ARGS_PROVIDED" == "false" && $# -eq 0 ]]; then
             12) VERSION_ARG="1.21.11" ;;
             13) VERSION_ARG="26.1" ;;
             14) VERSION_ARG="26.2" ;;
-            14) VERSION_ARG="all" ;;
+            15) VERSION_ARG="all" ;;
             *) VERSION_ARG="26.2" ;;
         esac
     fi
 
     echo ""
-    read -p "Start Paper server? [y/N]: " paper_choice
+    read -r -p "Start Paper server? [y/N]: " paper_choice
     if [[ "$paper_choice" =~ ^[Yy]$ ]]; then
         WITH_PAPER=true
     fi
 
-    read -p "Start Fabric server? [y/N]: " fabric_choice
+    read -r -p "Start Fabric server? [y/N]: " fabric_choice
     if [[ "$fabric_choice" =~ ^[Yy]$ ]]; then
         WITH_FABRIC=true
     fi
 
-    read -p "Enable quickplay? [y/N]: " quickplay_choice
+    read -r -p "Enable quickplay? [y/N]: " quickplay_choice
     if [[ "$quickplay_choice" =~ ^[Yy]$ ]]; then
         QUICKPLAY=true
     fi
 
-    read -p "Build before launching? [y/N]: " build_choice
+    read -r -p "Build before launching? [y/N]: " build_choice
     if [[ "$build_choice" =~ ^[Yy]$ ]]; then
         BUILD_FIRST=true
     fi
 
-    read -p "Build only (don't launch)? [y/N]: " build_only_choice
+    read -r -p "Build only (don't launch)? [y/N]: " build_only_choice
     if [[ "$build_only_choice" =~ ^[Yy]$ ]]; then
         BUILD_ONLY=true
         BUILD_FIRST=true
@@ -186,6 +187,10 @@ if [[ "$VERSION_ARG" == "-h" || "$VERSION_ARG" == "--help" ]]; then
     echo "  QUICKPLAY=true      Auto-join server or latest world"
     echo "  BUILD_FIRST=true    Build before launching (default: false)"
     echo "  BUILD_ONLY=true     Build only, don't launch clients"
+    echo ""
+    echo "MULTI-VERSION TESTING:"
+    echo "  Clients run one at a time. In a world, hold Alt and click 'Finish testing'"
+    echo "  to close the current client and launch the next selected version."
     echo ""
     echo "INTERACTIVE MODE:"
     echo "  Running ./run-axion.sh without arguments shows an interactive prompt"
@@ -846,6 +851,9 @@ stop_clients() {
 cleanup() {
     local status=$?
     trap - EXIT
+    if [[ ${#CLIENT_MATRIX_MARKERS[@]} -gt 0 ]]; then
+        rm -f -- "${CLIENT_MATRIX_MARKERS[@]}"
+    fi
     stop_clients
     stop_servers
     echo
@@ -971,20 +979,10 @@ install_cached_client_mod() {
     local target_file="$mods_dir/${mod_name}-${mc_version}.jar"
 
     mkdir -p "$cache_dir"
-    local should_download=false
+    # Modrinth version IDs are immutable and part of the cache filename, so an
+    # existing file never needs a time-based refresh. Changing a compatibility
+    # pin naturally selects a different cache entry.
     if [[ ! -f "$cached_file" ]]; then
-        should_download=true
-    else
-        # Re-download if cached file is older than 7 days
-        local file_age
-        file_age=$(find "$cached_file" -mtime +7 -print 2>/dev/null)
-        if [[ -n "$file_age" ]]; then
-            should_download=true
-            echo "  Cached $mod_name is older than 7 days, updating..."
-        fi
-    fi
-
-    if [[ "$should_download" == true ]]; then
         download_modrinth_version "$version_id" "$cached_file" "${mod_name} for Minecraft ${mc_version}" || return 0
     fi
 
@@ -1123,6 +1121,7 @@ desired = {
     "fullscreen": "false",
     "narrator": "0",
     "onboardAccessibility": "false",
+    "soundCategory_music": "0.0",
     "tutorialStep": "none",
 }
 
@@ -1148,12 +1147,20 @@ PY
 install_servers_dat() {
     local client_run_dir="$1"
     local server_list_source="$ROOT_DIR/run/servers.dat"
+    local client_server_list="$client_run_dir/servers.dat"
 
     generate_servers_dat "$server_list_source"
 
-    rm -f "$client_run_dir/servers.dat" "$client_run_dir/servers.dat_old"
+    # A single-version launch uses run/ directly, so the generated source is
+    # already the client's servers.dat. Do not delete it before copying.
+    if [[ "$client_server_list" == "$server_list_source" ]]; then
+        cp "$server_list_source" "$client_run_dir/servers.dat_old"
+        return
+    fi
+
+    rm -f "$client_server_list" "$client_run_dir/servers.dat_old"
     if [[ -f "$server_list_source" ]]; then
-        cp "$server_list_source" "$client_run_dir/servers.dat"
+        cp "$server_list_source" "$client_server_list"
         cp "$server_list_source" "$client_run_dir/servers.dat_old"
     else
         echo "Warning: servers.dat not generated, skipping server list copy"
@@ -1224,14 +1231,12 @@ prepare_client_workspace() {
     local version="$1"
     local workspace="$ROOT_DIR/.run-workspaces/$version"
 
-    if [[ ${#VERSIONS[@]} -eq 1 ]]; then
-        echo "$ROOT_DIR"
-        return 0
-    fi
-
     echo "  Preparing isolated Gradle workspace for $version..." >&2
     mkdir -p "$workspace"
-    rsync -a --delete --delete-excluded \
+    # Keep excluded Gradle/build directories in an existing workspace. Gradle
+    # invalidates changed inputs itself, while retaining these directories turns
+    # subsequent matrix launches into incremental builds instead of cold builds.
+    rsync -a --delete \
         --exclude='.agents/' \
         --exclude='.codex/' \
         --exclude='.factory/' \
@@ -1333,6 +1338,7 @@ start_client() {
     local fabric_kotlin_version
     local modmenu_version
     local loom_version
+    local matrix_marker
     local quickplay_args=()
 
     mc_version="$(resolve_mc_version "$version")"
@@ -1344,6 +1350,12 @@ start_client() {
 
     client_run_dir="$(client_run_dir_for "$version")"
     prepare_client_run_dir "$client_run_dir"
+    matrix_marker="$client_run_dir/.axion-test-matrix"
+    rm -f -- "$matrix_marker"
+    if [[ ${#VERSIONS[@]} -gt 1 ]]; then
+        printf '%s\n' "Created by ./run-axion.sh for sequential Axion client testing." > "$matrix_marker"
+        CLIENT_MATRIX_MARKERS=("$matrix_marker")
+    fi
     gradle_dir="$(prepare_client_workspace "$version")"
     gradle_run_dir="$(relative_path "$gradle_dir" "$client_run_dir")"
 
@@ -1377,6 +1389,9 @@ start_client() {
 
     local client_pid=$!
     STARTED_CLIENT_PIDS+=("$client_pid")
+    LAST_STARTED_CLIENT_PID="$client_pid"
+    LAST_STARTED_CLIENT_VERSION="$mc_version"
+    LAST_STARTED_CLIENT_MARKER="$matrix_marker"
     echo "  Client for $mc_version started with PID: $client_pid"
 }
 
@@ -1416,18 +1431,25 @@ if [[ "$WITH_FABRIC" == "true" ]]; then
     done
 fi
 
-for version in "${VERSIONS[@]}"; do
+client_status=0
+for i in "${!VERSIONS[@]}"; do
+    version="${VERSIONS[$i]}"
+    echo
+    echo "==> Client $((i + 1))/${#VERSIONS[@]}: $version"
     start_client "$version"
     if [[ ${#VERSIONS[@]} -gt 1 ]]; then
-        sleep 3
+        echo "  Test Minecraft $LAST_STARTED_CLIENT_VERSION, then hold Alt in the Axion menu and click 'Finish testing'."
     fi
-done
-
-client_status=0
-for pid in "${STARTED_CLIENT_PIDS[@]}"; do
-    if ! wait "$pid"; then
+    if wait "$LAST_STARTED_CLIENT_PID"; then
+        echo "  Minecraft $LAST_STARTED_CLIENT_VERSION finished."
+    else
+        client_exit_status=$?
         client_status=1
+        echo "  WARNING: Minecraft $LAST_STARTED_CLIENT_VERSION exited with status $client_exit_status; continuing the test matrix." >&2
     fi
+    rm -f -- "$LAST_STARTED_CLIENT_MARKER"
+    CLIENT_MATRIX_MARKERS=()
+    STARTED_CLIENT_PIDS=()
 done
 
 echo

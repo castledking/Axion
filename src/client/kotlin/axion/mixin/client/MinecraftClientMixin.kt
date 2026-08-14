@@ -4,7 +4,6 @@ import axion.client.input.AxionInteractionRouter
 import axion.client.input.AxionPrimaryActionRouting
 import axion.client.input.AxionShortcutPreemption
 import axion.client.mode.ClientModeController
-import axion.client.symmetry.SymmetryBreakController
 import net.minecraft.client.MinecraftClient
 import org.spongepowered.asm.mixin.Mixin
 import org.spongepowered.asm.mixin.injection.At
@@ -41,17 +40,7 @@ abstract class MinecraftClientMixin {
 
         // Infinite reach owns the primary click before generic symmetry. Both IR
         // handlers already dispatch their derived breaks with the protected origin.
-        val infiniteReachOwned = AxionPrimaryActionRouting.route(
-            handleBulldozerInfiniteReach = {
-                ClientModeController.handleBulldozerInfiniteReachBreaking(self())
-            },
-            handleInfiniteReach = {
-                ClientModeController.handleInfiniteReachBreaking(self())
-            },
-            handleGenericSymmetry = {
-                SymmetryBreakController.handlePrimaryAction(self())
-            },
-        )
+        val infiniteReachOwned = AxionPrimaryActionRouting.route(self())
         if (infiniteReachOwned) {
             ci.setReturnValue(false)
             ci.cancel()

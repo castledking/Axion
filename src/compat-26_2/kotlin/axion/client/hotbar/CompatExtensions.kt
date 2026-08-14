@@ -98,3 +98,7 @@ val Direction.vector: Vec3i
 fun MinecraftClient.setScreen(screen: net.minecraft.client.gui.screens.Screen?) {
     gui.setScreen(screen)
 }
+
+fun MinecraftClient.scheduleStop() {
+    stop()
+}

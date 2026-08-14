@@ -198,10 +198,10 @@ object WorldRenderCompat {
         val registered = registerBatchedListener("END_MAIN", "EndMain") { rawContext ->
             val ctx = AxionWorldRenderContext(rawContext)
             try {
-                for (cb in endMainCallbacks) cb(ctx)
+                    for (cb in endMainCallbacks) cb(ctx)
                 // Flush deferred draws with no parameters - use internal defaults
-                flushDeferredDraws()
-                ctx.drawConsumers()
+                    flushDeferredDraws()
+                    ctx.drawConsumers()
             } catch (e: Throwable) {
                 logger.error("[Axion/Render] END_MAIN dispatch error", e)
             }

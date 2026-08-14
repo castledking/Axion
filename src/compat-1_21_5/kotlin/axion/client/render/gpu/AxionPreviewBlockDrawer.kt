@@ -102,6 +102,11 @@ object AxionPreviewBlockDrawer {
         val drawList = SectionDrawList.buildAll(sectionBuffers)
         if (drawList.isEmpty()) return ChunkedDrawResult.NO_BUFFERS
 
+        // The 1.21.5 backend cannot upload/grow buffers while a pass is open.
+        // Pre-warm shared sequential indices for every section before creating
+        // the direct preview pass.
+        drawList.forEach { it.buffer.prepareSequentialIndexBuffer() }
+
         val r = ((color shr 16) and 0xFF) / 255f
         val g = ((color shr 8) and 0xFF) / 255f
         val b = (color and 0xFF) / 255f
@@ -113,64 +118,85 @@ object AxionPreviewBlockDrawer {
         val camY = cameraPos.y
         val camZ = cameraPos.z
 
-        val projMatrix = RenderSystem.getProjectionMatrix()
+        // 1.21.5's GL backend ignores RenderPass.setUniform for anything in
+        // ShaderProgram.PREDEFINED_UNIFORMS. GlResourceManager.setupRenderPass
+        // applies the pass-local values first, then calls
+        // ShaderProgram.initializeUniforms(mode, RenderSystem.getModelViewMatrix(),
+        // RenderSystem.getProjectionMatrix(), ...) which overwrites ModelViewMat,
+        // ProjMat and ColorModulator from the RenderSystem globals before the
+        // uniforms are uploaded. Setting them on the pass silently collapses every
+        // section onto the same origin with an untinted colour, so the per-section
+        // transform and the preview tint are published through RenderSystem here.
+        // 1.21.6+ has DynamicTransforms/bindDefaultUniforms and does not need this.
+        val modelViewStack = RenderSystem.getModelViewStack()
+        val previousColor = RenderSystem.getShaderColor().copyOf()
 
-        val encoder = device.createCommandEncoder()
-        val pass = encoder.createRenderPass(
-            colorAttachment,
-            OptionalInt.empty(),
-            depthAttachment,
-            OptionalDouble.empty(),
-        )
+        modelViewStack.pushMatrix()
+        RenderSystem.setShaderColor(r, g, b, a)
         try {
-            pass.setPipeline(RenderPipelines.RENDERTYPE_TRANSLUCENT_MOVING_BLOCK)
-            pass.setUniform("ProjMat", projMatrix)
-            pass.setUniform("ColorModulator", r, g, b, a)
+            val encoder = device.createCommandEncoder()
+            val pass = encoder.createRenderPass(
+                colorAttachment,
+                OptionalInt.empty(),
+                depthAttachment,
+                OptionalDouble.empty(),
+            )
+            try {
+                pass.setPipeline(RenderPipelines.RENDERTYPE_TRANSLUCENT_MOVING_BLOCK)
 
-            val atlas = client.bakedModelManager
-                ?.getAtlas(net.minecraft.client.texture.SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE)
-                ?.glTexture
-            if (atlas != null) {
-                pass.bindSampler("Sampler0", atlas)
-            }
-
-            val lightmapTexture = client.gameRenderer?.lightmapTextureManager?.glTexture
-            if (lightmapTexture != null) {
-                pass.bindSampler("Sampler2", lightmapTexture)
-            }
-
-            val sectionMv = Matrix4f()
-            for (entry in drawList) {
-                sectionMv.set(baseMv)
-                val translation = PreviewSectionTransform.cameraRelative(
-                    entry.sectionOriginX,
-                    entry.sectionOriginY,
-                    entry.sectionOriginZ,
-                    camX,
-                    camY,
-                    camZ,
-                    deltaX,
-                    deltaY,
-                    deltaZ,
-                )
-                sectionMv.translate(translation.x, translation.y, translation.z)
-                pass.setUniform("ModelViewMat", sectionMv)
-                entry.buffer.drawIndexed(pass)
-            }
-
-            if (DEBUG_LOG) {
-                val now = System.currentTimeMillis()
-                if (now - lastLogTime >= LOG_INTERVAL_MS) {
-                    lastLogTime = now
-                    logger.info(
-                        "[Axion GPU 1.21.5] drawChunked: sections={} visible={}",
-                        sectionBuffers.size, drawList.size,
-                    )
+                val atlas = client.bakedModelManager
+                    ?.getAtlas(net.minecraft.client.texture.SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE)
+                    ?.glTexture
+                if (atlas != null) {
+                    pass.bindSampler("Sampler0", atlas)
                 }
+
+                val lightmapTexture = client.gameRenderer?.lightmapTextureManager?.glTexture
+                if (lightmapTexture != null) {
+                    pass.bindSampler("Sampler2", lightmapTexture)
+                }
+
+                for (entry in drawList) {
+                    val translation = PreviewSectionTransform.cameraRelative(
+                        entry.sectionOriginX,
+                        entry.sectionOriginY,
+                        entry.sectionOriginZ,
+                        camX,
+                        camY,
+                        camZ,
+                        deltaX,
+                        deltaY,
+                        deltaZ,
+                    )
+                    // initializeUniforms reads the stack on every draw call, so the
+                    // section transform has to be live on it before drawIndexed.
+                    modelViewStack.set(baseMv)
+                    modelViewStack.translate(translation.x, translation.y, translation.z)
+                    entry.buffer.drawIndexed(pass)
+                }
+
+                if (DEBUG_LOG) {
+                    val now = System.currentTimeMillis()
+                    if (now - lastLogTime >= LOG_INTERVAL_MS) {
+                        lastLogTime = now
+                        logger.info(
+                            "[Axion GPU 1.21.5] drawChunked: sections={} visible={}",
+                            sectionBuffers.size, drawList.size,
+                        )
+                    }
+                }
+                return ChunkedDrawResult.DREW
+            } finally {
+                pass.close()
             }
-            return ChunkedDrawResult.DREW
         } finally {
-            pass.close()
+            modelViewStack.popMatrix()
+            RenderSystem.setShaderColor(
+                previousColor[0],
+                previousColor[1],
+                previousColor[2],
+                previousColor[3],
+            )
         }
     }
 }

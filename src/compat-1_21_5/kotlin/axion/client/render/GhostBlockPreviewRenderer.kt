@@ -27,15 +27,10 @@ object GhostBlockPreviewRenderer {
     private const val MAX_TEXTURED_GHOST_BLOCKS: Int = 32768
     private const val DEFAULT_GHOST_COLOR: Int = 0xFFFFFFFF.toInt()
 
-    // Threshold above which we route textured ghost rendering through the
-    // chunked preview session (Phase A+B GPU-style pipeline). Below this,
-    // the existing per-frame tessellation path is fine and avoids the
-    // session's diff-overhead for tiny clipboards.
-    // Keep medium previews on the established CPU textured path. The chunked
-    // GPU path is still useful for truly huge structures, but it can currently
-    // produce outline-only previews on some 1.21.x render callbacks.
+    // Keep every textured preview on the persistent GPU path so small edits
+    // use the same biome-aware rendering as large edits.
     private const val CHUNKED_PATH_CELL_THRESHOLD: Int = MAX_TEXTURED_GHOST_BLOCKS
-    private const val FORCE_CHUNKED_PREVIEW: Boolean = false
+    private const val FORCE_CHUNKED_PREVIEW: Boolean = true
 
     fun maxOriginsFor(nonAirCellCount: Int): Int {
         if (nonAirCellCount <= 0) {

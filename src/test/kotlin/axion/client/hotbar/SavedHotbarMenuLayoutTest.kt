@@ -56,4 +56,28 @@ class SavedHotbarMenuLayoutTest {
 
         assertEquals(0, buttons.minOf { it.y })
     }
+
+    @Test
+    fun devFinishButtonReusesTheDisabledDisplayEntityPlaceholder() {
+        val screenWidth = 426
+        val screenHeight = 240
+        val placeholder = AxionHudLayout.savedHotbarActionButtons(screenWidth, screenHeight, page = 0)
+            .first { it.action == SavedHotbarMenuAction.CREATE_DISPLAY_ENTITY }
+        val finish = AxionHudLayout.finishTestingSavedHotbarBounds(screenWidth, screenHeight, page = 0)
+
+        assertEquals(placeholder.x, finish.x)
+        assertEquals(placeholder.y, finish.y)
+        assertEquals(placeholder.width, finish.width)
+        assertEquals(placeholder.height, finish.height)
+        assertTrue(finish.y >= 0)
+    }
+
+    @Test
+    fun axionToolFinishButtonSitsAboveTheExistingToggles() {
+        val sideSlot = AxionHudLayout.SlotBounds(x = 500, y = 330, size = 24)
+        val finish = AxionHudLayout.finishTestingBounds(sideSlot)
+        val middleClick = AxionHudLayout.middleClickToggleBounds(sideSlot)
+
+        assertTrue(finish.y + finish.height < middleClick.y)
+    }
 }

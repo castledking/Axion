@@ -70,6 +70,17 @@ class AxionPreviewBuffer : AutoCloseable {
         uploaded = true
     }
 
+    /**
+     * Ensures Minecraft's shared quad index buffer is large enough before a
+     * render pass is opened. In 1.21.5, growing it records a buffer upload and
+     * therefore throws if [drawIndexed] first requests a larger buffer from
+     * inside an active pass.
+     */
+    fun prepareSequentialIndexBuffer() {
+        if (indexCount <= 0 || indexBuffer?.isClosed == false) return
+        RenderSystem.getSequentialBuffer(drawMode).getIndexBuffer(indexCount)
+    }
+
     fun drawIndexed(renderPass: RenderPass) {
         val vb = vertexBuffer ?: return
         if (vb.isClosed) return

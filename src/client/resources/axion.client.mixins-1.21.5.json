@@ -19,6 +19,7 @@
     "SculkSensorBlockMixin",
     "ServerEntityMixin",
     "SodiumMoveSourceLevelSliceMixin",
+    "SodiumMoveSourceWorldSliceMixin",
     "TripwireBlockMixin",
     "WorldRendererFallbackMixin"
   ],

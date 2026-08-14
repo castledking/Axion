@@ -95,6 +95,27 @@ object AxionAltMenuController {
         )
     }
 
+    fun isHoveringFinishTesting(client: MinecraftClient, screenWidth: Int, screenHeight: Int): Boolean {
+        if (!isAnyAltOverlayActive(client) || !AxionDevTestSession.isActive) {
+            return false
+        }
+
+        val bounds = if (SavedHotbarController.isOverlayActive(client)) {
+            AxionHudLayout.finishTestingSavedHotbarBounds(
+                screenWidth,
+                screenHeight,
+                SavedHotbarController.selectedPage(),
+            )
+        } else {
+            val sideSlot = AxionHudLayout.sideSlot(client, screenWidth, screenHeight)
+            AxionHudLayout.finishTestingBounds(sideSlot)
+        }
+        return bounds.contains(
+            VersionCompatImpl.getScaledMouseX(client),
+            VersionCompatImpl.getScaledMouseY(client),
+        )
+    }
+
     fun isHoveringKeepExistingToggle(client: MinecraftClient, screenWidth: Int, screenHeight: Int): Boolean {
         if (!isActive(client)) {
             return false
@@ -446,6 +467,11 @@ object AxionAltMenuController {
     fun handleMouseButton(client: MinecraftClient, button: Int, action: Int): Boolean {
         if (SavedHotbarController.isOverlayActive(client)) {
             if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && action == GLFW.GLFW_PRESS) {
+                if (isHoveringFinishTesting(client, client.window.scaledWidth, client.window.scaledHeight)) {
+                    VanillaHudButtonStore.click(client, VanillaHudButtonStore.FINISH_TESTING, button)
+                    AxionDevTestSession.finish(client)
+                    return true
+                }
                 hoveringSavedHotbarActionButton(
                     client,
                     client.window.scaledWidth,
@@ -548,6 +574,11 @@ object AxionAltMenuController {
         }
 
         if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && action == GLFW.GLFW_PRESS) {
+            if (isHoveringFinishTesting(client, client.window.scaledWidth, client.window.scaledHeight)) {
+                VanillaHudButtonStore.click(client, VanillaHudButtonStore.FINISH_TESTING, button)
+                AxionDevTestSession.finish(client)
+                return true
+            }
             if (isHoveringMiddleClickToggle(client, client.window.scaledWidth, client.window.scaledHeight)) {
                 VanillaHudButtonStore.click(client, VanillaHudButtonStore.MIDDLE_CLICK, button)
                 AxionClientState.updateMiddleClickMagicSelect(!AxionClientState.middleClickMagicSelectEnabled)

@@ -1367,6 +1367,28 @@ val verifyMoveSourceReplacementCoverage by tasks.registering {
                 "Sodium MOVE source suppression is incomplete: missing $requiredSource"
             }
         }
+        val legacySodiumMixinFile = file(
+            "src/client/kotlin/axion/mixin/client/SodiumMoveSourceWorldSliceMixin.kt",
+        )
+        check(legacySodiumMixinFile.isFile) {
+            "Sodium 0.5.x bypasses the vanilla MOVE source suppression mixin"
+        }
+        val legacySodiumMixin = legacySodiumMixinFile.readText()
+        listOf(
+            "@Pseudo",
+            "me.jellysquid.mods.sodium.client.world.WorldSlice",
+            "private lateinit var world: ClientWorld",
+            "value = \"getBlockState\"",
+            "args = [Int::class, Int::class, Int::class]",
+            "at = [At(\"HEAD\")]",
+            "cancellable = true",
+            "require = 0",
+            "MoveSourceRenderState.suppressedState(world, x, y, z)",
+        ).forEach { requiredSource ->
+            check(requiredSource in legacySodiumMixin) {
+                "Sodium 0.5.x MOVE source suppression is incomplete: missing $requiredSource"
+            }
+        }
         val nextSnapshotBody = moveSourceState
             .substringAfter("val nextSnapshot = Snapshot(", missingDelimiterValue = "")
         val publishIndex = nextSnapshotBody.indexOf("snapshot = nextSnapshot")
@@ -1686,6 +1708,9 @@ val verifyMoveSourceReplacementCoverage by tasks.registering {
             check("\"SodiumMoveSourceLevelSliceMixin\"" in mixinConfig) {
                 "Sodium MOVE source suppression mixin is not enabled in $mixinConfigPath"
             }
+            check("\"SodiumMoveSourceWorldSliceMixin\"" in mixinConfig) {
+                "Sodium 0.5.x MOVE source suppression mixin is not enabled in $mixinConfigPath"
+            }
         }
 
         val disconnectHandler = file(
@@ -1768,6 +1793,15 @@ val verifyGpuPreviewCoverage by tasks.registering {
             "Move preview for Minecraft $minecraftVersion still draws a second textured source mesh"
         }
 
+        val ghostRenderer = file(
+            "$gpuPreviewCompatDir/kotlin/axion/client/render/GhostBlockPreviewRenderer.kt",
+        ).readText()
+        if (!rangeMc26x) {
+            check("FORCE_CHUNKED_PREVIEW: Boolean = true" in ghostRenderer) {
+                "Minecraft $minecraftVersion still routes small textured previews through the CPU path"
+            }
+        }
+
         val blockTessellator = file(
             "$gpuPreviewCompatDir/kotlin/axion/client/render/AxionBlockTessellator.kt",
         ).readText()
@@ -1791,6 +1825,38 @@ val verifyGpuPreviewCoverage by tasks.registering {
             ).readText()
             check("Matrix4f(RenderSystem.getModelViewMatrix())" in drawer) {
                 "Legacy GPU preview for Minecraft $minecraftVersion is not using the active camera model-view matrix"
+            }
+
+            if (rangeMc1215) {
+                val previewBuffer = file(
+                    "$gpuPreviewCompatDir/kotlin/axion/client/render/AxionPreviewBuffer.kt",
+                ).readText()
+                check("fun prepareSequentialIndexBuffer()" in previewBuffer) {
+                    "Minecraft $minecraftVersion can grow its shared index buffer inside an active render pass"
+                }
+                check(
+                    drawer.indexOf("prepareSequentialIndexBuffer()") in 0 until
+                        drawer.indexOf("createRenderPass("),
+                ) {
+                    "Minecraft $minecraftVersion does not prepare shared indices before opening its preview render pass"
+                }
+
+                // ShaderProgram.initializeUniforms overwrites every predefined
+                // uniform from the RenderSystem globals after the pass-local
+                // values are applied, so setting these on the pass draws every
+                // section at one origin with no tint.
+                listOf("ModelViewMat", "ProjMat", "ColorModulator").forEach { predefined ->
+                    check("setUniform(\"$predefined\"" !in drawer) {
+                        "Minecraft $minecraftVersion sets the predefined uniform $predefined on the render pass, " +
+                            "where initializeUniforms discards it"
+                    }
+                }
+                check("RenderSystem.getModelViewStack()" in drawer) {
+                    "Minecraft $minecraftVersion does not publish its per-section preview transform through RenderSystem"
+                }
+                check("RenderSystem.setShaderColor(" in drawer) {
+                    "Minecraft $minecraftVersion does not publish its preview tint through RenderSystem"
+                }
             }
         }
 
