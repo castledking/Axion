@@ -2,6 +2,7 @@ package axion.client.symmetry
 
 import axion.client.AxionClientState
 import axion.client.compat.VersionCompatImpl
+import axion.client.mode.AxionCapabilityPolicy
 import axion.client.mode.BuildPlacementService
 import axion.client.mode.InfiniteReachInteractionPolicy
 import axion.client.mode.ModeTargeting
@@ -15,9 +16,12 @@ import net.minecraft.sound.SoundCategory
 import net.minecraft.util.Hand
 
 object SymmetryPlacementController {
-    private val dispatcher = SymmetryAwareOperationDispatcher()
+    private val dispatcher = SymmetryAwareOperationDispatcher(
+        suppressBlockUpdates = AxionCapabilityPolicy::suppressBlockUpdates,
+    )
     private val infiniteReachDispatcher = SymmetryAwareOperationDispatcher(
         interactionOrigin = AxionInteractionOrigin.INFINITE_REACH,
+        suppressBlockUpdates = AxionCapabilityPolicy::suppressBlockUpdates,
     )
 
     fun updatePreview(client: MinecraftClient): Boolean {
@@ -48,6 +52,7 @@ object SymmetryPlacementController {
                 infiniteReachEnabled = state.infiniteReachEnabled,
                 replaceModeEnabled = false,
                 vanillaTargetPresent = client.crosshairTarget?.type?.name?.let { it != "MISS" } == true,
+                axionOwnsPlacement = state.forcePlaceEnabled || state.noUpdatesEnabled,
             )
         ) {
             return false

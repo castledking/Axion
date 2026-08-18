@@ -75,6 +75,7 @@ object AxionClientBootstrap {
     private fun registerRenderers() {
         try {
             val rendererClasses = listOf(
+                "axion.client.render.AngelPlacementPreviewRenderer",
                 "axion.client.render.PlacementPreviewRenderer",
                 "axion.client.render.ExtrudePreviewRenderer",
                 "axion.client.render.SmearPreviewRenderer",

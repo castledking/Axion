@@ -1,6 +1,7 @@
 package axion.client.symmetry
 
 import axion.client.AxionClientState
+import axion.client.mode.AxionCapabilityPolicy
 import axion.client.mode.ModeTargeting
 import axion.client.tool.AxionToolSelectionController
 import axion.common.model.BlockRegion
@@ -11,9 +12,12 @@ import net.minecraft.util.math.BlockPos
 import axion.protocol.AxionInteractionOrigin
 
 object SymmetryBreakController {
-    private val dispatcher = SymmetryAwareOperationDispatcher()
+    private val dispatcher = SymmetryAwareOperationDispatcher(
+        suppressBlockUpdates = AxionCapabilityPolicy::suppressBlockUpdates,
+    )
     private val infiniteReachDispatcher = SymmetryAwareOperationDispatcher(
         interactionOrigin = AxionInteractionOrigin.INFINITE_REACH,
+        suppressBlockUpdates = AxionCapabilityPolicy::suppressBlockUpdates,
     )
 
     fun handlePrimaryAction(client: MinecraftClient): Boolean {

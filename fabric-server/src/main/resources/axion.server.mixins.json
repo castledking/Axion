@@ -1,0 +1,16 @@
+{
+  "required": true,
+  "package": "axion.server.fabric.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "AbstractPressurePlateBlockMixin",
+    "BigDripleafBlockMixin",
+    "CobwebBlockMixin",
+    "RedstoneOreBlockMixin",
+    "SculkSensorBlockMixin",
+    "TripwireBlockMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -8,4 +8,6 @@ data class GlobalModeState(
     val fastPlaceEnabled: Boolean = false,
     val phantomEnabled: Boolean = false,
     val noUpdatesEnabled: Boolean = false,
+    val forcePlaceEnabled: Boolean = false,
+    val angelPlacementEnabled: Boolean = false,
 )

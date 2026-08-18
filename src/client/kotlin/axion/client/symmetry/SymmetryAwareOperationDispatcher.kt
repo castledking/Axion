@@ -16,6 +16,12 @@ import net.minecraft.text.Text
 class SymmetryAwareOperationDispatcher(
     private val recordHistory: Boolean = true,
     interactionOrigin: AxionInteractionOrigin = AxionInteractionOrigin.NONE,
+    /**
+     * Axion tool edits always suppress neighbour updates. Capability-driven
+     * dispatchers pass the live No Updates state instead, so an unarmed
+     * replace-mode placement still behaves like a vanilla one.
+     */
+    private val suppressBlockUpdates: () -> Boolean = { true },
 ) : OperationDispatcher {
     private val validator = PermissiveOperationValidator()
     private val planner = LocalWritePlanner()
@@ -23,6 +29,7 @@ class SymmetryAwareOperationDispatcher(
     private val networkDispatcher = NetworkOperationDispatcher(
         recordHistory = recordHistory,
         interactionOrigin = interactionOrigin,
+        suppressBlockUpdates = { suppressBlockUpdates() },
     )
 
     override fun dispatch(operation: EditOperation) {
@@ -67,7 +74,7 @@ class SymmetryAwareOperationDispatcher(
             if (recordHistory) {
                 HistoryManager.record(targetWorld, plan)
             }
-            applier.apply(targetWorld, plan)
+            applier.apply(targetWorld, plan, suppressBlockUpdates())
         }
     }
 }

@@ -149,9 +149,18 @@ object VersionCompatImpl : VersionCompat {
         return BlockEntityDataSnapshot(blockEntity.createNbtWithIdentifyingData(world.registryManager).copy())
     }
 
-    fun applyBlockEntity(world: net.minecraft.world.World, write: BlockWrite) {
-        world.setBlockState(write.pos, write.state, BlockWriteUpdatePolicy.LEGACY_NO_PHYSICS_FLAGS)
-        suppressLegacyScheduledUpdates(world, write.pos)
+    fun applyBlockEntity(world: net.minecraft.world.World, write: BlockWrite, suppressUpdates: Boolean = true) {
+        world.setBlockState(
+            write.pos,
+            write.state,
+            BlockWriteUpdatePolicy.capabilityFlags(
+                suppressUpdates = suppressUpdates,
+                modernCallbacksAvailable = false,
+            ),
+        )
+        if (suppressUpdates) {
+            suppressLegacyScheduledUpdates(world, write.pos)
+        }
         val payload = write.blockEntityData
         if (payload == null) {
             world.removeBlockEntity(write.pos)

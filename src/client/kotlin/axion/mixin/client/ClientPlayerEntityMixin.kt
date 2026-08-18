@@ -22,9 +22,9 @@ abstract class ClientPlayerEntityMixin {
             return
         }
 
-        // 26.1.x removed the mapped noClip setter this mixin used; push-out suppression
-        // still handles client-side collision nudging until the movement hook is ported.
-        // player.noClip = true
+        // The flag itself is owned by ClientModeController.applyNoClip, which sets
+        // it every tick through the compat alias (noPhysics on 26.x). This hook
+        // exists only to run before movement is integrated.
     }
 
     @Inject(method = ["move"], at = [At("HEAD")], cancellable = true, require = 0)
@@ -44,8 +44,24 @@ abstract class ClientPlayerEntityMixin {
         ci.cancel()
     }
 
+    /**
+     * The client player has its own horizontal-only push-out, separate from the
+     * three-argument one on Entity, and `aiStep` calls it four times per tick —
+     * once per corner of the hitbox. Leaving it running is what shoves a
+     * no-clipping player back out of a wall while vertical movement stays fine.
+     */
     @Inject(method = ["pushOutOfBlocks"], at = [At("HEAD")], cancellable = true, require = 0)
     private fun axionSuppressClientPushOutOfBlocks(x: Double, z: Double, ci: CallbackInfo) {
+        axionSuppressClientPushOutOfBlocksImpl(ci)
+    }
+
+    // 26.x official namespace: moveTowardsClosestSpace(double, double).
+    @Inject(method = ["moveTowardsClosestSpace"], at = [At("HEAD")], cancellable = true, require = 0)
+    private fun axionSuppressClientPushOutOfBlocksOfficial(x: Double, z: Double, ci: CallbackInfo) {
+        axionSuppressClientPushOutOfBlocksImpl(ci)
+    }
+
+    private fun axionSuppressClientPushOutOfBlocksImpl(ci: CallbackInfo) {
         if (!ClientModeController.isNoClipActiveFor(self())) {
             return
         }

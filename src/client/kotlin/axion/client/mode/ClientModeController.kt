@@ -45,10 +45,14 @@ object ClientModeController {
     private const val NO_CLIP_ESCAPE_TICKS: Int = 8
     private const val MULTI_SAMPLE_COUNT: Int = 50
     private const val HOTBAR_SIZE: Int = 9
-    private val dispatcher = SymmetryAwareOperationDispatcher(recordHistory = false)
+    private val dispatcher = SymmetryAwareOperationDispatcher(
+        recordHistory = false,
+        suppressBlockUpdates = AxionCapabilityPolicy::suppressBlockUpdates,
+    )
     private val infiniteReachDispatcher = SymmetryAwareOperationDispatcher(
         recordHistory = false,
         interactionOrigin = AxionInteractionOrigin.INFINITE_REACH,
+        suppressBlockUpdates = AxionCapabilityPolicy::suppressBlockUpdates,
     )
     private var suppressPrimaryUntilRelease: Boolean = false
     private var suppressSecondaryUntilRelease: Boolean = false
@@ -101,6 +105,8 @@ object ClientModeController {
         if (!canUseModes(client)) {
             applyNoClip(client)
             syncRemoteNoClip(client)
+            syncRemoteCapabilities(client)
+            AngelPlacementController.clear()
             return
         }
 
@@ -119,7 +125,9 @@ object ClientModeController {
                 seenPlacementTargets.clear()
 
                 // For infinite reach without fast place: use single-block vanilla-speed placement
-                if (state.infiniteReachEnabled && !useFastPlace && !AxionToolSelectionController.isAxionSlotActive()) {
+                if (state.infiniteReachEnabled && !useFastPlace && !AxionToolSelectionController.isAxionSlotActive() &&
+                    AngelPlacementController.currentGhost() == null
+                ) {
                     // Enforce vanilla placement speed (4 tick cooldown)
                     val currentTick = client.world?.time ?: 0
                     if (!shouldYieldInfiniteReachToVanilla(client, state) &&
@@ -203,6 +211,8 @@ object ClientModeController {
 
         applyNoClip(client)
         syncRemoteNoClip(client)
+        syncRemoteCapabilities(client)
+        AngelPlacementController.onEndTick(client)
 
         // Apply flying speed multiplier
         applyFlyingSpeed(client)
@@ -495,6 +505,12 @@ object ClientModeController {
             return false
         }
 
+        // A mid-air ghost only exists when the ray found nothing, so infinite
+        // reach has nothing to place here — hand the click to Angel instead.
+        if (AngelPlacementController.currentGhost() != null) {
+            return false
+        }
+
         // Allow usable items (potions, shields, food, etc.) to work normally
         val player = client.player
         val heldStack = player?.mainHandStack
@@ -631,6 +647,14 @@ object ClientModeController {
         while (AxionKeybindings.toggleNoUpdates.wasPressed()) {
             toggleNoUpdates(client)
         }
+
+        while (AxionKeybindings.toggleForcePlace.wasPressed()) {
+            toggleForcePlace(client)
+        }
+
+        while (AxionKeybindings.toggleAngelPlacement.wasPressed()) {
+            toggleAngelPlacement(client)
+        }
     }
 
     fun shouldSuppressPrimary(client: MinecraftClient): Boolean {
@@ -679,13 +703,14 @@ object ClientModeController {
         if (AxionToolSelectionController.isAxionSlotActive()) {
             return false
         }
-        if (!AxionClientState.globalModeState.infiniteReachEnabled) {
-            return false
+        val modes = AxionClientState.globalModeState
+        if (!modes.infiniteReachEnabled) {
+            return consumeNoUpdatesBreak(client, modes)
         }
 
         val target = ModeTargeting.currentBlockTarget(client) ?: return false
         if (!target.beyondVanillaReach) {
-            return false
+            return consumeNoUpdatesBreak(client, modes)
         }
         val world = client.world ?: return false
         val targetPos = target.hitResult.blockPos.toImmutable()
@@ -710,6 +735,48 @@ object ClientModeController {
         return true
     }
 
+    /**
+     * Breaks the targeted block through Axion so the write can skip neighbour
+     * updates. Only No Updates needs this: bulldozer and infinite reach already
+     * route their own breaks, and vanilla has no way to clear a block quietly.
+     */
+    private fun consumeNoUpdatesBreak(
+        client: MinecraftClient,
+        modes: axion.common.model.GlobalModeState,
+    ): Boolean {
+        if (!AxionCapabilityPolicy.ownsBreak(modes) || modes.bulldozerEnabled) {
+            return false
+        }
+
+        val target = ModeTargeting.currentBlockTarget(client) ?: return false
+        if (target.beyondVanillaReach) {
+            return false
+        }
+
+        val world = client.world ?: return false
+        val currentTick = world.time
+        if (currentTick - lastBreakTick < VANILLA_BREAK_COOLDOWN_TICKS) {
+            // Still owned by Axion — swallow the click so vanilla does not break
+            // the block with updates while we are pacing.
+            client.interactionManager?.cancelBlockBreaking()
+            return true
+        }
+
+        val targetPos = target.hitResult.blockPos.toImmutable()
+        val brokenState = world.getBlockState(targetPos)
+        if (brokenState.isAir) {
+            return false
+        }
+
+        lastBreakTick = currentTick
+        client.interactionManager?.cancelBlockBreaking()
+        dispatcher.dispatch(ClearRegionOperation(BlockRegion(targetPos, targetPos)))
+        SymmetryBreakController.dispatchDerivedBreaks(client, targetPos)
+        client.player?.swingHand(Hand.MAIN_HAND)
+        playBreakEffects(client, targetPos, brokenState)
+        return true
+    }
+
     fun consumeHeldPrimaryAction(client: MinecraftClient): Boolean {
         if (suppressPrimaryUntilRelease) {
             client.interactionManager?.cancelBlockBreaking()
@@ -727,7 +794,22 @@ object ClientModeController {
         }
 
         val state = AxionClientState.globalModeState
-        if (!state.replaceModeEnabled && !state.infiniteReachEnabled) {
+        // Angel only ever has a target when the crosshair found no block, so it
+        // can never steal a click another capability would have used.
+        if (state.angelPlacementEnabled) {
+            val currentTick = client.world?.time ?: 0
+            if (AngelPlacementController.currentGhost() != null) {
+                if (currentTick - lastPlacementTick < VANILLA_PLACEMENT_COOLDOWN_TICKS) {
+                    return true
+                }
+                if (AngelPlacementController.consumeSecondaryAction(client)) {
+                    lastPlacementTick = currentTick
+                    return true
+                }
+            }
+        }
+
+        if (!AxionCapabilityPolicy.ownsPlacement(state)) {
             return false
         }
 
@@ -744,6 +826,13 @@ object ClientModeController {
             if (currentTick - lastPlacementTick < cooldownTicks) {
                 return true
             }
+        } else if (!state.infiniteReachEnabled) {
+            // Force place or No Updates standing in for an ordinary click: keep
+            // vanilla's placement pacing rather than firing once per tick.
+            val currentTick = client.world?.time ?: 0
+            if (currentTick - lastPlacementTick < VANILLA_PLACEMENT_COOLDOWN_TICKS) {
+                return true
+            }
         }
 
         val player = client.player ?: return false
@@ -756,7 +845,10 @@ object ClientModeController {
         // For infinite reach placement:
         // - Within vanilla range: use interactBlock for client prediction
         // - Beyond vanilla range: use dispatch for server-side placement
-        if (state.infiniteReachEnabled && !state.replaceModeEnabled) {
+        // Force place and No Updates cannot use the vanilla-prediction half of
+        // that split, so they fall through to the Axion write path below.
+        val vanillaPredictionAllowed = !state.forcePlaceEnabled && !state.noUpdatesEnabled
+        if (state.infiniteReachEnabled && !state.replaceModeEnabled && vanillaPredictionAllowed) {
             val target = origin.add(direction.multiply(maxDistance))
             val hit = world.raycast(
                 RaycastContext(
@@ -826,7 +918,7 @@ object ClientModeController {
         if (!state.infiniteReachEnabled && beyondVanillaReach) {
             return false
         }
-        if (!state.replaceModeEnabled && !beyondVanillaReach) {
+        if (!state.replaceModeEnabled && !beyondVanillaReach && vanillaPredictionAllowed) {
             return false
         }
 
@@ -849,8 +941,8 @@ object ClientModeController {
         } else {
             dispatcher.dispatch(operation)
         }
+        lastPlacementTick = client.world?.time ?: lastPlacementTick
         if (state.replaceModeEnabled) {
-            lastPlacementTick = client.world?.time ?: lastPlacementTick
             fastPlaceExecutedThisTick = true
         }
         client.player?.swingHand(Hand.MAIN_HAND)
@@ -935,8 +1027,41 @@ object ClientModeController {
             noUpdatesEnabled = !AxionClientState.globalModeState.noUpdatesEnabled,
         )
         AxionClientState.updateGlobalModes(nextState)
-        AxionServerConnection.syncNoUpdatesState(nextState.noUpdatesEnabled)
         showToast(client, "No Updates", nextState.noUpdatesEnabled)
+    }
+
+    private fun toggleAngelPlacement(client: MinecraftClient) {
+        val nextState = AxionClientState.globalModeState.copy(
+            angelPlacementEnabled = !AxionClientState.globalModeState.angelPlacementEnabled,
+        )
+        AxionClientState.updateGlobalModes(nextState)
+        if (!nextState.angelPlacementEnabled) {
+            AngelPlacementController.clear()
+        }
+        showToast(client, "Angel Placement", nextState.angelPlacementEnabled)
+    }
+
+    private fun toggleForcePlace(client: MinecraftClient) {
+        val nextState = AxionClientState.globalModeState.copy(
+            forcePlaceEnabled = !AxionClientState.globalModeState.forcePlaceEnabled,
+        )
+        AxionClientState.updateGlobalModes(nextState)
+        showToast(client, "Force Place", nextState.forcePlaceEnabled)
+    }
+
+    /**
+     * Pushes the capabilities the server has to know about.
+     *
+     * Runs every tick instead of from the toggles so the alt menu, the keybinds,
+     * and a reconnect all converge on the same server state.
+     * [AxionServerConnection] drops repeats, so a steady state costs nothing.
+     */
+    private fun syncRemoteCapabilities(client: MinecraftClient) {
+        val usable = canUseModes(client)
+        val state = AxionClientState.globalModeState
+        AxionServerConnection.syncNoUpdatesState(usable && state.noUpdatesEnabled)
+        AxionServerConnection.syncPhantomState(usable && state.phantomEnabled)
+        AxionServerConnection.syncForcePlaceState(usable && state.forcePlaceEnabled)
     }
 
     private fun applyNoClip(client: MinecraftClient) {
@@ -1613,6 +1738,7 @@ object ClientModeController {
             infiniteReachEnabled = state.infiniteReachEnabled,
             replaceModeEnabled = state.replaceModeEnabled,
             vanillaTargetPresent = hasVanillaInteractionTarget(client),
+            axionOwnsPlacement = state.forcePlaceEnabled || state.noUpdatesEnabled,
         )
     }
 

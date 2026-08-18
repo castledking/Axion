@@ -171,10 +171,6 @@ sourceSets.named("client") {
         kotlin.srcDir("$mc26CompatDir/kotlin")
         // InGameHud does not exist in 26.x (HUD is HudElement-based)
         kotlin.exclude("axion/mixin/client/InGameHudMixin*")
-        // onEntityCollision removed in 26.x — replaced by stepOn on Block
-        kotlin.exclude("axion/mixin/client/AbstractPressurePlateBlockMixin*")
-        kotlin.exclude("axion/mixin/client/CobwebBlockMixin*")
-        kotlin.exclude("axion/mixin/client/TripwireBlockMixin*")
 
     } else {
         // 1.21.9+: registry-manager-based serialization, has MouseInput / WorldRenderState
@@ -304,9 +300,6 @@ tasks.named<ProcessResources>("processClientResources") {
             val excludedMixins = setOf(
                 "InGameHudMixin",
                 "WorldRendererFallbackMixin",
-                "AbstractPressurePlateBlockMixin",
-                "CobwebBlockMixin",
-                "TripwireBlockMixin",
             )
             val clientMixins = normalized["client"] as? List<*>
                 ?: throw GradleException("Mixin config has no client array: $mixinConfig")
@@ -378,9 +371,6 @@ val verifyIntegratedNoClipWiring by tasks.registering {
                     it in setOf(
                         "InGameHudMixin",
                         "WorldRendererFallbackMixin",
-                        "AbstractPressurePlateBlockMixin",
-                        "CobwebBlockMixin",
-                        "TripwireBlockMixin",
                     )
                 },
             ) {
@@ -399,6 +389,25 @@ val verifyIntegratedNoClipWiring by tasks.registering {
         }
         check(mixinConfig.readText().contains("\"ServerEntityMixin\"")) {
             "Integrated-server no-clip mixin is not enabled for Minecraft $minecraftVersion"
+        }
+
+        // Phantom is the only capability whose enforcement lives entirely in block
+        // mixins, so a dropped entry degrades silently into "the trap still fires".
+        val phantomMixins = listOf(
+            "AbstractPressurePlateBlockMixin",
+            "BigDripleafBlockMixin",
+            "CobwebBlockMixin",
+            "RedstoneOreBlockMixin",
+            "SculkSensorBlockMixin",
+            "TripwireBlockMixin",
+        )
+        phantomMixins.forEach { mixin ->
+            check(mixin in clientMixins) {
+                "Phantom mixin $mixin is not enabled for Minecraft $minecraftVersion: $mixinConfig"
+            }
+            check(clientClasses.resolve("axion/mixin/client/$mixin.class").isFile) {
+                "Phantom mixin $mixin was not compiled for Minecraft $minecraftVersion"
+            }
         }
 
         if (rangeMc262x) {

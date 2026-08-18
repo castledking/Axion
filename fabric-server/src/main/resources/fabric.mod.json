@@ -19,6 +19,9 @@
       "axion.server.fabric.AxionFabricServerMod"
     ]
   },
+  "mixins": [
+    "axion.server.mixins.json"
+  ],
   "depends": {
     "fabricloader": ">=0.18.4",
     "minecraft": "=1.21.11",

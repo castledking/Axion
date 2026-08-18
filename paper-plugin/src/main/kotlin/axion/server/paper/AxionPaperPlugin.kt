@@ -11,6 +11,8 @@ class AxionPaperPlugin : JavaPlugin() {
         private set
     lateinit var noUpdatesService: AxionNoUpdatesService
         private set
+    lateinit var phantomService: AxionPhantomService
+        private set
     lateinit var flightSpeedService: AxionFlightSpeedService
         private set
 
@@ -23,6 +25,7 @@ class AxionPaperPlugin : JavaPlugin() {
     override fun onLoad() {
         noClipService = AxionNoClipService(this)
         noUpdatesService = AxionNoUpdatesService()
+        phantomService = AxionPhantomService()
         flightSpeedService = AxionFlightSpeedService(this)
     }
 
@@ -35,11 +38,14 @@ class AxionPaperPlugin : JavaPlugin() {
         if (!::noUpdatesService.isInitialized) {
             noUpdatesService = AxionNoUpdatesService()
         }
+        if (!::phantomService.isInitialized) {
+            phantomService = AxionPhantomService()
+        }
         if (!::flightSpeedService.isInitialized) {
             flightSpeedService = AxionFlightSpeedService(this)
         }
         installConfiguredProtectionAdapters()
-        messaging = AxionPluginMessaging(this, policyService, noClipService, noUpdatesService, flightSpeedService)
+        messaging = AxionPluginMessaging(this, policyService, noClipService, noUpdatesService, phantomService, flightSpeedService)
         lifecycleManager.registerEventHandler(LifecycleEvents.COMMANDS) { event ->
             event.registrar().register(
                 pluginMeta,
@@ -50,6 +56,7 @@ class AxionPaperPlugin : JavaPlugin() {
             )
         }
         server.pluginManager.registerEvents(AxionNoClipListener(noClipService), this)
+        server.pluginManager.registerEvents(AxionPhantomListener(phantomService), this)
         server.pluginManager.registerEvents(flightSpeedService, this)
         server.pluginManager.registerEvents(AxionDevModeListener(this), this)
         server.messenger.registerIncomingPluginChannel(this, AxionProtocol.CHANNEL_ID, messaging)
@@ -70,6 +77,9 @@ class AxionPaperPlugin : JavaPlugin() {
         if (::noClipService.isInitialized) {
             noClipService.stop()
         }
+        if (::phantomService.isInitialized) {
+            phantomService.stop()
+        }
         if (::flightSpeedService.isInitialized) {
             flightSpeedService.stop()
         }
@@ -85,7 +95,7 @@ class AxionPaperPlugin : JavaPlugin() {
         installConfiguredProtectionAdapters()
         if (::messaging.isInitialized) {
             server.messenger.unregisterIncomingPluginChannel(this, AxionProtocol.CHANNEL_ID, messaging)
-            messaging = AxionPluginMessaging(this, policyService, noClipService, noUpdatesService, flightSpeedService)
+            messaging = AxionPluginMessaging(this, policyService, noClipService, noUpdatesService, phantomService, flightSpeedService)
             server.messenger.registerIncomingPluginChannel(this, AxionProtocol.CHANNEL_ID, messaging)
         }
     }

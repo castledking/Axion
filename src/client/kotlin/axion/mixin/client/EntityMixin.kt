@@ -45,4 +45,15 @@ abstract class EntityMixin {
 
         ci.cancel()
     }
+
+    // 26.x official namespace: moveTowardsClosestSpace. Without this the block a
+    // no-clipping player is standing inside keeps shoving them toward open air.
+    @Inject(method = ["moveTowardsClosestSpace"], at = [At("HEAD")], cancellable = true, require = 0)
+    private fun axionSuppressPushOutOfBlocksOfficial(x: Double, y: Double, z: Double, ci: CallbackInfo) {
+        if (!ClientModeController.isNoClipActiveFor(self())) {
+            return
+        }
+
+        ci.cancel()
+    }
 }

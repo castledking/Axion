@@ -116,6 +116,18 @@ object AxionKeybindings {
         category,
     )
 
+    val toggleForcePlace: KeyBinding = KeyBindingCompat.create(
+        "key.${AxionMod.MOD_ID}.toggle_force_place",
+        GLFW.GLFW_KEY_UNKNOWN,
+        category,
+    )
+
+    val toggleAngelPlacement: KeyBinding = KeyBindingCompat.create(
+        "key.${AxionMod.MOD_ID}.toggle_angel_placement",
+        GLFW.GLFW_KEY_UNKNOWN,
+        category,
+    )
+
     fun register() {
         KeyBindingHelper.registerKeyBinding(selectAxionTool)
         KeyBindingHelper.registerKeyBinding(nextSubtool)
@@ -135,5 +147,7 @@ object AxionKeybindings {
         KeyBindingHelper.registerKeyBinding(toggleSameBlockMagicSelect)
         KeyBindingHelper.registerKeyBinding(togglePhantom)
         KeyBindingHelper.registerKeyBinding(toggleNoUpdates)
+        KeyBindingHelper.registerKeyBinding(toggleForcePlace)
+        KeyBindingHelper.registerKeyBinding(toggleAngelPlacement)
     }
 }

@@ -218,7 +218,7 @@ class AxionOperationService(
             val appliedEntityDeletes = mutableListOf<CommittedEntityClone>()
             request.operations.forEach { operation ->
                 when (operation) {
-                    is ClearRegionRequest -> applyClear(player, world, operation, interactionRoute, interactionEye)
+                    is ClearRegionRequest -> applyClear(player, world, operation, interactionRoute, interactionEye, request.suppressBlockUpdates)
                     is CloneEntitiesRequest -> appliedEntityClones += PaperEntityCloneService.clone(world, operation)
                     is CloneRegionRequest -> applyClone(world, operation)
                     is DeleteEntitiesRequest -> appliedEntityDeletes += PaperEntityDeleteService.delete(world, operation)
@@ -227,7 +227,7 @@ class AxionOperationService(
                     is StackRegionRequest -> applyStack(world, operation)
                     is SmearRegionRequest -> applySmear(world, operation)
                     is ExtrudeRequest -> applyExtrude(world, resolvedExtrudePlans.getValue(operation))
-                    is PlaceBlocksRequest -> applyPlacements(player, world, operation, interactionRoute, interactionEye)
+                    is PlaceBlocksRequest -> applyPlacements(player, world, operation, interactionRoute, interactionEye, request.suppressBlockUpdates)
                 }
             }
             entityMoves = appliedEntityMoves
@@ -283,12 +283,16 @@ class AxionOperationService(
         return historyActions.redo(player, requestId, transactionId, timing)
     }
 
+    // Clear and place are the only operations a capability interaction can
+    // produce, so they are the only ones that honour the batch's
+    // suppressBlockUpdates flag. Bulk tool edits stay on the quiet path always.
     private fun applyClear(
         player: Player,
         world: World,
         operation: ClearRegionRequest,
         interactionRoute: PaperInteractionBatchRoute,
         interactionEye: Location?,
+        suppressUpdates: Boolean,
     ) {
         forEachPos(operation.min, operation.max) { x, y, z ->
             val pos = IntVector3(x, y, z)
@@ -297,6 +301,7 @@ class AxionOperationService(
                 world = world,
                 pos = pos,
                 origin = interactionOriginForWrite(interactionRoute, interactionEye, pos),
+                suppressUpdates = suppressUpdates,
             )
         }
     }
@@ -394,6 +399,7 @@ class AxionOperationService(
         operation: PlaceBlocksRequest,
         interactionRoute: PaperInteractionBatchRoute,
         interactionEye: Location?,
+        suppressUpdates: Boolean,
     ) {
         operation.placements.forEach { placement ->
             interactionEventGateway.applyPlacement(
@@ -403,6 +409,7 @@ class AxionOperationService(
                 blockState = placement.blockState,
                 blockEntityData = placement.blockEntityData,
                 origin = interactionOriginForWrite(interactionRoute, interactionEye, placement.pos),
+                suppressUpdates = suppressUpdates,
             )
         }
     }

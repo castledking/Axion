@@ -9,9 +9,11 @@ import axion.protocol.AxionOperationType
 import axion.protocol.AxionProtocol
 import axion.protocol.AxionTransportCodec
 import axion.protocol.ClientHello
+import axion.protocol.ForcePlaceStateRequest
 import axion.protocol.NoClipStateRequest
 import axion.protocol.NoUpdatesStateRequest
 import axion.protocol.OperationBatchResult
+import axion.protocol.PhantomStateRequest
 import axion.protocol.RedoRequest
 import axion.protocol.ServerHello
 import axion.protocol.UndoRequest
@@ -39,6 +41,8 @@ object AxionServerConnection {
     private var lastStatusMessage: String? = null
     private var lastSentNoClipArmed: Boolean? = null
     private var lastSentNoUpdatesArmed: Boolean? = null
+    private var lastSentPhantomArmed: Boolean? = null
+    private var lastSentForcePlaceArmed: Boolean? = null
 
     fun initialize() {
         logger.info("[Axion/Network] Registering payload channel")
@@ -56,13 +60,17 @@ object AxionServerConnection {
                 state = State.Disconnected
                 lastSentNoClipArmed = null
                 lastSentNoUpdatesArmed = null
+                lastSentPhantomArmed = null
+                lastSentForcePlaceArmed = null
                 nextTransferId = 1L
                 return@onPlayJoin
             }
 
             state = State.AwaitingHello
             lastSentNoClipArmed = null
-                lastSentNoUpdatesArmed = null
+            lastSentNoUpdatesArmed = null
+            lastSentPhantomArmed = null
+            lastSentForcePlaceArmed = null
             nextTransferId = 1L
             send(
                 ClientHello(
@@ -78,7 +86,9 @@ object AxionServerConnection {
             state = State.Disconnected
             lastStatusMessage = null
             lastSentNoClipArmed = null
-                lastSentNoUpdatesArmed = null
+            lastSentNoUpdatesArmed = null
+            lastSentPhantomArmed = null
+            lastSentForcePlaceArmed = null
             nextTransferId = 1L
             AxionRequestTracker.clear()
             AxionServerMessageAssembler.clear()
@@ -168,6 +178,48 @@ object AxionServerConnection {
         lastSentNoUpdatesArmed = armed
         sendClientMessage(
             NoUpdatesStateRequest(armed = armed),
+        )
+    }
+
+    fun syncPhantomState(armed: Boolean) {
+        when (state) {
+            State.Disconnected,
+            State.Unsupported,
+                -> return
+
+            State.AwaitingHello,
+            is State.Available,
+                -> Unit
+        }
+
+        if (lastSentPhantomArmed == armed) {
+            return
+        }
+
+        lastSentPhantomArmed = armed
+        sendClientMessage(
+            PhantomStateRequest(armed = armed),
+        )
+    }
+
+    fun syncForcePlaceState(armed: Boolean) {
+        when (state) {
+            State.Disconnected,
+            State.Unsupported,
+                -> return
+
+            State.AwaitingHello,
+            is State.Available,
+                -> Unit
+        }
+
+        if (lastSentForcePlaceArmed == armed) {
+            return
+        }
+
+        lastSentForcePlaceArmed = armed
+        sendClientMessage(
+            ForcePlaceStateRequest(armed = armed),
         )
     }
 

@@ -73,6 +73,16 @@ data class OperationBatchRequest(
     val usesSymmetry: Boolean = false,
     val recordHistory: Boolean = true,
     val interactionOrigin: AxionInteractionOrigin = AxionInteractionOrigin.NONE,
+    /**
+     * Whether the server should write these blocks without notifying neighbours.
+     *
+     * Axion tool edits always suppress updates. Capability-driven interactions
+     * (replace mode, infinite reach, force place, plain place/break routed
+     * through Axion) only suppress them while the No Updates capability is armed,
+     * so an unarmed replace-mode placement still ticks redstone and gravity the
+     * way vanilla would.
+     */
+    val suppressBlockUpdates: Boolean = true,
 ) : AxionClientMessage
 
 data class UndoRequest(
@@ -104,6 +114,14 @@ data class GameModeChangeRequest(
 ) : AxionClientMessage
 
 data class NoUpdatesStateRequest(
+    val armed: Boolean,
+) : AxionClientMessage
+
+data class PhantomStateRequest(
+    val armed: Boolean,
+) : AxionClientMessage
+
+data class ForcePlaceStateRequest(
     val armed: Boolean,
 ) : AxionClientMessage
 

@@ -15,11 +15,18 @@ object PaperBlockEntitySnapshotService {
         return blockEntity.saveWithFullMetadata(level.registryAccess()).toString()
     }
 
-    fun apply(world: World, pos: BlockPos, blockStateString: String, blockEntityPayload: String?) {
+    fun apply(
+        world: World,
+        pos: BlockPos,
+        blockStateString: String,
+        blockEntityPayload: String?,
+        suppressUpdates: Boolean = true,
+    ) {
         val level = (world as CraftWorld).handle
         PaperBlockWritePolicy.setBlockData(
             world.getBlockAt(pos.x, pos.y, pos.z),
             Bukkit.createBlockData(blockStateString),
+            applyPhysics = !suppressUpdates,
         )
 
         val blockState = level.getBlockState(pos)

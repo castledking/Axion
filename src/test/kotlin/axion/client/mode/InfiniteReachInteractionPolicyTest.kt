@@ -28,6 +28,18 @@ class InfiniteReachInteractionPolicyTest {
     }
 
     @Test
+    fun `force place and no updates keep the click away from vanilla`() {
+        assertFalse(
+            InfiniteReachInteractionPolicy.shouldYieldToVanilla(
+                infiniteReachEnabled = true,
+                replaceModeEnabled = false,
+                vanillaTargetPresent = true,
+                axionOwnsPlacement = true,
+            ),
+        )
+    }
+
+    @Test
     fun `explicit replace mode continues to own its target`() {
         assertFalse(
             InfiniteReachInteractionPolicy.shouldYieldToVanilla(

@@ -15,7 +15,10 @@ typealias BlockRenderType = net.minecraft.world.level.block.RenderShape
 //   RedstoneOreBlock → RedStoneOreBlock
 //   TripwireBlock → TripWireBlock
 typealias AbstractPressurePlateBlock = net.minecraft.world.level.block.BasePressurePlateBlock
+typealias BigDripleafBlock = net.minecraft.world.level.block.BigDripleafBlock
 typealias CobwebBlock = net.minecraft.world.level.block.WebBlock
 typealias RedstoneOreBlock = net.minecraft.world.level.block.RedStoneOreBlock
 typealias SculkSensorBlock = net.minecraft.world.level.block.SculkSensorBlock
+// Mirroring corner stairs needs to recognise the block: StairsBlock -> StairBlock.
+typealias StairsBlock = net.minecraft.world.level.block.StairBlock
 typealias TripwireBlock = net.minecraft.world.level.block.TripWireBlock

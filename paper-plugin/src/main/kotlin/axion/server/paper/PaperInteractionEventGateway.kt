@@ -29,7 +29,9 @@ internal class PaperInteractionEventGateway(
         world: World,
         pos: IntVector3,
         origin: AxionInteractionOrigin,
+        suppressUpdates: Boolean = true,
     ) {
+        val quiet = suppressesUpdates(player, suppressUpdates)
         applyChange(
             player = player,
             world = world,
@@ -37,8 +39,13 @@ internal class PaperInteractionEventGateway(
             targetState = "minecraft:air",
             targetBlockEntityData = null,
             origin = origin,
+            suppressUpdates = quiet,
         ) {
-            PaperBlockWritePolicy.setType(world.getBlockAt(pos.x, pos.y, pos.z), org.bukkit.Material.AIR)
+            PaperBlockWritePolicy.setType(
+                world.getBlockAt(pos.x, pos.y, pos.z),
+                org.bukkit.Material.AIR,
+                applyPhysics = !quiet,
+            )
         }
     }
 
@@ -49,7 +56,9 @@ internal class PaperInteractionEventGateway(
         blockState: String,
         blockEntityData: String?,
         origin: AxionInteractionOrigin,
+        suppressUpdates: Boolean = true,
     ) {
+        val quiet = suppressesUpdates(player, suppressUpdates)
         applyChange(
             player = player,
             world = world,
@@ -57,15 +66,24 @@ internal class PaperInteractionEventGateway(
             targetState = blockState,
             targetBlockEntityData = blockEntityData,
             origin = origin,
+            suppressUpdates = quiet,
         ) {
             PaperBlockEntitySnapshotService.apply(
                 world = world,
                 pos = BlockPos(pos.x, pos.y, pos.z),
                 blockStateString = blockState,
                 blockEntityPayload = blockEntityData,
+                suppressUpdates = quiet,
             )
         }
     }
+
+    /**
+     * A batch says whether it wants updates, but a player with No Updates armed
+     * never gets them — a stale or forged flag cannot re-enable physics for them.
+     */
+    private fun suppressesUpdates(player: Player, requested: Boolean): Boolean =
+        requested || noUpdatesService.isArmed(player)
 
     private fun applyChange(
         player: Player,
@@ -74,6 +92,7 @@ internal class PaperInteractionEventGateway(
         targetState: String,
         targetBlockEntityData: String?,
         origin: AxionInteractionOrigin,
+        suppressUpdates: Boolean,
         applyTarget: () -> Unit,
     ) {
         if (origin != AxionInteractionOrigin.INFINITE_REACH) {
@@ -109,7 +128,7 @@ internal class PaperInteractionEventGateway(
             }
         }
 
-        if (noUpdatesService.isArmed(player)) {
+        if (suppressUpdates) {
             nmsWrite(world, pos, targetState)
         } else {
             applyTarget()

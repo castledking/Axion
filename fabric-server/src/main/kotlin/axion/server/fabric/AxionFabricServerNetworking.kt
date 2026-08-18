@@ -10,11 +10,13 @@ import axion.protocol.AxionServerMessage
 import axion.protocol.AxionTransportCodec
 import axion.protocol.ClientHello
 import axion.protocol.FlightSpeedRequest
+import axion.protocol.ForcePlaceStateRequest
 import axion.protocol.GameModeChangeRequest
 import axion.protocol.NoClipStateRequest
 import axion.protocol.NoUpdatesStateRequest
 import axion.protocol.OperationBatchRequest
 import axion.protocol.OperationBatchResult
+import axion.protocol.PhantomStateRequest
 import axion.protocol.RedoRequest
 import axion.protocol.ServerHello
 import axion.protocol.UndoRequest
@@ -49,6 +51,11 @@ class AxionFabricServerNetworking(
                     is ClientHello -> handleHello(context.player(), decoded)
                     is NoClipStateRequest -> noClipService.setArmed(context.player(), decoded.armed)
                     is NoUpdatesStateRequest -> noUpdatesService.setArmed(context.player(), decoded.armed)
+                    is PhantomStateRequest -> AxionFabricPhantomService.setArmed(context.player(), decoded.armed)
+                    // Force place needs no server state: the client already routes
+                    // those placements through the operation pipeline, which writes
+                    // blocks without consulting entity collision.
+                    is ForcePlaceStateRequest -> Unit
                     is FlightSpeedRequest -> handleFlightSpeed(context.player(), decoded)
                     is GameModeChangeRequest -> handleGameModeChange(context.server(), context.player(), decoded)
                     is OperationBatchRequest -> handleOperationBatch(context.player(), decoded)
@@ -61,12 +68,14 @@ class AxionFabricServerNetworking(
         ServerPlayConnectionEvents.DISCONNECT.register(ServerPlayConnectionEvents.Disconnect { handler, _ ->
             noClipService.clear(handler.player)
             noUpdatesService.clear(handler.player)
+            AxionFabricPhantomService.clear(handler.player)
         })
     }
 
     fun stop(server: MinecraftServer) {
         noClipService.stop(server)
         noUpdatesService.stop(server)
+        AxionFabricPhantomService.stop(server)
     }
 
     private fun decodeClientMessage(message: ByteArray): AxionClientMessage? {

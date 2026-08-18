@@ -408,8 +408,15 @@ object VersionCompatImpl : VersionCompat {
         return BlockEntityDataSnapshot(nbt.copy())
     }
 
-    fun applyBlockEntity(world: World, write: BlockWrite) {
-        world.setBlock(write.pos, write.state, BlockWriteUpdatePolicy.MODERN_NO_PHYSICS_FLAGS)
+    fun applyBlockEntity(world: World, write: BlockWrite, suppressUpdates: Boolean = true) {
+        world.setBlock(
+            write.pos,
+            write.state,
+            BlockWriteUpdatePolicy.capabilityFlags(
+                suppressUpdates = suppressUpdates,
+                modernCallbacksAvailable = true,
+            ),
+        )
         val payload = write.blockEntityData
         if (payload == null) {
             world.removeBlockEntity(write.pos)

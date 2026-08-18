@@ -19,4 +19,12 @@ class RedstoneOreBlockMixin {
             ci.cancel()
         }
     }
+
+    // 26.x official namespace: stepOn
+    @Inject(method = ["stepOn"], at = [At("HEAD")], cancellable = true, require = 0)
+    fun axionPhantomCancelRedstoneOreOfficial(world: World, pos: BlockPos, state: BlockState, entity: Entity, ci: CallbackInfo) {
+        if (PhantomService.isEnabledFor(entity)) {
+            ci.cancel()
+        }
+    }
 }

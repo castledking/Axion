@@ -357,6 +357,11 @@ object BuildPlacementService {
         if (player.isSpectator || player.noClip) {
             return false
         }
+        // Force place is exactly "place it anyway". Axion writes the block
+        // directly, so no entity ever gets a say — mobs included.
+        if (AxionCapabilityPolicy.ignoresEntityCollision()) {
+            return false
+        }
 
         val collisionShape = state.getCollisionShape(world, pos, ShapeContext.of(player))
         if (collisionShape.isEmpty) {

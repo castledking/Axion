@@ -8,6 +8,7 @@ package axion.client.network
  * versions need their newly scheduled ticks removed immediately after the write instead.
  */
 object BlockWriteUpdatePolicy {
+    const val NOTIFY_NEIGHBORS = 1
     const val NOTIFY_CLIENTS = 2
     const val KEEP_KNOWN_SHAPE = 16
     const val SUPPRESS_DROPS = 32
@@ -20,4 +21,21 @@ object BlockWriteUpdatePolicy {
 
     const val NO_UPDATES_FLAGS =
         NOTIFY_CLIENTS or KEEP_KNOWN_SHAPE or SUPPRESS_DROPS or SKIP_REPLACED_CALLBACK or SKIP_ADDED_CALLBACK
+
+    /**
+     * What vanilla uses for an ordinary place or break: neighbours get notified,
+     * so redstone re-evaluates and gravity blocks start falling.
+     *
+     * Capability writes (replace mode, infinite reach, force place, and plain
+     * place/break that Axion has taken over) use this unless the No Updates
+     * capability is armed. Axion tool edits stay on the no-physics flags always.
+     */
+    const val NEIGHBOR_UPDATE_FLAGS = NOTIFY_NEIGHBORS or NOTIFY_CLIENTS
+
+    /** Resolves the write flags for a capability write on this Minecraft version. */
+    fun capabilityFlags(suppressUpdates: Boolean, modernCallbacksAvailable: Boolean): Int = when {
+        !suppressUpdates -> NEIGHBOR_UPDATE_FLAGS
+        modernCallbacksAvailable -> MODERN_NO_PHYSICS_FLAGS
+        else -> LEGACY_NO_PHYSICS_FLAGS
+    }
 }

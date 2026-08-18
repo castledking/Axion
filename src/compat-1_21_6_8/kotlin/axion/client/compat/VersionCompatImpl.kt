@@ -252,8 +252,15 @@ object VersionCompatImpl : VersionCompat {
         return BlockEntityDataSnapshot(blockEntity.createNbtWithIdentifyingData(world.registryManager).copy())
     }
 
-    fun applyBlockEntity(world: net.minecraft.world.World, write: BlockWrite) {
-        world.setBlockState(write.pos, write.state, BlockWriteUpdatePolicy.MODERN_NO_PHYSICS_FLAGS)
+    fun applyBlockEntity(world: net.minecraft.world.World, write: BlockWrite, suppressUpdates: Boolean = true) {
+        world.setBlockState(
+            write.pos,
+            write.state,
+            BlockWriteUpdatePolicy.capabilityFlags(
+                suppressUpdates = suppressUpdates,
+                modernCallbacksAvailable = true,
+            ),
+        )
         val payload = write.blockEntityData
         if (payload == null) {
             world.removeBlockEntity(write.pos)

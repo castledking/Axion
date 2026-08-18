@@ -18,6 +18,8 @@ class AxionGameModeCodecTest {
 
     @Test
     fun `game mode protocol revision is advertised`() {
-        assertEquals(12, AxionProtocol.PROTOCOL_VERSION)
+        // Bumped to 13 by the phantom / force place state requests and the
+        // suppressBlockUpdates field on OperationBatchRequest.
+        assertEquals(13, AxionProtocol.PROTOCOL_VERSION)
     }
 }

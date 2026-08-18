@@ -24,6 +24,7 @@ object AxionProtocolCodec {
                     data.writeBoolean(message.usesSymmetry)
                     data.writeBoolean(message.recordHistory)
                     data.writeUTF(message.interactionOrigin.name)
+                    data.writeBoolean(message.suppressBlockUpdates)
                 }
 
                 is UndoRequest -> {
@@ -57,6 +58,16 @@ object AxionProtocolCodec {
                     data.writeByte(8)
                     data.writeBoolean(message.armed)
                 }
+
+                is PhantomStateRequest -> {
+                    data.writeByte(9)
+                    data.writeBoolean(message.armed)
+                }
+
+                is ForcePlaceStateRequest -> {
+                    data.writeByte(10)
+                    data.writeBoolean(message.armed)
+                }
             }
         }
         return output.toByteArray()
@@ -87,6 +98,9 @@ object AxionProtocolCodec {
                     usesSymmetry = data.readBoolean(),
                     recordHistory = data.readBoolean(),
                     interactionOrigin = AxionInteractionOrigin.valueOf(data.readUTF()),
+                    // Protocol 12 and older stop here; those clients only ever
+                    // wrote suppressed batches, which is the default.
+                    suppressBlockUpdates = if (data.available() > 0) data.readBoolean() else true,
                 )
 
                 3 -> UndoRequest(
@@ -112,6 +126,14 @@ object AxionProtocolCodec {
                 )
 
                 8 -> NoUpdatesStateRequest(
+                    armed = data.readBoolean(),
+                )
+
+                9 -> PhantomStateRequest(
+                    armed = data.readBoolean(),
+                )
+
+                10 -> ForcePlaceStateRequest(
                     armed = data.readBoolean(),
                 )
 

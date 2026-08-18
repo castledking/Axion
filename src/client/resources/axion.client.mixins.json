@@ -4,6 +4,7 @@
   "compatibilityLevel": "JAVA_21",
   "client": [
     "AbstractPressurePlateBlockMixin",
+    "BigDripleafBlockMixin",
     "CameraNoClipMixin",
     "ClientPlayerEntityMixin",
     "CobwebBlockMixin",

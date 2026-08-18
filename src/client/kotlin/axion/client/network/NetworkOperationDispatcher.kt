@@ -41,6 +41,11 @@ import net.minecraft.command.argument.BlockArgumentParser
 class NetworkOperationDispatcher(
     private val recordHistory: Boolean = true,
     private val interactionOrigin: AxionInteractionOrigin = AxionInteractionOrigin.NONE,
+    /**
+     * Read per dispatch rather than captured, because the No Updates capability
+     * can be toggled between two dispatches from the same long-lived dispatcher.
+     */
+    private val suppressBlockUpdates: () -> Boolean = { true },
 ) : OperationDispatcher {
     override fun dispatch(operation: EditOperation) {
         val flattened = flattenOperations(operation)
@@ -84,6 +89,7 @@ class NetworkOperationDispatcher(
                 usesSymmetry = false,
                 recordHistory = recordHistory,
                 interactionOrigin = interactionOrigin,
+                suppressBlockUpdates = suppressBlockUpdates(),
             ),
         )
     }

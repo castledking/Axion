@@ -10,9 +10,9 @@ class LocalOperationApplier : OperationApplier {
         apply(world, planner.plan(world, operation))
     }
 
-    fun apply(world: World, plan: WritePlan) {
+    fun apply(world: World, plan: WritePlan, suppressBlockUpdates: Boolean = true) {
         plan.writes.forEach { write ->
-            BlockEntitySnapshotService.apply(world, write)
+            BlockEntitySnapshotService.apply(world, write, suppressBlockUpdates)
         }
         if (plan.entityDeletes.isNotEmpty()) {
             LocalEntityDeleteService.apply(world, plan.entityDeletes)

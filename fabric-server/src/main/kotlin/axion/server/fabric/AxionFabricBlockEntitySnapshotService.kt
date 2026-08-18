@@ -12,6 +12,9 @@ object AxionFabricBlockEntitySnapshotService {
     // The callback bits are available on the dedicated-server target (Minecraft 1.21.11).
     private const val NO_PHYSICS_UPDATE_FLAGS = 2 or 16 or 32 or 256 or 512
 
+    // Notify neighbours and clients — what vanilla does for an ordinary place or break.
+    private const val NEIGHBOR_UPDATE_FLAGS = 1 or 2
+
     fun capture(world: ServerWorld, pos: BlockPos): String? {
         val blockEntity = world.getBlockEntity(pos) ?: return null
         return blockEntity.createNbtWithIdentifyingData(world.registryManager).toString()
@@ -22,8 +25,13 @@ object AxionFabricBlockEntitySnapshotService {
         pos: BlockPos,
         state: BlockState,
         blockEntityData: String?,
+        suppressUpdates: Boolean = true,
     ) {
-        world.setBlockState(pos, state, NO_PHYSICS_UPDATE_FLAGS)
+        world.setBlockState(
+            pos,
+            state,
+            if (suppressUpdates) NO_PHYSICS_UPDATE_FLAGS else NEIGHBOR_UPDATE_FLAGS,
+        )
 
         val provider = state.block as? BlockEntityProvider
         if (blockEntityData == null) {

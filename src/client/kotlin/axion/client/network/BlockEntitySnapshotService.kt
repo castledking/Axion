@@ -8,5 +8,6 @@ import net.minecraft.world.World
 object BlockEntitySnapshotService {
     fun capture(world: World, pos: BlockPos): BlockEntityDataSnapshot? = VersionCompatImpl.captureBlockEntity(world, pos)
 
-    fun apply(world: World, write: BlockWrite) = VersionCompatImpl.applyBlockEntity(world, write)
+    fun apply(world: World, write: BlockWrite, suppressUpdates: Boolean = true) =
+        VersionCompatImpl.applyBlockEntity(world, write, suppressUpdates)
 }

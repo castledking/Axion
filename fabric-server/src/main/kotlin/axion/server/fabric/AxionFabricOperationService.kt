@@ -109,13 +109,13 @@ class AxionFabricOperationService(
         ) {
             request.operations.forEach { operation ->
                 when (operation) {
-                    is ClearRegionRequest -> applyClear(world, operation)
+                    is ClearRegionRequest -> applyClear(world, operation, request.suppressBlockUpdates)
                     is CloneRegionRequest -> applyClone(world, operation)
                     is FilteredCloneRegionRequest -> applyFilteredClone(world, operation)
                     is CloneEntitiesRequest -> entityClones += AxionFabricEntityCloneService.clone(world, operation)
                     is DeleteEntitiesRequest -> entityDeletes += AxionFabricEntityDeleteService.delete(world, operation)
                     is MoveEntitiesRequest -> entityMoves += AxionFabricEntityMoveService.move(world, operation)
-                    is PlaceBlocksRequest -> applyPlacements(world, operation)
+                    is PlaceBlocksRequest -> applyPlacements(world, operation, request.suppressBlockUpdates)
                     is StackRegionRequest -> applyRepeatedClipboard(world, operation.sourceOrigin, operation.cells, operation.step, operation.repeatCount, airOnly = operation.keepExisting)
                     is SmearRegionRequest -> applySmearedClipboard(world, operation)
                     is ExtrudeRequest -> applyExtrude(world, plannedExtrudes[operation])
@@ -140,7 +140,10 @@ class AxionFabricOperationService(
         return result
     }
 
-    private fun applyClear(world: ServerWorld, operation: ClearRegionRequest) {
+    // Clear and place are the two operations a capability interaction can produce,
+    // so they are the only ones that honour the batch's suppressBlockUpdates flag.
+    // Bulk tool edits (clone, stack, smear, extrude) always stay on the quiet path.
+    private fun applyClear(world: ServerWorld, operation: ClearRegionRequest, suppressUpdates: Boolean) {
         val min = minVector(operation.min, operation.max)
         val max = maxVector(operation.min, operation.max)
         forEachPos(min, max) { pos ->
@@ -149,6 +152,7 @@ class AxionFabricOperationService(
                 pos = pos,
                 state = net.minecraft.block.Blocks.AIR.defaultState,
                 blockEntityData = null,
+                suppressUpdates = suppressUpdates,
             )
         }
     }
@@ -212,7 +216,7 @@ class AxionFabricOperationService(
         }
     }
 
-    private fun applyPlacements(world: ServerWorld, operation: PlaceBlocksRequest) {
+    private fun applyPlacements(world: ServerWorld, operation: PlaceBlocksRequest, suppressUpdates: Boolean) {
         operation.placements.forEach { placement ->
             val parsed = parseBlockState(world, placement.blockState) ?: return@forEach
             AxionFabricBlockEntitySnapshotService.apply(
@@ -220,6 +224,7 @@ class AxionFabricOperationService(
                 pos = BlockPos(placement.pos.x, placement.pos.y, placement.pos.z),
                 state = parsed.blockState(),
                 blockEntityData = placement.blockEntityData,
+                suppressUpdates = suppressUpdates,
             )
         }
     }

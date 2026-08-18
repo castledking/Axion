@@ -71,6 +71,7 @@ class AxionFabricServerMod : DedicatedServerModInitializer {
         LOGGER.info("Initializing Axion Fabric server support")
         noClipService.initialize()
         noUpdatesService.initialize()
+        AxionFabricPhantomService.initialize()
         networking.initialize()
         ServerLifecycleEvents.SERVER_STARTED.register(ServerLifecycleEvents.ServerStarted { server ->
             if (AxionFabricDevMode.isEnabled(server)) {

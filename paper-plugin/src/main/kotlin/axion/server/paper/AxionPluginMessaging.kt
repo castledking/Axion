@@ -6,11 +6,13 @@ import axion.protocol.AxionProtocolCodec
 import axion.protocol.AxionTransportCodec
 import axion.protocol.ClientHello
 import axion.protocol.FlightSpeedRequest
+import axion.protocol.ForcePlaceStateRequest
 import axion.protocol.GameModeChangeRequest
 import axion.protocol.NoClipStateRequest
 import axion.protocol.NoUpdatesStateRequest
 import axion.protocol.OperationBatchRequest
 import axion.protocol.OperationBatchResult
+import axion.protocol.PhantomStateRequest
 import axion.protocol.RedoRequest
 import axion.protocol.ServerHello
 import axion.protocol.UndoRequest
@@ -23,6 +25,7 @@ class AxionPluginMessaging(
     private val policyService: AxionPolicyService,
     private val noClipService: AxionNoClipService,
     private val noUpdatesService: AxionNoUpdatesService,
+    private val phantomService: AxionPhantomService,
     private val flightSpeedService: AxionFlightSpeedService,
 ) : PluginMessageListener {
     private val auditEnabled = plugin.config.getBoolean("audit.enabled", true)
@@ -50,6 +53,11 @@ class AxionPluginMessaging(
             is ClientHello -> handleHello(player, decoded)
             is NoClipStateRequest -> handleNoClipState(player, decoded)
             is NoUpdatesStateRequest -> handleNoUpdatesState(player, decoded)
+            is PhantomStateRequest -> phantomService.setArmed(player, decoded.armed)
+            // Force place needs no server state: the client routes those
+            // placements through the operation pipeline, which writes blocks
+            // without consulting entity collision.
+            is ForcePlaceStateRequest -> Unit
             is FlightSpeedRequest -> handleFlightSpeed(player, decoded)
             is GameModeChangeRequest -> handleGameModeChange(player, decoded)
             is OperationBatchRequest -> handleOperationBatch(player, decoded)

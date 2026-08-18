@@ -64,14 +64,14 @@ object AxionHotbarHud {
     private val CAPABILITIES = listOf(
         CapabilityEntry("Bulldozer", 0, description = "Quickly break multiple blocks"),
         CapabilityEntry("Replace Mode", 1, description = "Only replace non-air blocks"),
-        CapabilityEntry("Force Place", 2, supported = false, description = "Not yet implemented"),
-        CapabilityEntry("No Updates", 3, supported = false, description = "Not yet implemented"),
+        CapabilityEntry("Force Place", 2, description = "Place blocks even where a player or mob is standing"),
+        CapabilityEntry("No Updates", 3, description = "Place and break without notifying neighbouring blocks"),
         CapabilityEntry("Tinker", 4, supported = false, description = "Not yet implemented"),
         CapabilityEntry("Infinite Reach", 5, description = "Extended block interaction range"),
         CapabilityEntry("Fast Place", 6, description = "Place blocks at maximum speed"),
-        CapabilityEntry("Angel Placement", 7, supported = false, description = "Not yet implemented"),
+        CapabilityEntry("Angel Placement", 7, description = "Place blocks in mid air, 4 blocks from the camera"),
         CapabilityEntry("No Clip", 8, description = "Phase through blocks while flying"),
-        CapabilityEntry("Phantom", 9, description = "Walk over tripwires, pressure plates, and sculk sensors without triggering them"),
+        CapabilityEntry("Phantom", 9, description = "Walk through tripwires, plates, sculk sensors, redstone ore, cobwebs, and dripleaf without triggering them"),
     )
 
     private fun capabilityState(index: Int): Boolean {
@@ -79,8 +79,11 @@ object AxionHotbarHud {
         return when (index) {
             0 -> state.bulldozerEnabled
             1 -> state.replaceModeEnabled
+            2 -> state.forcePlaceEnabled
+            3 -> state.noUpdatesEnabled
             5 -> state.infiniteReachEnabled
             6 -> state.fastPlaceEnabled
+            7 -> state.angelPlacementEnabled
             8 -> state.noClipEnabled
             9 -> state.phantomEnabled
             else -> false
