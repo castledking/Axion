@@ -7,6 +7,7 @@ pluginManagement {
         id("fabric-loom") version loomVersion
         id("net.fabricmc.fabric-loom") version loomVersion
         id("io.papermc.paperweight.userdev") version paperweightVersion
+        id("net.neoforged.moddev") version "2.0.49-beta"
         kotlin("jvm") version kotlinVersion
     }
 
@@ -14,12 +15,16 @@ pluginManagement {
         gradlePluginPortal()
         maven("https://maven.fabricmc.net/")
         maven("https://repo.papermc.io/repository/maven-public/")
+        maven("https://maven.neoforged.net/releases/")
         mavenCentral()
     }
 }
 
 rootProject.name = "Axion"
 
+include(":common")
+include(":fabric")
+include(":neoforge")
 include(":protocol")
 include(":paper-plugin")
 include(":fabric-server")

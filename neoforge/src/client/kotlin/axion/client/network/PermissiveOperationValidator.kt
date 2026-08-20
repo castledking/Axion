@@ -1,0 +1,153 @@
+package axion.client.network
+
+import axion.common.operation.EditOperation
+import axion.common.operation.ClearRegionOperation
+import axion.common.operation.CloneRegionOperation
+import axion.common.operation.CloneEntitiesOperation
+import axion.common.operation.CompositeOperation
+import axion.common.operation.DeleteEntitiesOperation
+import axion.common.operation.ExtrudeOperation
+import axion.common.operation.FilteredCloneRegionOperation
+import axion.common.operation.MoveEntitiesOperation
+import axion.common.operation.OperationValidator
+import axion.common.operation.SmearRegionOperation
+import axion.common.operation.StackRegionOperation
+import axion.common.operation.SymmetryPlacementOperation
+import axion.protocol.IntVector3
+
+class PermissiveOperationValidator : OperationValidator {
+    var lastFailureMessage: String? = null
+        private set
+
+    override fun validate(operation: EditOperation): Boolean {
+        lastFailureMessage = validationMessage(operation)
+        return lastFailureMessage == null
+    }
+
+    private fun validationMessage(operation: EditOperation): String? {
+        invalidEntitySelection(operation)?.let { return it }
+        val estimate = estimate(operation)
+        if (estimate.clipboardCells > MAX_CLIPBOARD_CELLS) {
+            return "Axion edit canceled: clipboard preview exceeds $MAX_CLIPBOARD_CELLS cells."
+        }
+        if (estimate.extrudeFootprint > MAX_EXTRUDE_FOOTPRINT) {
+            return "Axion edit canceled: extrude footprint exceeds $MAX_EXTRUDE_FOOTPRINT blocks."
+        }
+        if (estimate.extrudeWrites > MAX_EXTRUDE_WRITES) {
+            return "Axion edit canceled: extrude write count exceeds $MAX_EXTRUDE_WRITES blocks."
+        }
+        if (estimate.blocksPerBatch > MAX_BLOCKS_PER_BATCH) {
+            return "Axion edit canceled: estimated touched block count exceeds $MAX_BLOCKS_PER_BATCH blocks."
+        }
+        if (estimate.totalWrites > MAX_TOTAL_WRITES) {
+            return "Axion edit canceled: estimated write count exceeds $MAX_TOTAL_WRITES blocks."
+        }
+        return null
+    }
+
+    private fun estimate(operation: EditOperation): OperationEstimate {
+        return when (operation) {
+            is ClearRegionOperation -> OperationEstimate(
+                totalWrites = operation.region.volume(),
+                blocksPerBatch = operation.region.volume(),
+            )
+            is CloneRegionOperation -> OperationEstimate(
+                totalWrites = operation.sourceRegion.volume(),
+                blocksPerBatch = operation.sourceRegion.volume(),
+            )
+            is CloneEntitiesOperation -> OperationEstimate(
+                clipboardCells = entitySelectionCellCount(operation.sourceRegion, operation.entitySelection),
+            )
+            is DeleteEntitiesOperation -> OperationEstimate()
+            is FilteredCloneRegionOperation -> OperationEstimate(
+                totalWrites = operation.sourceRegion.volume(),
+                blocksPerBatch = operation.sourceRegion.volume(),
+            )
+            is StackRegionOperation -> OperationEstimate(
+                totalWrites = operation.clipboardBuffer.cells.size.toLong() * operation.repeatCount,
+                clipboardCells = operation.clipboardBuffer.cells.size,
+                blocksPerBatch = operation.clipboardBuffer.cells.size.toLong() * operation.repeatCount,
+            )
+            is SmearRegionOperation -> OperationEstimate(
+                totalWrites = operation.clipboardBuffer.cells.size.toLong() * operation.repeatCount,
+                clipboardCells = operation.clipboardBuffer.cells.size,
+                blocksPerBatch = operation.clipboardBuffer.cells.size.toLong() * operation.repeatCount,
+            )
+            is ExtrudeOperation -> OperationEstimate(
+                totalWrites = operation.footprint.size.toLong(),
+                blocksPerBatch = operation.footprint.size.toLong(),
+                extrudeFootprint = operation.footprint.size,
+                extrudeWrites = operation.footprint.size,
+            )
+            is MoveEntitiesOperation -> OperationEstimate(
+                clipboardCells = entitySelectionCellCount(operation.sourceRegion, operation.entitySelection),
+            )
+            is SymmetryPlacementOperation -> OperationEstimate(
+                totalWrites = operation.placements.size.toLong(),
+                blocksPerBatch = operation.placements.size.toLong(),
+            )
+            is CompositeOperation -> operation.operations
+                .map(::estimate)
+                .fold(OperationEstimate(), OperationEstimate::plus)
+            else -> OperationEstimate()
+        }
+    }
+
+    private data class OperationEstimate(
+        val totalWrites: Long = 0,
+        val blocksPerBatch: Long = 0,
+        val clipboardCells: Int = 0,
+        val extrudeFootprint: Int = 0,
+        val extrudeWrites: Int = 0,
+    ) {
+        operator fun plus(other: OperationEstimate): OperationEstimate {
+            return OperationEstimate(
+                totalWrites = totalWrites + other.totalWrites,
+                blocksPerBatch = blocksPerBatch + other.blocksPerBatch,
+                clipboardCells = maxOf(clipboardCells, other.clipboardCells),
+                extrudeFootprint = maxOf(extrudeFootprint, other.extrudeFootprint),
+                extrudeWrites = extrudeWrites + other.extrudeWrites,
+            )
+        }
+    }
+
+    private fun axion.common.model.BlockRegion.volume(): Long {
+        val size = size()
+        return size.x.toLong() * size.y.toLong() * size.z.toLong()
+    }
+
+    private fun invalidEntitySelection(operation: EditOperation): String? = when (operation) {
+        is CloneEntitiesOperation -> invalidEntitySelection(operation.sourceRegion, operation.entitySelection)
+        is MoveEntitiesOperation -> invalidEntitySelection(operation.sourceRegion, operation.entitySelection)
+        is CompositeOperation -> operation.operations.firstNotNullOfOrNull(::invalidEntitySelection)
+        else -> null
+    }
+
+    private fun invalidEntitySelection(
+        region: axion.common.model.BlockRegion,
+        selection: axion.protocol.EntitySelectionMask,
+    ): String? {
+        val size = region.normalized().size().let { IntVector3(it.x, it.y, it.z) }
+        return if (selection.isValidFor(size)) {
+            null
+        } else {
+            "Axion edit canceled: entity selection contains a cell outside its source region."
+        }
+    }
+
+    private fun entitySelectionCellCount(
+        region: axion.common.model.BlockRegion,
+        selection: axion.protocol.EntitySelectionMask,
+    ): Int {
+        val size = region.normalized().size().let { IntVector3(it.x, it.y, it.z) }
+        return selection.selectedBlockCount(size).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+    }
+
+    private companion object {
+        const val MAX_BLOCKS_PER_BATCH: Long = 4_000_000
+        const val MAX_TOTAL_WRITES: Long = 4_000_000
+        const val MAX_CLIPBOARD_CELLS: Int = 4_000_000
+        const val MAX_EXTRUDE_FOOTPRINT: Int = 32_768
+        const val MAX_EXTRUDE_WRITES: Int = 32_768
+    }
+}

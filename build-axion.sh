@@ -380,7 +380,7 @@ resolve_metadata_version_range() {
 
 cleanup_range_jars() {
     local range_tag="$1"
-    local mod_output_dir="build/libs/${range_tag}"
+    local mod_output_dir="fabric/build/libs/${range_tag}"
     local paper_output_dir="paper-plugin/build/libs/${range_tag}"
 
     mkdir -p "${mod_output_dir}" "${paper_output_dir}"
@@ -388,7 +388,7 @@ cleanup_range_jars() {
     # Clear only Gradle's staging output. The range-directory jars may be the
     # version currently advertised by the locally hosted download site, so
     # leave them in place until validated replacements are ready.
-    rm -f "build/libs/Axion-v${MOD_VERSION}-${range_tag}.jar"
+    rm -f "fabric/build/libs/Axion-v${MOD_VERSION}-${range_tag}.jar"
 
     # The Paper subproject emits a compile-version jar first, then this script
     # renames it into the range directory. Remove only AxionPaper outputs from
@@ -425,7 +425,7 @@ resolve_range_label() {
 }
 
 publish_release_manifest() {
-    local manifest_path="build/libs/axion-release.json"
+    local manifest_path="fabric/build/libs/axion-release.json"
     local manifest_tmp="${manifest_path}.tmp.$$"
     local display_ranges=(
         "mc26_2_x"
@@ -447,8 +447,8 @@ publish_release_manifest() {
         range_tag="$(resolve_range_tag "$range")"
         mod_jar="Axion-v${MOD_VERSION}-${range_tag}.jar"
         paper_jar="AxionPaper-v${MOD_VERSION}-${range_tag}.jar"
-        if [[ ! -f "build/libs/${range_tag}/${mod_jar}" ]]; then
-            echo "Cannot publish release manifest: missing build/libs/${range_tag}/${mod_jar}" >&2
+        if [[ ! -f "fabric/build/libs/${range_tag}/${mod_jar}" ]]; then
+            echo "Cannot publish release manifest: missing fabric/build/libs/${range_tag}/${mod_jar}" >&2
             return 1
         fi
         if [[ ! -f "paper-plugin/build/libs/${range_tag}/${paper_jar}" ]]; then
@@ -537,8 +537,8 @@ build_range() {
     mod_jar="Axion-v${MOD_VERSION}-${range_tag}.jar"
     paper_jar="AxionPaper-v${MOD_VERSION}-${range_tag}.jar"
     local output_dir_tag="${range_tag}"
-    mod_output_dir="build/libs/${output_dir_tag}"
-    paper_output_dir="paper-plugin/build/libs/${output_dir_tag}"
+    local mod_output_dir="fabric/build/libs/${output_dir_tag}"
+    local paper_output_dir="paper-plugin/build/libs/${output_dir_tag}"
 
     echo
     echo "==> Building Axion v${MOD_VERSION} for range ${range_tag} (compiled against MC ${compile_version})"
@@ -546,28 +546,28 @@ build_range() {
     wipe_kotlin_caches
 
     local gradle_tasks=(
-        remapJar
+        :fabric:remapJar
         :paper-plugin:jar
-        verifyGpuPreviewCoverage
-        verifyFabricServerRangeCompatibility
-        verifyMoveSourceReplacementCoverage
-        verifyXraySelectionRenderingCoverage
-        verifyPreviewVisualCoverage
-        verifyMagicSelectFirstRenderCoverage
-        verifyIntegratedNoClipWiring
+        :fabric:verifyGpuPreviewCoverage
+        :fabric:verifyFabricServerRangeCompatibility
+        :fabric:verifyMoveSourceReplacementCoverage
+        :fabric:verifyXraySelectionRenderingCoverage
+        :fabric:verifyPreviewVisualCoverage
+        :fabric:verifyMagicSelectFirstRenderCoverage
+        :fabric:verifyIntegratedNoClipWiring
     )
     if [[ "$compile_version" == 26.* ]]; then
         echo "    Fabric client/mod 26.x builds in the official namespace; using jar instead of remapJar."
         gradle_tasks=(
-            jar
+            :fabric:jar
             :paper-plugin:jar
-            verifyGpuPreviewCoverage
-            verifyFabricServerRangeCompatibility
-            verifyMoveSourceReplacementCoverage
-            verifyXraySelectionRenderingCoverage
-            verifyPreviewVisualCoverage
-            verifyMagicSelectFirstRenderCoverage
-            verifyIntegratedNoClipWiring
+            :fabric:verifyGpuPreviewCoverage
+            :fabric:verifyFabricServerRangeCompatibility
+            :fabric:verifyMoveSourceReplacementCoverage
+            :fabric:verifyXraySelectionRenderingCoverage
+            :fabric:verifyPreviewVisualCoverage
+            :fabric:verifyMagicSelectFirstRenderCoverage
+            :fabric:verifyIntegratedNoClipWiring
         )
     fi
 
@@ -585,7 +585,7 @@ build_range() {
         -Paxion_artifact_tag="${range_tag}" \
         -Paxion_minecraft_version_range="${metadata_version_range}"
 
-    local staged_mod_jar="build/libs/${mod_jar}"
+    local staged_mod_jar="fabric/build/libs/${mod_jar}"
     # Paper plugin emits a single-version filename; rename to range-style for output
     local actual_paper_jar
     actual_paper_jar="$(find paper-plugin/build/libs -maxdepth 1 -type f -name 'AxionPaper-*.jar' -print -quit 2>/dev/null)"
@@ -616,12 +616,12 @@ build_range() {
 # needed for jar gathering in the release workflow.
 wipe_kotlin_caches() {
     rm -rf \
-        build/tmp/compileClientKotlin \
-        build/tmp/compileKotlin \
-        build/tmp/kotlin-classes \
-        build/tmp/kotlinClientClasses \
-        build/classes/kotlin \
-        build/classes/kotlinClient
+        fabric/build/tmp/compileClientKotlin \
+        fabric/build/tmp/compileKotlin \
+        fabric/build/tmp/kotlin-classes \
+        fabric/build/tmp/kotlinClientClasses \
+        fabric/build/classes/kotlin \
+        fabric/build/classes/kotlinClient
 }
 
 print_menu() {

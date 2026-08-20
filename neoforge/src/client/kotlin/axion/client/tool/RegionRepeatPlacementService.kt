@@ -1,0 +1,476 @@
+package axion.client.tool
+
+import axion.common.model.BlockRegion
+import axion.common.model.ClipboardBuffer
+import axion.common.model.ClipboardCell
+import axion.common.operation.CompositeOperation
+import axion.common.operation.EditOperation
+import axion.common.operation.SmearRegionOperation
+import axion.common.operation.StackRegionOperation
+import axion.client.tool.directionGetFacing
+import axion.client.tool.floorMod
+import axion.client.compat.blockPosIterate
+import axion.client.compat.add
+import axion.client.compat.toImmutable
+import axion.client.compat.ORIGIN
+import net.minecraft.block.Blocks
+import net.minecraft.client.MinecraftClient
+import net.minecraft.util.math.BlockPos
+import net.minecraft.util.math.Axis
+import net.minecraft.util.math.Direction
+import net.minecraft.util.math.Vec3i
+import kotlin.math.abs
+
+object RegionRepeatPlacementService {
+    enum class Mode {
+        STACK,
+        SMEAR,
+    }
+
+    fun createInitialPreview(
+        client: MinecraftClient,
+        firstCorner: BlockPos,
+        sourceRegion: BlockRegion,
+        clipboardBuffer: ClipboardBuffer,
+        scrollAmount: Double,
+        mode: Mode,
+    ): RepeatRegionPreview? {
+        val scrollDirection = scrollAmount.compareTo(0.0)
+        if (scrollDirection == 0) {
+            return null
+        }
+
+        val direction = dominantLookDirection(client)
+        val entitySelection = clipboardBuffer.toEntitySelectionMask()
+        if (mode == Mode.SMEAR) {
+            return createPreview(
+                firstCorner = firstCorner,
+                sourceRegion = sourceRegion,
+                clipboardBuffer = clipboardBuffer,
+                entitySelection = entitySelection,
+                lookDirection = direction,
+                step = direction.vector.multiply(scrollDirection).let { Vec3i(it.x, it.y, it.z) },
+                scrollSign = scrollDirection,
+                repeatCount = 1,
+                committedSegments = emptyList(),
+            )
+        }
+
+        return createPreview(
+            firstCorner = firstCorner,
+            sourceRegion = sourceRegion,
+            clipboardBuffer = clipboardBuffer,
+            entitySelection = entitySelection,
+            lookDirection = direction,
+            step = stepFor(sourceRegion, direction, scrollDirection),
+            scrollSign = scrollDirection,
+            repeatCount = 1,
+            committedSegments = emptyList(),
+        )
+    }
+
+    fun nudgePreview(
+        client: MinecraftClient,
+        preview: RepeatRegionPreview,
+        scrollAmount: Double,
+        mode: Mode,
+    ): RepeatRegionPreview? {
+        val scrollDirection = scrollAmount.compareTo(0.0)
+        if (scrollDirection == 0) {
+            return preview
+        }
+
+        val currentDirection = dominantLookDirection(client)
+        if (mode == Mode.SMEAR) {
+            return nudgeSmearNode(preview, currentDirection, scrollDirection)
+        }
+
+        return if (preview.lookDirection == currentDirection) {
+            nudgeCurrentSegment(preview, scrollDirection)
+        } else {
+            redirectPreview(preview, currentDirection, scrollDirection, mode)
+        }
+    }
+
+    private fun nudgeSmearNode(
+        preview: RepeatRegionPreview,
+        currentDirection: Direction,
+        scrollDirection: Int,
+    ): RepeatRegionPreview? {
+        val nextStep = preview.step.add(currentDirection.vector.multiply(scrollDirection))
+        val nextRepeatCount = maxAbsComponent(nextStep)
+        if (nextRepeatCount == 0) {
+            return null
+        }
+
+        return createPreview(
+            firstCorner = preview.firstCorner,
+            sourceRegion = preview.sourceRegion,
+            clipboardBuffer = preview.clipboardBuffer,
+            entitySelection = preview.entitySelection,
+            lookDirection = currentDirection,
+            step = nextStep,
+            scrollSign = intSign(scrollDirection),
+            repeatCount = nextRepeatCount,
+            committedSegments = emptyList(),
+        )
+    }
+
+    fun toOperation(
+        preview: RepeatRegionPreview,
+        mode: Mode,
+        keepExisting: Boolean = false,
+    ): EditOperation {
+        val currentOperation = toOperation(
+            sourceRegion = preview.sourceRegion,
+            clipboardBuffer = preview.clipboardBuffer,
+            step = preview.step,
+            repeatCount = preview.repeatCount,
+            mode = mode,
+            keepExisting = keepExisting,
+        )
+        val committedOperations = preview.committedSegments.map { segment ->
+            toOperation(
+                sourceRegion = segment.sourceRegion,
+                clipboardBuffer = segment.clipboardBuffer,
+                step = segment.step,
+                repeatCount = segment.repeatCount,
+                mode = mode,
+                keepExisting = keepExisting,
+            )
+        }
+        return when {
+            committedOperations.isEmpty() -> currentOperation
+            else -> CompositeOperation(committedOperations + currentOperation)
+        }
+    }
+
+    private fun nudgeCurrentSegment(
+        preview: RepeatRegionPreview,
+        scrollDirection: Int,
+    ): RepeatRegionPreview? {
+        val currentSignedCount = preview.repeatCount * preview.scrollSign
+        val nextSignedCount = currentSignedCount + scrollDirection
+        if (nextSignedCount == 0) {
+            if (preview.committedSegments.isNotEmpty()) {
+                return unfoldLastSegment(preview)
+            }
+            return null
+        }
+
+        val nextScrollSign = intSign(nextSignedCount)
+        val nextStep = if (nextScrollSign != preview.scrollSign) {
+            preview.step.multiply(-1)
+        } else {
+            preview.step
+        }
+
+        return createPreview(
+            firstCorner = preview.firstCorner,
+            sourceRegion = preview.sourceRegion,
+            clipboardBuffer = preview.clipboardBuffer,
+            entitySelection = preview.entitySelection,
+            lookDirection = preview.lookDirection,
+            step = nextStep,
+            scrollSign = nextScrollSign,
+            repeatCount = abs(nextSignedCount),
+            committedSegments = preview.committedSegments,
+        )
+    }
+
+    private fun unfoldLastSegment(
+        preview: RepeatRegionPreview,
+    ): RepeatRegionPreview {
+        val lastSegment = preview.committedSegments.last()
+        val remainingSegments = preview.committedSegments.dropLast(1)
+        return createPreview(
+            firstCorner = preview.firstCorner,
+            sourceRegion = lastSegment.sourceRegion,
+            clipboardBuffer = lastSegment.clipboardBuffer,
+            entitySelection = lastSegment.entitySelection,
+            lookDirection = lastSegment.lookDirection,
+            step = lastSegment.step,
+            scrollSign = lastSegment.scrollSign,
+            repeatCount = lastSegment.repeatCount,
+            committedSegments = remainingSegments,
+        )
+    }
+
+    private fun redirectPreview(
+        preview: RepeatRegionPreview,
+        nextDirection: Direction,
+        scrollDirection: Int,
+        mode: Mode,
+    ): RepeatRegionPreview {
+        val folded = foldPreview(preview, mode)
+        return createPreview(
+            firstCorner = preview.firstCorner,
+            sourceRegion = folded.region,
+            clipboardBuffer = folded.clipboardBuffer,
+            entitySelection = folded.entitySelection,
+            lookDirection = nextDirection,
+            step = stepFor(folded.region, nextDirection, scrollDirection),
+            scrollSign = scrollDirection,
+            repeatCount = 1,
+            committedSegments = preview.committedSegments + folded.segment,
+        )
+    }
+
+    private fun createPreview(
+        firstCorner: BlockPos,
+        sourceRegion: BlockRegion,
+        clipboardBuffer: ClipboardBuffer,
+        entitySelection: axion.protocol.EntitySelectionMask,
+        lookDirection: Direction,
+        step: Vec3i,
+        scrollSign: Int,
+        repeatCount: Int,
+        committedSegments: List<RepeatPreviewSegment>,
+    ): RepeatRegionPreview {
+        val normalized = sourceRegion.normalized()
+        return RepeatRegionPreview(
+            firstCorner = firstCorner,
+            sourceRegion = normalized,
+            clipboardBuffer = clipboardBuffer,
+            entitySelection = entitySelection,
+            lookDirection = lookDirection,
+            step = step,
+            scrollSign = scrollSign,
+            repeatCount = repeatCount,
+            committedSegments = committedSegments,
+        )
+    }
+
+    private fun toOperation(
+        sourceRegion: BlockRegion,
+        clipboardBuffer: ClipboardBuffer,
+        step: Vec3i,
+        repeatCount: Int,
+        mode: Mode,
+        keepExisting: Boolean,
+    ): EditOperation {
+        return when (mode) {
+            Mode.STACK -> StackRegionOperation(
+                sourceRegion = sourceRegion,
+                clipboardBuffer = clipboardBuffer,
+                step = step,
+                repeatCount = repeatCount,
+                keepExisting = keepExisting,
+            )
+
+            Mode.SMEAR -> SmearRegionOperation(
+                sourceRegion = sourceRegion,
+                clipboardBuffer = clipboardBuffer,
+                step = step,
+                repeatCount = repeatCount,
+            )
+        }
+    }
+
+    private data class FoldCacheKey(
+        val clipboardHash: Int,
+        val entitySelectionHash: Int,
+        val sourceRegion: BlockRegion,
+        val step: Vec3i,
+        val repeatCount: Int,
+        val mode: Mode,
+    )
+
+    private val foldCache = LinkedHashMap<FoldCacheKey, FoldedRepeatPreview>(8, 0.75f, true)
+
+    fun foldPreview(
+        preview: RepeatRegionPreview,
+        mode: Mode,
+    ): FoldedRepeatPreview {
+        val key = FoldCacheKey(
+            clipboardHash = preview.clipboardBuffer.hashCode(),
+            entitySelectionHash = preview.entitySelection.hashCode(),
+            sourceRegion = preview.sourceRegion,
+            step = preview.step,
+            repeatCount = preview.repeatCount,
+            mode = mode,
+        )
+        foldCache[key]?.let { return it }
+        val result = foldPreviewUncached(preview, mode)
+        if (foldCache.size >= 8) {
+            foldCache.entries.iterator().let { it.next(); it.remove() }
+        }
+        foldCache[key] = result
+        return result
+    }
+
+    private fun foldPreviewUncached(
+        preview: RepeatRegionPreview,
+        mode: Mode,
+    ): FoldedRepeatPreview {
+        val sourceOrigin = preview.sourceRegion.minCorner()
+        val absoluteCells = linkedMapOf<BlockPos, ClipboardCell>()
+
+        preview.clipboardBuffer.cells.forEach { cell ->
+            val absolutePos = sourceOrigin.add(cell.offset).toImmutable()
+            absoluteCells[absolutePos] = cell.copy(offset = Vec3i(absolutePos.x, absolutePos.y, absolutePos.z))
+        }
+
+        for (index in 1..preview.repeatCount) {
+            val destinationOrigin = sourceOrigin.add(preview.step.multiply(index))
+            preview.clipboardBuffer.cells.forEach { cell ->
+                val absolutePos = destinationOrigin.add(cell.offset).toImmutable()
+                val existing = absoluteCells[absolutePos]
+                if (mode == Mode.SMEAR && existing != null && !existing.state.isAir) {
+                    return@forEach
+                }
+                absoluteCells[absolutePos] = cell.copy(offset = Vec3i(absolutePos.x, absolutePos.y, absolutePos.z))
+            }
+        }
+
+        val region = boundingRegion(absoluteCells.keys)
+        val min = region.minCorner()
+        val max = region.maxCorner()
+
+        // Safety check: if region is too large, skip folding and return original
+        val regionSize = region.size()
+        if (regionSize.x > 1000 || regionSize.y > 1000 || regionSize.z > 1000) {
+            return FoldedRepeatPreview(
+                region = preview.sourceRegion,
+                clipboardBuffer = preview.clipboardBuffer,
+                entitySelection = preview.entitySelection,
+                segment = RepeatPreviewSegment(
+                    sourceRegion = preview.sourceRegion,
+                    clipboardBuffer = preview.clipboardBuffer,
+                    entitySelection = preview.entitySelection,
+                    step = preview.step,
+                    repeatCount = preview.repeatCount,
+                    lookDirection = preview.lookDirection,
+                    scrollSign = preview.scrollSign,
+                ),
+            )
+        }
+
+        val foldedCells = buildList {
+            for (pos in blockPosIterate(min, max)) {
+                val absolutePos = pos.toImmutable()
+                val cell = absoluteCells[absolutePos]
+                add(
+                    ClipboardCell(
+                        offset = Vec3i(
+                            absolutePos.x - min.x,
+                            absolutePos.y - min.y,
+                            absolutePos.z - min.z,
+                        ),
+                        state = cell?.state ?: Blocks.AIR.defaultState,
+                        blockEntityData = cell?.blockEntityData?.copy(),
+                    ),
+                )
+            }
+        }
+
+        val repeatedEntitySelection = preview.entitySelection.repeated(
+            sourceSize = preview.sourceRegion.size().toProtocolVector(),
+            step = preview.step.toProtocolVector(),
+            repeatCount = preview.repeatCount,
+        )
+        check(repeatedEntitySelection.size == region.size().toProtocolVector()) {
+            "Folded entity selection size does not match folded block region"
+        }
+        check(
+            sourceOrigin.add(
+                Vec3i(
+                    repeatedEntitySelection.relativeOrigin.x,
+                    repeatedEntitySelection.relativeOrigin.y,
+                    repeatedEntitySelection.relativeOrigin.z,
+                ),
+            ) == region.minCorner(),
+        ) {
+            "Folded entity selection origin does not match folded block region"
+        }
+
+        return FoldedRepeatPreview(
+            region = region,
+            clipboardBuffer = ClipboardBuffer(size = region.size(), cells = foldedCells),
+            entitySelection = repeatedEntitySelection.mask,
+            segment = RepeatPreviewSegment(
+                sourceRegion = preview.sourceRegion,
+                clipboardBuffer = preview.clipboardBuffer,
+                entitySelection = preview.entitySelection,
+                step = preview.step,
+                repeatCount = preview.repeatCount,
+                lookDirection = preview.lookDirection,
+                scrollSign = preview.scrollSign,
+            ),
+        )
+    }
+
+    private fun dominantLookDirection(client: MinecraftClient): Direction {
+        val look = client.player?.rotationVecClient ?: return Direction.UP
+        return directionGetFacing(look)
+    }
+
+    private fun stepFor(region: BlockRegion, direction: Direction, scrollDirection: Int): Vec3i {
+        val stepLength = region.normalized().size().componentAlong(direction.axis)
+        return direction.vector.multiply(stepLength * scrollDirection).let { Vec3i(it.x, it.y, it.z) }
+    }
+
+    fun smearOffsets(offset: Vec3i, steps: Int = maxAbsComponent(offset)): List<Vec3i> {
+        if (steps <= 0) {
+            return emptyList()
+        }
+        return (1..steps).map { index ->
+            Vec3i(
+                java.lang.Math.round(index * offset.x.toFloat() / steps),
+                java.lang.Math.round(index * offset.y.toFloat() / steps),
+                java.lang.Math.round(index * offset.z.toFloat() / steps),
+            )
+        }.distinct()
+    }
+
+    fun maxAbsComponent(vector: Vec3i): Int {
+        return maxOf(abs(vector.x), abs(vector.y), abs(vector.z))
+    }
+
+    private fun boundingRegion(positions: Collection<BlockPos>): BlockRegion {
+        if (positions.isEmpty()) {
+            return BlockRegion(ORIGIN, ORIGIN)
+        }
+        val iterator = positions.iterator()
+        val first = iterator.next()
+        var minX = first.x
+        var minY = first.y
+        var minZ = first.z
+        var maxX = first.x
+        var maxY = first.y
+        var maxZ = first.z
+        while (iterator.hasNext()) {
+            val pos = iterator.next()
+            minX = minOf(minX, pos.x)
+            minY = minOf(minY, pos.y)
+            minZ = minOf(minZ, pos.z)
+            maxX = maxOf(maxX, pos.x)
+            maxY = maxOf(maxY, pos.y)
+            maxZ = maxOf(maxZ, pos.z)
+        }
+        return BlockRegion(BlockPos(minX, minY, minZ), BlockPos(maxX, maxY, maxZ)).normalized()
+    }
+
+    private fun Vec3i.componentAlong(axis: Axis): Int {
+        return when (axis) {
+            Axis.X -> x
+            Axis.Y -> y
+            Axis.Z -> z
+        }
+    }
+
+    private fun intSign(value: Int): Int {
+        return when {
+            value > 0 -> 1
+            value < 0 -> -1
+            else -> 0
+        }
+    }
+
+    data class FoldedRepeatPreview(
+        val region: BlockRegion,
+        val clipboardBuffer: ClipboardBuffer,
+        val entitySelection: axion.protocol.EntitySelectionMask,
+        val segment: RepeatPreviewSegment,
+    )
+}

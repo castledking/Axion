@@ -1,0 +1,338 @@
+package axion.client.network
+
+import axion.client.config.defaultState
+import axion.common.compat.VersionCompat
+import axion.common.model.BlockEntityDataSnapshot
+import axion.common.model.BlockRegion
+import axion.common.operation.CloneEntitiesOperation
+import axion.common.operation.ClearRegionOperation
+import axion.common.operation.CloneRegionOperation
+import axion.common.operation.CompositeOperation
+import axion.common.operation.DeleteEntitiesOperation
+import axion.common.operation.EditOperation
+import axion.common.operation.ExtrudeMode
+import axion.common.operation.ExtrudeOperation
+import axion.common.operation.FilteredCloneRegionOperation
+import axion.common.operation.MoveEntitiesOperation
+import axion.common.operation.SmearRegionOperation
+import axion.common.operation.StackRegionOperation
+import axion.common.operation.SymmetryPlacementOperation
+import net.minecraft.block.BlockState
+import net.minecraft.block.Blocks
+import net.minecraft.util.math.BlockPos
+import net.minecraft.util.math.Vec3i
+import axion.client.compat.blockPosIterate
+import axion.client.compat.toImmutable
+import axion.client.compat.add
+import net.minecraft.world.World
+
+class LocalWritePlanner {
+    fun plan(world: World, operation: EditOperation): WritePlan {
+        val overlay = linkedMapOf<BlockPos, BlockWrite>()
+        val writes = mutableListOf<BlockWrite>()
+        val entityMoves = mutableListOf<EntityMovePlan>()
+        val entityClones = mutableListOf<axion.common.history.EntityCloneChange>()
+        val entityDeletes = mutableListOf<axion.common.history.EntityCloneChange>()
+        appendWrites(world, operation, overlay, writes, entityMoves, entityClones, entityDeletes)
+        return WritePlan(
+            label = operationLabel(operation),
+            writes = writes,
+            entityMoves = entityMoves,
+            entityClones = entityClones,
+            entityDeletes = entityDeletes,
+        )
+    }
+
+    private fun appendWrites(
+        world: World,
+        operation: EditOperation,
+        overlay: MutableMap<BlockPos, BlockWrite>,
+        writes: MutableList<BlockWrite>,
+        entityMoves: MutableList<EntityMovePlan>,
+        entityClones: MutableList<axion.common.history.EntityCloneChange>,
+        entityDeletes: MutableList<axion.common.history.EntityCloneChange>,
+    ) {
+        when (operation) {
+            is CloneEntitiesOperation -> entityClones += LocalEntityCloneService.plan(world, operation)
+            is CloneRegionOperation -> appendClone(world, operation, overlay, writes)
+            is ClearRegionOperation -> appendClear(operation, overlay, writes)
+            is DeleteEntitiesOperation -> entityDeletes += LocalEntityDeleteService.plan(world, operation)
+            is FilteredCloneRegionOperation -> appendFilteredClone(world, operation, overlay, writes)
+            is StackRegionOperation -> appendStack(world, operation, overlay, writes)
+            is SmearRegionOperation -> appendSmear(world, operation, overlay, writes)
+            is ExtrudeOperation -> appendExtrude(world, operation, overlay, writes)
+            is MoveEntitiesOperation -> entityMoves += LocalEntityMoveService.plan(world, operation)
+            is SymmetryPlacementOperation -> appendSymmetryPlacement(operation, overlay, writes)
+            is CompositeOperation -> operation.operations.forEach { nested ->
+                appendWrites(world, nested, overlay, writes, entityMoves, entityClones, entityDeletes)
+            }
+        }
+    }
+
+    private fun appendClone(
+        world: World,
+        operation: CloneRegionOperation,
+        overlay: MutableMap<BlockPos, BlockWrite>,
+        writes: MutableList<BlockWrite>,
+    ) {
+        captureRegionCells(world, operation.sourceRegion, overlay).forEach { cell ->
+            appendWrite(
+                pos = operation.destinationOrigin.add(cell.offset),
+                state = cell.state,
+                blockEntityData = cell.blockEntityData,
+                overlay = overlay,
+                writes = writes,
+            )
+        }
+    }
+
+    private fun appendClear(
+        operation: ClearRegionOperation,
+        overlay: MutableMap<BlockPos, BlockWrite>,
+        writes: MutableList<BlockWrite>,
+    ) {
+        val region = operation.region.normalized()
+        blockPosIterate(region.minCorner(), region.maxCorner()).forEach { pos ->
+            appendWrite(pos.toImmutable(), Blocks.AIR.defaultState, null, overlay, writes)
+        }
+    }
+
+    private fun appendFilteredClone(
+        world: World,
+        operation: FilteredCloneRegionOperation,
+        overlay: MutableMap<BlockPos, BlockWrite>,
+        writes: MutableList<BlockWrite>,
+    ) {
+        val source = operation.sourceRegion.normalized()
+        captureRegionCells(world, source, overlay).forEach { cell ->
+            if (!operation.copyAir && cell.state.isAir) {
+                return@forEach
+            }
+
+            val destinationPos = operation.destinationOrigin.add(cell.offset).toImmutable()
+            if (operation.keepExisting && source.contains(destinationPos)) {
+                return@forEach
+            }
+
+            appendWrite(
+                pos = destinationPos,
+                state = cell.state,
+                blockEntityData = cell.blockEntityData,
+                overlay = overlay,
+                writes = writes,
+            )
+        }
+    }
+
+    private fun appendStack(
+        world: World,
+        operation: StackRegionOperation,
+        overlay: MutableMap<BlockPos, BlockWrite>,
+        writes: MutableList<BlockWrite>,
+    ) {
+        if (operation.repeatCount <= 0) {
+            return
+        }
+
+        val source = operation.sourceRegion.normalized()
+        for (index in 1..operation.repeatCount) {
+            val destinationOrigin = source.minCorner().add(operation.step.multiply(index))
+            operation.clipboardBuffer.cells.forEach { cell ->
+                val destinationPos = destinationOrigin.add(cell.offset).toImmutable()
+                if (operation.keepExisting && !currentStateAt(world, overlay, destinationPos).isAir) {
+                    return@forEach
+                }
+                appendWrite(destinationPos, cell.state, cell.blockEntityData, overlay, writes)
+            }
+        }
+    }
+
+    private fun appendSmear(
+        world: World,
+        operation: SmearRegionOperation,
+        overlay: MutableMap<BlockPos, BlockWrite>,
+        writes: MutableList<BlockWrite>,
+    ) {
+        val smearOffsets = axion.client.tool.RegionRepeatPlacementService.smearOffsets(
+            operation.step,
+            operation.repeatCount,
+        )
+        if (smearOffsets.isEmpty()) {
+            return
+        }
+
+        val source = operation.sourceRegion.normalized()
+        val sourceOrigin = source.minCorner()
+        val sourcePositions = operation.clipboardBuffer.cells.mapTo(linkedSetOf()) { cell ->
+            sourceOrigin.add(cell.offset).toImmutable()
+        }
+        val candidates = linkedMapOf<BlockPos, SmearCandidate>()
+
+        operation.clipboardBuffer.cells.forEach { cell ->
+            if (cell.state.isAir) {
+                return@forEach
+            }
+
+            for (offset in smearOffsets) {
+                val destinationPos = sourceOrigin
+                    .add(cell.offset)
+                    .add(offset)
+                    .toImmutable()
+                if (destinationPos !in sourcePositions && !currentStateAt(world, overlay, destinationPos).isAir) {
+                    break
+                }
+
+                val distanceSq = offset.x * offset.x + offset.y * offset.y + offset.z * offset.z
+                val existing = candidates[destinationPos]
+                if (existing == null || distanceSq < existing.distanceSq) {
+                    candidates[destinationPos] = SmearCandidate(
+                        pos = destinationPos,
+                        state = cell.state,
+                        blockEntityData = cell.blockEntityData,
+                        distanceSq = distanceSq,
+                    )
+                }
+            }
+        }
+
+        candidates.values
+            .sortedWith(compareBy<SmearCandidate> { it.pos.x }.thenBy { it.pos.y }.thenBy { it.pos.z })
+            .forEach { candidate ->
+                appendWrite(candidate.pos, candidate.state, candidate.blockEntityData, overlay, writes)
+            }
+    }
+
+    private fun appendExtrude(
+        world: World,
+        operation: ExtrudeOperation,
+        overlay: MutableMap<BlockPos, BlockWrite>,
+        writes: MutableList<BlockWrite>,
+    ) {
+        when (operation.mode) {
+            ExtrudeMode.EXTEND -> {
+                operation.footprint.forEach { sourcePos ->
+                    if (currentStateAt(world, overlay, sourcePos) != operation.sourceState) {
+                        return@forEach
+                    }
+
+                    appendWrite(
+                        pos = sourcePos.add(VersionCompat.INSTANCE.directionGetVector(operation.direction) as Vec3i),
+                        state = operation.sourceState,
+                        blockEntityData = currentBlockEntityAt(world, overlay, sourcePos),
+                        overlay = overlay,
+                        writes = writes,
+                    )
+                }
+            }
+
+            ExtrudeMode.SHRINK -> {
+                operation.footprint.forEach { sourcePos ->
+                    if (currentStateAt(world, overlay, sourcePos) == operation.sourceState) {
+                        appendWrite(sourcePos, Blocks.AIR.defaultState, null, overlay, writes)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun appendSymmetryPlacement(
+        operation: SymmetryPlacementOperation,
+        overlay: MutableMap<BlockPos, BlockWrite>,
+        writes: MutableList<BlockWrite>,
+    ) {
+        operation.placements.forEach { placement ->
+            appendWrite(placement.pos, placement.state, placement.blockEntityData, overlay, writes)
+        }
+    }
+
+    private fun appendWrite(
+        pos: BlockPos,
+        state: BlockState,
+        blockEntityData: BlockEntityDataSnapshot?,
+        overlay: MutableMap<BlockPos, BlockWrite>,
+        writes: MutableList<BlockWrite>,
+    ) {
+        val immutablePos = pos.toImmutable()
+        val write = BlockWrite(immutablePos, state, blockEntityData?.copy())
+        overlay[immutablePos] = write
+        writes += write
+    }
+
+    private fun captureRegionCells(
+        world: World,
+        region: BlockRegion,
+        overlay: MutableMap<BlockPos, BlockWrite>,
+    ): List<CapturedCell> {
+        val normalized = region.normalized()
+        val min = normalized.minCorner()
+        val max = normalized.maxCorner()
+        return buildList {
+            for (pos in blockPosIterate(min, max)) {
+                add(
+                    CapturedCell(
+                        offset = Vec3i(pos.x - min.x, pos.y - min.y, pos.z - min.z),
+                        state = currentStateAt(world, overlay, pos),
+                        blockEntityData = currentBlockEntityAt(world, overlay, pos),
+                    ),
+                )
+            }
+        }
+    }
+
+    private fun currentStateAt(
+        world: World,
+        overlay: Map<BlockPos, BlockWrite>,
+        pos: BlockPos,
+    ): BlockState {
+        return overlay[pos]?.state ?: world.getBlockState(pos)
+    }
+
+    private fun currentBlockEntityAt(
+        world: World,
+        overlay: Map<BlockPos, BlockWrite>,
+        pos: BlockPos,
+    ): BlockEntityDataSnapshot? {
+        return overlay[pos]?.blockEntityData?.copy() ?: BlockEntitySnapshotService.capture(world, pos)
+    }
+
+    private fun operationLabel(operation: EditOperation): String {
+        return when (operation) {
+            is CloneRegionOperation -> "Clone"
+            is CloneEntitiesOperation -> "Clone"
+            is ClearRegionOperation -> "Erase"
+            is DeleteEntitiesOperation -> "Erase"
+            is FilteredCloneRegionOperation -> "Clone"
+            is StackRegionOperation -> "Stack"
+            is SmearRegionOperation -> "Smear"
+            is ExtrudeOperation -> "Extrude"
+            is MoveEntitiesOperation -> "Move"
+            is SymmetryPlacementOperation -> "Place"
+            is CompositeOperation -> compositeLabel(operation)
+            else -> "Edit"
+        }
+    }
+
+    private fun compositeLabel(operation: CompositeOperation): String {
+        val hasClone = operation.operations.any { it is CloneRegionOperation }
+        val hasClear = operation.operations.any { it is ClearRegionOperation }
+        return when {
+            operation.operations.any { it is MoveEntitiesOperation } -> "Move"
+            hasClone && hasClear -> "Move"
+            hasClone -> "Clone"
+            else -> operation.operations.firstOrNull()?.let(::operationLabel) ?: "Edit"
+        }
+    }
+
+    private data class CapturedCell(
+        val offset: Vec3i,
+        val state: BlockState,
+        val blockEntityData: BlockEntityDataSnapshot?,
+    )
+
+    private data class SmearCandidate(
+        val pos: BlockPos,
+        val state: BlockState,
+        val blockEntityData: BlockEntityDataSnapshot?,
+        val distanceSq: Int,
+    )
+}
