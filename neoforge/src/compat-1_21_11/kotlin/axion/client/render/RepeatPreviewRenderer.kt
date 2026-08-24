@@ -154,7 +154,7 @@ object RepeatPreviewRenderer {
         val sparseDestination = ClipboardSelectionRenderer.isSparse(layout.region, selectionClipboard)
         val nonAirCells = ghostClipboard.nonAirCells()
 
-        BlockPreviewPipeline.renderDecorations(
+        BlockPreviewPipeline.renderOverlay(
             context = context,
             scene = BlockPreviewPipeline.OverlayScene(
                 origins = if (nonAirCells.isNotEmpty()) listOf(layout.region.minCorner()) else emptyList(),

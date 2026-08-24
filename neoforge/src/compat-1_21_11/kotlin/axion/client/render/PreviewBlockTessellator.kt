@@ -50,7 +50,7 @@ object PreviewBlockTessellator {
             val model = blockRenderManager.getBlockModel(state)
             parts.clear()
             random.setSeed(state.getSeed(block.pos))
-            model.addCommonParts(random, parts)
+            model.collectParts(random, parts)
             if (parts.isEmpty()) {
                 return@forEach
             }

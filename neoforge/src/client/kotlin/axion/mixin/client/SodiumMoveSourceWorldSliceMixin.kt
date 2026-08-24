@@ -47,6 +47,6 @@ abstract class SodiumMoveSourceWorldSliceMixin {
         cir: CallbackInfoReturnable<BlockState>,
     ) {
         val replacement = MoveSourceRenderState.suppressedState(world, x, y, z) ?: return
-        .returnValue = replacement
+replacement
     }
 }

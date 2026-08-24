@@ -34,7 +34,7 @@ class SymmetryAwareOperationDispatcher(
 
     override fun dispatch(operation: EditOperation) {
         if (!validator.validate(operation)) {
-            Minecraft.getInstance().player?.sendMessage(Component.literal(validator.lastFailureMessage ?: "Axion edit canceled."), false)
+            Minecraft.getInstance().player?.displayClientMessage(Component.literal(validator.lastFailureMessage ?: "Axion edit canceled."), false)
             return
         }
 

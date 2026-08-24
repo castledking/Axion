@@ -89,7 +89,7 @@ object AxionHudLayout {
 
     fun sideSlot(client: Minecraft, screenWidth: Int, screenHeight: Int): SlotBounds {
         val hotbarLeft = (screenWidth / 2) - HOTBAR_HALF_WIDTH
-        val slotX = when (client.options.mainHand.value) {
+        val slotX = when (client.options.mainHand().get()) {
             HumanoidArm.LEFT -> hotbarLeft - SLOT_SIZE - STRIP_GAP
             HumanoidArm.RIGHT -> hotbarLeft + (HOTBAR_HALF_WIDTH * 2) + STRIP_GAP
         }
@@ -263,7 +263,7 @@ object AxionHudLayout {
         val btnHeight = FLY_BUTTON_HEIGHT
         val centerX = buttonX + (SAVED_HOTBAR_PAGE_BUTTON_WIDTH / 2)
 
-        val fontHeight = Minecraft.getInstance().font.fontHeight
+        val fontHeight = Minecraft.getInstance().font.lineHeight
         val plusY = buttonBottom + fontHeight + 6
         val trackY = plusY + btnHeight
 

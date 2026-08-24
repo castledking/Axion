@@ -31,7 +31,7 @@ object AxionTargeting {
         val dy = hit.location.y - origin.y
         val dz = hit.location.z - origin.z
         return AxionTarget.FaceTarget(
-            blockPos = hit.blockPos.immutable(),
+            blockPos = hit.blockPos,
             face = hit.direction.toRegionFace(),
             hitPos = hit.location,
             squaredDistance = dx * dx + dy * dy + dz * dz,

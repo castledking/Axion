@@ -17,7 +17,7 @@ import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent
 import net.neoforged.neoforge.client.event.RenderGuiLayerEvent
 import net.neoforged.neoforge.common.NeoForge
 import net.neoforged.neoforge.event.tick.ServerTickEvent
-import net.neoforged.neoforge.network.event.RegisterClientPayloadHandlersEvent
+import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent
 import org.slf4j.LoggerFactory
 
@@ -37,7 +37,7 @@ class AxionNeoForgeMod(modEventBus: IEventBus) {
     }
 }
 
-@Mod(value = AxionMod.MOD_ID, dist = Dist.CLIENT)
+@Mod(AxionMod.MOD_ID)
 class AxionNeoForgeClientMod(modEventBus: IEventBus) {
     init {
         modEventBus.addListener(::onClientSetup)

@@ -30,7 +30,7 @@ abstract class WorldRendererFallbackMixin {
     )
     private fun axionFallbackAfterBlockDamageModern(
         matrices: PoseStack,
-        immediate: net.minecraft.client.render.Immediate,
+        immediate: net.minecraft.client.renderer.MultiBufferSource.BufferSource,
         renderState: LevelRenderState,
         ci: CallbackInfo,
     ) {
@@ -49,7 +49,7 @@ abstract class WorldRendererFallbackMixin {
         at = [At("TAIL")],
     )
     private fun axionFallbackAfterTargetOutlineModern(
-        immediate: net.minecraft.client.render.Immediate,
+        immediate: net.minecraft.client.renderer.MultiBufferSource.BufferSource,
         matrices: PoseStack,
         renderHitOutline: Boolean,
         renderState: LevelRenderState,

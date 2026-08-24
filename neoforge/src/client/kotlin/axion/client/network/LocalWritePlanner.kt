@@ -1,6 +1,5 @@
 package axion.client.network
 
-import axion.client.config.defaultBlockState()
 import axion.common.compat.VersionCompat
 import axion.common.model.BlockEntityDataSnapshot
 import axion.common.model.BlockRegion
@@ -92,7 +91,7 @@ class LocalWritePlanner {
     ) {
         val region = operation.region.normalized()
         blockPosIterate(region.minCorner(), region.maxCorner()).forEach { pos ->
-            appendWrite(pos.immutable(), Blocks.AIR.defaultBlockState(), null, overlay, writes)
+            appendWrite(pos, Blocks.AIR.defaultBlockState(), null, overlay, writes)
         }
     }
 
@@ -108,7 +107,7 @@ class LocalWritePlanner {
                 return@forEach
             }
 
-            val destinationPos = operation.destinationOrigin.add(cell.offset).immutable()
+            val destinationPos = operation.destinationOrigin.add(cell.offset)
             if (operation.keepExisting && source.contains(destinationPos)) {
                 return@forEach
             }
@@ -137,7 +136,7 @@ class LocalWritePlanner {
         for (index in 1..operation.repeatCount) {
             val destinationOrigin = source.minCorner().add(operation.step.multiply(index))
             operation.clipboardBuffer.cells.forEach { cell ->
-                val destinationPos = destinationOrigin.add(cell.offset).immutable()
+                val destinationPos = destinationOrigin.add(cell.offset)
                 if (operation.keepExisting && !currentStateAt(world, overlay, destinationPos).isAir) {
                     return@forEach
                 }
@@ -163,7 +162,7 @@ class LocalWritePlanner {
         val source = operation.sourceRegion.normalized()
         val sourceOrigin = source.minCorner()
         val sourcePositions = operation.clipboardBuffer.cells.mapTo(linkedSetOf()) { cell ->
-            sourceOrigin.add(cell.offset).immutable()
+            sourceOrigin.add(cell.offset)
         }
         val candidates = linkedMapOf<BlockPos, SmearCandidate>()
 
@@ -176,7 +175,7 @@ class LocalWritePlanner {
                 val destinationPos = sourceOrigin
                     .add(cell.offset)
                     .add(offset)
-                    .immutable()
+                    
                 if (destinationPos !in sourcePositions && !currentStateAt(world, overlay, destinationPos).isAir) {
                     break
                 }
@@ -251,7 +250,7 @@ class LocalWritePlanner {
         overlay: MutableMap<BlockPos, BlockWrite>,
         writes: MutableList<BlockWrite>,
     ) {
-        val immutablePos = pos.immutable()
+        val immutablePos = pos
         val write = BlockWrite(immutablePos, state, blockEntityData?.copy())
         overlay[immutablePos] = write
         writes += write

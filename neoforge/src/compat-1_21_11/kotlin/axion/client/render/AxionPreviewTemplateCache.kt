@@ -37,7 +37,7 @@ object AxionPreviewTemplateCache {
 
     data class TemplateEntry(
         val cachedVertexData: ByteArray,
-        val cachedDrawParams: MeshData.DrawParameters,
+        val cachedDrawParams: MeshData.DrawState,
         val renderLayer: RenderType,
         val isReady: Boolean,
         val scale: Float,
@@ -78,10 +78,10 @@ object AxionPreviewTemplateCache {
         }
 
         // Cache raw vertex bytes so we can reconstruct MeshData each frame
-        val vertexBuffer = builtBuffer.buffer
+        val vertexBuffer = builtBuffer.vertexBuffer()
         val vertexBytes = ByteArray(vertexBuffer.remaining())
         vertexBuffer.get(vertexBytes)
-        val drawParams = builtBuffer.drawState
+        val drawParams = builtBuffer.drawState()
         LOGGER.debug("[Axion] tessellated: vertexBytes={}, vertexCount={}, indexCount={}", vertexBytes.size, drawParams.vertexCount(), drawParams.indexCount())
         builtBuffer.close()
 
@@ -157,9 +157,9 @@ object AxionPreviewTemplateCache {
         val data = entry.cachedVertexData
         if (data.isEmpty()) return null
 
-        allocator.allocate(data.size)
+        allocator.reserve(data.size)
         val closeableBuffer = allocator.build() ?: return null
-        val buffer = closeableBuffer.buffer
+        val buffer = closeableBuffer.byteBuffer()
         buffer.put(data)
         buffer.rewind()
         return MeshData(closeableBuffer, entry.cachedDrawParams)
@@ -203,7 +203,7 @@ object AxionPreviewTemplateCache {
         val statesByPosition = LinkedHashMap<Long, net.minecraft.world.level.block.state.BlockState>(cellsToRender.size)
         cellsToRender.forEach { cell ->
             val offsetPos = BlockPos(cell.offset.x, cell.offset.y, cell.offset.z)
-            if (cell.state.renderType == net.minecraft.world.level.block.RenderShape.MODEL) {
+            if (cell.state.getRenderShape() == net.minecraft.world.level.block.RenderShape.MODEL) {
                 blocks += PreviewBlockInfo(pos = offsetPos, state = cell.state)
             }
             statesByPosition[offsetPos.asLong()] = cell.state
@@ -211,8 +211,8 @@ object AxionPreviewTemplateCache {
         if (blocks.isEmpty()) return null
 
         val previewView = AxionBlockTessellator.TemplateBlockRenderView(world, statesByPosition)
-        val allocator = ByteBufferBuilder(layer.bufferSize)
-        val bufferBuilder = BufferBuilder(allocator, layer.mode, layer.format)
+        val allocator = ByteBufferBuilder(layer.bufferSize())
+        val bufferBuilder = BufferBuilder(allocator, layer.mode(), layer.format())
         // Use fullBright=true because template tessellation happens at offset positions
         // (0-based), not real world positions. The world lighting provider would return
         // incorrect (often dark) light values for these positions.

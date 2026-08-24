@@ -28,7 +28,7 @@ object LitematicaCompat {
 
         val player = client.player ?: return false
         val configuredItemId = configuredToolItemId() ?: return false
-        val heldItemId = BuiltInRegistries.ITEM.getId(player.mainHandStack.item).toString()
+        val heldItemId = BuiltInRegistries.ITEM.getId(player.mainHandItem.item).toString()
         return heldItemId == configuredItemId
     }
 

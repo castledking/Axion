@@ -1,7 +1,7 @@
 package axion.client.hotbar
 
 import java.nio.file.Files
-import net.neoforged.fml.loadingDotsWidget.FMLLoader
+import net.neoforged.fml.loading.FMLEnvironment
 import net.neoforged.fml.loading.FMLPaths
 import net.minecraft.client.Minecraft
 
@@ -14,7 +14,7 @@ object AxionDevTestSession {
     }
 
     val isActive: Boolean by lazy {
-        !FMLLoader.isProduction() && Files.isRegularFile(markerPath)
+        !net.neoforged.fml.loading.FMLEnvironment.isProduction() && Files.isRegularFile(markerPath)
     }
 
     fun finish(client: Minecraft) {

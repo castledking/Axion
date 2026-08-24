@@ -158,7 +158,7 @@ object SmearToolController {
     }
 
     private fun setFirstCorner(): Boolean {
-        val firstCorner = SelectionController.currentTarget().blockPosOrNull()?.immutable() ?: return false
+        val firstCorner = SelectionController.currentTarget().blockPosOrNull() ?: return false
         val nextState = SmearToolState.FirstCornerSet(firstCorner)
         AxionClientState.updateSmearToolState(nextState)
         AxionClientState.updateClipboard(ClipboardState.Empty)
@@ -167,7 +167,7 @@ object SmearToolController {
     }
 
     private fun setSecondCorner(): Boolean {
-        val secondCorner = SelectionController.currentTarget().blockPosOrNull()?.immutable() ?: return false
+        val secondCorner = SelectionController.currentTarget().blockPosOrNull() ?: return false
         val firstCorner = when (val state = AxionClientState.smearToolState) {
             SmearToolState.Idle -> return false
             is SmearToolState.FirstCornerSet -> state.firstCorner
@@ -190,7 +190,7 @@ object SmearToolController {
         client: Minecraft,
     ): Boolean {
         val world = client.level ?: return false
-        val seed = SelectionController.currentTarget().blockPosOrNull()?.immutable() ?: return false
+        val seed = SelectionController.currentTarget().blockPosOrNull() ?: return false
         val result = MagicSelectionService.select(world, seed) ?: return false
         val merged = when (val clipboardState = AxionClientState.clipboardState) {
             is ClipboardState.MagicSelection -> MagicSelectionService.merge(

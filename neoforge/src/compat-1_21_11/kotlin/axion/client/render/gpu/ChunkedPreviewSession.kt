@@ -184,7 +184,7 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
 
         val camera = client.gameRenderer.mainCamera ?: return ChunkedDrawResult.FAILED
         val cameraPos = CameraAccess.getPos(camera)
-        val baseModelView = Matrix4f(context.matrices().last().pose)
+        val baseModelView = Matrix4f(context.matrices().last().pose())
         return drawDeferred(color, alpha, translationDelta, baseModelView, cameraPos)
     }
 
@@ -260,8 +260,8 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
         val sectionOriginZ = (ChunkedBooleanStore.sectionZ(sectionKey) shl 4).toDouble()
 
         val layer = RenderLayerCompat.blockTranslucentCull()
-        val allocator = ByteBufferBuilder(layer.bufferSize)
-        val bufferBuilder = BufferBuilder(allocator, layer.mode, layer.format)
+        val allocator = ByteBufferBuilder(layer.bufferSize())
+        val bufferBuilder = BufferBuilder(allocator, layer.mode(), layer.format())
         AxionBlockTessellator.tessellateBatch(
             blocks = blocks,
             world = previewView,

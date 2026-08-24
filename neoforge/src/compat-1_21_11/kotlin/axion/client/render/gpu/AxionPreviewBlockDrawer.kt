@@ -174,11 +174,11 @@ object AxionPreviewBlockDrawer {
     ): ChunkedDrawResult {
         val client = Minecraft.getInstance()
         val device = RenderSystem.getDevice()
-        val mainTarget = client.framebuffer ?: return ChunkedDrawResult.FAILED
+        val mainTarget = client.mainRenderTarget ?: return ChunkedDrawResult.FAILED
         val colorView = mainTarget.colorTextureView ?: return ChunkedDrawResult.FAILED
         val depthView = mainTarget.depthTextureView ?: return ChunkedDrawResult.FAILED
 
-        val camera = client.gameRenderer?.camera ?: return ChunkedDrawResult.FAILED
+        val camera = client.gameRenderer.mainCamera ?: return ChunkedDrawResult.FAILED
         val cameraPos = cameraPosOverride ?: CameraAccess.getPos(camera)
 
         val baseMv = if (USE_CUSTOM_PREVIEW_PIPELINE) {
@@ -192,9 +192,9 @@ object AxionPreviewBlockDrawer {
         // --- Phase 1: build the draw list ----------------------------------
         val useSectionFrustumCulling = USE_SECTION_FRUSTUM_CULLING
         val drawList = if (useSectionFrustumCulling) {
-            val proj = Matrix4f(projectionMatrix ?: client.gameRenderer?.getBasicProjectionMatrix(1.0f) ?: Matrix4f())
+            val proj = Matrix4f(projectionMatrix ?: client.gameRenderer?.getProjectionMatrix(1.0f) ?: Matrix4f())
             val frustum = Frustum(Matrix4f(cullingModelView ?: baseMv), proj)
-            frustum.setPosition(cameraPos.x, cameraPos.y, cameraPos.z)
+            frustum.prepare(cameraPos.x, cameraPos.y, cameraPos.z)
             SectionDrawList.buildVisible(sectionBuffers, frustum, translationDelta)
         } else {
             SectionDrawList.buildAll(sectionBuffers)
@@ -266,9 +266,9 @@ object AxionPreviewBlockDrawer {
             val pipeline = if (USE_CUSTOM_PREVIEW_PIPELINE) {
                 val firstBuffer = drawList.first().buffer
                 VersionCompatImpl.getPreviewShellPipeline(firstBuffer.vertexFormatValue, firstBuffer.drawModeValue)
-                    ?: VersionCompatImpl.pipeline(renderLayer)
+                    ?: VersionCompatImpl.getRenderPipeline(renderLayer)
             } else {
-                VersionCompatImpl.pipeline(renderLayer)
+                VersionCompatImpl.getRenderPipeline(renderLayer)
             } ?: return ChunkedDrawResult.FAILED
             pass.setPipeline(pipeline)
             RenderSystem.bindDefaultUniforms(pass)
@@ -278,7 +278,7 @@ object AxionPreviewBlockDrawer {
                 VersionCompatImpl.bindTextureToRenderPass(pass, "Sampler0", atlasView)
             }
 
-            val lightmap = client.gameRenderer?.lightTexture
+            val lightmap = client.gameRenderer.lightTexture()
             val lightmapView = lightmap?.getTextureView()
             if (lightmapView != null) {
                 VersionCompatImpl.bindTextureToRenderPass(pass, "Sampler2", lightmapView)

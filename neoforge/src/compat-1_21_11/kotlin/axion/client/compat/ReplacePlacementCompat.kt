@@ -9,6 +9,6 @@ import net.minecraft.core.BlockPos
 
 fun normalizeReplacePlacementState(state: BlockState, hitResult: BlockHitResult, replacementPos: BlockPos): BlockState {
     if (!state.hasProperty(BlockStateProperties.SLAB_TYPE) || state.getValue(BlockStateProperties.SLAB_TYPE) != SlabType.DOUBLE) return state
-    val half = ReplacePlacementPolicy.singleSlabHalf(hitResult.direction, hitResult.pos.y - replacementPos.y)
-    return state.with(BlockStateProperties.SLAB_TYPE, if (half == ReplacePlacementPolicy.SlabHalf.TOP) SlabType.TOP else SlabType.BOTTOM)
+    val half = ReplacePlacementPolicy.singleSlabHalf(hitResult.direction, hitResult.location.y - replacementPos.y)
+    return state.setValue(BlockStateProperties.SLAB_TYPE, if (half == ReplacePlacementPolicy.SlabHalf.TOP) SlabType.TOP else SlabType.BOTTOM)
 }

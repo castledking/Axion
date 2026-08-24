@@ -120,7 +120,7 @@ object MagicSelectionService {
         clipboard: ClipboardBuffer,
     ) {
         clipboard.cells.forEach { cell ->
-            destination[origin.offset(cell.offset).immutable()] = cell.copy()
+            destination[origin.offset(cell.offset)] = cell.copy()
         }
     }
 
@@ -133,7 +133,7 @@ object MagicSelectionService {
         val selected = linkedSetOf<BlockPos>()
         val visited = mutableSetOf<BlockPos>()
         val queue = ArrayDeque<BlockPos>()
-        val centerPos = center.immutable()
+        val centerPos = center
 
         visited += centerPos
         queue += centerPos
@@ -148,7 +148,7 @@ object MagicSelectionService {
             selected += pos
 
             Direction.entries.forEach { direction ->
-                val next = pos.add(direction.extents).immutable()
+                val next = pos.add(direction.extents)
                 if (next in visited || !withinRadius(centerPos, next, radiusSquared)) {
                     return@forEach
                 }
@@ -203,14 +203,14 @@ object MagicSelectionService {
         if (seedId in template.customBlockIds) {
             return true
         }
-        if (template.rules().any { rule -> rule.contains(seedState) }) {
+        if (template.rules().any { rule -> rule.matches(seedState, seedState) }) {
             return true
         }
         return template.selectedCustomMaskIds
             .mapNotNull(AxionClientConfig::customMaskById)
             .any { mask ->
                 seedId !in mask.excludedBlockIds &&
-                    (seedId in mask.customBlockIds || mask.rules().any { rule -> rule.contains(seedState) })
+                    (seedId in mask.customBlockIds || mask.rules().any { rule -> rule.matches(seedState, seedState) })
             }
     }
 
@@ -220,7 +220,7 @@ object MagicSelectionService {
         candidateState: BlockState,
     ): Boolean {
         return groupMatches(
-            ruleMatcher = { state -> template.rules().any { rule -> rule.contains(state) } },
+            ruleMatcher = { state -> template.rules().any { rule -> rule.matches(state, state) } },
             customBlockIds = template.customBlockIds,
             excludedBlockIds = emptySet(),
             seedState = seedState,
@@ -234,7 +234,7 @@ object MagicSelectionService {
         candidateState: BlockState,
     ): Boolean {
         return groupMatches(
-            ruleMatcher = { state -> mask.rules().any { rule -> rule.contains(state) } },
+            ruleMatcher = { state -> mask.rules().any { rule -> rule.matches(state, state) } },
             customBlockIds = mask.customBlockIds,
             excludedBlockIds = mask.excludedBlockIds,
             seedState = seedState,

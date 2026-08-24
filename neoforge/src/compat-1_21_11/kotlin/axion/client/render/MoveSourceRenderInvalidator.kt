@@ -8,10 +8,12 @@ internal object MoveSourceRenderInvalidator {
         sections: Set<MoveSourceRenderState.SectionCoordinate>,
     ) {
         sections.forEach { section ->
-            world.scheduleChunkRenders(
+            (world as net.minecraft.client.multiplayer.ClientLevel).setSectionDirtyWithNeighbors(
                 section.x - 1,
                 section.y - 1,
                 section.z - 1,
+            )
+            (world as net.minecraft.client.multiplayer.ClientLevel).setSectionDirtyWithNeighbors(
                 section.x + 1,
                 section.y + 1,
                 section.z + 1,

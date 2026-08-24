@@ -723,7 +723,7 @@ object RenderLayerCompat {
             method.name in methodNames &&
                 method.parameterCount == args.size &&
                 method.parameterTypes.zip(args).all { (type, arg) ->
-                    if (type.isAllowedPrimitiveArgument) primitiveMatches(type, arg) else type.isInstance(arg)
+                    if (type.isPrimitive) primitiveMatches(type, arg) else type.isInstance(arg)
                 }
         } ?: return null
         return method.invoke(target, *args) ?: target

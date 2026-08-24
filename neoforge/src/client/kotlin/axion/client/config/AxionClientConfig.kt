@@ -85,7 +85,7 @@ object AxionClientConfig {
 
     fun setActiveSavedHotbarIndex(index: Int) {
         ensureSavedHotbarCapacity(index + 1)
-        val normalizedIndex = index.coerceIn(0, data.savedHotbars.last)
+        val normalizedIndex = index.coerceIn(0, data.savedHotbars.lastIndex)
         data = data.copy(activeSavedHotbarIndex = normalizedIndex)
         save()
         saveSavedHotbars()
@@ -274,7 +274,7 @@ object AxionClientConfig {
     private fun load(): Data {
         val defaults = Data.default()
         val fileData = runCatching {
-            if (!Files.validateDirPath(path)) {
+            if (!Files.exists(path)) {
                 return@runCatching null
             }
             Files.newBufferedReader(path).use { reader ->
@@ -317,7 +317,7 @@ object AxionClientConfig {
     private fun loadSavedHotbarData(fileData: FileData?): ResolvedHotbarData {
         savedHotbarsLoadFailed = false
         val dedicatedData = runCatching {
-            if (!Files.validateDirPath(savedHotbarsPath)) {
+            if (!Files.exists(savedHotbarsPath)) {
                 return@runCatching null
             }
             Files.newBufferedReader(savedHotbarsPath).use { reader ->
@@ -335,7 +335,7 @@ object AxionClientConfig {
         val activeSavedHotbarIndex = (dedicatedData?.activeSavedHotbarIndex
             ?: fileData?.activeSavedHotbarIndex
             ?: defaults.activeSavedHotbarIndex)
-            .coerceIn(0, savedHotbars.last)
+            .coerceIn(0, savedHotbars.lastIndex)
 
         return ResolvedHotbarData(
             activeSavedHotbarIndex = activeSavedHotbarIndex,
@@ -395,7 +395,7 @@ object AxionClientConfig {
 
     private fun save() {
         runCatching {
-            Files.createDirectoriesSafe(path.parent)
+            Files.createDirectories(path.parent)
             Files.newBufferedWriter(path).use { writer ->
                 gson.toJson(data, writer)
             }
@@ -404,7 +404,7 @@ object AxionClientConfig {
 
     private fun saveSavedHotbars() {
         runCatching {
-            Files.createDirectoriesSafe(savedHotbarsPath.parent)
+            Files.createDirectories(savedHotbarsPath.parent)
             Files.newBufferedWriter(savedHotbarsPath).use { writer ->
                 gson.toJson(
                     HotbarFileData(

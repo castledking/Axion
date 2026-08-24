@@ -29,11 +29,11 @@ object PreviewRegionOutlineRenderer {
             maxQuads = MAX_REGION_QUADS,
         )
         region.chunks.values.forEach { chunk ->
-            if (!chunk.shape.isEmpty) {
+            if (!chunk.outlineShape.isEmpty) {
                 VertexRenderingCompat.drawOutline(
                     context.matrices(),
                     context.consumers().getBuffer(RenderLayerCompat.lines()),
-                    chunk.shape,
+                    chunk.outlineShape,
                     -cameraPos.x,
                     -cameraPos.y,
                     -cameraPos.z,

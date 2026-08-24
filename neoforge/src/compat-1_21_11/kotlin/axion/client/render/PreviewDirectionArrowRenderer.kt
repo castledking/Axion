@@ -26,7 +26,7 @@ object PreviewDirectionArrowRenderer {
 
     fun render(context: AxionWorldRenderContext, region: BlockRegion) {
         val axisDirection = liveLookDirection() ?: return
-        render(context, region, axisDirection.normal)
+        render(context, region, axisDirection.unitVec3i)
     }
 
     fun render(context: AxionWorldRenderContext, region: BlockRegion, direction: Vec3i) {

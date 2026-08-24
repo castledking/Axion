@@ -470,7 +470,7 @@ object ClipboardSelectionRenderer {
             val visibleCells = surfaceCells(clipboard)
             val boxes = ArrayList<AABB>(visibleCells.size)
             visibleCells.forEach { cell ->
-                boxes += SelectionBounds.blockBox(BlockPos.ORIGIN.add(cell.offset))
+                boxes += SelectionBounds.blockBox(BlockPos.ZERO.offset(cell.offset))
             }
             if (visibleCells.size <= MAX_SINGLE_SHAPE_UNION_CELLS) {
                 // Small selection: build merged VoxelShape for smooth outline
@@ -632,9 +632,9 @@ object ClipboardSelectionRenderer {
         lineWidth: Float,
     ) {
         val vertex = consumer
-            .vertex(entry, x, y, z)
-            .color(red, green, blue, alpha)
-            .normal(entry, normalX, normalY, normalZ)
+            .addVertex(entry, x, y, z)
+            .setColor(red, green, blue, alpha)
+            .setNormal(entry, normalX, normalY, normalZ)
         lineWidthMethod?.invoke(vertex, lineWidth)
     }
 

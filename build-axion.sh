@@ -609,6 +609,39 @@ build_range() {
     echo "Built:"
     echo "  ${mod_output_dir}/${mod_jar}"
     echo "  ${paper_output_dir}/${paper_jar}"
+
+    # NeoForge jar (modern range only — no NeoForge exists for MC 1.21.9,
+    # and the neoforge sources target the 1.21.10/1.21.11 Mojmap API).
+    case "$compile_version" in
+        1.21.10|1.21.11)
+            local neoforge_version
+            case "$compile_version" in
+                1.21.10) neoforge_version="21.10.64" ;;
+                *)       neoforge_version="21.11.45" ;;
+            esac
+            local neoforge_jar="AxionNeoForge-v${MOD_VERSION}-${range_tag}.jar"
+            echo "==> Building AxionNeoForge for ${compile_version} (NeoForge ${neoforge_version})"
+            if run_gradle_with_retry :neoforge:build \
+                -Pmod_version="${MOD_VERSION}" \
+                -Pminecraft_version="${compile_version}" \
+                -Pneoforge_version="${neoforge_version}"; then
+                local staged_neoforge_jar
+                staged_neoforge_jar="$(find neoforge/build/libs -maxdepth 1 -type f -name 'axion-neoforge-*.jar' ! -name '*-sources*' ! -name '*-javadoc*' -print -quit 2>/dev/null)"
+                if [[ -n "${staged_neoforge_jar}" && -s "${staged_neoforge_jar}" ]] &&
+                   jar tf "${staged_neoforge_jar}" >/dev/null 2>&1; then
+                    mkdir -p "${mod_output_dir}"
+                    mv -f "${staged_neoforge_jar}" "${mod_output_dir}/${neoforge_jar}"
+                    echo "  ${mod_output_dir}/${neoforge_jar}"
+                else
+                    echo "WARNING: NeoForge jar missing or invalid; skipping staging." >&2
+                    return 1
+                fi
+            else
+                echo "WARNING: NeoForge build failed; continuing with Fabric/Paper artifacts." >&2
+                return 1
+            fi
+            ;;
+    esac
 }
 
 # Wipe Kotlin incremental compilation caches so new source files are

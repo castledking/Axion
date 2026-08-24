@@ -9,8 +9,8 @@ fun GuiGraphics.drawStrokedRectangleCompat(x: Int, y: Int, width: Int, height: I
 
     val maxX = x + width - 1
     val maxY = y + height - 1
-    drawHorizontalLine(x, maxX, y, color)
-    drawHorizontalLine(x, maxX, maxY, color)
-    drawVerticalLine(x, y, maxY, color)
-    drawVerticalLine(maxX, y, maxY, color)
+    hLine(x, maxX, y, color)
+    hLine(x, maxX, maxY, color)
+    vLine(x, y, maxY, color)
+    vLine(maxX, y, maxY, color)
 }

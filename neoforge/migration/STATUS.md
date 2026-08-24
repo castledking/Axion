@@ -1,7 +1,7 @@
 # NeoForge migration status (feat/neoforge)
 
-Last updated: 2026-08-24 (WIP #2). Compile state: `:neoforge:compileKotlin` = **~622 errors**
-(1451 -> 728 -> ~660 -> ~622; fabric untouched and green).
+Last updated: 2026-08-24 (WIP #2). Compile state: `:neoforge:compileKotlin` = **0 errors — BUILD GREEN**
+(1451 -> 728 -> ~660 -> ~622 -> 0; fabric untouched and green).
 
 ## What was done
 
@@ -117,3 +117,32 @@ JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :fabric:compileKotlin
 
 Gradle daemons may spawn with Java 26 (default JVM) which breaks NeoForm zip handling —
 always pin `-Dorg.gradle.java.home=/usr/lib/jvm/java-21-openjdk` or export JAVA_HOME first.
+
+
+## WIP #4 (final): jar builds end-to-end
+
+`JAVA_HOME=...java-21-openjdk ./build-axion.sh modern` exits 0 and produces:
+- `fabric/build/libs/mc1.21.9-1.21.11/Axion-v0.2.15-mc1.21.9-1.21.11.jar` (Fabric)
+- `fabric/build/libs/mc1.21.9-1.21.11/AxionNeoForge-v0.2.15-mc1.21.9-1.21.11.jar` (NeoForge)
+
+NeoForge jar: 513 classes, mods.toml version 0.2.15 expanded, neoforge dep [4,),
+minecraft range from gradle.properties.
+
+### Last-mile fixes
+- Access transformer widened `BlockItem.getPlacementState` (+ StandingAndWall /
+  GameMaster overrides); AT descriptor needs full return type
+- `MeshData.vertexBuffer()/indexBuffer()/drawState()` need explicit call parens
+  (private fields shadow the Kotlin property)
+- `Frustum.prepare(x,y,z)`, `GuiGraphics.hLine/vLine`, `ItemBlockRenderTypes.
+  getMovingBlockRenderType`, `Direction.getApproximateNearest/unitVec3i`,
+  `RegistryAccess.lookupOrThrow`, `BlockPlaceContext.getClickedPos/
+  replacingClickedOnBlock`, `FMLEnvironment.isProduction`
+- bogus map renames reverted at call sites (vert0->firstCorner,
+  clipboardManager->clipboard, connect->track, mode() parens dropped)
+- multiloader-common now expands `${mod_version}` (project.version was read
+  before assignment -> 'unspecified' in mods.toml)
+
+### Known limitation
+MC 1.21.10 NeoForge uses `ResourceLocation`; 1.21.11 renamed it to
+`Identifier`. The single source tree targets 1.21.11 only. A 1.21.10 jar
+needs either a shim typealias module or its own source pass.

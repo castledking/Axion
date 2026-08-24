@@ -676,7 +676,7 @@ object VersionCompatImpl : VersionCompat {
 
     fun getRenderPipeline(layer: RenderType): RenderPipeline? {
         return try {
-            layer.renderPipeline
+            layer.pipeline()
         } catch (_: Throwable) {
             // renderPipeline property may not exist on 1.21.9 — try reflection
             try {
@@ -893,7 +893,7 @@ object VersionCompatImpl : VersionCompat {
     override fun itemStackEncode(registryManager: Any, stack: Any): ByteArray? {
         return runCatching {
             val buf = RegistryFriendlyByteBuf(Unpooled.buffer(), registryManager as RegistryAccess)
-            ItemStack.PACKET_CODEC.encode(buf, stack as ItemStack)
+            ItemStack.STREAM_CODEC.encode(buf, stack as ItemStack)
             ByteArray(buf.readableBytes()).also { buf.getBytes(0, it) }
         }.getOrNull()
     }
@@ -901,7 +901,7 @@ object VersionCompatImpl : VersionCompat {
     override fun itemStackDecode(registryManager: Any, bytes: ByteArray): Any? {
         return runCatching {
             val buf = RegistryFriendlyByteBuf(Unpooled.wrappedBuffer(bytes), registryManager as RegistryAccess)
-            ItemStack.PACKET_CODEC.decode(buf)
+            ItemStack.STREAM_CODEC.decode(buf)
         }.getOrNull()
     }
 

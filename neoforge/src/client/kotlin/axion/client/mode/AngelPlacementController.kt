@@ -83,7 +83,7 @@ object AngelPlacementController {
             return null
         }
         val player = client.player ?: return null
-        if (!player.hasInfiniteMaterials) {
+        if (!player.hasInfiniteMaterials()) {
             return null
         }
         if (AxionToolSelectionController.isAxionSlotActive()) {
@@ -171,13 +171,13 @@ object AngelPlacementController {
             stack,
             BlockHitResult(hitPos, side, pos, false),
         ) {
-            override fun getBlockPos(): BlockPos = pos
+            override fun getClickedPos(): BlockPos = pos
 
             // The whole point of Angel is that there is nothing to build against,
             // so the support checks vanilla would run here are the wrong question.
             override fun canPlace(): Boolean = true
 
-            override fun canReplaceExisting(): Boolean = true
+            override fun replacingClickedOnBlock(): Boolean = true
         }
         return ForcePlaceSupportBypass.withBypass(AxionCapabilityPolicy.ignoresSupportRequirements()) {
             val adjusted = blockItem.updatePlacementContext(context) ?: context

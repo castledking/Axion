@@ -41,34 +41,34 @@ abstract class MouseMixin {
 
         // For infinite reach without fast place, let vanilla handle the event
         // so that doItemUse is called and continuous placement works
-        if (mouseInput.button() == GLFW.MOUSE_BUTTON_RIGHT &&
+        if (mouseInput.button() == GLFW.GLFW_MOUSE_BUTTON_RIGHT &&
             ClientModeController.shouldLetVanillaHandleSecondaryAction(client)) {
             return
         }
 
         // For fast place mode, let vanilla handle so doItemUse is called
         // which triggers our mixin and enables manual key tracking
-        if (mouseInput.button() == GLFW.MOUSE_BUTTON_RIGHT &&
+        if (mouseInput.button() == GLFW.GLFW_MOUSE_BUTTON_RIGHT &&
             ClientModeController.isFastPlaceEnabled(client)) {
             return
         }
 
         // For infinite reach without bulldozer, let vanilla handle the event
         // so that doAttack is called and continuous breaking works
-        if (mouseInput.button() == GLFW.MOUSE_BUTTON_LEFT &&
+        if (mouseInput.button() == GLFW.GLFW_MOUSE_BUTTON_LEFT &&
             ClientModeController.shouldLetVanillaHandlePrimaryAction(client)) {
             return
         }
 
         // For bulldozer + infinite reach, also let vanilla handle for continuous multi-block breaking
-        if (mouseInput.button() == GLFW.MOUSE_BUTTON_LEFT &&
+        if (mouseInput.button() == GLFW.GLFW_MOUSE_BUTTON_LEFT &&
             ClientModeController.shouldLetVanillaHandleBulldozerInfiniteReach(client)) {
             return
         }
 
         val consumed = when (mouseInput.button()) {
-            GLFW.MOUSE_BUTTON_LEFT -> ClientModeController.consumePrimaryAction(client)
-            GLFW.MOUSE_BUTTON_RIGHT -> ClientModeController.consumeSecondaryAction(client)
+            GLFW.GLFW_MOUSE_BUTTON_LEFT -> ClientModeController.consumePrimaryAction(client)
+            GLFW.GLFW_MOUSE_BUTTON_RIGHT -> ClientModeController.consumeSecondaryAction(client)
             else -> false
         }
         if (consumed) {

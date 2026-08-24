@@ -37,7 +37,6 @@ class BlockStateSupportMixin {
         if (!ForcePlaceSupportBypass.isActive()) {
             return
         }
-
-        .returnValue = true
+true
     }
 }

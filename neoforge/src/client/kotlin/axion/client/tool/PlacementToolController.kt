@@ -210,7 +210,7 @@ object PlacementToolController {
         val estimatedSize = estimateOperationSize(operation)
         if (estimatedSize > AxionTransportCodec.MAX_SERIALIZED_BYTES) {
             val player = Minecraft.getInstance().player
-            player?.sendMessage(
+            player?.displayClientMessage(
                 Component.literal("Selection too large! Please select a smaller region (max ~${AxionTransportCodec.MAX_SERIALIZED_BYTES / 1024 / 1024}MB) or increase the limit."),
                 false
             )
@@ -260,7 +260,7 @@ object PlacementToolController {
     }
 
     private fun reanchorPreview(preview: ClonePreviewState): Boolean {
-        val anchorPos = SelectionController.currentTarget().blockPosOrNull()?.immutable() ?: return false
+        val anchorPos = SelectionController.currentTarget().blockPosOrNull() ?: return false
         val nextState = CloneToolState.AwaitingConfirm(
             ClonePlacementService.reanchorPreview(preview, anchorPos),
         )
@@ -272,7 +272,7 @@ object PlacementToolController {
     private fun setFirstCorner(): Boolean {
         val mode = activeMode() ?: return false
         val blockPos = SelectionController.currentTarget().blockPosOrNull() ?: return false
-        val nextState = CloneToolState.FirstCornerSet(mode, blockPos.immutable())
+        val nextState = CloneToolState.FirstCornerSet(mode, blockPos)
         AxionClientState.updatePlacementToolState(nextState)
         AxionClientState.updateClipboard(ClipboardState.Empty)
         syncSelectionState(nextState)
@@ -291,9 +291,9 @@ object PlacementToolController {
 
         val nextState = CloneToolState.RegionDefined(
             mode,
-            currentFirstCorner.immutable(),
-            secondCorner.immutable(),
-            BlockRegion(currentFirstCorner.immutable(), secondCorner.immutable()).normalized(),
+            currentFirstCorner,
+            secondCorner,
+            BlockRegion(currentFirstCorner, secondCorner).normalized(),
             null,
         )
         AxionClientState.updatePlacementToolState(nextState)
@@ -307,7 +307,7 @@ object PlacementToolController {
     ): Boolean {
         activeMode() ?: return false
         val world = client.level ?: return false
-        val seed = SelectionController.currentTarget().blockPosOrNull()?.immutable() ?: return false
+        val seed = SelectionController.currentTarget().blockPosOrNull() ?: return false
         val result = MagicSelectionService.select(world, seed) ?: return false
         val merged = when (val clipboardState = AxionClientState.clipboardState) {
             is ClipboardState.MagicSelection -> MagicSelectionService.merge(

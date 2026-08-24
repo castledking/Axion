@@ -122,8 +122,8 @@ object AxionHotbarHud {
 
         val sideSlot = AxionHudLayout.sideSlot(
             client = client,
-            screenWidth = context.guiWidth,
-            screenHeight = context.guiHeight,
+            screenWidth = context.guiWidth(),
+            screenHeight = context.guiHeight(),
         )
 
         val axionSelected = AxionToolSelectionController.isAxionSelected()
@@ -138,7 +138,7 @@ object AxionHotbarHud {
             sideSlot = sideSlot,
             activeSubtool = activeSubtool,
             hovered = if (expandedTools) {
-                AxionAltMenuController.hoveredSubtool(client, context.guiWidth, context.guiHeight)
+                AxionAltMenuController.hoveredSubtool(client, context.guiWidth(), context.guiHeight())
             } else {
                 null
             },
@@ -310,31 +310,31 @@ object AxionHotbarHud {
         context: GuiGraphics,
         client: Minecraft,
     ) {
-        val matrices = context.matrices
+        val matrices = context.pose()
         pushMatrices(matrices)
         translateMatrices(matrices, 0.0, 0.0, 200.0)
         pendingTooltip = null
         try {
             val page = SavedHotbarController.selectedPage()
             val displayRows = SavedHotbarController.displayHotbarsForSelectedPage(client)
-            val rowBounds = AxionHudLayout.savedHotbarRows(context.guiWidth, context.guiHeight, page)
+            val rowBounds = AxionHudLayout.savedHotbarRows(context.guiWidth(), context.guiHeight(), page)
 
             // 9×9 grid background
-            val centerX = context.guiWidth / 2
-            drawHotbarSwapperRegion(context, HOTBAR_GRID_BG, centerX - 91, context.guiHeight - 182)
+            val centerX = context.guiWidth() / 2
+            drawHotbarSwapperRegion(context, HOTBAR_GRID_BG, centerX - 91, context.guiHeight() - 182)
             renderSavedHotbarActionButtons(context, client, page)
             if (AxionDevTestSession.isActive) {
                 renderFinishTestingButton(
                     context,
                     AxionHudLayout.finishTestingSavedHotbarBounds(
-                        context.guiWidth,
-                        context.guiHeight,
+                        context.guiWidth(),
+                        context.guiHeight(),
                         page,
                     ),
                 )
             }
 
-            val hoveredSlot = findHoveredSlot(client, context.guiWidth, context.guiHeight, rowBounds)
+            val hoveredSlot = findHoveredSlot(client, context.guiWidth(), context.guiHeight(), rowBounds)
 
             rowBounds.zip(displayRows).forEach { (bounds, display) ->
                 if (display.selected) {
@@ -379,8 +379,8 @@ object AxionHotbarHud {
         }
 
         AxionHudLayout.savedHotbarActionButtons(
-            context.guiWidth,
-            context.guiHeight,
+            context.guiWidth(),
+            context.guiHeight(),
             page,
         ).filterNot { bounds ->
             AxionDevTestSession.isActive && bounds.action == SavedHotbarMenuAction.CREATE_DISPLAY_ENTITY
@@ -414,8 +414,8 @@ object AxionHotbarHud {
         val bgY = y - 12
         val bgW = maxWidth + padding * 2
         val bgH = lines.size * (font.lineHeight + 2) + padding
-        val screenWidth = context.guiWidth
-        val screenHeight = context.guiHeight
+        val screenWidth = context.guiWidth()
+        val screenHeight = context.guiHeight()
         val clampedBgX = bgX.coerceIn(0, screenWidth - bgW)
         val clampedBgY = bgY.coerceIn(0, screenHeight - bgH)
         context.fill(clampedBgX, clampedBgY, clampedBgX + bgW, clampedBgY + bgH, 0xF0100010.toInt())
@@ -484,13 +484,13 @@ object AxionHotbarHud {
         client: Minecraft,
         page: Int,
     ) {
-        if (client.player?.abilities?.allowFlying != true) return
+        if (client.player?.abilities?.mayfly != true) return
 
-        val bounds = AxionHudLayout.flyingSpeedSliderBounds(context.guiWidth, context.guiHeight, page)
+        val bounds = AxionHudLayout.flyingSpeedSliderBounds(context.guiWidth(), context.guiHeight(), page)
         val multiplier = AxionClientState.flySpeedMultiplier
 
-        val plusHovered = AxionAltMenuController.isHoveringFlyingSpeedPlusButton(client, context.guiWidth, context.guiHeight)
-        val minusHovered = AxionAltMenuController.isHoveringFlyingSpeedMinusButton(client, context.guiWidth, context.guiHeight)
+        val plusHovered = AxionAltMenuController.isHoveringFlyingSpeedPlusButton(client, context.guiWidth(), context.guiHeight())
+        val minusHovered = AxionAltMenuController.isHoveringFlyingSpeedMinusButton(client, context.guiWidth(), context.guiHeight())
 
         val plus = bounds.plusButton
         drawHotbarSwapperRegion(context, if (plusHovered) FLY_PLUS_HOVER else FLY_PLUS, plus.x, plus.y)
@@ -519,8 +519,8 @@ object AxionHotbarHud {
         context: GuiGraphics,
         client: Minecraft,
     ) {
-        val bounds = AxionHudLayout.toolboxSlotBounds(client, context.guiWidth, context.guiHeight)
-        val hovered = AxionAltMenuController.isHoveringToolboxButton(client, context.guiWidth, context.guiHeight)
+        val bounds = AxionHudLayout.toolboxSlotBounds(client, context.guiWidth(), context.guiHeight())
+        val hovered = AxionAltMenuController.isHoveringToolboxButton(client, context.guiWidth(), context.guiHeight())
         val centerOffset = (bounds.size - 20) / 2
         drawHotbarSwapperRegion(context, if (hovered) TOOLBOX_SLOT_HOVER else TOOLBOX_SLOT, bounds.x + centerOffset, bounds.y + centerOffset)
         drawHotbarSwapperRegion(context, WRENCH, bounds.x + centerOffset + 2, bounds.y + centerOffset + 2)
@@ -530,12 +530,12 @@ object AxionHotbarHud {
         context: GuiGraphics,
         client: Minecraft,
     ) {
-        val centerX = context.guiWidth / 2
-        val mainX = when (client.options.mainHand.value) {
+        val centerX = context.guiWidth() / 2
+        val mainX = when (client.options.mainHand().get()) {
             HumanoidArm.LEFT -> centerX - 109
             HumanoidArm.RIGHT -> centerX + 109
         }
-        val screenHeight = context.guiHeight
+        val screenHeight = context.guiHeight()
         val mouseX = VersionCompatImpl.getScaledMouseX(client).toInt()
         val mouseY = VersionCompatImpl.getScaledMouseY(client).toInt()
         val hovered = mouseX >= mainX - 11 && mouseX < mainX + 13 && mouseY >= screenHeight - 22 && mouseY < screenHeight
@@ -567,12 +567,12 @@ object AxionHotbarHud {
         context: GuiGraphics,
         client: Minecraft,
     ) {
-        val centerX = context.guiWidth / 2
-        val offX = when (client.options.mainHand.value) {
+        val centerX = context.guiWidth() / 2
+        val offX = when (client.options.mainHand().get()) {
             HumanoidArm.LEFT -> centerX + 107
             HumanoidArm.RIGHT -> centerX - 107
         }
-        val screenHeight = context.guiHeight
+        val screenHeight = context.guiHeight()
         val mouseX = VersionCompatImpl.getScaledMouseX(client).toInt()
         val mouseY = VersionCompatImpl.getScaledMouseY(client).toInt()
 
@@ -636,7 +636,7 @@ object AxionHotbarHud {
             }
             if (!stack.isEmpty) {
                 context.renderItem(stack, slotX + 2, startY + 2)
-                drawStackOverlayReflective(context, Minecraft.getInstance().textRenderer, stack, slotX + 2, startY + 2)
+                drawStackOverlayReflective(context, Minecraft.getInstance().font, stack, slotX + 2, startY + 2)
             }
         }
     }
@@ -648,10 +648,10 @@ object AxionHotbarHud {
     ) {
         val hovered = AxionAltMenuController.hoveringSavedHotbarPageButton(
             client,
-            context.guiWidth,
-            context.guiHeight,
+            context.guiWidth(),
+            context.guiHeight(),
         )
-        AxionHudLayout.savedHotbarPageButtons(context.guiWidth, context.guiHeight, page).forEach { button ->
+        AxionHudLayout.savedHotbarPageButtons(context.guiWidth(), context.guiHeight(), page).forEach { button ->
             val isHovered = hovered?.direction == button.direction
             val borderColor = if (isHovered) BORDER_HOVER else BORDER_NEUTRAL
             context.fill(button.x, button.y, button.x + button.width, button.y + button.height, OUTER_BACKGROUND)

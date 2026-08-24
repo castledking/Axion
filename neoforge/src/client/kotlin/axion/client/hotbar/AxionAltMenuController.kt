@@ -216,7 +216,7 @@ object AxionAltMenuController {
             return false
         }
         val bounds = AxionHudLayout.flyingSpeedSliderBounds(screenWidth, screenHeight, SavedHotbarController.selectedPage())
-        return bounds.connect.contains(
+        return bounds.track.contains(
             VersionCompatImpl.getScaledMouseX(client),
             VersionCompatImpl.getScaledMouseY(client),
         )
@@ -260,7 +260,7 @@ object AxionAltMenuController {
     fun isHoveringBinSlot(client: Minecraft, screenWidth: Int, screenHeight: Int): Boolean {
         if (!SavedHotbarController.isOverlayActive(client)) return false
         val centerX = screenWidth / 2
-        val mainX = when (client.options.mainHand.value) {
+        val mainX = when (client.options.mainHand().get()) {
             HumanoidArm.LEFT -> centerX - 109
             HumanoidArm.RIGHT -> centerX + 109
         }
@@ -311,7 +311,7 @@ object AxionAltMenuController {
             grabbedHotbarIndex = hotbarIndex
             grabbedSlotIndex = slotIndex
             grabbedFromLive = false
-            grabbedStack = SavedHotbarController.deserializeStackForDisplay(world.registryAccess, serialized)
+            grabbedStack = SavedHotbarController.deserializeStackForDisplay(world.registryAccess(), serialized)
             return true
         }
     }
@@ -338,7 +338,7 @@ object AxionAltMenuController {
             }
         } else {
             val existingSerialized = AxionClientConfig.savedHotbar(hotbarIndex)?.slots?.getOrNull(slotIndex)
-            val registryManager = world.registryAccess
+            val registryManager = world.registryAccess()
             val heldBytes = VersionCompat.INSTANCE.itemStackEncode(registryManager, heldStack)
             val heldSerialized = if (heldBytes != null) Base64.getEncoder().encodeToString(heldBytes) else null
             SavedHotbarController.setSlotItem(hotbarIndex, slotIndex, heldSerialized)
@@ -366,7 +366,7 @@ object AxionAltMenuController {
         } else {
             val world = client.level
             if (world != null) {
-                val bytes = VersionCompat.INSTANCE.itemStackEncode(world.registryAccess, grabbedStack)
+                val bytes = VersionCompat.INSTANCE.itemStackEncode(world.registryAccess(), grabbedStack)
                 val serialized = if (bytes != null) Base64.getEncoder().encodeToString(bytes) else null
                 SavedHotbarController.setSlotItem(grabbedHotbarIndex, grabbedSlotIndex, serialized)
             }
@@ -430,7 +430,7 @@ object AxionAltMenuController {
         val screenWidth = client.window.guiScaledWidth
         val screenHeight = client.window.guiScaledHeight
         val centerX = screenWidth / 2
-        val offX = when (client.options.mainHand.value) {
+        val offX = when (client.options.mainHand().get()) {
             HumanoidArm.LEFT -> centerX + 107
             HumanoidArm.RIGHT -> centerX - 107
         }
@@ -473,7 +473,7 @@ object AxionAltMenuController {
 
     fun handleMouseButton(client: Minecraft, button: Int, action: Int): Boolean {
         if (SavedHotbarController.isOverlayActive(client)) {
-            if (button == GLFW.MOUSE_BUTTON_LEFT && action == GLFW.GLFW_PRESS) {
+            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && action == GLFW.GLFW_PRESS) {
                 if (isHoveringFinishTesting(client, client.window.guiScaledWidth, client.window.guiScaledHeight)) {
                     VanillaHudButtonStore.click(client, VanillaHudButtonStore.FINISH_TESTING, button)
                     AxionDevTestSession.finish(client)
@@ -566,7 +566,7 @@ object AxionAltMenuController {
                 }
             }
 
-            if (button == GLFW.MOUSE_BUTTON_LEFT && action == GLFW.GLFW_RELEASE) {
+            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && action == GLFW.GLFW_RELEASE) {
                 isDraggingSlider = false
             }
 
@@ -580,7 +580,7 @@ object AxionAltMenuController {
             return false
         }
 
-        if (button == GLFW.MOUSE_BUTTON_LEFT && action == GLFW.GLFW_PRESS) {
+        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && action == GLFW.GLFW_PRESS) {
             if (isHoveringFinishTesting(client, client.window.guiScaledWidth, client.window.guiScaledHeight)) {
                 VanillaHudButtonStore.click(client, VanillaHudButtonStore.FINISH_TESTING, button)
                 AxionDevTestSession.finish(client)

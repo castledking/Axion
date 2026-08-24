@@ -25,7 +25,7 @@ object ModeTargeting {
         val hitResult = if (vanillaCrosshair != null) {
             vanillaCrosshair
         } else if (AxionClientState.globalModeState.infiniteReachEnabled) {
-            val selectionTarget = SelectionRaycast.clip(client, AxionClientConfig.infiniteReachRange())
+            val selectionTarget = SelectionRaycast.raycast(client, AxionClientConfig.infiniteReachRange())
             when (selectionTarget) {
                 is AxionTarget.FaceTarget -> BlockHitResult(
                     selectionTarget.hitPos,
@@ -56,7 +56,7 @@ object ModeTargeting {
                 else -> null
             }
         } ?: return null
-        val squaredDistance = origin.distanceToSqr(hitResult.pos)
+        val squaredDistance = origin.distanceToSqr(hitResult.location)
         val beyondVanillaReach = if (vanillaCrosshair != null) {
             false
         } else {

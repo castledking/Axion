@@ -14,7 +14,7 @@ object ExtrudePlacementService {
         world: BlockGetter,
         target: AxionTarget,
     ): ExtrudePreviewState? {
-        val origin = target.blockPosOrNull()?.immutable() ?: return null
+        val origin = target.blockPosOrNull() ?: return null
         val footprint = LayerDiscoveryService.discoverPlanarFootprint(
             world = world,
             origin = origin,
@@ -31,7 +31,7 @@ object ExtrudePlacementService {
             footprint = footprint,
             sourceState = sourceState,
             direction = direction,
-            extrudePositions = footprint.map { it.add(direction.extents).immutable() },
+            extrudePositions = footprint.map { it.add(direction.extents) },
         )
     }
 }

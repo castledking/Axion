@@ -21,7 +21,7 @@ object EraseToolController {
             return false
         }
 
-        val blockPos = SelectionController.currentTarget().blockPosOrNull()?.immutable() ?: return false
+        val blockPos = SelectionController.currentTarget().blockPosOrNull() ?: return false
         val nextState = EraseToolState.FirstCornerSet(blockPos)
         AxionClientState.updateEraseToolState(nextState)
         AxionClientState.updateClipboard(ClipboardState.Empty)
@@ -34,7 +34,7 @@ object EraseToolController {
             return false
         }
 
-        val secondCorner = SelectionController.currentTarget().blockPosOrNull()?.immutable() ?: return false
+        val secondCorner = SelectionController.currentTarget().blockPosOrNull() ?: return false
         val firstCorner = when (val state = AxionClientState.eraseToolState) {
             // Nothing has been selected yet, so right click is free to mean the
             // instant connected erase rather than "close the box".
@@ -106,7 +106,7 @@ object EraseToolController {
      */
     fun handleConnectedErase(client: Minecraft): Boolean {
         val world = client.level ?: return false
-        val seed = SelectionController.currentTarget().blockPosOrNull()?.immutable() ?: return false
+        val seed = SelectionController.currentTarget().blockPosOrNull() ?: return false
         val result = MagicSelectionService.select(
             world = world,
             center = seed,
@@ -120,7 +120,7 @@ object EraseToolController {
         client: Minecraft,
     ): Boolean {
         val world = client.level ?: return false
-        val seed = SelectionController.currentTarget().blockPosOrNull()?.immutable() ?: return false
+        val seed = SelectionController.currentTarget().blockPosOrNull() ?: return false
         val result = MagicSelectionService.select(world, seed) ?: return false
         val merged = when (val clipboardState = AxionClientState.clipboardState) {
             is ClipboardState.MagicSelection -> MagicSelectionService.merge(

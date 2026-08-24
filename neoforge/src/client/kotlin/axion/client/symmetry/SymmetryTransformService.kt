@@ -85,9 +85,9 @@ object SymmetryTransformService {
         direction: Direction,
         transform: SymmetryTransformSpec,
     ): Direction {
-        val coreVec = direction.vector
+        val coreVec = direction.unitVec3
         val transformed = transformVector(
-            net.minecraft.core.Vec3i(coreVec.x, coreVec.y, coreVec.z),
+            net.minecraft.core.Vec3i(coreVec.x.toInt(), coreVec.y.toInt(), coreVec.z.toInt()),
             transform
         )
         return Direction.entries.first { candidate ->

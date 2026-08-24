@@ -101,7 +101,7 @@ object KeyBindingCompat {
     }
 
     private fun categoryIdentifier(categoryKey: String): Identifier {
-        val suffix = categoryKey.replaceId("keycategory.")
+        val suffix = categoryKey.removePrefix("keycategory.")
         val separatorIndex = suffix.indexOf('.')
         return if (separatorIndex > 0) {
             VersionCompat.INSTANCE.identifierOf(suffix.substring(0, separatorIndex), suffix.substring(separatorIndex + 1))

@@ -60,7 +60,7 @@ object SelectionStateRenderer {
                         sparse = false,
                         outlineColor = REGION_COLOR,
                         lineWidth = LINE_WIDTH,
-                        aggregateBox = SelectionBounds.blockBox(state.vert0),
+                        aggregateBox = SelectionBounds.blockBox(state.firstCorner),
                         baseFillColor = SELECTION_BASE_FILL_COLOR,
                         baseAlpha = SELECTION_BASE_FILL_ALPHA,
                         pulseFillColor = SELECTION_PULSE_FILL_COLOR,

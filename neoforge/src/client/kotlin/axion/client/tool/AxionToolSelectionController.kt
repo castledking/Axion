@@ -14,7 +14,7 @@ object AxionToolSelectionController {
 
     fun currentState(): ToolSelectionState = AxionClientState.toolSelectionState
 
-    fun isCreativeModeAllowed(): Boolean = Minecraft.getInstance().player?.hasInfiniteMaterials == true
+    fun isCreativeModeAllowed(): Boolean = Minecraft.getInstance().player?.hasInfiniteMaterials() == true
 
     fun isAxionSlotActive(): Boolean = isCreativeModeAllowed() && currentState() is ToolSelectionState.Axion
 

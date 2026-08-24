@@ -137,7 +137,7 @@ object WorldRenderCompat {
         beforeDebugRenderCallbacks.forEach { it(context) }
         // Flush deferred draws with no parameters - use internal defaults
         flushDeferredDraws()
-        consumers.draw()
+        consumers.endBatch()
     }
 
     fun hasFallbackCallbacks(): Boolean {

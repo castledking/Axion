@@ -16,7 +16,7 @@ object SelectionController {
     fun onEndTick(client: Minecraft) {
         val modeActive = AxionClientState.globalModeState.infiniteReachEnabled
         currentTarget = if (AxionToolSelectionController.isAxionSlotActive() || modeActive) {
-            SelectionRaycast.clip(
+            SelectionRaycast.raycast(
                 client,
                 if (AxionToolSelectionController.isAxionSlotActive()) {
                     AxionTargeting.DEFAULT_REACH
@@ -33,7 +33,7 @@ object SelectionController {
 
     fun currentRegion(): BlockRegion? = when (val state = AxionClientState.selectionState) {
         SelectionState.Idle -> null
-        is SelectionState.FirstCornerSet -> BlockRegion(state.vert0, state.vert0)
+        is SelectionState.FirstCornerSet -> BlockRegion(state.firstCorner, state.firstCorner)
         is SelectionState.RegionDefined -> state.region()
     }
 
@@ -47,7 +47,7 @@ object SelectionController {
         }
 
         val blockPos = currentTarget.blockPosOrNull() ?: return false
-        AxionClientState.updateSelection(SelectionState.FirstCornerSet(blockPos.immutable()))
+        AxionClientState.updateSelection(SelectionState.FirstCornerSet(blockPos))
         return true
     }
 
@@ -60,11 +60,11 @@ object SelectionController {
         val nextState = when (val state = AxionClientState.selectionState) {
             SelectionState.Idle -> return false
             is SelectionState.FirstCornerSet -> SelectionState.RegionDefined(
-                firstCorner = state.vert0,
-                secondCorner = blockPos.immutable(),
+                firstCorner = state.firstCorner,
+                secondCorner = blockPos,
             )
 
-            is SelectionState.RegionDefined -> state.copy(secondCorner = blockPos.immutable())
+            is SelectionState.RegionDefined -> state.copy(secondCorner = blockPos)
         }
 
         AxionClientState.updateSelection(nextState)
@@ -73,12 +73,12 @@ object SelectionController {
 
     fun selectionAnchor(): BlockPos? = when (val state = AxionClientState.selectionState) {
         SelectionState.Idle -> null
-        is SelectionState.FirstCornerSet -> state.vert0
-        is SelectionState.RegionDefined -> state.vert0
+        is SelectionState.FirstCornerSet -> state.firstCorner
+        is SelectionState.RegionDefined -> state.firstCorner
     }
 
     fun expandRegionToCurrentTarget(client: Minecraft, region: BlockRegion): BlockRegion? {
-        val targetBlock = currentTarget.blockPosOrNull()?.immutable()
+        val targetBlock = currentTarget.blockPosOrNull()
         val targetHitPos = currentTarget.hitPosOrNull()
         if (targetBlock != null && targetHitPos != null) {
             val outwardFace = SelectionBounds.outwardFaceToward(region, targetBlock, targetHitPos)

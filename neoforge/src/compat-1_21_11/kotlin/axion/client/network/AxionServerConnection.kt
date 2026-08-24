@@ -44,7 +44,7 @@ object AxionServerConnection {
     fun initialize() {
         VersionCompatImpl.registerAxionPayloadChannel(AxionPluginPayload.ID, AxionPluginPayload.CODEC)
         VersionCompatImpl.registerAxionReceiver(AxionPluginPayload.ID) { payload ->
-            AxionServerMessageAssembler.parse(payload.bytes)?.let(::handleServerMessage)
+            AxionServerMessageAssembler.consume(payload.bytes)?.let(::handleServerMessage)
         }
 
         VersionCompatImpl.onPlayJoin { client, _ ->
@@ -66,7 +66,7 @@ object AxionServerConnection {
             nextTransferId = 1L
             send(
                 ClientHello(
-                    protocolVersion = AxionProtocol.FAKE_PROTOCOL_VERSION,
+                    protocolVersion = AxionProtocol.PROTOCOL_VERSION,
                     clientVersion = VersionCompatImpl.getModVersion(AxionMod.MOD_ID),
                 ),
             )
@@ -245,7 +245,7 @@ object AxionServerConnection {
     private fun handleServerMessage(message: axion.protocol.AxionServerMessage) {
         when (message) {
             is ServerHello -> {
-                state = if (message.protocolVersion == AxionProtocol.FAKE_PROTOCOL_VERSION) {
+                state = if (message.protocolVersion == AxionProtocol.PROTOCOL_VERSION) {
                     clearStatusMessage(PLUGIN_REQUIRED_MESSAGE)
                     State.Available(message.protocolVersion, message.supportedOperations)
                 } else {
@@ -257,7 +257,7 @@ object AxionServerConnection {
             is OperationBatchResult -> {
                 if (state == State.AwaitingHello) {
                     state = State.Available(
-                        protocolVersion = AxionProtocol.FAKE_PROTOCOL_VERSION,
+                        protocolVersion = AxionProtocol.PROTOCOL_VERSION,
                         supportedOperations = AxionOperationType.entries.toSet(),
                     )
                 }

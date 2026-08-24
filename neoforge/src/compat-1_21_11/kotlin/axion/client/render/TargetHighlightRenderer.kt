@@ -54,6 +54,6 @@ object TargetHighlightRenderer {
         if (target == AxionTarget.MissTarget) {
             return null
         }
-        return target.blockPosOrNull()?.immutable()
+        return target.blockPosOrNull()
     }
 }

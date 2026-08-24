@@ -22,12 +22,12 @@ class TintedAlphaVertexConsumer(
     }
 
     override fun setColor(red: Int, green: Int, blue: Int, alpha: Int): VertexConsumer {
-        delegate.color(tinted(red, tintRed), tinted(green, tintGreen), tinted(blue, tintBlue), scaledAlpha(alpha))
+        delegate.setColor(tinted(red, tintRed), tinted(green, tintGreen), tinted(blue, tintBlue), scaledAlpha(alpha))
         return this
     }
 
     override fun setColor(color: Int): VertexConsumer {
-        delegate.color(tintedPackedColor(color))
+        delegate.setColor(tintedPackedColor(color))
         return this
     }
 
@@ -43,7 +43,7 @@ class TintedAlphaVertexConsumer(
 
     override fun setUv2(u: Int, v: Int): VertexConsumer {
         if (fullBright) {
-            delegate.light(MAX_LIGHT_UV, MAX_LIGHT_UV)
+            delegate.setUv2(MAX_LIGHT_UV, MAX_LIGHT_UV)
         } else {
             delegate.setUv2(u, v)
         }
@@ -68,7 +68,7 @@ class TintedAlphaVertexConsumer(
     // directly to the buffer, completely bypassing our color() and light() overrides.
     // This was the root cause of ghost blocks appearing un-tinted and dark.
 
-    override fun vertex(
+    override fun addVertex(
         x: Float, y: Float, z: Float,
         color: Int,
         u: Float, v: Float,

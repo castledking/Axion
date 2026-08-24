@@ -40,7 +40,7 @@ class AxionPreviewBuffer : AutoCloseable {
     val indexCountValue: Int get() = indexCount
 
     /** Expose vertex format for custom preview pipelines. */
-    val vertexFormatValue: com.mojang.blaze3d.vertex.VertexFormat get() = RenderLayerCompat.blockTranslucentCull().format
+    val vertexFormatValue: com.mojang.blaze3d.vertex.VertexFormat get() = RenderLayerCompat.blockTranslucentCull().format()
 
     /** Expose draw mode for custom preview pipelines. */
     val drawModeValue: VertexFormat.Mode get() = drawMode
@@ -51,9 +51,9 @@ class AxionPreviewBuffer : AutoCloseable {
      * - If existing buffer fits, use CommandEncoder.writeToBuffer for in-place update
      */
     fun upload(builtBuffer: MeshData) {
-        val params = builtBuffer.drawState
-        val vertexData = builtBuffer.buffer
-        val indexData = builtBuffer.indexBuffer
+        val params = builtBuffer.drawState()
+        val vertexData = builtBuffer.vertexBuffer()
+        val indexData = builtBuffer.indexBuffer()
 
         val device = RenderSystem.getDevice()
         val commandEncoder = device.createCommandEncoder()
@@ -99,7 +99,7 @@ class AxionPreviewBuffer : AutoCloseable {
 
         vertexCount = params.vertexCount
         indexCount = params.indexCount
-        drawMode = params.mode
+        drawMode = params.mode()
         indexType = params.indexType
         uploaded = true
     }
@@ -121,8 +121,8 @@ class AxionPreviewBuffer : AutoCloseable {
             } else {
                 val sequential = RenderSystem.getSequentialBuffer(drawMode)
                 renderPass.setIndexBuffer(
-                    sequential.getIndexBuffer(indexCount),
-                    sequential.indexType,
+                    sequential.getBuffer(indexCount),
+                    sequential.type(),
                 )
             }
             renderPass.drawIndexed(0, 0, indexCount, 1)

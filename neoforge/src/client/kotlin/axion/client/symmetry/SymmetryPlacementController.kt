@@ -103,7 +103,7 @@ object SymmetryPlacementController {
                 soundType.placeSound,
                 SoundSource.BLOCKS,
                 (soundType.volume + 1.0f) / 2.0f,
-                soundType.xRot * 0.8f,
+                soundType.pitch * 0.8f,
             )
         }
     }

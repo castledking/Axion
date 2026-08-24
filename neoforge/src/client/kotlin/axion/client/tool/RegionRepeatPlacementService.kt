@@ -48,7 +48,7 @@ object RegionRepeatPlacementService {
                 clipboardBuffer = clipboardBuffer,
                 entitySelection = entitySelection,
                 lookDirection = direction,
-                step = direction.unitVec3.scale(scrollDirection).let { Vec3i(it.x, it.y, it.z) },
+                step = direction.unitVec3i.multiply(scrollDirection),
                 scrollSign = scrollDirection,
                 repeatCount = 1,
                 committedSegments = emptyList(),
@@ -96,7 +96,7 @@ object RegionRepeatPlacementService {
         currentDirection: Direction,
         scrollDirection: Int,
     ): RepeatRegionPreview? {
-        val nextStep = preview.step.add(currentDirection.vector.scale(scrollDirection))
+        val nextStep = preview.step.add(currentDirection.unitVec3i.multiply(scrollDirection))
         val nextRepeatCount = maxAbsComponent(nextStep)
         if (nextRepeatCount == 0) {
             return null
@@ -306,14 +306,14 @@ object RegionRepeatPlacementService {
         val absoluteCells = linkedMapOf<BlockPos, ClipboardCell>()
 
         preview.clipboardBuffer.cells.forEach { cell ->
-            val absolutePos = sourceOrigin.add(cell.offset).immutable()
+            val absolutePos = sourceOrigin.add(cell.offset)
             absoluteCells[absolutePos] = cell.copy(offset = Vec3i(absolutePos.x, absolutePos.y, absolutePos.z))
         }
 
         for (index in 1..preview.repeatCount) {
             val destinationOrigin = sourceOrigin.add(preview.step.multiply(index))
             preview.clipboardBuffer.cells.forEach { cell ->
-                val absolutePos = destinationOrigin.add(cell.offset).immutable()
+                val absolutePos = destinationOrigin.add(cell.offset)
                 val existing = absoluteCells[absolutePos]
                 if (mode == Mode.SMEAR && existing != null && !existing.state.isAir) {
                     return@forEach
@@ -347,7 +347,7 @@ object RegionRepeatPlacementService {
 
         val foldedCells = buildList {
             for (pos in blockPosIterate(min, max)) {
-                val absolutePos = pos.immutable()
+                val absolutePos = pos
                 val cell = absoluteCells[absolutePos]
                 add(
                     ClipboardCell(
@@ -406,7 +406,7 @@ object RegionRepeatPlacementService {
 
     private fun stepFor(region: BlockRegion, direction: Direction, scrollDirection: Int): Vec3i {
         val stepLength = region.normalized().size().componentAlong(direction.axis)
-        return direction.unitVec3.scale(stepLength * scrollDirection).let { Vec3i(it.x, it.y, it.z) }
+        return (direction.unitVec3.scale((stepLength * scrollDirection).toDouble())).let { Vec3i(it.x.toInt(), it.y.toInt(), it.z.toInt()) }
     }
 
     fun smearOffsets(offset: Vec3i, steps: Int = maxAbsComponent(offset)): List<Vec3i> {

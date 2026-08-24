@@ -371,7 +371,7 @@ object ClientModeController {
         }
 
         val blockHit = hit as BlockHitResult
-        val targetPos = blockHit.blockPos.immutable()
+        val targetPos = blockHit.blockPos
         val brokenState = world.getBlockState(targetPos)
 
         if (brokenState.isAir) {
@@ -429,7 +429,7 @@ object ClientModeController {
         }
 
         val blockHit = hit as BlockHitResult
-        val targetPos = blockHit.blockPos.immutable()
+        val targetPos = blockHit.blockPos
         val brokenState = world.getBlockState(targetPos)
 
         if (brokenState.isAir) {
@@ -513,13 +513,13 @@ object ClientModeController {
 
         // Allow usable items (potions, shields, food, etc.) to work normally
         val player = client.player
-        val heldStack = player?.mainHandStack
+        val heldStack = player?.mainHandItem
         val item = heldStack?.item
         if (item != null) {
             // Check if item has a use action (food, potions, shields, etc.)
             // Items with maxUseTime > 0 are usable (food, potions, shields, bows, etc.)
             // player is non-null transitively: item != null implies heldStack != null implies player != null.
-            if (item.getUseDuration(heldStack, player) > 0) {
+            if (heldStack.getUseDuration(player) > 0) {
                 // Let vanilla handle items with right-click actions (potions, shields, etc.)
                 return false
             }
@@ -713,7 +713,7 @@ object ClientModeController {
             return consumeNoUpdatesBreak(client, modes)
         }
         val world = client.level ?: return false
-        val targetPos = target.hitResult.blockPos.immutable()
+        val targetPos = target.hitResult.blockPos
         val brokenState = world.getBlockState(targetPos)
         suppressPrimaryUntilRelease = true
         client.gameMode?.stopDestroyBlock()
@@ -754,7 +754,7 @@ object ClientModeController {
         }
 
         val world = client.level ?: return false
-        val currentTick = world.time
+        val currentTick = world.gameTime
         if (currentTick - lastBreakTick < VANILLA_BREAK_COOLDOWN_TICKS) {
             // Still owned by Axion — swallow the click so vanilla does not break
             // the block with updates while we are pacing.
@@ -762,7 +762,7 @@ object ClientModeController {
             return true
         }
 
-        val targetPos = target.hitResult.blockPos.immutable()
+        val targetPos = target.hitResult.blockPos
         val brokenState = world.getBlockState(targetPos)
         if (brokenState.isAir) {
             return false
@@ -868,7 +868,7 @@ object ClientModeController {
 
                 if (!beyondVanillaReach) {
                     // Within vanilla range - use vanilla interaction for client prediction
-                    client.gameMode?.interactBlock(player, InteractionHand.MAIN_HAND, blockHit)
+                    client.gameMode?.useItemOn(player, InteractionHand.MAIN_HAND, blockHit)
                     client.player?.swing(InteractionHand.MAIN_HAND)
                 } else {
                     // Beyond vanilla range - use dispatch for server-side placement
@@ -1152,7 +1152,7 @@ object ClientModeController {
 
     private fun isInsideSolidBlock(player: Player): Boolean {
         val world = Minecraft.getInstance().level ?: return false
-        val bounds = player.boundingBox.contract(1.0E-4)
+        val bounds = player.boundingBox.inflate(1.0E-4)
         return net.minecraft.world.entity.Entity.collectAllColliders(player, world, bounds).isNotEmpty()
     }
 
@@ -1161,7 +1161,7 @@ object ClientModeController {
         client.gui.setOverlayMessage(message, false)
         SystemToast.add(
             client.toastManager,
-            SystemToast.Type.PERIODIC_NOTIFICATION,
+            net.minecraft.client.gui.components.toasts.SystemToast.SystemToastId.PERIODIC_NOTIFICATION,
             Component.literal("Axion $modeName"),
             Component.literal(if (enabled) "Enabled" else "Disabled"),
         )
@@ -1174,7 +1174,7 @@ object ClientModeController {
     ) {
         val world = client.level ?: return
         val player = client.player
-        world.syncWorldEvent(player, 2001, pos, VersionCompatImpl.rawBlockStateId(state))
+        world.globalLevelEvent(2001, pos, VersionCompatImpl.rawBlockStateId(state))
     }
 
     private fun playPlacementEffects(
@@ -1201,7 +1201,7 @@ object ClientModeController {
             soundType.placeSound,
             SoundSource.BLOCKS,
             (soundType.volume + 1.0f) / 2.0f,
-            soundType.xRot * 0.8f,
+            soundType.pitch * 0.8f,
         )
     }
 
@@ -1222,7 +1222,7 @@ object ClientModeController {
         }
 
         val inventory = player.inventory
-        if (player.hasInfiniteMaterials) {
+        if (player.hasInfiniteMaterials()) {
             val hotbarSlot = findInventorySlot(inventory, pickedItem, 0 until HOTBAR_SIZE)
             if (hotbarSlot >= 0) {
                 inventory.selectedSlot = hotbarSlot
@@ -1242,7 +1242,7 @@ object ClientModeController {
                 return true
             }
 
-            return clonePickedItemIntoHand(client, player, inventory, pickedItem.getDefaultStack())
+            return clonePickedItemIntoHand(client, player, inventory, pickedItem.defaultInstance)
         }
 
         val hotbarSlot = findInventorySlot(inventory, pickedItem, 0 until HOTBAR_SIZE)
@@ -1253,7 +1253,7 @@ object ClientModeController {
 
         val inventorySlot = findInventorySlot(inventory, pickedItem, HOTBAR_SIZE until VersionCompatImpl.getMainInventoryStacks(inventory).size)
         if (inventorySlot < 0) {
-            return clonePickedItemIntoHand(client, player, inventory, pickedItem.getDefaultStack())
+            return clonePickedItemIntoHand(client, player, inventory, pickedItem.defaultInstance)
         }
 
         client.gameMode?.handleInventoryMouseClick(
@@ -1274,12 +1274,12 @@ object ClientModeController {
         pickedStack: net.minecraft.world.item.ItemStack,
     ): Boolean {
         val interactionManager = client.gameMode ?: return false
-        if (!player.hasInfiniteMaterials) {
+        if (!player.hasInfiniteMaterials()) {
             return false
         }
 
         val selectedSlot = inventory.selectedSlot
-        val heldStack = inventory.getStack(selectedSlot)
+        val heldStack = inventory.getItem(selectedSlot)
         val emptySlot = inventory.getFreeSlot().takeIf { it >= 0 && it != selectedSlot }
         if (!heldStack.isEmpty && emptySlot != null) {
             interactionManager.handleInventoryMouseClick(
@@ -1297,7 +1297,7 @@ object ClientModeController {
     }
 
     private fun canUseModes(client: Minecraft): Boolean {
-        return client.player?.hasInfiniteMaterials == true
+        return client.player?.hasInfiniteMaterials() == true
     }
 
     private fun findInventorySlot(
@@ -1306,7 +1306,7 @@ object ClientModeController {
         slots: IntRange,
     ): Int {
         return slots.firstOrNull { slot ->
-            inventory.getStack(slot).item == item
+            inventory.getItem(slot).item == item
         } ?: -1
     }
 
@@ -1450,7 +1450,7 @@ object ClientModeController {
 
             // Execute within-range placements with interactBlock
             withinRangeOperations.forEach { blockHit ->
-                client.gameMode?.interactBlock(player, InteractionHand.MAIN_HAND, blockHit)
+                client.gameMode?.useItemOn(player, InteractionHand.MAIN_HAND, blockHit)
             }
             if (withinRangeReplacementOperations.isNotEmpty()) {
                 dispatchBatch(withinRangeReplacementOperations)
@@ -1504,7 +1504,7 @@ object ClientModeController {
                 }
 
                 val blockHit = hit as BlockHitResult
-                val sampleTarget = PlacementSampleTarget(blockHit.blockPos.immutable(), blockHit.direction)
+                val sampleTarget = PlacementSampleTarget(blockHit.blockPos, blockHit.direction)
                 if (!seenPlacementTargets.add(sampleTarget)) {
                     break
                 }
@@ -1546,7 +1546,7 @@ object ClientModeController {
 
                 if (hit.type.name == "BLOCK") {
                     val blockHit = hit as BlockHitResult
-                    val sampleTarget = PlacementSampleTarget(blockHit.blockPos.immutable(), blockHit.direction)
+                    val sampleTarget = PlacementSampleTarget(blockHit.blockPos, blockHit.direction)
                     if (!seenPlacementTargets.add(sampleTarget)) {
                         continue
                     }
@@ -1695,7 +1695,7 @@ object ClientModeController {
         if (!beyondVanillaReach) {
             // Within vanilla range - use vanilla attackBlock for proper client prediction
             // This prevents ghost blocks by letting the client handle the break prediction
-            client.gameMode?.attackBlock(BlockPos(targetPos), blockHit.direction)
+            client.gameMode?.startDestroyBlock(targetPos, blockHit.direction)
             SymmetryBreakController.dispatchDerivedBreaks(
                 client,
                 BlockPos(targetPos),

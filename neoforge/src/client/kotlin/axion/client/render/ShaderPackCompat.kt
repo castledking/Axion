@@ -88,7 +88,7 @@ object ShaderPackCompat {
         return runCatching {
             val irisClass = Class.forName("net.irisshaders.iris.Iris")
             irisClass.getMethod("isPackInUseQuick").invoke(null) as? Boolean
-                ?: (irisClass.getMethod("getCurrentPack").invoke(null) as? java.util.Optional<*>)?.isSuccess
+                ?: ((irisClass.getMethod("getCurrentPack").invoke(null) as? java.util.Optional<*>)?.orElse(null) != null)
                 ?: false
         }.getOrDefault(false)
     }

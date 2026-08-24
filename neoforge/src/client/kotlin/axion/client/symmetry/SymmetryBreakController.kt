@@ -31,7 +31,7 @@ object SymmetryBreakController {
         val target = ModeTargeting.currentBlockTarget(client) ?: return false
         return dispatchDerivedBreaks(
             client,
-            target.hitResult.blockPos.immutable(),
+            target.hitResult.blockPos,
             interactionOrigin = SymmetryBreakOriginPolicy.forPrimaryBreak(
                 AxionClientState.globalModeState.infiniteReachEnabled,
             ),

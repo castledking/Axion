@@ -43,13 +43,15 @@ object AxionServerMessageAssembler {
             return null
         }
 
-        partial.chunks[frame.translucencyResortIterationIndex] = frame.payload
+        partial.chunks[frame.chunkIndex] = frame.payload
         if (partial.chunks.size != partial.chunkCount) {
             return null
         }
 
         partialTransfers.remove(frame.transferId)
-        val combined = ByteArray(partial.chunks.values.accumulate { it.size })
+        var total = 0
+        for (v in partial.chunks.values) total += v.size
+        val combined = ByteArray(total)
         var cursor = 0
         for (chunkIndex in 0 until partial.chunkCount) {
             val chunk = partial.chunks[chunkIndex] ?: return null

@@ -87,7 +87,7 @@ object StackPlacementService {
             CloneEntitiesOperation(
                 entitySelection = entitySelection,
                 sourceRegion = sourceRegion,
-                destinationOrigin = sourceOrigin.add(step.multiply(index)).immutable(),
+                destinationOrigin = sourceOrigin.add(step.multiply(index)),
             )
         }
     }

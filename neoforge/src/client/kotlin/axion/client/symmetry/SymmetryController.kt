@@ -167,7 +167,7 @@ object SymmetryController {
         client.gui.setOverlayMessage(Component.literal("Axion $label symmetry $status"), false)
         SystemToast.add(
             client.toastManager,
-            SystemToast.Type.PERIODIC_NOTIFICATION,
+            net.minecraft.client.gui.components.toasts.SystemToast.SystemToastId.PERIODIC_NOTIFICATION,
             Component.literal("Axion $label symmetry"),
             Component.literal(if (enabled) "Enabled" else "Disabled"),
         )

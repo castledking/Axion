@@ -125,7 +125,7 @@ object PlacementPreviewRenderer {
         if (sourceOccupancyClipboard.nonAirCells().size > MAX_MOVE_SOURCE_CELLS) return
         val sourceClipboard = moveSourceClipboard(sourceOccupancyClipboard) ?: return
         val sourceSurfaceClipboard = moveSourceSurfaceClipboard(sourceOccupancyClipboard) ?: return
-        BlockPreviewPipeline.renderDecorations(
+        BlockPreviewPipeline.renderOverlay(
             context = context,
             scene = BlockPreviewPipeline.OverlayScene(
                 origins = listOf(preview.sourceRegion.minCorner()),

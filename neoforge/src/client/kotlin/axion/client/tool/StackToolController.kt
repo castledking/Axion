@@ -183,7 +183,7 @@ object StackToolController {
     }
 
     private fun setFirstCorner(): Boolean {
-        val firstCorner = SelectionController.currentTarget().blockPosOrNull()?.immutable() ?: return false
+        val firstCorner = SelectionController.currentTarget().blockPosOrNull() ?: return false
         val nextState = StackToolState.FirstCornerSet(firstCorner)
         AxionClientState.updateStackToolState(nextState)
         AxionClientState.updateClipboard(ClipboardState.Empty)
@@ -192,7 +192,7 @@ object StackToolController {
     }
 
     private fun setSecondCorner(): Boolean {
-        val secondCorner = SelectionController.currentTarget().blockPosOrNull()?.immutable() ?: return false
+        val secondCorner = SelectionController.currentTarget().blockPosOrNull() ?: return false
         val firstCorner = when (val state = AxionClientState.stackToolState) {
             StackToolState.Idle -> return false
             is StackToolState.FirstCornerSet -> state.firstCorner
@@ -215,7 +215,7 @@ object StackToolController {
         client: Minecraft,
     ): Boolean {
         val world = client.level ?: return false
-        val seed = SelectionController.currentTarget().blockPosOrNull()?.immutable() ?: return false
+        val seed = SelectionController.currentTarget().blockPosOrNull() ?: return false
         val result = MagicSelectionService.select(world, seed) ?: return false
         val merged = when (val clipboardState = AxionClientState.clipboardState) {
             is ClipboardState.MagicSelection -> MagicSelectionService.merge(

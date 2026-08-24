@@ -68,9 +68,9 @@ object AxionToolHintHud {
             return
         }
 
-        val centerX = context.guiWidth / 2
+        val centerX = context.guiWidth() / 2
         val rowHeight = ICON_SIZE + CROSSHAIR_ROW_GAP
-        var y = (context.guiHeight / 2) + CROSSHAIR_TOP_OFFSET
+        var y = (context.guiHeight() / 2) + CROSSHAIR_TOP_OFFSET
 
         hints.forEach { hint ->
             when (hint) {
@@ -117,8 +117,8 @@ object AxionToolHintHud {
         }
 
         val width = font.width(status)
-        val x = (context.guiWidth - width) / 2
-        val y = context.guiHeight - 48
+        val x = (context.guiWidth() - width) / 2
+        val y = context.guiHeight() - 48
         context.fill(
             x - PANEL_PADDING_X,
             y - PANEL_PADDING_Y,
@@ -139,12 +139,12 @@ object AxionToolHintHud {
         }
 
         val lines = hints.map { "${it.input} - ${it.action}" }
-        val contentWidth = lines.maxOf(font::getWidth)
+        val contentWidth = lines.maxOf(font::width)
         val lineHeight = font.lineHeight
         val panelWidth = contentWidth + (PANEL_PADDING_X * 2)
         val panelHeight = (lineHeight * lines.size) + (KEY_LINE_GAP * (lines.size - 1)) + (PANEL_PADDING_Y * 2)
-        val x = context.guiWidth - RIGHT_MARGIN - panelWidth
-        val y = context.guiHeight - BOTTOM_MARGIN - panelHeight
+        val x = context.guiWidth() - RIGHT_MARGIN - panelWidth
+        val y = context.guiHeight() - BOTTOM_MARGIN - panelHeight
 
         context.fill(x, y, x + panelWidth, y + panelHeight, PANEL_BACKGROUND)
         context.drawStrokedRectangleCompat(x, y, panelWidth, panelHeight, PANEL_BORDER)

@@ -29,7 +29,7 @@ object SymmetryPlacementService {
             return null
         }
 
-        val placementPos = hitResult.blockPos.immutable()
+        val placementPos = hitResult.blockPos
         if (!world.isInWorldBounds(placementPos)) {
             return null
         }
@@ -75,7 +75,7 @@ object SymmetryPlacementService {
         derivedPos: BlockPos,
         derivedSide: net.minecraft.core.Direction,
     ): SymmetryPlacementResult.Placement? {
-        val supportPos = if (originalContext.canReplaceExisting()) {
+        val supportPos = if (originalContext.replacingClickedOnBlock()) {
             derivedPos
         } else {
             derivedPos.add(derivedSide.opposite.extents)

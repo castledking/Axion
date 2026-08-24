@@ -247,7 +247,7 @@ object BuildPlacementService {
         if (!placementContext.canPlace()) {
             return null
         }
-        val placementPos = placementContext.blockPos.immutable()
+        val placementPos = placementContext.clickedPos
         val placementState = blockItem.getPlacementState(placementContext) ?: return null
         if (!placementState.canSurvive(world, placementPos)) {
             return null
@@ -257,7 +257,7 @@ object BuildPlacementService {
         }
         return PlacementResult(
             placement = SymmetryBlockPlacement(placementPos, placementState),
-            canReplaceExisting = rawContext.canReplaceExisting(),
+            canReplaceExisting = rawContext.replacingClickedOnBlock(),
         )
     }
 
@@ -278,7 +278,7 @@ object BuildPlacementService {
             Direction.entries.forEach { d -> if (d != side) add(d) }
         }
         for (face in facesToTry) {
-            val supportPos = pos.offset(face.opposite)
+            val supportPos = pos.offset(face.opposite.unitVec3i)
             if (world.getBlockState(supportPos).isAir) continue
             val hitPos = centerOf(supportPos).add(
                 face.stepX * 0.5,
@@ -292,11 +292,11 @@ object BuildPlacementService {
                 BlockHitResult(hitPos, face, supportPos, false),
             )
             val placementContext = blockItem.updatePlacementContext(rawContext) ?: continue
-            if (placementContext.blockPos != pos || !placementContext.canPlace()) continue
+            if (placementContext.clickedPos != pos || !placementContext.canPlace()) continue
             val placementState = blockItem.getPlacementState(placementContext) ?: continue
             if (!placementState.canSurvive(world, pos)) continue
             if (wouldCollideWithPlayer(world, player, pos, placementState)) return null
-            return SymmetryBlockPlacement(pos.immutable(), placementState)
+            return SymmetryBlockPlacement(pos, placementState)
         }
         return null
     }
@@ -315,7 +315,7 @@ object BuildPlacementService {
             hand = hand,
             stack = stack,
             blockItem = blockItem,
-            pos = hitResult.blockPos.immutable(),
+            pos = hitResult.blockPos,
             hitResult = hitResult,
         ) ?: return null
         return PlacementResult(
@@ -338,9 +338,9 @@ object BuildPlacementService {
         }
 
         val placementContext = object : BlockPlaceContext(world, player, hand, stack, hitResult) {
-            override fun getBlockPos(): BlockPos = pos
+            override fun getClickedPos(): BlockPos = pos
             override fun canPlace(): Boolean = true
-            override fun canReplaceExisting(): Boolean = true
+            override fun replacingClickedOnBlock(): Boolean = true
         }
         val adjustedContext = blockItem.updatePlacementContext(placementContext) ?: placementContext
         val rawPlacementState = blockItem.getPlacementState(adjustedContext) ?: return null
@@ -353,7 +353,7 @@ object BuildPlacementService {
         }
 
         return SymmetryBlockPlacement(
-            pos = pos.immutable(),
+            pos = pos,
             state = placementState,
         )
     }
@@ -367,7 +367,7 @@ object BuildPlacementService {
         pos: BlockPos,
         side: Direction,
     ): SymmetryBlockPlacement? {
-        val supportPos = pos.offset(side.opposite)
+        val supportPos = pos.offset(side.opposite.unitVec3i)
         val hitPos = centerOf(supportPos).add(
             side.stepX * 0.5,
             side.stepY * 0.5,
@@ -409,8 +409,8 @@ object BuildPlacementService {
             return false
         }
 
-        val playerShape = Shapes.create(player.boundingBox.contract(1.0E-4))
-        return Shapes.matchesAnywhere(
+        val playerShape = Shapes.create(player.boundingBox.inflate(1.0E-4))
+        return Shapes.joinIsNotEmpty(
             collisionShape.move(pos.x.toDouble(), pos.y.toDouble(), pos.z.toDouble()),
             playerShape,
             BooleanOp.AND,

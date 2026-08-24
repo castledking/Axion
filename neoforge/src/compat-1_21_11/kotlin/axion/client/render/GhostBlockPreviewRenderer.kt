@@ -271,7 +271,7 @@ object GhostBlockPreviewRenderer {
                     blockPos.z - cameraPos.z,
                 )
                 applyScale(matrixStack, scale)
-                blockRenderManager.renderBlockAsEntity(
+                blockRenderManager.renderSingleBlock(
                     cell.state,
                     matrixStack,
                     alphaConsumers,
@@ -343,7 +343,7 @@ object GhostBlockPreviewRenderer {
                 write.pos.z - cameraPos.z,
             )
             applyScale(matrixStack, scale)
-            blockRenderManager.renderBlockAsEntity(
+            blockRenderManager.renderSingleBlock(
                 write.state,
                 matrixStack,
                 alphaConsumers,
@@ -396,7 +396,7 @@ object GhostBlockPreviewRenderer {
             return
         }
 
-        val shape = state.getOutlineShape(world, blockPos, shapeContext)
+        val shape = state.getShape(world, blockPos, shapeContext)
         if (shape.isEmpty) return
 
         shape.forAllBoxes { minX, minY, minZ, maxX, maxY, maxZ ->

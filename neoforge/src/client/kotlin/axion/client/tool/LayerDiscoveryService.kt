@@ -24,16 +24,16 @@ object LayerDiscoveryService {
 
         val queue = ArrayDeque<BlockPos>()
         val visited = linkedSetOf<BlockPos>()
-        queue.add(origin.immutable())
+        queue.add(origin)
 
         while (queue.isNotEmpty()) {
-            val current = queue.removeFirst().immutable()
+            val current = queue.removeFirst()
             if (!visited.add(current)) {
                 continue
             }
 
             planeNeighborOffsets(direction.axis).forEach { offset ->
-                val neighbor = current.add(offset).immutable()
+                val neighbor = current.add(offset)
                 if (neighbor !in visited && isEligibleNeighbor(world, origin, neighbor, direction.axis, sourceState)) {
                     queue.addLast(neighbor)
                 }

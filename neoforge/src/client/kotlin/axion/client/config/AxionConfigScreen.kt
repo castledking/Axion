@@ -55,7 +55,7 @@ class AxionConfigScreen(
         ).apply {
             value = InfiniteReachRange.display(AxionClientConfig.configuredInfiniteReachRange())
             setMaxLength(12)
-            setChangedListener { input ->
+            setResponder { input ->
                 when {
                     InfiniteReachRange.isUnlimitedInput(input) -> AxionClientConfig.setInfiniteReachRange(null)
                     input.trim().toDoubleOrNull()?.isFinite() == true -> {

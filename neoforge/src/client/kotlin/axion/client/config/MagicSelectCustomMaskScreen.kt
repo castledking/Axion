@@ -313,7 +313,7 @@ class MagicSelectCustomMaskScreen(
         val blockId = entry.id.toString()
         val selectedByRule = selectedRuleIds
             .mapNotNull(MagicSelectRule::fromId)
-            .any { rule -> rule.contains(entry.block.defaultBlockState()) }
+            .any { rule -> rule.matches(entry.block.defaultBlockState(), entry.block.defaultBlockState()) }
         val selectedByCustom = blockId in selectedBlockIds
         val selectedByEffectiveState = isBlockSelected(blockId, entry.block.defaultBlockState())
 
@@ -381,7 +381,7 @@ class MagicSelectCustomMaskScreen(
         }
         return excludedBlockIds.any { blockId ->
             val block = Identifier.tryParse(blockId)?.let(VersionCompat.INSTANCE::getBlock) ?: return@any false
-            rule.contains(block.defaultBlockState())
+            rule.matches(block.defaultBlockState(), block.defaultBlockState())
         }
     }
 
@@ -394,7 +394,7 @@ class MagicSelectCustomMaskScreen(
         }
         return selectedRuleIds
             .mapNotNull(MagicSelectRule::fromId)
-            .any { rule -> rule.contains(blockState) }
+            .any { rule -> rule.matches(blockState, blockState) }
     }
 
     private fun confirmButtonText(): Component {

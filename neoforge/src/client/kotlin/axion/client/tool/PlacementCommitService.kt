@@ -71,7 +71,7 @@ object PlacementCommitService {
         val copyAir = AxionClientState.copyAirEnabled
         return SymmetryPlacementOperation(
             preview.destinationClipboardBuffer.cells.mapNotNull { cell ->
-                val destinationPos = preview.destinationRegion.minCorner().add(cell.offset).immutable()
+                val destinationPos = preview.destinationRegion.minCorner().add(cell.offset)
                 if (!copyAir && cell.state.isAir) {
                     null
                 } else if (keepExisting && sourceRegion.contains(destinationPos)) {
@@ -132,9 +132,9 @@ object PlacementCommitService {
                 )
             }
         }
-        val destinationPositions = destinationPlacements.mapTo(linkedSetOf()) { it.pos.immutable() }
+        val destinationPositions = destinationPlacements.mapTo(linkedSetOf()) { it.pos }
         val sourcePositions = preview.sourceClipboardBuffer.cells.mapTo(linkedSetOf()) { cell ->
-            preview.sourceRegion.minCorner().add(cell.offset).immutable()
+            preview.sourceRegion.minCorner().add(cell.offset)
         }
         val sourceOnlyAirPlacements = buildList {
             for (immutablePos in sourcePositions) {

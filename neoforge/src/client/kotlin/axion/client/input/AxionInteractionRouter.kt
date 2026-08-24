@@ -202,7 +202,7 @@ object AxionInteractionRouter {
         if (target == null || !AxionToolSelectionController.isAxionSlotActive()) {
             return false
         }
-        RegionEraseService.erase(target.region, target.clipboardManager)
+        RegionEraseService.erase(target.region, target.clipboard)
         reset()
         return true
     }
@@ -327,11 +327,11 @@ object AxionInteractionRouter {
     }
 
     private fun isMiddleMousePressed(client: Minecraft): Boolean {
-        return GLFW.glfwGetMouseButton(client.window.handle, GLFW.MOUSE_BUTTON_MIDDLE) == GLFW.GLFW_PRESS
+        return GLFW.glfwGetMouseButton(client.window.handle(), GLFW.GLFW_MOUSE_BUTTON_MIDDLE) == GLFW.GLFW_PRESS
     }
 
     private fun currentTargetBlock(): BlockPos? {
-        return SelectionController.currentTarget().blockPosOrNull()?.immutable()
+        return SelectionController.currentTarget().blockPosOrNull()
     }
 
     private fun supportsHeldMiddleMagicSelect(): Boolean {

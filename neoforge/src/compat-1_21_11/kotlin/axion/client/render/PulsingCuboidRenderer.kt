@@ -346,7 +346,7 @@ object PulsingCuboidRenderer {
         val green = (((color shr 8) and 0xFF) * colorScale).roundToInt()
         val blue = ((color and 0xFF) * colorScale).roundToInt()
 
-        val drawMode = layer.mode
+        val drawMode = layer.mode()
 
         // Cull back faces. Vertices are camera-relative, so the camera is at the
         // origin and a face is only visible when the camera is on its outer side

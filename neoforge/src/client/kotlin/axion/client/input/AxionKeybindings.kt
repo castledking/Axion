@@ -9,7 +9,7 @@ object AxionKeybindings {
 
     val selectAxionTool: KeyMapping = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.select_axion_tool",
-        GLFW.KEY_G,
+        GLFW.GLFW_KEY_G,
         category,
     )
 
@@ -57,37 +57,37 @@ object AxionKeybindings {
 
     val toolDeleteAction: KeyMapping = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.tool_delete_action",
-        GLFW.KEY_DELETE,
+        GLFW.GLFW_KEY_DELETE,
         category,
     )
 
     val symmetryToggleRotation: KeyMapping = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.symmetry_toggle_rotation",
-        GLFW.KEY_R,
+        GLFW.GLFW_KEY_R,
         category,
     )
 
     val symmetryToggleMirror: KeyMapping = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.symmetry_toggle_mirror",
-        GLFW.KEY_F,
+        GLFW.GLFW_KEY_F,
         category,
     )
 
     val symmetryToggleConstruct: KeyMapping = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.symmetry_toggle_construct",
-        GLFW.KEY_C,
+        GLFW.GLFW_KEY_C,
         category,
     )
 
     val undoAction: KeyMapping = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.undo_action",
-        GLFW.KEY_Z,
+        GLFW.GLFW_KEY_Z,
         category,
     )
 
     val redoAction: KeyMapping = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.redo_action",
-        GLFW.KEY_Y,
+        GLFW.GLFW_KEY_Y,
         category,
     )
 
