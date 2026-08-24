@@ -2,9 +2,9 @@ package axion.client.render
 
 import axion.client.network.BlockWrite
 import axion.client.network.LocalWritePlanner
-import axion.client.current.SelectionBounds
-import axion.client.itemStack.RegionRepeatPlacementService
-import axion.client.itemStack.RepeatRegionPreview
+import axion.client.selection.SelectionBounds
+import axion.client.tool.RegionRepeatPlacementService
+import axion.client.tool.RepeatRegionPreview
 import axion.common.model.BlockRegion
 import axion.common.model.ClipboardBuffer
 import axion.common.model.ClipboardCell
@@ -141,7 +141,7 @@ object RepeatPreviewRenderer {
             return
         }
 
-        val world = Minecraft.getInstance().world ?: return
+        val world = Minecraft.getInstance().level ?: return
         val layout = clippedSmearLayout(
             world = world,
             sourceRegion = preview.sourceRegion,

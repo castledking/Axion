@@ -1,8 +1,8 @@
 package axion.client.render
 
-import axion.client.itemStack.CloneToolState
-import axion.client.itemStack.PlacementPreviewPolicy
-import axion.client.itemStack.PlacementToolMode
+import axion.client.tool.CloneToolState
+import axion.client.tool.PlacementPreviewPolicy
+import axion.client.tool.PlacementToolMode
 import axion.common.model.ClipboardBuffer
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet
 import net.minecraft.world.level.block.state.BlockState
@@ -38,7 +38,7 @@ object MoveSourceRenderState {
     private var snapshot: Snapshot? = null
 
     fun synchronize(state: CloneToolState) {
-        val world = runCatching { Minecraft.getInstance().world }.getOrNull()
+        val world = runCatching { Minecraft.getInstance().level }.getOrNull()
         synchronize(world, state)
     }
 

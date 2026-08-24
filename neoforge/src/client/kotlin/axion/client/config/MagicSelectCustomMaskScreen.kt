@@ -283,11 +283,11 @@ class MagicSelectCustomMaskScreen(
                 tile.size,
                 if (selected) 0xFF58D06F.toInt() else 0xFF767676.toInt(),
             )
-            context.drawItem(tile.entry.block.asItem().defaultStack, tile.x + 3, tile.y + 3)
+            context.renderItem(tile.entry.block.asItem().defaultInstance, tile.x + 3, tile.y + 3)
         }
 
         hoveredTile?.let { tile ->
-            context.drawTooltip(font, tile.entry.block.asItem().name, mouseX, mouseY)
+            context.setTooltipForNextFrame(font, tile.entry.block.asItem().name, mouseX, mouseY)
         }
 
         context.drawCenteredString(

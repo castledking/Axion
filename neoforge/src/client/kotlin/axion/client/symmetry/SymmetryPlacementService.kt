@@ -1,5 +1,6 @@
 package axion.client.symmetry
 
+import axion.client.compat.extents
 import axion.common.model.SymmetryConfig
 import net.minecraft.client.Minecraft
 import net.minecraft.world.item.BlockItem

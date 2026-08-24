@@ -1,7 +1,7 @@
 package axion.client.network
 
 import axion.AxionMod
-import axion.client.lastCommands.HistoryManager
+import axion.client.history.HistoryManager
 import axion.common.compat.VersionCompat
 import axion.common.operation.EditOperation
 import axion.common.operation.OperationDispatcher

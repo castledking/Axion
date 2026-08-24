@@ -2,7 +2,7 @@ package axion.client.config
 
 import com.google.gson.GsonBuilder
 import axion.common.compat.VersionCompat
-import net.neoforged.fml.loadingDotsWidget.FMLPaths
+import net.neoforged.fml.loading.FMLPaths
 import net.minecraft.world.item.Item
 import net.minecraft.world.item.Items
 import net.minecraft.core.registries.BuiltInRegistries

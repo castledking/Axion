@@ -1,7 +1,8 @@
-package axion.client.itemStack
+package axion.client.tool
 
-import axion.client.current.AxionTarget
-import axion.client.current.blockPosOrNull
+import axion.client.compat.extents
+import axion.client.selection.AxionTarget
+import axion.client.selection.blockPosOrNull
 import axion.client.compat.add
 import net.minecraft.client.Minecraft
 import net.minecraft.core.BlockPos

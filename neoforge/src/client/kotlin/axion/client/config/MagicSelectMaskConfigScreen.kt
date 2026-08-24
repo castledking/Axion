@@ -105,7 +105,7 @@ class MagicSelectMaskConfigScreen(
 
         rows.forEach { row ->
             AxionClientConfig.templateIcons(row.template).forEachIndexed { index, item ->
-                context.drawItem(item.defaultStack, row.contentX + (index * 18), row.y + 2)
+                context.renderItem(item.defaultInstance, row.contentX + (index * 18), row.y + 2)
             }
             context.drawStrokedRectangleCompat(
                 row.toggleX,

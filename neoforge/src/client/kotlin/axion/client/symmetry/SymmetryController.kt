@@ -1,8 +1,8 @@
 package axion.client.symmetry
 
 import axion.client.AxionClientState
-import axion.client.current.SelectionController
-import axion.client.itemStack.AxionToolSelectionController
+import axion.client.selection.SelectionController
+import axion.client.tool.AxionToolSelectionController
 import axion.common.model.AxionSubtool
 import axion.common.model.SymmetryConfig
 import axion.common.model.SymmetryMirrorAxis

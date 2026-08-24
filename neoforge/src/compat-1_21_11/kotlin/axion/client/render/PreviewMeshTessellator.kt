@@ -73,7 +73,7 @@ object PreviewMeshTessellator {
         val resolvedFaces = ArrayList<ResolvedFace>(template.exposedFaces.size * boundedOrigins.size)
         boundedOrigins.forEach { origin ->
             template.exposedFaces.forEach { exposedFace ->
-                val blockPos = origin.add(exposedFace.offset)
+                val blockPos = origin.offset(exposedFace.offset)
                 val bounds = AABB(
                     blockPos.x.toDouble(),
                     blockPos.y.toDouble(),
@@ -123,7 +123,7 @@ object PreviewMeshTessellator {
             val exposedFaces = ArrayList<ExposedFace>(occupiedCells.size * 2)
             occupiedCells.forEach { cell ->
                 val state = cell.state
-                if (state.isAir || state.renderType != RenderShape.MODEL) {
+                if (state.isAir || state.getRenderShape() != RenderShape.MODEL) {
                     return@forEach
                 }
                 Direction.entries.forEach { face ->

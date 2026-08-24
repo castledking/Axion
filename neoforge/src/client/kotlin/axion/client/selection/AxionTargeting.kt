@@ -1,4 +1,4 @@
-package axion.client.current
+package axion.client.selection
 
 import axion.common.model.RegionFace
 import net.minecraft.world.phys.BlockHitResult

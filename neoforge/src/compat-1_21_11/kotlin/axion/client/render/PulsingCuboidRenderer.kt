@@ -1,7 +1,7 @@
 package axion.client.render
 import axion.client.compat.CameraAccess
 
-import axion.client.current.SelectionBounds
+import axion.client.selection.SelectionBounds
 import com.mojang.blaze3d.vertex.VertexFormat
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.rendertype.RenderType
@@ -143,7 +143,7 @@ object PulsingCuboidRenderer {
         val cameraPos = CameraAccess.getPos(camera)
         val matrixStack = context.matrices()
         val baseBox = SelectionBounds.outlineBox(box)
-        val pulseBox = baseBox.expand(0.0015, 0.0015, 0.0015)
+        val pulseBox = baseBox.inflate(0.0015, 0.0015, 0.0015)
         val fillLayer = try {
             if (ShaderPackCompat.isShaderPackActive()) {
                 // Iris only maps vanilla render layers onto a shader pack's
@@ -253,7 +253,7 @@ object PulsingCuboidRenderer {
                 consumer = consumer,
                 layer = layer,
                 cameraPos = originOffset,
-                box = edge.expand(half, half, half),
+                box = edge.inflate(half, half, half),
                 alpha = alpha,
                 color = color,
             )

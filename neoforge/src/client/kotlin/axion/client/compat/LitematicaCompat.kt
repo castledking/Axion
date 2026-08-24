@@ -6,7 +6,7 @@ import net.minecraft.core.registries.BuiltInRegistries
 
 object LitematicaCompat {
     private val available: Boolean by lazy {
-        ModList.get().hasClientLoaded("litematica")
+        ModList.get().isLoaded("litematica")
     }
 
     private val genericConfigsClass: Class<*>? by lazy {

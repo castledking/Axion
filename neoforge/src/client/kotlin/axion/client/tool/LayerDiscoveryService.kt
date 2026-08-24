@@ -1,4 +1,4 @@
-package axion.client.itemStack
+package axion.client.tool
 
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.core.BlockPos

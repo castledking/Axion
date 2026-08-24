@@ -2,7 +2,7 @@ package axion.client.symmetry
 
 import axion.AxionMod
 import axion.common.compat.VersionCompat
-import axion.client.lastCommands.HistoryManager
+import axion.client.history.HistoryManager
 import axion.client.network.LocalOperationApplier
 import axion.client.network.LocalWritePlanner
 import axion.client.network.NetworkOperationDispatcher

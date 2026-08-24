@@ -2,9 +2,9 @@ package axion.client.mode
 
 import axion.client.AxionClientState
 import axion.client.config.AxionClientConfig
-import axion.client.current.AxionTarget
-import axion.client.current.SelectionRaycast
-import axion.client.current.toDirection
+import axion.client.selection.AxionTarget
+import axion.client.selection.SelectionRaycast
+import axion.client.selection.toDirection
 import net.minecraft.client.Minecraft
 import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.HitResult

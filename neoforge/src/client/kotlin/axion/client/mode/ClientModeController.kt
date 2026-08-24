@@ -8,7 +8,7 @@ import axion.client.symmetry.ActiveSymmetryConfig
 import axion.client.symmetry.SymmetryAwareOperationDispatcher
 import axion.client.symmetry.SymmetryBreakController
 import axion.client.symmetry.SymmetryBreakOriginPolicy
-import axion.client.itemStack.AxionToolSelectionController
+import axion.client.tool.AxionToolSelectionController
 import axion.common.model.BlockRegion
 import axion.common.operation.ClearRegionOperation
 import axion.protocol.AxionInteractionOrigin
@@ -1151,9 +1151,9 @@ object ClientModeController {
     }
 
     private fun isInsideSolidBlock(player: Player): Boolean {
-        val world = Minecraft.getInstance().world ?: return false
+        val world = Minecraft.getInstance().level ?: return false
         val bounds = player.boundingBox.contract(1.0E-4)
-        return world.getBlockCollisions(player, bounds).iterator().hasNext()
+        return net.minecraft.world.entity.Entity.collectAllColliders(player, world, bounds).isNotEmpty()
     }
 
     private fun showToast(client: Minecraft, modeName: String, enabled: Boolean) {
@@ -1192,16 +1192,16 @@ object ClientModeController {
 
         // Play sound only for the first placement (represents the batch)
         val placement = operation.placements.firstOrNull() ?: return
-        val soundGroup = placement.state.soundGroup
+        val soundType = placement.state.soundType
         VersionCompatImpl.playSoundClient(
             world,
             placement.pos.x + 0.5,
             placement.pos.y + 0.5,
             placement.pos.z + 0.5,
-            soundGroup.placeSound,
+            soundType.placeSound,
             SoundSource.BLOCKS,
-            (soundGroup.volume + 1.0f) / 2.0f,
-            soundGroup.xRot * 0.8f,
+            (soundType.volume + 1.0f) / 2.0f,
+            soundType.xRot * 0.8f,
         )
     }
 
@@ -1231,7 +1231,7 @@ object ClientModeController {
 
             val inventorySlot = findInventorySlot(inventory, pickedItem, HOTBAR_SIZE until VersionCompatImpl.getMainInventoryStacks(inventory).size)
             if (inventorySlot >= 0) {
-                client.gameMode?.clickSlot(
+                client.gameMode?.handleInventoryMouseClick(
                     player.containerMenu.containerId,
                     inventorySlotToScreenSlot(inventorySlot),
                     inventory.selectedSlot,
@@ -1256,7 +1256,7 @@ object ClientModeController {
             return clonePickedItemIntoHand(client, player, inventory, pickedItem.getDefaultStack())
         }
 
-        client.gameMode?.clickSlot(
+        client.gameMode?.handleInventoryMouseClick(
             player.containerMenu.containerId,
             inventorySlotToScreenSlot(inventorySlot),
             inventory.selectedSlot,
@@ -1282,7 +1282,7 @@ object ClientModeController {
         val heldStack = inventory.getStack(selectedSlot)
         val emptySlot = inventory.getFreeSlot().takeIf { it >= 0 && it != selectedSlot }
         if (!heldStack.isEmpty && emptySlot != null) {
-            interactionManager.clickSlot(
+            interactionManager.handleInventoryMouseClick(
                 player.containerMenu.containerId,
                 inventorySlotToScreenSlot(emptySlot),
                 selectedSlot,
@@ -1291,8 +1291,8 @@ object ClientModeController {
             )
         }
 
-        inventory.setStack(selectedSlot, pickedStack.copy())
-        interactionManager.clickCreativeStack(pickedStack, 36 + selectedSlot)
+        inventory.setItem(selectedSlot, pickedStack.copy())
+        interactionManager.handleCreativeModeItemAdd(pickedStack, 36 + selectedSlot)
         return true
     }
 
@@ -1504,7 +1504,7 @@ object ClientModeController {
                 }
 
                 val blockHit = hit as BlockHitResult
-                val sampleTarget = PlacementSampleTarget(blockHit.blockPos.immutable(), blockHit.side)
+                val sampleTarget = PlacementSampleTarget(blockHit.blockPos.immutable(), blockHit.direction)
                 if (!seenPlacementTargets.add(sampleTarget)) {
                     break
                 }
@@ -1546,7 +1546,7 @@ object ClientModeController {
 
                 if (hit.type.name == "BLOCK") {
                     val blockHit = hit as BlockHitResult
-                    val sampleTarget = PlacementSampleTarget(blockHit.blockPos.immutable(), blockHit.side)
+                    val sampleTarget = PlacementSampleTarget(blockHit.blockPos.immutable(), blockHit.direction)
                     if (!seenPlacementTargets.add(sampleTarget)) {
                         continue
                     }
@@ -1695,7 +1695,7 @@ object ClientModeController {
         if (!beyondVanillaReach) {
             // Within vanilla range - use vanilla attackBlock for proper client prediction
             // This prevents ghost blocks by letting the client handle the break prediction
-            client.gameMode?.attackBlock(BlockPos(targetPos), blockHit.side)
+            client.gameMode?.attackBlock(BlockPos(targetPos), blockHit.direction)
             SymmetryBreakController.dispatchDerivedBreaks(
                 client,
                 BlockPos(targetPos),

@@ -2,7 +2,7 @@ package axion.mixin.client
 
 import axion.client.hotbar.AxionHotbarPresentation
 import axion.client.hotbar.SavedHotbarController
-import axion.client.itemStack.AxionToolSelectionController
+import axion.client.tool.AxionToolSelectionController
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiGraphics

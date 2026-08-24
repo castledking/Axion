@@ -1,4 +1,4 @@
-package axion.client.itemStack
+package axion.client.tool
 
 import axion.client.compat.rotationVecClient
 import axion.common.model.BlockRegion
@@ -8,8 +8,8 @@ import axion.common.operation.CompositeOperation
 import axion.common.operation.EditOperation
 import axion.common.operation.SmearRegionOperation
 import axion.common.operation.StackRegionOperation
-import axion.client.itemStack.directionGetFacing
-import axion.client.itemStack.floorMod
+import axion.client.tool.directionGetFacing
+import axion.client.tool.floorMod
 import axion.client.compat.blockPosIterate
 import axion.client.compat.add
 import axion.client.compat.ORIGIN
@@ -48,7 +48,7 @@ object RegionRepeatPlacementService {
                 clipboardBuffer = clipboardBuffer,
                 entitySelection = entitySelection,
                 lookDirection = direction,
-                step = direction.vector.scale(scrollDirection).let { Vec3i(it.x, it.y, it.z) },
+                step = direction.unitVec3.scale(scrollDirection).let { Vec3i(it.x, it.y, it.z) },
                 scrollSign = scrollDirection,
                 repeatCount = 1,
                 committedSegments = emptyList(),
@@ -159,7 +159,7 @@ object RegionRepeatPlacementService {
 
         val nextScrollSign = intSign(nextSignedCount)
         val nextStep = if (nextScrollSign != preview.scrollSign) {
-            preview.step.scale(-1)
+            preview.step.multiply(-1)
         } else {
             preview.step
         }
@@ -311,7 +311,7 @@ object RegionRepeatPlacementService {
         }
 
         for (index in 1..preview.repeatCount) {
-            val destinationOrigin = sourceOrigin.add(preview.step.scale(index))
+            val destinationOrigin = sourceOrigin.add(preview.step.multiply(index))
             preview.clipboardBuffer.cells.forEach { cell ->
                 val absolutePos = destinationOrigin.add(cell.offset).immutable()
                 val existing = absoluteCells[absolutePos]
@@ -406,7 +406,7 @@ object RegionRepeatPlacementService {
 
     private fun stepFor(region: BlockRegion, direction: Direction, scrollDirection: Int): Vec3i {
         val stepLength = region.normalized().size().componentAlong(direction.axis)
-        return direction.vector.scale(stepLength * scrollDirection).let { Vec3i(it.x, it.y, it.z) }
+        return direction.unitVec3.scale(stepLength * scrollDirection).let { Vec3i(it.x, it.y, it.z) }
     }
 
     fun smearOffsets(offset: Vec3i, steps: Int = maxAbsComponent(offset)): List<Vec3i> {

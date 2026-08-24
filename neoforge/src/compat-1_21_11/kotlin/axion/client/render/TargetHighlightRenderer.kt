@@ -2,11 +2,11 @@ package axion.client.render
 import axion.client.compat.CameraAccess
 
 import axion.client.AxionClientState
-import axion.client.current.AxionTarget
-import axion.client.current.SelectionBounds
-import axion.client.current.SelectionController
-import axion.client.current.blockPosOrNull
-import axion.client.itemStack.AxionToolSelectionController
+import axion.client.selection.AxionTarget
+import axion.client.selection.SelectionBounds
+import axion.client.selection.SelectionController
+import axion.client.selection.blockPosOrNull
+import axion.client.tool.AxionToolSelectionController
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.rendertype.RenderType
 import net.minecraft.world.phys.shapes.Shapes

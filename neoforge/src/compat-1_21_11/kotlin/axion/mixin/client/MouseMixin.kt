@@ -98,9 +98,9 @@ abstract class MouseMixin {
             altHeld = AxionModifierKeys.isAltDown(client),
             ctrlHeld = AxionModifierKeys.isControlDown(),
         )) {
-            axion.client.itemStack.AxionToolSelectionController.ScrollOutcome.PassThrough -> Unit
-            axion.client.itemStack.AxionToolSelectionController.ScrollOutcome.Consumed -> ci.cancel()
-            is axion.client.itemStack.AxionToolSelectionController.ScrollOutcome.SelectVanilla -> {
+            axion.client.tool.AxionToolSelectionController.ScrollOutcome.PassThrough -> Unit
+            axion.client.tool.AxionToolSelectionController.ScrollOutcome.Consumed -> ci.cancel()
+            is axion.client.tool.AxionToolSelectionController.ScrollOutcome.SelectVanilla -> {
                 player.inventory.selectedSlot = outcome.slot
                 ci.cancel()
             }

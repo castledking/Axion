@@ -186,7 +186,7 @@ class MagicSelectTemplateEditScreen(
 
         rows.forEach { row ->
             AxionClientConfig.customMaskIcons(row.mask).forEachIndexed { index, item ->
-                context.drawItem(item.defaultStack, row.contentX + (index * 18), row.y + 2)
+                context.renderItem(item.defaultInstance, row.contentX + (index * 18), row.y + 2)
             }
             context.drawStrokedRectangleCompat(
                 row.toggleX,
@@ -198,7 +198,7 @@ class MagicSelectTemplateEditScreen(
         }
 
         rows.firstOrNull { it.containsToggle(mouseX.toDouble(), mouseY.toDouble()) }?.let { row ->
-            context.drawTooltip(
+            context.setComponentTooltipForNextFrame(
                 font,
                 activeTemplatesTooltip(row.mask.id),
                 mouseX,
@@ -236,13 +236,13 @@ class MagicSelectTemplateEditScreen(
 
         if (activeTemplates.isEmpty()) {
             return listOf(
-                Component.literal("Active in templates:").formatted(ChatFormatting.GRAY),
-                Component.literal("None").formatted(ChatFormatting.DARK_GRAY),
+                Component.literal("Active in templates:").withStyle(ChatFormatting.GRAY),
+                Component.literal("None").withStyle(ChatFormatting.DARK_GRAY),
             )
         }
 
         val lines = mutableListOf<Component>()
-        lines += Component.literal("Active in templates:").formatted(ChatFormatting.GRAY)
+        lines += Component.literal("Active in templates:").withStyle(ChatFormatting.GRAY)
         activeTemplates.forEach { template ->
             lines += bulletLine(FormattedNameText.parse(template.name))
         }
@@ -250,7 +250,7 @@ class MagicSelectTemplateEditScreen(
     }
 
     private fun bulletLine(content: Component): Component {
-        val line: MutableComponent = Component.literal("• ").formatted(ChatFormatting.GRAY)
+        val line: MutableComponent = Component.literal("• ").withStyle(ChatFormatting.GRAY)
         line.append(content)
         return line
     }

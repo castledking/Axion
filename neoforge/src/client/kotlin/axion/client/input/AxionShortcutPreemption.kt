@@ -1,7 +1,7 @@
 package axion.client.input
 
 import axion.client.symmetry.SymmetryController
-import axion.client.itemStack.PlacementToolController
+import axion.client.tool.PlacementToolController
 import net.minecraft.client.Minecraft
 
 object AxionShortcutPreemption {

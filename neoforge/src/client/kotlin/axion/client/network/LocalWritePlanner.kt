@@ -135,7 +135,7 @@ class LocalWritePlanner {
 
         val source = operation.sourceRegion.normalized()
         for (index in 1..operation.repeatCount) {
-            val destinationOrigin = source.minCorner().add(operation.step.scale(index))
+            val destinationOrigin = source.minCorner().add(operation.step.multiply(index))
             operation.clipboardBuffer.cells.forEach { cell ->
                 val destinationPos = destinationOrigin.add(cell.offset).immutable()
                 if (operation.keepExisting && !currentStateAt(world, overlay, destinationPos).isAir) {
@@ -152,7 +152,7 @@ class LocalWritePlanner {
         overlay: MutableMap<BlockPos, BlockWrite>,
         writes: MutableList<BlockWrite>,
     ) {
-        val smearOffsets = axion.client.itemStack.RegionRepeatPlacementService.smearOffsets(
+        val smearOffsets = axion.client.tool.RegionRepeatPlacementService.smearOffsets(
             operation.step,
             operation.repeatCount,
         )

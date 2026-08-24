@@ -1,4 +1,4 @@
-package axion.client.itemStack
+package axion.client.tool
 
 import axion.common.operation.ExtrudeMode
 import axion.common.operation.ExtrudeOperation

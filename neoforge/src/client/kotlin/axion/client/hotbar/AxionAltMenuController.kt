@@ -7,7 +7,7 @@ import axion.client.compat.VersionCompatImpl
 import axion.client.config.AxionClientConfig
 import axion.client.config.AxionConfigScreen
 import axion.client.input.AxionModifierKeys
-import axion.client.itemStack.AxionToolSelectionController
+import axion.client.tool.AxionToolSelectionController
 import axion.common.compat.VersionCompat
 import axion.common.model.AxionSubtool
 import net.minecraft.client.Minecraft
@@ -260,7 +260,7 @@ object AxionAltMenuController {
     fun isHoveringBinSlot(client: Minecraft, screenWidth: Int, screenHeight: Int): Boolean {
         if (!SavedHotbarController.isOverlayActive(client)) return false
         val centerX = screenWidth / 2
-        val mainX = when (client.options.mainArm.value) {
+        val mainX = when (client.options.mainHand.value) {
             HumanoidArm.LEFT -> centerX - 109
             HumanoidArm.RIGHT -> centerX + 109
         }
@@ -292,11 +292,11 @@ object AxionAltMenuController {
         val player = client.player ?: return false
         val activeIndex = SavedHotbarController.activeIndex()
         if (hotbarIndex == activeIndex) {
-            val stack = player.inventory.getStack(slotIndex)
+            val stack = player.inventory.getItem(slotIndex)
             if (stack.isEmpty) return false
             val copy = stack.copy()
-            player.inventory.setStack(slotIndex, ItemStack.EMPTY)
-            client.gameMode?.clickCreativeStack(ItemStack.EMPTY, 36 + slotIndex)
+            player.inventory.setItem(slotIndex, ItemStack.EMPTY)
+            client.gameMode?.handleCreativeModeItemAdd(ItemStack.EMPTY, 36 + slotIndex)
             grabbedStack = copy
             grabbedHotbarIndex = hotbarIndex
             grabbedSlotIndex = slotIndex
@@ -323,10 +323,10 @@ object AxionAltMenuController {
         if (heldStack.isEmpty) return false
         val activeIndex = SavedHotbarController.activeIndex()
         if (hotbarIndex == activeIndex) {
-            val existing = player.inventory.getStack(slotIndex)
+            val existing = player.inventory.getItem(slotIndex)
             val existingStack = if (existing.isEmpty) null else existing.copy()
-            player.inventory.setStack(slotIndex, heldStack.copy())
-            client.gameMode?.clickCreativeStack(heldStack.copy(), 36 + slotIndex)
+            player.inventory.setItem(slotIndex, heldStack.copy())
+            client.gameMode?.handleCreativeModeItemAdd(heldStack.copy(), 36 + slotIndex)
             if (existingStack != null) {
                 grabbedStack = existingStack
                 grabbedHotbarIndex = hotbarIndex
@@ -359,8 +359,8 @@ object AxionAltMenuController {
         if (grabbedStack.isEmpty) return
         val player = client.player ?: return cancelGrab()
         if (grabbedFromLive) {
-            player.inventory.setStack(grabbedSlotIndex, grabbedStack.copy())
-            client.gameMode?.clickCreativeStack(grabbedStack.copy(), 36 + grabbedSlotIndex)
+            player.inventory.setItem(grabbedSlotIndex, grabbedStack.copy())
+            client.gameMode?.handleCreativeModeItemAdd(grabbedStack.copy(), 36 + grabbedSlotIndex)
         } else if (grabbedData != null) {
             SavedHotbarController.setSlotItem(grabbedHotbarIndex, grabbedSlotIndex, grabbedData)
         } else {
@@ -430,7 +430,7 @@ object AxionAltMenuController {
         val screenWidth = client.window.guiScaledWidth
         val screenHeight = client.window.guiScaledHeight
         val centerX = screenWidth / 2
-        val offX = when (client.options.mainArm.value) {
+        val offX = when (client.options.mainHand.value) {
             HumanoidArm.LEFT -> centerX + 107
             HumanoidArm.RIGHT -> centerX - 107
         }

@@ -1,9 +1,9 @@
-package axion.client.itemStack
+package axion.client.tool
 
 import axion.client.compat.rotationVecClient
-import axion.client.current.AxionTarget
-import axion.client.current.toDirection
-import axion.client.itemStack.directionGetFacing
+import axion.client.selection.AxionTarget
+import axion.client.selection.toDirection
+import axion.client.tool.directionGetFacing
 import net.minecraft.client.Minecraft
 import net.minecraft.core.Direction
 

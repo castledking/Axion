@@ -3,7 +3,7 @@ package axion.client.symmetry
 import axion.client.AxionClientState
 import axion.client.mode.AxionCapabilityPolicy
 import axion.client.mode.ModeTargeting
-import axion.client.itemStack.AxionToolSelectionController
+import axion.client.tool.AxionToolSelectionController
 import axion.common.model.BlockRegion
 import axion.common.operation.ClearRegionOperation
 import axion.common.operation.CompositeOperation

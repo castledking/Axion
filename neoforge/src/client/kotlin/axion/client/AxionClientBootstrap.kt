@@ -9,7 +9,7 @@ import axion.client.hotbar.AxionToolHintHud
 import axion.client.input.AxionKeybindings
 import axion.client.network.AxionServerConnection
 import axion.client.input.AxionTickHandler
-import axion.client.itemStack.PlacementToolController
+import axion.client.tool.PlacementToolController
 import axion.common.compat.VersionCompat
 import axion.client.render.WorldRenderCompat
 import axion.client.render.MoveSourceRenderState

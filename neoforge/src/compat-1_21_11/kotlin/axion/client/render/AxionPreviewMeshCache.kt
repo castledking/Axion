@@ -126,7 +126,7 @@ object AxionPreviewMeshCache {
             cellsToRender.forEach { cell ->
                 val pos = cell.absolutePos(origin)
                 statesByPosition[pos.asLong()] = cell.state
-                if (cell.state.renderType == RenderShape.MODEL) {
+                if (cell.state.getRenderShape() == RenderShape.MODEL) {
                     blocks += PreviewBlockInfo(pos = pos, state = cell.state)
                 }
             }

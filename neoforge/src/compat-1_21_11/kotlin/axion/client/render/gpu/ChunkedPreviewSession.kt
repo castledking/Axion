@@ -250,7 +250,7 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
         for (packed in surface) {
             val state = statesByPosition[packed] ?: continue
             if (state.isAir) continue
-            blocks += PreviewBlockInfo(pos = BlockPos.fromLong(packed), state = state)
+            blocks += PreviewBlockInfo(pos = BlockPos.of(packed), state = state)
         }
         if (blocks.isEmpty()) return null
 
@@ -301,7 +301,7 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
             for (packed in surface) {
                 val state = statesView[packed] ?: continue
                 if (state.isAir) continue
-                blocks += PreviewBlockInfo(pos = BlockPos.fromLong(packed), state = state)
+                blocks += PreviewBlockInfo(pos = BlockPos.of(packed), state = state)
             }
             if (blocks.isNotEmpty()) {
                 AxionBlockTessellator.tessellateBatch(

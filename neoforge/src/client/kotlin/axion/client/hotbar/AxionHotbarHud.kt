@@ -3,7 +3,7 @@ package axion.client.hotbar
 import axion.client.AxionClientState
 import axion.client.compat.VersionCompatImpl
 import axion.client.input.AxionModifierKeys
-import axion.client.itemStack.AxionToolSelectionController
+import axion.client.tool.AxionToolSelectionController
 import axion.client.ui.drawStrokedRectangleCompat
 import axion.common.compat.VersionCompat
 import axion.common.model.AxionSubtool
@@ -345,7 +345,7 @@ object AxionHotbarHud {
 
             val topBounds = rowBounds.last()
             context.drawString(
-                client.textRenderer,
+                client.font,
                 "Page ${page + 1}",
                 topBounds.x + topBounds.width + 8,
                 topBounds.y + 2,
@@ -496,8 +496,8 @@ object AxionHotbarHud {
         drawHotbarSwapperRegion(context, if (plusHovered) FLY_PLUS_HOVER else FLY_PLUS, plus.x, plus.y)
 
         val percentageText = "${(multiplier * 100).toInt()}%"
-        val labelY = plus.y - client.textRenderer.lineHeight - 2
-        context.drawCenteredString(client.textRenderer, percentageText, plus.x + plus.width / 2, labelY, TEXT_IDLE)
+        val labelY = plus.y - client.font.lineHeight - 2
+        context.drawCenteredString(client.font, percentageText, plus.x + plus.width / 2, labelY, TEXT_IDLE)
 
         val track = bounds.track
         val flyAmount = sqrt(((multiplier - 1.0f) / 8.99f).coerceIn(0f, 1f))
@@ -531,7 +531,7 @@ object AxionHotbarHud {
         client: Minecraft,
     ) {
         val centerX = context.guiWidth / 2
-        val mainX = when (client.options.mainArm.value) {
+        val mainX = when (client.options.mainHand.value) {
             HumanoidArm.LEFT -> centerX - 109
             HumanoidArm.RIGHT -> centerX + 109
         }
@@ -546,7 +546,7 @@ object AxionHotbarHud {
                 "Delete" to 0xFFFFFF,
                 "Drag items here or shift-click to clear page" to 0x808080,
             )
-            renderTooltip(context, client.textRenderer, lines, mouseX, mouseY)
+            renderTooltip(context, client.font, lines, mouseX, mouseY)
         }
     }
 
@@ -558,8 +558,8 @@ object AxionHotbarHud {
         if (!stack.isEmpty) {
             val mouseX = VersionCompatImpl.getScaledMouseX(client).toInt()
             val mouseY = VersionCompatImpl.getScaledMouseY(client).toInt()
-            context.drawItem(stack, mouseX - 8, mouseY - 8)
-            drawStackOverlayReflective(context, client.textRenderer, stack, mouseX - 8, mouseY - 8)
+            context.renderItem(stack, mouseX - 8, mouseY - 8)
+            drawStackOverlayReflective(context, client.font, stack, mouseX - 8, mouseY - 8)
         }
     }
 
@@ -568,7 +568,7 @@ object AxionHotbarHud {
         client: Minecraft,
     ) {
         val centerX = context.guiWidth / 2
-        val offX = when (client.options.mainArm.value) {
+        val offX = when (client.options.mainHand.value) {
             HumanoidArm.LEFT -> centerX + 107
             HumanoidArm.RIGHT -> centerX - 107
         }
@@ -587,7 +587,7 @@ object AxionHotbarHud {
                     listOf(cap.name to 0xFFFFFF, cap.description to 0x808080)
                 else
                     listOf(cap.name to 0x808080, cap.description to 0x606060)
-                renderTooltip(context, client.textRenderer, tooltip, mouseX, mouseY)
+                renderTooltip(context, client.font, tooltip, mouseX, mouseY)
             }
         }
     }
@@ -635,7 +635,7 @@ object AxionHotbarHud {
                 renderSlotHover(context, slotX + 2, startY + 2)
             }
             if (!stack.isEmpty) {
-                context.drawItem(stack, slotX + 2, startY + 2)
+                context.renderItem(stack, slotX + 2, startY + 2)
                 drawStackOverlayReflective(context, Minecraft.getInstance().textRenderer, stack, slotX + 2, startY + 2)
             }
         }
@@ -658,7 +658,7 @@ object AxionHotbarHud {
             context.fill(button.x + 1, button.y + 1, button.x + button.width - 1, button.y + button.height - 1, INNER_BACKGROUND)
             context.drawStrokedRectangleCompat(button.x, button.y, button.width, button.height, borderColor)
             context.drawCenteredString(
-                client.textRenderer,
+                client.font,
                 if (button.direction > 0) "↑" else "↓",
                 button.x + (button.width / 2),
                 button.y + 2,

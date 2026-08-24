@@ -40,7 +40,7 @@ object LocalEntityCloneService {
             IntVector3(sourceMax.x, sourceMax.y, sourceMax.z),
         )
         val seen = linkedSetOf<UUID>()
-        return serverWorld.getEntitiesByClass(Entity::class.java, queryBox) { entity ->
+        return serverWorld.getEntitiesOfClass(Entity::class.java, queryBox) { entity ->
             entity !is Player &&
                 !VersionCompat.INSTANCE.entityIsRemoved(entity) &&
                 entityMatcher.containsFeet(
@@ -101,7 +101,7 @@ object LocalEntityCloneService {
             entity
         } ?: return null
         val cloneEntity = entity as? Entity ?: return null
-        LocalEntityPositioning.apply(cloneEntity, clone.pos, clone.yRot, clone.xRot)
+        LocalEntityPositioning.apply(cloneEntity, clone.pos, clone.yaw, clone.pitch)
         VersionCompat.INSTANCE.worldSpawnNewEntityAndPassengers(world, cloneEntity)
         return cloneEntity
     }
@@ -162,8 +162,8 @@ object LocalEntityCloneService {
                     parentEntityId = parentCloneId,
                     entityData = snapshot,
                     pos = target.position,
-                    yaw = target.yRot,
-                    pitch = target.xRot,
+                    yaw = target.yaw,
+                    pitch = target.pitch,
                 ),
             )
             VersionCompat.INSTANCE.entityGetPassengerList(entity).forEach { passenger ->

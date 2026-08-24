@@ -1,7 +1,7 @@
 package axion.client.symmetry
 
 import axion.client.compat.rotationVecClient
-import axion.client.current.AxionTarget
+import axion.client.selection.AxionTarget
 import axion.client.symmetry.directionGetFacing
 import axion.common.model.SymmetryMirrorAxis
 import axion.common.model.SymmetryAnchor

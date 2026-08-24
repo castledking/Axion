@@ -16,47 +16,47 @@ class TintedAlphaVertexConsumer(
 
     // --- Abstract method implementations (must be explicit, not delegated) ---
 
-    override fun vertex(x: Float, y: Float, z: Float): VertexConsumer {
-        delegate.vertex(x, y, z)
+    override fun addVertex(x: Float, y: Float, z: Float): VertexConsumer {
+        delegate.addVertex(x, y, z)
         return this
     }
 
-    override fun color(red: Int, green: Int, blue: Int, alpha: Int): VertexConsumer {
+    override fun setColor(red: Int, green: Int, blue: Int, alpha: Int): VertexConsumer {
         delegate.color(tinted(red, tintRed), tinted(green, tintGreen), tinted(blue, tintBlue), scaledAlpha(alpha))
         return this
     }
 
-    override fun color(color: Int): VertexConsumer {
+    override fun setColor(color: Int): VertexConsumer {
         delegate.color(tintedPackedColor(color))
         return this
     }
 
-    override fun texture(u: Float, v: Float): VertexConsumer {
-        delegate.texture(u, v)
+    override fun setUv(u: Float, v: Float): VertexConsumer {
+        delegate.setUv(u, v)
         return this
     }
 
-    override fun overlay(u: Int, v: Int): VertexConsumer {
-        delegate.overlay(u, v)
+    override fun setUv1(u: Int, v: Int): VertexConsumer {
+        delegate.setUv1(u, v)
         return this
     }
 
-    override fun light(u: Int, v: Int): VertexConsumer {
+    override fun setUv2(u: Int, v: Int): VertexConsumer {
         if (fullBright) {
             delegate.light(MAX_LIGHT_UV, MAX_LIGHT_UV)
         } else {
-            delegate.light(u, v)
+            delegate.setUv2(u, v)
         }
         return this
     }
 
-    override fun normal(x: Float, y: Float, z: Float): VertexConsumer {
-        delegate.normal(x, y, z)
+    override fun setNormal(x: Float, y: Float, z: Float): VertexConsumer {
+        delegate.setNormal(x, y, z)
         return this
     }
 
     @Suppress("NOTHING_TO_OVERRIDE", "ACCIDENTAL_OVERRIDE")
-    override fun lineWidth(w: Float): VertexConsumer {
+    override fun setLineWidth(w: Float): VertexConsumer {
         lineWidthMethod?.invoke(delegate, w)
         return this
     }
@@ -76,7 +76,7 @@ class TintedAlphaVertexConsumer(
         light: Int,
         nx: Float, ny: Float, nz: Float,
     ) {
-        delegate.vertex(
+        delegate.addVertex(
             x, y, z,
             tintedPackedColor(color),
             u, v,
@@ -110,7 +110,7 @@ class TintedAlphaVertexConsumer(
 
         private val lineWidthMethod: java.lang.reflect.Method? by lazy {
             VertexConsumer::class.java.methods.firstOrNull { m ->
-                (m.name == "lineWidth" || m.name == "setLineWidth") &&
+                (m.name == "setLineWidth") &&
                     m.parameterCount == 1 && m.parameterTypes[0] == Float::class.javaPrimitiveType
             } ?: VertexConsumer::class.java.methods.firstOrNull { m ->
                 m.parameterCount == 1 && m.parameterTypes[0] == Float::class.javaPrimitiveType &&

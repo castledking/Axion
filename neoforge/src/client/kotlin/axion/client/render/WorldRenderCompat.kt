@@ -1,18 +1,18 @@
 package axion.client.render
 
 import net.minecraft.client.Minecraft
-import net.minecraft.client.render.Immediate
+import net.minecraft.client.renderer.MultiBufferSource
 import com.mojang.blaze3d.vertex.PoseStack
 import org.slf4j.LoggerFactory
 
 class AxionWorldRenderContext private constructor(
     private val delegate: Any?,
-    private val fallbackConsumers: Immediate?,
+    private val fallbackConsumers: MultiBufferSource.BufferSource?,
     private val fallbackMatrices: PoseStack?,
 ) {
     constructor(delegate: Any) : this(delegate, null, null)
 
-    constructor(consumers: Immediate, matrices: PoseStack) : this(null, consumers, matrices)
+    constructor(consumers: MultiBufferSource.BufferSource, matrices: PoseStack) : this(null, consumers, matrices)
 
     // Every renderer calls consumers() separately, and on 26.2 the adapter owns
     // the per-render-type batches that are flushed at the end of the frame.
@@ -114,7 +114,7 @@ object WorldRenderCompat {
 
     @Suppress("SENSELESS_COMPARISON") // Camera became non-null in 26.1; check is still required on 1.21.x.
     fun dispatchFallbackCallbacks(
-        consumers: Immediate,
+        consumers: MultiBufferSource.BufferSource,
         matrices: PoseStack,
     ) {
         if (!hasFallbackCallbacks()) {

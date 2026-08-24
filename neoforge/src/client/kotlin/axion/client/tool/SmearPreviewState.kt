@@ -1,3 +1,3 @@
-package axion.client.itemStack
+package axion.client.tool
 
 typealias SmearPreviewState = RepeatRegionPreview

@@ -11,7 +11,7 @@ object CrowBarCompat {
     )
 
     private val suppressLocatorBarMethod: SuppressMethod? by lazy {
-        if (!ModList.get().hasClientLoaded("crowbar")) {
+        if (!ModList.get().isLoaded("crowbar")) {
             return@lazy null
         }
         runCatching {

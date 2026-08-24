@@ -1,4 +1,4 @@
-package axion.client.itemStack
+package axion.client.tool
 
 object PlacementPreviewPolicy {
     fun activePreview(state: CloneToolState): ClonePreviewState? = when (state) {

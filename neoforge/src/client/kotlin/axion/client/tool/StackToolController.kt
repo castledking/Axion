@@ -1,17 +1,17 @@
-package axion.client.itemStack
+package axion.client.tool
 
 import axion.client.compat.rotationVecClient
 import axion.client.AxionClientState
-import axion.client.current.SelectionController
-import axion.client.current.blockPosOrNull
+import axion.client.selection.SelectionController
+import axion.client.selection.blockPosOrNull
 import axion.client.symmetry.SymmetryAwareOperationDispatcher
 import axion.common.model.AxionSubtool
 import axion.common.model.BlockRegion
 import axion.common.model.ClipboardState
 import axion.common.model.SelectionState
 import net.minecraft.client.Minecraft
-import axion.client.itemStack.ClipboardTransformService
-import axion.client.itemStack.PlacementMirrorAxis
+import axion.client.tool.ClipboardTransformService
+import axion.client.tool.PlacementMirrorAxis
 
 object StackToolController {
     private val dispatcher = SymmetryAwareOperationDispatcher()

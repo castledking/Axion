@@ -1,8 +1,8 @@
-package axion.client.current
+package axion.client.selection
 
 import axion.client.AxionClientState
 import axion.client.config.AxionClientConfig
-import axion.client.itemStack.AxionToolSelectionController
+import axion.client.tool.AxionToolSelectionController
 import axion.common.compat.offset
 import axion.common.model.BlockRegion
 import axion.common.model.RegionFace

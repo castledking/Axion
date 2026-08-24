@@ -1,10 +1,11 @@
-package axion.client.itemStack
+package axion.client.tool
 
+import axion.client.compat.extents
 import axion.client.compat.rotationVecClient
 import axion.common.model.BlockRegion
 import axion.common.model.ClipboardBuffer
 import axion.protocol.EntitySelectionMask
-import axion.client.itemStack.directionGetFacing
+import axion.client.tool.directionGetFacing
 import axion.client.compat.add
 import net.minecraft.client.Minecraft
 import net.minecraft.core.BlockPos
@@ -52,7 +53,7 @@ object ClonePlacementService {
             return preview
         }
 
-        val delta = direction.extents.scale(scrollDirection)
+        val delta = direction.extents.multiply(scrollDirection)
         return createPreview(
             mode = preview.mode,
             firstCorner = preview.firstCorner,

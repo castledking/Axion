@@ -1,4 +1,4 @@
-package axion.client.lastCommands
+package axion.client.history
 
 import axion.client.network.AxionServerConnection
 import net.minecraft.client.Minecraft

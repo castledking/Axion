@@ -1,4 +1,4 @@
-package axion.client.itemStack
+package axion.client.tool
 
 import axion.client.AxionClientState
 import axion.common.model.AxionSubtool

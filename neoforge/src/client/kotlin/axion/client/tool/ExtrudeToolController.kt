@@ -1,7 +1,7 @@
-package axion.client.itemStack
+package axion.client.tool
 
 import axion.client.AxionClientState
-import axion.client.current.SelectionController
+import axion.client.selection.SelectionController
 import axion.client.symmetry.SymmetryAwareOperationDispatcher
 import axion.common.model.AxionSubtool
 import axion.common.operation.ExtrudeMode

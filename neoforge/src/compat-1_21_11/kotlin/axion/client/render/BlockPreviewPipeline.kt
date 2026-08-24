@@ -130,7 +130,7 @@ object BlockPreviewPipeline {
                 )
 
                 SelectionStyle.PULSE -> scene.origins.any { origin ->
-                    val max = origin.add(
+                    val max = origin.offset(
                         scene.selectionClipboard.size.x - 1,
                         scene.selectionClipboard.size.y - 1,
                         scene.selectionClipboard.size.z - 1,

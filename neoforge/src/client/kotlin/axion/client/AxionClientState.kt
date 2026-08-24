@@ -18,19 +18,19 @@ object AxionClientState {
     var selectedSubtool: AxionSubtool = AxionSubtool.MOVE
         private set
 
-    var placementToolState: axion.client.itemStack.CloneToolState = axion.client.itemStack.CloneToolState.Idle
+    var placementToolState: axion.client.tool.CloneToolState = axion.client.tool.CloneToolState.Idle
         private set
 
-    var eraseToolState: axion.client.itemStack.EraseToolState = axion.client.itemStack.EraseToolState.Idle
+    var eraseToolState: axion.client.tool.EraseToolState = axion.client.tool.EraseToolState.Idle
         private set
 
-    var stackToolState: axion.client.itemStack.StackToolState = axion.client.itemStack.StackToolState.Idle
+    var stackToolState: axion.client.tool.StackToolState = axion.client.tool.StackToolState.Idle
         private set
 
-    var smearToolState: axion.client.itemStack.SmearToolState = axion.client.itemStack.SmearToolState.Idle
+    var smearToolState: axion.client.tool.SmearToolState = axion.client.tool.SmearToolState.Idle
         private set
 
-    var extrudeToolState: axion.client.itemStack.ExtrudeToolState = axion.client.itemStack.ExtrudeToolState.Idle
+    var extrudeToolState: axion.client.tool.ExtrudeToolState = axion.client.tool.ExtrudeToolState.Idle
         private set
 
     var clipboardState: ClipboardState = ClipboardState.Empty
@@ -72,24 +72,24 @@ object AxionClientState {
         selectedSubtool = subtool
     }
 
-    fun updatePlacementToolState(state: axion.client.itemStack.CloneToolState) {
+    fun updatePlacementToolState(state: axion.client.tool.CloneToolState) {
         placementToolState = state
         MoveSourceRenderState.synchronize(state)
     }
 
-    fun updateEraseToolState(state: axion.client.itemStack.EraseToolState) {
+    fun updateEraseToolState(state: axion.client.tool.EraseToolState) {
         eraseToolState = state
     }
 
-    fun updateStackToolState(state: axion.client.itemStack.StackToolState) {
+    fun updateStackToolState(state: axion.client.tool.StackToolState) {
         stackToolState = state
     }
 
-    fun updateSmearToolState(state: axion.client.itemStack.SmearToolState) {
+    fun updateSmearToolState(state: axion.client.tool.SmearToolState) {
         smearToolState = state
     }
 
-    fun updateExtrudeToolState(state: axion.client.itemStack.ExtrudeToolState) {
+    fun updateExtrudeToolState(state: axion.client.tool.ExtrudeToolState) {
         extrudeToolState = state
     }
 

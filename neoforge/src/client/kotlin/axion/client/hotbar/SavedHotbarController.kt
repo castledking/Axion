@@ -4,7 +4,7 @@ import axion.client.compat.LitematicaCompat
 import axion.client.config.AxionClientConfig
 import axion.client.config.SavedHotbarConfig
 import axion.client.input.AxionModifierKeys
-import axion.client.itemStack.AxionToolSelectionController
+import axion.client.tool.AxionToolSelectionController
 import axion.common.compat.VersionCompat
 import io.netty.buffer.Unpooled
 import net.minecraft.client.Minecraft
@@ -186,7 +186,7 @@ object SavedHotbarController {
         val world = client.level ?: return
         val hotbar = SavedHotbarConfig(
             slots = List(HOTBAR_SIZE) { slot ->
-                serializeStack(world.registryAccess, player.inventory.getStack(slot))
+                serializeStack(world.registryAccess, player.inventory.getItem(slot))
             },
         )
         hotbar.slots.filterNotNull().forEach(stackCache::remove)
@@ -200,8 +200,8 @@ object SavedHotbarController {
         val savedHotbar = AxionClientConfig.savedHotbar(hotbarIndex) ?: SavedHotbarConfig.empty()
         repeat(HOTBAR_SIZE) { slot ->
             val stack = deserializeStack(world.registryAccess, savedHotbar.slots.getOrNull(slot)).copy()
-            player.inventory.setStack(slot, stack)
-            interactionManager.clickCreativeStack(stack, 36 + slot)
+            player.inventory.setItem(slot, stack)
+            interactionManager.handleCreativeModeItemAdd(stack, 36 + slot)
         }
     }
 
@@ -220,7 +220,7 @@ object SavedHotbarController {
     ): List<ItemStack> {
         val player = client.player
         return if (showLiveHotbar && index == activeIndex && player != null) {
-            List(HOTBAR_SIZE) { slot -> player.inventory.getStack(slot).copy() }
+            List(HOTBAR_SIZE) { slot -> player.inventory.getItem(slot).copy() }
         } else {
             val savedHotbar = AxionClientConfig.savedHotbar(index) ?: SavedHotbarConfig.empty()
             val registryManager = client.level?.registryAccess ?: return List(HOTBAR_SIZE) { ItemStack.EMPTY }

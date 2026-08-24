@@ -1,7 +1,7 @@
 package axion.client.render
 import axion.client.compat.CameraAccess
 
-import axion.client.current.SelectionBounds
+import axion.client.selection.SelectionBounds
 import axion.common.model.ClipboardBuffer
 import net.minecraft.client.Minecraft
 import net.minecraft.core.BlockPos

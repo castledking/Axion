@@ -1,4 +1,4 @@
-package axion.client.itemStack
+package axion.client.tool
 
 import axion.common.model.ClipboardBuffer
 import axion.common.model.ClipboardCell

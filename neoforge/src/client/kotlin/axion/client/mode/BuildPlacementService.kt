@@ -200,7 +200,7 @@ object BuildPlacementService {
                     transform = transform,
                 )
                 val derivedSide = axion.client.symmetry.SymmetryTransformService.transformDirection(
-                    target.hitResult.side,
+                    target.hitResult.direction,
                     transform,
                 )
                 derivedPos to derivedSide
@@ -248,8 +248,8 @@ object BuildPlacementService {
             return null
         }
         val placementPos = placementContext.blockPos.immutable()
-        val placementState = blockItem.block.getPlacementState(placementContext) ?: return null
-        if (!placementState.canPlaceAt(world, placementPos)) {
+        val placementState = blockItem.getPlacementState(placementContext) ?: return null
+        if (!placementState.canSurvive(world, placementPos)) {
             return null
         }
         if (wouldCollideWithPlayer(world, player, placementPos, placementState)) {
@@ -293,8 +293,8 @@ object BuildPlacementService {
             )
             val placementContext = blockItem.updatePlacementContext(rawContext) ?: continue
             if (placementContext.blockPos != pos || !placementContext.canPlace()) continue
-            val placementState = blockItem.block.getPlacementState(placementContext) ?: continue
-            if (!placementState.canPlaceAt(world, pos)) continue
+            val placementState = blockItem.getPlacementState(placementContext) ?: continue
+            if (!placementState.canSurvive(world, pos)) continue
             if (wouldCollideWithPlayer(world, player, pos, placementState)) return null
             return SymmetryBlockPlacement(pos.immutable(), placementState)
         }
@@ -343,9 +343,9 @@ object BuildPlacementService {
             override fun canReplaceExisting(): Boolean = true
         }
         val adjustedContext = blockItem.updatePlacementContext(placementContext) ?: placementContext
-        val rawPlacementState = blockItem.block.getPlacementState(adjustedContext) ?: return null
+        val rawPlacementState = blockItem.getPlacementState(adjustedContext) ?: return null
         val placementState = normalizeReplacePlacementState(rawPlacementState, hitResult, pos)
-        if (!placementState.canPlaceAt(world, pos)) {
+        if (!placementState.canSurvive(world, pos)) {
             return null
         }
         if (wouldCollideWithPlayer(world, player, pos, placementState)) {
@@ -411,7 +411,7 @@ object BuildPlacementService {
 
         val playerShape = Shapes.create(player.boundingBox.contract(1.0E-4))
         return Shapes.matchesAnywhere(
-            collisionShape.offset(pos.x.toDouble(), pos.y.toDouble(), pos.z.toDouble()),
+            collisionShape.move(pos.x.toDouble(), pos.y.toDouble(), pos.z.toDouble()),
             playerShape,
             BooleanOp.AND,
         )

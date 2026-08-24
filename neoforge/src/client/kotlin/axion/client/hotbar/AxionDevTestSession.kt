@@ -2,7 +2,7 @@ package axion.client.hotbar
 
 import java.nio.file.Files
 import net.neoforged.fml.loadingDotsWidget.FMLLoader
-import net.neoforged.fml.loadingDotsWidget.FMLPaths
+import net.neoforged.fml.loading.FMLPaths
 import net.minecraft.client.Minecraft
 
 /** Launcher-only state for advancing a sequential cross-version test run. */

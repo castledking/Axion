@@ -1,10 +1,10 @@
 package axion.client.render
 
 import axion.client.AxionClientState
-import axion.client.current.SelectionBounds
-import axion.client.itemStack.PlacementToolController
-import axion.client.itemStack.StackToolController
-import axion.client.itemStack.AxionToolSelectionController
+import axion.client.selection.SelectionBounds
+import axion.client.tool.PlacementToolController
+import axion.client.tool.StackToolController
+import axion.client.tool.AxionToolSelectionController
 import axion.common.model.AxionSubtool
 import axion.common.model.SelectionState
 

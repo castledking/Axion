@@ -1,10 +1,10 @@
-package axion.client.itemStack
+package axion.client.tool
 
 import axion.client.AxionClientState
 import axion.common.model.AxionSubtool
 import axion.common.model.ClipboardState
 import axion.common.model.ToolSelectionState
-import axion.client.itemStack.floorMod
+import axion.client.tool.floorMod
 import net.minecraft.client.Minecraft
 
 object AxionToolSelectionController {

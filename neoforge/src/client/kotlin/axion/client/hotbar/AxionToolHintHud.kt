@@ -39,13 +39,13 @@ object AxionToolHintHud {
 
     fun render(context: GuiGraphics, tickCounter: net.minecraft.client.DeltaTracker) {
         val client = Minecraft.getInstance()
-        minecraft.player ?: return
-        if (minecraft.options.hideGui || shouldSuppressForScreen(minecraft.screen)) {
+        client.player ?: return
+        if (client.options.hideGui || shouldSuppressForScreen(client.screen)) {
             return
         }
 
         val hints = AxionToolHintProvider.currentCompactHints() ?: return
-        val font = minecraft.textRenderer
+        val font = client.font
 
         renderCrosshairHints(context, font, hints.crosshairHints)
         renderHotbarStatus(context, font, hints.hotbarStatus)

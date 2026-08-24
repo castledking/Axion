@@ -2,8 +2,8 @@ package axion.client.network
 
 import axion.AxionMod
 import axion.client.compat.VersionCompatImpl
-import axion.client.lastCommands.HistoryManager
-import axion.client.lastCommands.RemoteHistoryAdapter
+import axion.client.history.HistoryManager
+import axion.client.history.RemoteHistoryAdapter
 import axion.protocol.AxionClientMessage
 import axion.protocol.AxionOperationType
 import axion.protocol.AxionProtocol

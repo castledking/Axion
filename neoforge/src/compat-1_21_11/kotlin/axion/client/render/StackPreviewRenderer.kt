@@ -1,7 +1,7 @@
 package axion.client.render
 
-import axion.client.itemStack.RegionRepeatPlacementService
-import axion.client.itemStack.StackToolController
+import axion.client.tool.RegionRepeatPlacementService
+import axion.client.tool.StackToolController
 
 object StackPreviewRenderer {
     private const val DESTINATION_COLOR: Int = 0xFFFF9F5A.toInt()

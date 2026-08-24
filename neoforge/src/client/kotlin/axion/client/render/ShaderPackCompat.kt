@@ -17,7 +17,7 @@ object ShaderPackCompat {
      * layers Axion builds at runtime are dropped while a pack is loaded.
      */
     fun isShaderPackActive(): Boolean {
-        val shaderPackActive = ModList.get().hasClientLoaded("iris") && isIrisShaderPackActive()
+        val shaderPackActive = ModList.get().isLoaded("iris") && isIrisShaderPackActive()
         observeShaderPackState(shaderPackActive)
         return shaderPackActive
     }

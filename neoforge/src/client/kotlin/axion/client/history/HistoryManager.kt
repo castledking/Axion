@@ -1,4 +1,4 @@
-package axion.client.lastCommands
+package axion.client.history
 
 import axion.AxionMod
 import axion.client.network.BlockEntitySnapshotService
@@ -86,8 +86,8 @@ object HistoryManager {
                         parentEntityId = clone.parentEntityId,
                         entityData = clone.entityData.copy(),
                         pos = clone.pos,
-                        yaw = clone.yRot,
-                        pitch = clone.xRot,
+                        yaw = clone.yaw,
+                        pitch = clone.pitch,
                     )
                 },
                 entityDeletes = plan.entityDeletes.map { delete ->
@@ -96,8 +96,8 @@ object HistoryManager {
                         parentEntityId = delete.parentEntityId,
                         entityData = delete.entityData.copy(),
                         pos = delete.pos,
-                        yaw = delete.yRot,
-                        pitch = delete.xRot,
+                        yaw = delete.yaw,
+                        pitch = delete.pitch,
                     )
                 },
             ),

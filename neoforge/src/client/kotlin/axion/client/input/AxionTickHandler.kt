@@ -7,17 +7,17 @@ import axion.client.config.AxionConfigScreen
 import axion.client.hotbar.AxionAltMenuController
 import axion.client.hotbar.SavedHotbarController
 import axion.client.hotbar.SavedHotbarGameModeController
-import axion.client.lastCommands.UndoRedoController
+import axion.client.history.UndoRedoController
 import axion.client.mode.ClientModeController
 import axion.client.network.AxionServerConnection
-import axion.client.current.SelectionController
+import axion.client.selection.SelectionController
 import axion.client.symmetry.SymmetryController
-import axion.client.itemStack.AxionToolSelectionController
-import axion.client.itemStack.EraseToolController
-import axion.client.itemStack.ExtrudeToolController
-import axion.client.itemStack.PlacementToolController
-import axion.client.itemStack.SmearToolController
-import axion.client.itemStack.StackToolController
+import axion.client.tool.AxionToolSelectionController
+import axion.client.tool.EraseToolController
+import axion.client.tool.ExtrudeToolController
+import axion.client.tool.PlacementToolController
+import axion.client.tool.SmearToolController
+import axion.client.tool.StackToolController
 import net.minecraft.client.Minecraft
 import net.minecraft.client.multiplayer.ClientLevel
 

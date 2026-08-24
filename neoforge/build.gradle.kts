@@ -27,6 +27,8 @@ sourceSets.main {
 neoForge {
     version = neoforgeVersion
 
+    accessTransformers.from("src/main/resources/META-INF/accesstransformer.cfg")
+
     mods {
         create("axion") {
             sourceSet(sourceSets["main"])

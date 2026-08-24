@@ -27,6 +27,6 @@ fun unpackLongX(packed: Long): Int = BlockPos.unpackLongX(packed)
 fun unpackLongY(packed: Long): Int = BlockPos.unpackLongY(packed)
 fun unpackLongZ(packed: Long): Int = BlockPos.unpackLongZ(packed)
 
-fun blockPosFromLong(packed: Long): BlockPos = BlockPos.fromLong(packed)
+fun blockPosFromLong(packed: Long): BlockPos = BlockPos.of(packed)
 
 val ORIGIN: BlockPos = BlockPos.ORIGIN

@@ -3,7 +3,7 @@ import axion.client.compat.CameraAccess
 
 import axion.client.render.gpu.PreviewOcclusionCompat
 import axion.client.render.gpu.PreviewOcclusionPolicy
-import axion.client.current.SelectionBounds
+import axion.client.selection.SelectionBounds
 import axion.common.model.BlockRegion
 import axion.common.model.ClipboardCell
 import axion.common.model.ClipboardBuffer
@@ -203,7 +203,7 @@ object ClipboardSelectionRenderer {
         clipboard.cells.forEach { cell ->
             PulsingCuboidRenderer.renderShell(
                 context = context,
-                box = SelectionBounds.blockBox(origin.add(cell.offset)),
+                box = SelectionBounds.blockBox(origin.offset(cell.offset)),
                 outlineColor = outlineColor,
                 lineWidth = lineWidth,
                 minAlpha = minAlpha,
@@ -265,7 +265,7 @@ object ClipboardSelectionRenderer {
         if (!useFastPath) {
             var shape: VoxelShape = Shapes.empty()
             positions.forEach { pos ->
-                shape = Shapes.union(shape, Shapes.create(SelectionBounds.blockBox(pos)))
+                shape = Shapes.or(shape, Shapes.create(SelectionBounds.blockBox(pos)))
             }
 
             VertexRenderingCompat.drawOutline(
@@ -401,7 +401,7 @@ object ClipboardSelectionRenderer {
         if (mergedShape != null) {
             // Small selection: use merged VoxelShape for smooth outline
             origins.forEach { origin ->
-                val translatedShape = mergedShape.offset(
+                val translatedShape = mergedShape.move(
                     origin.x.toDouble(),
                     origin.y.toDouble(),
                     origin.z.toDouble(),
@@ -428,7 +428,7 @@ object ClipboardSelectionRenderer {
                     outlines.forEach { outline ->
                         when (outline) {
                             is ComponentOutline.Merged -> {
-                                val translatedShape = outline.shape.offset(ox, oy, oz)
+                                val translatedShape = outline.shape.move(ox, oy, oz)
                                 VertexRenderingCompat.drawOutline(
                                     matrixStack,
                                     lineConsumer,
@@ -476,7 +476,7 @@ object ClipboardSelectionRenderer {
                 // Small selection: build merged VoxelShape for smooth outline
                 var shape: VoxelShape = Shapes.empty()
                 boxes.forEach { box ->
-                    shape = Shapes.union(shape, Shapes.create(box))
+                    shape = Shapes.or(shape, Shapes.create(box))
                 }
                 CachedGeometry(shape = shape, boxes = boxes, componentOutlines = emptyList())
             } else {

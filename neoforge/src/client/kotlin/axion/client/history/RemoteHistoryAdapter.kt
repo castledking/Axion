@@ -1,4 +1,4 @@
-package axion.client.lastCommands
+package axion.client.history
 
 import axion.common.history.HistoryEntry
 import axion.protocol.OperationBatchResult

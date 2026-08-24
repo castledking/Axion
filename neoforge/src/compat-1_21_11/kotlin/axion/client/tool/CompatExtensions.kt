@@ -1,4 +1,4 @@
-package axion.client.itemStack
+package axion.client.tool
 
 import net.minecraft.core.Direction
 import net.minecraft.world.phys.Vec3

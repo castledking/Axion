@@ -3,7 +3,7 @@ package axion.client.mode
 import axion.client.AxionClientState
 import axion.client.compat.blockPosOfFloored
 import axion.client.config.AxionClientConfig
-import axion.client.itemStack.AxionToolSelectionController
+import axion.client.tool.AxionToolSelectionController
 import axion.common.operation.SymmetryBlockPlacement
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.client.Minecraft
@@ -181,7 +181,7 @@ object AngelPlacementController {
         }
         return ForcePlaceSupportBypass.withBypass(AxionCapabilityPolicy.ignoresSupportRequirements()) {
             val adjusted = blockItem.updatePlacementContext(context) ?: context
-            blockItem.block.getPlacementState(adjusted)
+            blockItem.getPlacementState(adjusted)
         }
     }
 

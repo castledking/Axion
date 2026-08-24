@@ -1,5 +1,6 @@
-package axion.client.itemStack
+package axion.client.tool
 
+import axion.client.compat.extents
 import axion.client.config.AxionClientConfig
 import axion.client.network.BlockEntitySnapshotService
 import axion.common.model.BlockRegion
@@ -119,7 +120,7 @@ object MagicSelectionService {
         clipboard: ClipboardBuffer,
     ) {
         clipboard.cells.forEach { cell ->
-            destination[origin.add(cell.offset).immutable()] = cell.copy()
+            destination[origin.offset(cell.offset).immutable()] = cell.copy()
         }
     }
 

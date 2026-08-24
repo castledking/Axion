@@ -60,16 +60,16 @@ object AxionBlockTessellator {
         if (state.isAir) {
             return false
         }
-        val blockRenderManager = Minecraft.getInstance().blockRenderManager
+        val blockRenderManager = Minecraft.getInstance().blockRenderer
         var rendered = false
 
-        if (state.renderType == RenderShape.MODEL) {
+        if (state.getRenderShape() == RenderShape.MODEL) {
             val model = blockRenderManager.getBlockModel(state)
             val random = threadLocalRandom.get()
             val parts = threadLocalParts.get()
             parts.clear()
             random.setSeed(state.getSeed(pos))
-            model.addCommonParts(random, parts)
+            model.collectParts(random, parts)
             if (parts.isNotEmpty()) {
                 blockRenderManager.renderBatched(state, pos, world, matrixStack, consumer, checkSides, parts)
                 rendered = true
@@ -78,7 +78,7 @@ object AxionBlockTessellator {
 
         val fluidState = state.fluidState
         if (!fluidState.isEmpty) {
-            blockRenderManager.renderFluid(
+            blockRenderManager.renderLiquid(
                 pos,
                 world,
                 FluidOffsetVertexConsumer(consumer, pos, cameraX, cameraY, cameraZ, scale),
@@ -174,21 +174,21 @@ object AxionBlockTessellator {
 
         override fun getHeight(): Int = world.height
 
-        override fun getBottomY(): Int = world.bottomY
+        override fun getMinY(): Int = world.minY
 
-        override fun getBrightness(direction: Direction, shaded: Boolean): Float =
+        override fun getShade(direction: Direction, shaded: Boolean): Float =
             previewBrightness(direction, shaded)
 
-        override fun getLightingProvider(): LevelLightEngine = world.lightEngine
+        override fun getLightEngine(): net.minecraft.world.level.lighting.LevelLightEngine = world.lightEngine
 
-        override fun getLightLevel(type: LightLayer, pos: BlockPos): Int = 15
+        override fun getBrightness(type: net.minecraft.world.level.LightLayer, pos: BlockPos): Int = 15
 
-        override fun getBaseLightLevel(pos: BlockPos, ambientDarkness: Int): Int = 15
+        override fun getRawBrightness(pos: BlockPos, ambientDarkness: Int): Int = 15
 
-        override fun isSkyVisible(pos: BlockPos): Boolean = true
+        override fun canSeeSky(pos: BlockPos): Boolean = true
 
-        override fun getColor(pos: BlockPos, colorResolver: ColorResolver): Int =
-            world.getColor(pos, colorResolver)
+        override fun getBlockTint(pos: BlockPos, colorResolver: ColorResolver): Int =
+            world.getBlockTint(pos, colorResolver)
     }
 
     /**
@@ -230,21 +230,21 @@ object AxionBlockTessellator {
 
         override fun getHeight(): Int = world.height
 
-        override fun getBottomY(): Int = world.bottomY
+        override fun getMinY(): Int = world.minY
 
-        override fun getBrightness(direction: Direction, shaded: Boolean): Float =
+        override fun getShade(direction: Direction, shaded: Boolean): Float =
             previewBrightness(direction, shaded)
 
-        override fun getLightingProvider(): LevelLightEngine = world.lightEngine
+        override fun getLightEngine(): net.minecraft.world.level.lighting.LevelLightEngine = world.lightEngine
 
-        override fun getLightLevel(type: LightLayer, pos: BlockPos): Int = 15
+        override fun getBrightness(type: net.minecraft.world.level.LightLayer, pos: BlockPos): Int = 15
 
-        override fun getBaseLightLevel(pos: BlockPos, ambientDarkness: Int): Int = 15
+        override fun getRawBrightness(pos: BlockPos, ambientDarkness: Int): Int = 15
 
-        override fun isSkyVisible(pos: BlockPos): Boolean = true
+        override fun canSeeSky(pos: BlockPos): Boolean = true
 
-        override fun getColor(pos: BlockPos, colorResolver: ColorResolver): Int =
-            world.getColor(pos, colorResolver)
+        override fun getBlockTint(pos: BlockPos, colorResolver: ColorResolver): Int =
+            world.getBlockTint(pos, colorResolver)
     }
 
     private fun previewBrightness(direction: Direction, shaded: Boolean): Float {
@@ -265,48 +265,48 @@ object AxionBlockTessellator {
         private val cameraZ: Double,
         private val scale: Float,
     ) : VertexConsumer {
-        override fun vertex(x: Float, y: Float, z: Float): VertexConsumer {
-            delegate.vertex(transformX(x), transformY(y), transformZ(z))
+        override fun addVertex(x: Float, y: Float, z: Float): VertexConsumer {
+            delegate.addVertex(transformX(x), transformY(y), transformZ(z))
             return this
         }
 
-        override fun color(red: Int, green: Int, blue: Int, alpha: Int): VertexConsumer {
-            delegate.color(red, green, blue, alpha)
+        override fun setColor(red: Int, green: Int, blue: Int, alpha: Int): VertexConsumer {
+            delegate.setColor(red, green, blue, alpha)
             return this
         }
 
-        override fun color(color: Int): VertexConsumer {
-            delegate.color(color)
+        override fun setColor(color: Int): VertexConsumer {
+            delegate.setColor(color)
             return this
         }
 
-        override fun texture(u: Float, v: Float): VertexConsumer {
-            delegate.texture(u, v)
+        override fun setUv(u: Float, v: Float): VertexConsumer {
+            delegate.setUv(u, v)
             return this
         }
 
-        override fun overlay(u: Int, v: Int): VertexConsumer {
-            delegate.overlay(u, v)
+        override fun setUv1(u: Int, v: Int): VertexConsumer {
+            delegate.setUv1(u, v)
             return this
         }
 
-        override fun light(u: Int, v: Int): VertexConsumer {
-            delegate.light(u, v)
+        override fun setUv2(u: Int, v: Int): VertexConsumer {
+            delegate.setUv2(u, v)
             return this
         }
 
-        override fun normal(x: Float, y: Float, z: Float): VertexConsumer {
-            delegate.normal(x, y, z)
+        override fun setNormal(x: Float, y: Float, z: Float): VertexConsumer {
+            delegate.setNormal(x, y, z)
             return this
         }
 
         @Suppress("NOTHING_TO_OVERRIDE", "ACCIDENTAL_OVERRIDE")
-        override fun lineWidth(w: Float): VertexConsumer {
+        override fun setLineWidth(w: Float): VertexConsumer {
             lineWidthMethod?.invoke(delegate, w)
             return this
         }
 
-        override fun vertex(
+        override fun addVertex(
             x: Float,
             y: Float,
             z: Float,
@@ -319,7 +319,7 @@ object AxionBlockTessellator {
             ny: Float,
             nz: Float,
         ) {
-            delegate.vertex(transformX(x), transformY(y), transformZ(z), color, u, v, overlay, light, nx, ny, nz)
+            delegate.addVertex(transformX(x), transformY(y), transformZ(z), color, u, v, overlay, light, nx, ny, nz)
         }
 
         private fun transformX(value: Float): Float = transform(value, pos.x, cameraX)
@@ -339,7 +339,7 @@ object AxionBlockTessellator {
         companion object {
             private val lineWidthMethod: java.lang.reflect.Method? by lazy {
                 VertexConsumer::class.java.methods.firstOrNull { m ->
-                    (m.name == "lineWidth" || m.name == "setLineWidth") &&
+                    (m.name == "setLineWidth") &&
                         m.parameterCount == 1 && m.parameterTypes[0] == Float::class.javaPrimitiveType
                 } ?: VertexConsumer::class.java.methods.firstOrNull { m ->
                     m.parameterCount == 1 && m.parameterTypes[0] == Float::class.javaPrimitiveType &&

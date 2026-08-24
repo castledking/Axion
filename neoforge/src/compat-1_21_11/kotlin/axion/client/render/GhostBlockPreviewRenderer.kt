@@ -259,7 +259,7 @@ object GhostBlockPreviewRenderer {
         // Final fallback: entity rendering
         val occupiedCells = fallbackClipboard.nonAirCells()
         val consumers = context.consumers()
-        val blockRenderManager = client.blockRenderManager
+        val blockRenderManager = client.blockRenderer
         val alphaConsumers = TintedAlphaVertexConsumerProvider(consumers as MultiBufferSource, alphaScale, color)
         origins.forEach { origin ->
             occupiedCells.forEach { cell ->
@@ -333,7 +333,7 @@ object GhostBlockPreviewRenderer {
 
         // Fallback to entity rendering
         val consumers = context.consumers()
-        val blockRenderManager = client.blockRenderManager
+        val blockRenderManager = client.blockRenderer
         val alphaConsumers = TintedAlphaVertexConsumerProvider(consumers as MultiBufferSource, alphaScale, color)
         writes.forEach { write ->
             matrixStack.pushPose()

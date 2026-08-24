@@ -1,4 +1,4 @@
-package axion.client.current
+package axion.client.selection
 
 import axion.common.model.BlockRegion
 import axion.common.model.RegionFace
@@ -25,7 +25,7 @@ object SelectionBounds {
 
     fun regionBox(region: BlockRegion): AABB = region.normalized().toBox()
 
-    fun outlineBox(box: AABB): AABB = box.expand(OUTLINE_PADDING, OUTLINE_PADDING, OUTLINE_PADDING)
+    fun outlineBox(box: AABB): AABB = box.inflate(OUTLINE_PADDING, OUTLINE_PADDING, OUTLINE_PADDING)
 
     fun faceBox(pos: BlockPos, face: RegionFace): AABB {
         val box = blockBox(pos)

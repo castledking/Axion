@@ -1,4 +1,4 @@
-package axion.client.itemStack
+package axion.client.tool
 
 /**
  * Radius of the erase tool's right-click connected erase.

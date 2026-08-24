@@ -6,7 +6,7 @@ import axion.client.mode.AxionCapabilityPolicy
 import axion.client.mode.BuildPlacementService
 import axion.client.mode.InfiniteReachInteractionPolicy
 import axion.client.mode.ModeTargeting
-import axion.client.itemStack.AxionToolSelectionController
+import axion.client.tool.AxionToolSelectionController
 import axion.client.symmetry.SymmetryAwareOperationDispatcher
 import axion.common.model.SymmetryConfig
 import axion.common.model.SymmetryState
@@ -94,16 +94,16 @@ object SymmetryPlacementController {
     ) {
         val world = client.level ?: return
         operation.placements.forEach { placement ->
-            val soundGroup = placement.state.soundGroup
+            val soundType = placement.state.soundType
             VersionCompatImpl.playSoundClient(
                 world,
                 placement.pos.x + 0.5,
                 placement.pos.y + 0.5,
                 placement.pos.z + 0.5,
-                soundGroup.placeSound,
+                soundType.placeSound,
                 SoundSource.BLOCKS,
-                (soundGroup.volume + 1.0f) / 2.0f,
-                soundGroup.xRot * 0.8f,
+                (soundType.volume + 1.0f) / 2.0f,
+                soundType.xRot * 0.8f,
             )
         }
     }

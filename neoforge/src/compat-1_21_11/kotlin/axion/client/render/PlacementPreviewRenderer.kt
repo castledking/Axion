@@ -1,10 +1,10 @@
 package axion.client.render
 
-import axion.client.current.SelectionBounds
-import axion.client.itemStack.ClonePreviewState
-import axion.client.itemStack.PlacementPreviewPolicy
-import axion.client.itemStack.PlacementToolController
-import axion.client.itemStack.PlacementToolMode
+import axion.client.selection.SelectionBounds
+import axion.client.tool.ClonePreviewState
+import axion.client.tool.PlacementPreviewPolicy
+import axion.client.tool.PlacementToolController
+import axion.client.tool.PlacementToolMode
 import axion.common.model.ClipboardBuffer
 import net.minecraft.world.level.block.Blocks
 

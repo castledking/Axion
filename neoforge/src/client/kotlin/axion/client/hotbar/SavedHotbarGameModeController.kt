@@ -24,7 +24,7 @@ object SavedHotbarGameModeController {
         val observed = when {
             player == null -> null
             player.isSpectator -> AxionGameMode.SPECTATOR
-            axion.client.itemStack.AxionToolSelectionController.isCreativeModeAllowed() -> AxionGameMode.CREATIVE
+            axion.client.tool.AxionToolSelectionController.isCreativeModeAllowed() -> AxionGameMode.CREATIVE
             else -> AxionGameMode.SURVIVAL
         }
 

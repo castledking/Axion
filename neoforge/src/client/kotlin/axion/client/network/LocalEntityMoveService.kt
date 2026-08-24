@@ -34,7 +34,7 @@ object LocalEntityMoveService {
             IntVector3(sourceMax.x, sourceMax.y, sourceMax.z),
         )
         val seen = linkedSetOf<UUID>()
-        return serverWorld.getEntitiesByClass(Entity::class.java, queryBox) { entity ->
+        return serverWorld.getEntitiesOfClass(Entity::class.java, queryBox) { entity ->
             entity !is Player &&
                 !VersionCompat.INSTANCE.entityIsRemoved(entity) &&
                 entityMatcher.containsFeet(
@@ -60,8 +60,8 @@ object LocalEntityMoveService {
                     toPos = target.position,
                     fromYaw = VersionCompat.INSTANCE.entityGetYaw(entity),
                     fromPitch = VersionCompat.INSTANCE.entityGetPitch(entity),
-                    toYaw = target.yRot,
-                    toPitch = target.xRot,
+                    toYaw = target.yaw,
+                    toPitch = target.pitch,
                 )
             }
             .toList()

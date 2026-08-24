@@ -2,7 +2,7 @@ package axion.client.render
 import axion.client.compat.rotationVecClient
 import axion.client.compat.CameraAccess
 
-import axion.client.current.SelectionBounds
+import axion.client.selection.SelectionBounds
 import axion.common.model.BlockRegion
 import net.minecraft.client.Minecraft
 import com.mojang.blaze3d.vertex.VertexConsumer
@@ -26,7 +26,7 @@ object PreviewDirectionArrowRenderer {
 
     fun render(context: AxionWorldRenderContext, region: BlockRegion) {
         val axisDirection = liveLookDirection() ?: return
-        render(context, region, axisDirection.extents)
+        render(context, region, axisDirection.normal)
     }
 
     fun render(context: AxionWorldRenderContext, region: BlockRegion, direction: Vec3i) {
@@ -54,7 +54,7 @@ object PreviewDirectionArrowRenderer {
 
     private fun liveLookDirection(): Direction? {
         val look = Minecraft.getInstance().player?.rotationVecClient ?: return null
-        return Direction.getFacing(look)
+        return Direction.getApproximateNearest(look)
     }
 
     private fun arrowAlongX(box: AABB, positive: Boolean): ArrowData {
@@ -95,7 +95,7 @@ object PreviewDirectionArrowRenderer {
 
     private fun renderArrowGeometry(
         consumer: VertexConsumer,
-        entry: net.minecraft.client.util.math.Entry,
+        entry: com.mojang.blaze3d.vertex.PoseStack.Pose,
         cameraPos: Vec3,
         arrow: ArrowData,
     ) {
@@ -130,7 +130,7 @@ object PreviewDirectionArrowRenderer {
 
     private fun emitPrism(
         consumer: VertexConsumer,
-        entry: net.minecraft.client.util.math.Entry,
+        entry: com.mojang.blaze3d.vertex.PoseStack.Pose,
         cameraPos: Vec3,
         start: Vec3,
         end: Vec3,
@@ -150,7 +150,7 @@ object PreviewDirectionArrowRenderer {
 
     private fun emitFrustum(
         consumer: VertexConsumer,
-        entry: net.minecraft.client.util.math.Entry,
+        entry: com.mojang.blaze3d.vertex.PoseStack.Pose,
         cameraPos: Vec3,
         start: Vec3,
         end: Vec3,
@@ -182,7 +182,7 @@ object PreviewDirectionArrowRenderer {
 
     private fun emitQuad(
         consumer: VertexConsumer,
-        entry: net.minecraft.client.util.math.Entry,
+        entry: com.mojang.blaze3d.vertex.PoseStack.Pose,
         cameraPos: Vec3,
         a: Vec3,
         b: Vec3,
@@ -198,7 +198,7 @@ object PreviewDirectionArrowRenderer {
 
     private fun emitVertex(
         consumer: VertexConsumer,
-        entry: net.minecraft.client.util.math.Entry,
+        entry: com.mojang.blaze3d.vertex.PoseStack.Pose,
         cameraPos: Vec3,
         point: Vec3,
         color: Int,
@@ -260,7 +260,7 @@ object PreviewDirectionArrowRenderer {
         val up: Vec3,
     )
 
-    private enum class Direction.Axis {
+    private enum class AxisDir {
         X,
         Y,
         Z,

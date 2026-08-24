@@ -1,7 +1,7 @@
 package axion.client.symmetry
 
-import axion.client.current.AxionTarget
-import axion.client.current.blockPosOrNull
+import axion.client.selection.AxionTarget
+import axion.client.selection.blockPosOrNull
 import axion.common.model.SymmetryConfig
 
 object SymmetryPreviewService {

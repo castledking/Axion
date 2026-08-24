@@ -1,4 +1,4 @@
-package axion.client.itemStack
+package axion.client.tool
 
 sealed interface ExtrudeToolState {
     data object Idle : ExtrudeToolState

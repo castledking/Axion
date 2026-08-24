@@ -28,7 +28,7 @@ object PreviewBlockTessellator {
         val client = Minecraft.getInstance()
         val world = client.level ?: return false
         val camera = client.gameRenderer.mainCamera ?: return false
-        val blockRenderManager = client.blockRenderManager
+        val blockRenderManager = client.blockRenderer
         val previewView = PreviewRegionBlockRenderView(world, region.statesByPosition)
         val matrices = context.matrices()
         val cameraPos = CameraAccess.getPos(camera)
@@ -43,7 +43,7 @@ object PreviewBlockTessellator {
         val parts = ArrayList<BlockModelPart>(16)
         region.surfaceBlocks.forEach { block ->
             val state = block.state
-            if (state.isAir || state.renderType != RenderShape.MODEL) {
+            if (state.isAir || state.getRenderShape() != RenderShape.MODEL) {
                 return@forEach
             }
 
@@ -93,12 +93,18 @@ object PreviewBlockTessellator {
 
         override fun getHeight(): Int = world.height
 
-        override fun getBottomY(): Int = world.bottomY
+        override fun getMinY(): Int = world.minY
 
-        override fun getBrightness(direction: Direction, shaded: Boolean): Float = world.getBrightness(direction, shaded)
+        override fun getShade(direction: Direction, shaded: Boolean): Float = world.getShade(direction, shaded)
 
-        override fun getLightingProvider(): LevelLightEngine = world.lightEngine
+        override fun getLightEngine(): net.minecraft.world.level.lighting.LevelLightEngine = world.lightEngine
 
-        override fun getColor(pos: BlockPos, colorResolver: ColorResolver): Int = world.getColor(pos, colorResolver)
+        override fun getBrightness(type: net.minecraft.world.level.LightLayer, pos: BlockPos): Int = world.getBrightness(type, pos)
+
+        override fun getRawBrightness(pos: BlockPos, ambientDarkness: Int): Int = world.getRawBrightness(pos, ambientDarkness)
+
+        override fun canSeeSky(pos: BlockPos): Boolean = world.canSeeSky(pos)
+
+        override fun getBlockTint(pos: BlockPos, colorResolver: ColorResolver): Int = world.getBlockTint(pos, colorResolver)
     }
 }

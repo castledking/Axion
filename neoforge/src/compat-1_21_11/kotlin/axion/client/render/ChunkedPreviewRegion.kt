@@ -1,6 +1,6 @@
 package axion.client.render
 
-import axion.client.current.SelectionBounds
+import axion.client.selection.SelectionBounds
 import axion.common.model.ClipboardBuffer
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.core.BlockPos
@@ -61,7 +61,7 @@ data class ChunkedPreviewRegion(
             originKeys: List<Long>,
             maxQuads: Int,
         ): ChunkedPreviewRegion {
-            val origins = originKeys.map(BlockPos::fromLong)
+            val origins = originKeys.map(BlockPos::of)
             val mesh = PreviewMeshTessellator.buildShellMesh(
                 clipboard = clipboard,
                 origins = origins,
@@ -81,14 +81,14 @@ data class ChunkedPreviewRegion(
             val surfaceClipboard = ClipboardSelectionRenderer.surfaceClipboard(clipboard)
             origins.forEach { origin ->
                 clipboard.nonAirCells().forEach { cell ->
-                    val pos = origin.add(cell.offset)
+                    val pos = origin.offset(cell.offset)
                     statesByPosition[pos.asLong()] = cell.state
                 }
                 surfaceClipboard.nonAirCells().forEach { cell ->
-                    val pos = origin.add(cell.offset)
+                    val pos = origin.offset(cell.offset)
                     val chunkKey = BlockPos.asLong(pos.x shr 4, 0, pos.z shr 4)
                     val current = chunkShapes[chunkKey] ?: Shapes.empty()
-                    chunkShapes[chunkKey] = Shapes.union(
+                    chunkShapes[chunkKey] = Shapes.or(
                         current,
                         Shapes.create(SelectionBounds.blockBox(pos)),
                     )

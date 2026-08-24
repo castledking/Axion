@@ -1,4 +1,4 @@
-package axion.client.current
+package axion.client.selection
 
 import net.minecraft.world.phys.HitResult
 

@@ -1,4 +1,4 @@
-package axion.client.itemStack
+package axion.client.tool
 
 import axion.client.AxionClientState
 import axion.common.operation.CloneEntitiesOperation
@@ -87,7 +87,7 @@ object StackPlacementService {
             CloneEntitiesOperation(
                 entitySelection = entitySelection,
                 sourceRegion = sourceRegion,
-                destinationOrigin = sourceOrigin.add(step.scale(index)).immutable(),
+                destinationOrigin = sourceOrigin.add(step.multiply(index)).immutable(),
             )
         }
     }

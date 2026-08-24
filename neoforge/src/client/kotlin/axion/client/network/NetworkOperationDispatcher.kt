@@ -3,8 +3,8 @@ package axion.client.network
 import axion.common.compat.VersionCompat
 import axion.common.operation.ClearRegionOperation
 import axion.common.operation.CloneRegionOperation
-import axion.client.lastCommands.HistoryManager
-import axion.client.lastCommands.RemoteHistoryAdapter
+import axion.client.history.HistoryManager
+import axion.client.history.RemoteHistoryAdapter
 import axion.client.compat.VersionCompatImpl
 import axion.common.operation.CompositeOperation
 import axion.common.operation.EditOperation
@@ -36,7 +36,7 @@ import axion.protocol.PlaceBlocksRequest
 import axion.protocol.PlacedBlockPayload
 import axion.protocol.SmearRegionRequest
 import axion.protocol.StackRegionRequest
-import net.minecraft.items.arguments.blocks.BlockStateParser
+import net.minecraft.commands.arguments.blocks.BlockStateParser
 
 class NetworkOperationDispatcher(
     private val recordHistory: Boolean = true,
