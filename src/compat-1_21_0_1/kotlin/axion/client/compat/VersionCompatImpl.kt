@@ -68,6 +68,8 @@ object VersionCompatImpl : VersionCompat {
 
     override fun getBlockId(block: Block): Identifier = Registries.BLOCK.getId(block)
     override fun getItemId(item: Item): Identifier = Registries.ITEM.getId(item)
+    override fun getItemId(stack: ItemStack): Identifier = Registries.ITEM.getId(stack.item)
+    override fun getItemIdString(stack: ItemStack): String = Registries.ITEM.getId(stack.item).toString()
     override fun getAllBlocks(): Collection<Block> = Registries.BLOCK.toList()
     override fun getAllItems(): Collection<Item> = Registries.ITEM.toList()
 
@@ -229,6 +231,15 @@ object VersionCompatImpl : VersionCompat {
 
     fun closeChunkedPreviews() {
         ChunkedPreviewLifecycle.closeAll()
+    }
+
+    fun registerEditorHudElement(
+        editorId: Identifier,
+        editorRenderer: (DrawContext, RenderTickCounter) -> Unit,
+    ) {
+        net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback.EVENT.register { context, tickCounter ->
+            editorRenderer(context, tickCounter)
+        }
     }
 
     fun registerHudElements(

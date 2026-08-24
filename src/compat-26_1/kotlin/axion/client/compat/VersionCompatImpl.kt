@@ -88,6 +88,14 @@ object VersionCompatImpl : VersionCompat {
         return Registries.ITEM.getKey(item)
     }
 
+    override fun getItemId(stack: ItemStack): Identifier {
+        return Registries.ITEM.getKey(stack.item)
+    }
+
+    override fun getItemIdString(stack: ItemStack): String {
+        return Registries.ITEM.getKey(stack.item).toString()
+    }
+
     override fun getAllBlocks(): Collection<Block> {
         return Registries.BLOCK.toList()
     }
@@ -664,6 +672,24 @@ object VersionCompatImpl : VersionCompat {
 
     fun sendAxionPayload(payload: AxionPluginPayload) {
         ClientPlayNetworking.send(payload)
+    }
+
+    /**
+     * The editor chrome must render regardless of gamemode: anchoring it to
+     * the hotbar element made every attached renderer silently stop firing
+     * once the player entered spectator (vanilla skips hotbar extraction).
+     * addLast runs unconditionally at the end of the pipeline.
+     */
+    fun registerEditorHudElement(
+        editorId: Identifier,
+        editorRenderer: (DrawContext, RenderTickCounter) -> Unit,
+    ) {
+        net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry.addLast(
+            editorId,
+            net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement { extractor, deltaTracker ->
+                editorRenderer(DrawContext(extractor), deltaTracker)
+            }
+        )
     }
 
     fun registerHudElements(

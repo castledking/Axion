@@ -24,6 +24,7 @@ import axion.client.selection.SelectionController
 import axion.client.compat.toImmutable
 import axion.client.selection.blockPosOrNull
 import net.minecraft.client.MinecraftClient
+import net.minecraft.client.gui.screen.Screen
 import net.minecraft.text.Text
 import net.minecraft.util.math.BlockPos
 import org.lwjgl.glfw.GLFW
@@ -133,7 +134,7 @@ object AxionInteractionRouter {
 
     fun handleMiddleAction(client: MinecraftClient): Boolean {
         if (AxionModifierKeys.isControlDown(client) && supportsMagicSelectConfigShortcut()) {
-            client.setScreen(MagicSelectMaskConfigScreen(client.currentScreen))
+            client.setScreen(MagicSelectMaskConfigScreen(client.currentScreen as? Screen))
             return true
         }
 
@@ -244,6 +245,32 @@ object AxionInteractionRouter {
 
                 else -> Unit
             }
+
+            // Tool-specific scroll stays available under Ctrl (placement
+            // distance, stack count, smear radius), but Ctrl reserves the
+            // wheel: it must never reach the hotbar, which would disengage
+            // the axion slot mid-adjustment and strand the user on vanilla
+            // slots. Swallow whatever the tools did not use.
+            if (!altHeld) {
+                when (AxionToolSelectionController.selectedSubtool()) {
+                    AxionSubtool.CLONE,
+                    AxionSubtool.MOVE,
+                        -> {
+                        PlacementToolController.handleScroll(client, scrollAmount)
+                    }
+
+                    AxionSubtool.STACK -> {
+                        StackToolController.handleScroll(client, scrollAmount)
+                    }
+
+                    AxionSubtool.SMEAR -> {
+                        SmearToolController.handleScroll(client, scrollAmount)
+                    }
+
+                    else -> Unit
+                }
+            }
+            return AxionToolSelectionController.ScrollOutcome.Consumed
         }
 
         if (!altHeld && AxionToolSelectionController.isAxionSlotActive()) {

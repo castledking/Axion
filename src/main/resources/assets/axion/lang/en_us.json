@@ -15,6 +15,7 @@
   "key.axion.symmetry_toggle_mirror": "Toggle Axion Symmetry Mirror",
   "key.axion.undo_action": "Axion Undo",
   "key.axion.redo_action": "Axion Redo",
+  "key.axion.toggle_editor_ui": "Toggle Axion Editor",
   "key.axion.open_config_screen": "Open Axion Config",
   "key.axion.toggle_same_block_magic_select": "Toggle Same Block Magic Select",
   "key.axion.toggle_phantom": "Toggle Axion Phantom",
@@ -71,5 +72,8 @@
   "axion.config.magic_select.blocks.save": "Save Blocks",
   "axion.config.magic_select.blocks.page": "Page %s / %s",
   "axion.config.toggle.on": "ON",
-  "axion.config.toggle.off": "OFF"
+  "axion.config.toggle.off": "OFF",
+  "axion.editor.enabled": "Axion Editor enabled — hold Right Click to look around, Right Shift to exit",
+  "axion.editor.disabled": "Axion Editor disabled",
+  "axion.editor.requires_creative": "Axion Editor requires creative mode"
 }

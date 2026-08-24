@@ -8,6 +8,7 @@ import axion.client.config.MagicSelectTemplateEditScreen
 import axion.client.ui.drawStrokedRectangleCompat
 import axion.common.compat.VersionCompat
 import net.minecraft.client.MinecraftClient
+import net.minecraft.client.gui.screen.Screen
 import net.minecraft.client.font.TextRenderer
 import net.minecraft.client.gui.DrawContext
 import net.minecraft.util.Identifier
@@ -40,7 +41,7 @@ object AxionToolHintHud {
     fun render(context: DrawContext, tickCounter: net.minecraft.client.render.RenderTickCounter) {
         val client = MinecraftClient.getInstance()
         client.player ?: return
-        if (client.options.hudHidden || shouldSuppressForScreen(client.currentScreen)) {
+        if (client.options.hudHidden || shouldSuppressForScreen(client.currentScreen as? Screen)) {
             return
         }
 

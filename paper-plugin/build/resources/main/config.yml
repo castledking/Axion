@@ -10,7 +10,7 @@ limits:
     large-edit-multiplier: 4
     history:
       max-entries: 100
-      max-bytes: 67108864
+      max-bytes: 268435456
     tools:
       erase: true
       clone: true

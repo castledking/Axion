@@ -2,12 +2,15 @@ package axion.client.compat
 
 import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.client.MinecraftClient
-import net.minecraft.registry.Registries
+import net.minecraft.item.ItemStack
+import axion.common.compat.VersionCompat
 
 object LitematicaCompat {
     private val available: Boolean by lazy {
         FabricLoader.getInstance().isModLoaded("litematica")
     }
+
+    fun isAvailable(): Boolean = available
 
     private val genericConfigsClass: Class<*>? by lazy {
         reflectClass("fi.dy.masa.litematica.config.Configs\$Generic")
@@ -28,8 +31,8 @@ object LitematicaCompat {
 
         val player = client.player ?: return false
         val configuredItemId = configuredToolItemId() ?: return false
-        val heldItemId = Registries.ITEM.getId(player.mainHandStack.item).toString()
-        return heldItemId == configuredItemId
+        return listOf(player.mainHandStack, player.offHandStack)
+            .any { VersionCompat.INSTANCE.getItemIdString(it) == configuredItemId }
     }
 
     private fun configuredToolItemId(): String? {

@@ -25,8 +25,8 @@ import net.minecraft.world.entity.player.Abilities
 import net.minecraft.world.phys.AABB
 import java.util.UUID
 
-val MinecraftClient.currentScreen: Screen?
-    get() = gui.screen() as? Screen
+val MinecraftClient.currentScreen: net.minecraft.client.gui.screens.Screen?
+    get() = gui.screen()
 
 val MinecraftClient.world
     get() = level

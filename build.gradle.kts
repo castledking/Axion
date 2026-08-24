@@ -106,6 +106,18 @@ repositories {
     maven("https://maven.fabricmc.net/")
     maven("https://repo.papermc.io/repository/maven-public/")
     maven("https://maven.terraformersmc.com/releases/")
+    // Paper's proxy answers 502 for unknown groups, which aborts resolution
+    // instead of falling through — keep wispforest artifacts off its path.
+    exclusiveContent {
+        forRepository {
+            maven("https://maven.wispforest.io/")
+        }
+        filter {
+            includeGroup("io.wispforest")
+            includeGroupAndSubgroups("io.wispforest")
+        }
+    }
+    maven("https://jitpack.io/")
     mavenCentral()
 }
 
@@ -125,6 +137,14 @@ extensions.configure<LoomGradleExtensionAPI>("loom") {
             configName = "Axion Client"
             runDir = (findProperty("axion_run_dir") as String?) ?: "run"
         }
+    }
+}
+
+if (rangeMc12101 || rangeMc12123 || rangeMc1214 || rangeMc1215) {
+    // These ranges use different present/scissor entry points than 1.21.6+;
+    // the compat dirs provide matching RenderTargetFrameMixin variants.
+    sourceSets.named("client") {
+        kotlin.exclude("axion/mixin/client/RenderTargetFrameMixin*")
     }
 }
 
@@ -171,6 +191,11 @@ sourceSets.named("client") {
         kotlin.srcDir("$mc26CompatDir/kotlin")
         // InGameHud does not exist in 26.x (HUD is HudElement-based)
         kotlin.exclude("axion/mixin/client/InGameHudMixin*")
+        // Editor frame squish is yarn-only for now: 26.x's render-pass system
+        // owns viewport/scissor state per pass, so its present path needs the
+        // render-area route before framing can ship there.
+        kotlin.exclude("axion/mixin/client/WindowFrameMixin*")
+        kotlin.exclude("axion/mixin/client/RenderTargetFrameMixin*")
 
     } else {
         // 1.21.9+: registry-manager-based serialization, has MouseInput / WorldRenderState
@@ -236,6 +261,28 @@ dependencies {
         add("modCompileOnly", "com.terraformersmc:modmenu:${property("modmenu_version")}")
         add("modLocalRuntime", "com.terraformersmc:modmenu:${property("modmenu_version")}")
     }
+
+    // owo-ui drives the in-game editor panels. Version map per MC range; the
+    // 1.21.8 build's declared floor (>=1.21.6) covers 1.21.7, which upstream
+    // never published a dedicated jar for.
+    val owoVersion = when {
+        rangeMc261x -> "0.13.1+26.1"
+        rangeMc262x -> "0.13.1+26.2"
+        rangeMc12101 -> "0.12.15+1.21"
+        rangeMc12123 -> "0.12.16+1.21.2"
+        rangeMc1214 -> "0.12.20+1.21.4"
+        rangeMc1215 -> "0.12.21+1.21.5"
+        exactMc1216 || rangeLegacy || minecraftVersion == "1.21.8" -> "0.12.23+1.21.8"
+        rangeModern -> if (minecraftVersion == "1.21.11") "0.13.0+1.21.11" else "0.12.24+1.21.9"
+        else -> throw GradleException("No owo-lib mapping for Minecraft $minecraftVersion")
+    }
+    if (rangeMc26x) {
+        implementation("io.wispforest:owo-lib:$owoVersion")
+        add("include", "io.wispforest:owo-lib:$owoVersion")
+    } else {
+        add("modImplementation", "io.wispforest:owo-lib:$owoVersion")
+        add("include", "io.wispforest:owo-lib:$owoVersion")
+    }
     testImplementation(kotlin("test"))
 }
 
@@ -300,6 +347,9 @@ tasks.named<ProcessResources>("processClientResources") {
             val excludedMixins = setOf(
                 "InGameHudMixin",
                 "WorldRendererFallbackMixin",
+                "WindowFrameMixin",
+                "RenderTargetFrameMixin",
+                "LegacyRenderTargetFrameMixin",
             )
             val clientMixins = normalized["client"] as? List<*>
                 ?: throw GradleException("Mixin config has no client array: $mixinConfig")
@@ -311,9 +361,12 @@ tasks.named<ProcessResources>("processClientResources") {
     } else {
         filesMatching("axion.client.mixins.json") {
             filter { line ->
+                val legacyPresent = rangeMc12101 || rangeMc12123 || rangeMc1214 || rangeMc1215
                 when {
                     line.contains("\"GameRendererPostOutlineMixin\"") -> null
                     line.contains("\"GuiMixin\"") -> null
+                    legacyPresent && line.contains("\"RenderTargetFrameMixin\"") -> null
+                    !legacyPresent && line.contains("\"LegacyRenderTargetFrameMixin\"") -> null
                     else -> line
                 }
             }

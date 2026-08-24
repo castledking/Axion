@@ -1,10 +1,13 @@
 package axion.mixin.client
 
 import axion.client.compat.LitematicaCompat
+import axion.client.editor.AxionEditorMode
+import axion.client.editor.ui.AxionEditorUi
 import axion.client.hotbar.AxionAltMenuController
 import axion.client.input.AxionInteractionRouter
 import axion.client.input.AxionModifierKeys
 import axion.client.mode.ClientModeController
+import axion.client.tool.AxionToolSelectionController
 import axion.mixin.compat.currentScreenOf
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.Mouse
@@ -30,6 +33,11 @@ abstract class MouseMixin {
     )
     private fun axionHandleMouseButtonModern(window: Long, mouseInput: MouseInput, action: Int, ci: CallbackInfo) {
         val client = getClient()
+        if (AxionEditorMode.onMouseButton(client, mouseInput.button(), action)) {
+            ci.cancel()
+            return
+        }
+
         if (AxionAltMenuController.handleMouseButton(client, mouseInput.button(), action)) {
             ci.cancel()
             return
@@ -77,17 +85,50 @@ abstract class MouseMixin {
     }
 
     // Yarn name: onMouseScroll (1.21.x)
+    // Axiom-style editor: keep the OS cursor free while the editor owns
+    // input, and let the right-click camera drag own vanilla's grab instead.
+    @Inject(method = ["lockCursor"], at = [At("HEAD")], cancellable = true)
+    private fun axionEditorBlockCursorLock(ci: CallbackInfo) {
+        if (AxionEditorMode.shouldBlockCursorLock()) {
+            ci.cancel()
+        }
+    }
+
+    @Inject(method = ["unlockCursor"], at = [At("HEAD")], cancellable = true)
+    private fun axionEditorBlockCursorUnlock(ci: CallbackInfo) {
+        if (AxionEditorMode.shouldBlockCursorUnlock()) {
+            ci.cancel()
+        }
+    }
+
     @Inject(method = ["onMouseScroll"], at = [At("HEAD")], cancellable = true)
     private fun axionHandleScroll(window: Long, horizontal: Double, vertical: Double, ci: CallbackInfo) {
         val client = getClient()
-        if (currentScreenOf(client) != null) {
+        if (AxionEditorMode.isActive() && currentScreenOf(client) == null) {
+            // The editor owns the wheel: feed panels first, then swallow so
+            // hotbar cycling never fires mid-editing.
+            AxionEditorUi.onMouseScroll(vertical)
+            ci.cancel()
+            return
+        }
+        if (currentScreenOf(client) != null) return
+
+        val holdingTool = LitematicaCompat.isHoldingConfiguredTool(client)
+
+        if (holdingTool) {
             return
         }
 
-        if (LitematicaCompat.isHoldingConfiguredTool(client)) {
-            if (AxionModifierKeys.isAltDown(client) || AxionModifierKeys.isControlDown(client)) {
-                return
-            }
+        val litematicaLoaded = LitematicaCompat.isAvailable()
+        val altHeld = AxionModifierKeys.isAltDown(client)
+        val ctrlHeld = AxionModifierKeys.isControlDown(client)
+
+        // Litematica reserves Ctrl+scroll for its own tool handling, but the
+        // axion slot outranks that pass-through: with the slot active the wheel
+        // belongs to Axion (symmetry nudging, brush sizing), otherwise
+        // Ctrl+scroll would dump the user onto the vanilla hotbar.
+        if (litematicaLoaded && ctrlHeld && !altHeld && !AxionToolSelectionController.isAxionSlotActive()) {
+            return
         }
 
         val player = client.player ?: return
@@ -95,8 +136,8 @@ abstract class MouseMixin {
             client = client,
             currentVanillaSlot = player.inventory.selectedSlot,
             scrollAmount = vertical,
-            altHeld = AxionModifierKeys.isAltDown(client),
-            ctrlHeld = AxionModifierKeys.isControlDown(),
+            altHeld = altHeld,
+            ctrlHeld = ctrlHeld,
         )) {
             axion.client.tool.AxionToolSelectionController.ScrollOutcome.PassThrough -> Unit
             axion.client.tool.AxionToolSelectionController.ScrollOutcome.Consumed -> ci.cancel()

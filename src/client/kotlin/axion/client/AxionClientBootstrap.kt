@@ -3,6 +3,7 @@ package axion.client
 import axion.client.compat.VersionCompatInit
 import axion.client.compat.VersionCompatImpl
 import axion.client.config.AxionClientConfig
+import axion.client.editor.ui.AxionEditorUi
 import axion.client.hotbar.AxionHotbarHud
 import axion.client.hotbar.SavedHotbarController
 import axion.client.hotbar.AxionToolHintHud
@@ -24,6 +25,7 @@ object AxionClientBootstrap {
     private val logger = LoggerFactory.getLogger(AxionClientBootstrap::class.java)
     private val hudId: Identifier by lazy { VersionCompat.INSTANCE.identifierOf("axion", "side_hotbar") }
     private val hintHudId: Identifier by lazy { VersionCompat.INSTANCE.identifierOf("axion", "tool_hints") }
+    private val editorHudId: Identifier by lazy { VersionCompat.INSTANCE.identifierOf("axion", "editor_hud") }
     private val failedRenderers = linkedSetOf<String>()
 
     fun initialize() {
@@ -46,8 +48,18 @@ object AxionClientBootstrap {
         }
         AxionKeybindings.register()
         logger.info("[Axion/Bootstrap] Keybindings registered")
-        VersionCompatImpl.registerHudElements(hudId, hintHudId, AxionHotbarHud::render, AxionToolHintHud::render)
+        VersionCompatImpl.registerHudElements(
+            hudId,
+            hintHudId,
+            AxionHotbarHud::render,
+            AxionToolHintHud::render,
+        )
+        // The editor layer registers independently of the hotbar element: on
+        // 26.x anything chained after the hotbar stops firing once spectator
+        // mode suppresses it, which used to hide the panels mid-session.
+        VersionCompatImpl.registerEditorHudElement(editorHudId, AxionEditorUi::render)
         logger.info("[Axion/Bootstrap] HUD elements registered")
+        ClientTickEvents.START_CLIENT_TICK.register(AxionTickHandler::onStartTick)
         ClientTickEvents.END_CLIENT_TICK.register(AxionTickHandler::onEndTick)
         logger.info("[Axion/Bootstrap] Client tick handler registered")
         ClientLifecycleEvents.CLIENT_STOPPING.register(SavedHotbarController::flushActiveHotbar)

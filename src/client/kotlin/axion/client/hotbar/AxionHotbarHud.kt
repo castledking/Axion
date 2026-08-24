@@ -1,6 +1,7 @@
 package axion.client.hotbar
 
 import axion.client.AxionClientState
+import axion.client.compat.LitematicaCompat
 import axion.client.compat.VersionCompatImpl
 import axion.client.input.AxionModifierKeys
 import axion.client.tool.AxionToolSelectionController
@@ -116,7 +117,7 @@ object AxionHotbarHud {
             return
         }
 
-        if (!AxionToolSelectionController.isAxionSelected() && SavedHotbarController.isOverlayActive(client)) {
+        if (!AxionToolSelectionController.isAxionSelected() && SavedHotbarController.isOverlayActive(client) && !LitematicaCompat.isHoldingConfiguredTool(client)) {
             renderSavedHotbarOverlay(context, client)
         }
 
@@ -127,9 +128,10 @@ object AxionHotbarHud {
         )
 
         val axionSelected = AxionToolSelectionController.isAxionSelected()
+        val holdingLitematicaTool = LitematicaCompat.isHoldingConfiguredTool(client)
         val activeSubtool = AxionToolSelectionController.selectedSubtool()
         val showToolStack = axionSelected || !SavedHotbarController.isOverlayActive(client)
-        val expandedTools = axionSelected && AxionModifierKeys.isAltDown(client)
+        val expandedTools = axionSelected && AxionModifierKeys.isAltDown(client) && !holdingLitematicaTool
 
         if (!showToolStack) return
 

@@ -18,8 +18,8 @@ import net.minecraft.world.entity.HumanoidArm
 import net.minecraft.util.math.Direction
 import net.minecraft.util.math.Vec3i
 
-val MinecraftClient.currentScreen: Screen?
-    get() = gui.screen() as? Screen
+val MinecraftClient.currentScreen: net.minecraft.client.gui.screens.Screen?
+    get() = gui.screen()
 
 val MinecraftClient.world
     get() = level

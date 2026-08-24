@@ -15,6 +15,7 @@
   "key.axion.symmetry_toggle_mirror": "切换 Axion 对称镜像",
   "key.axion.undo_action": "Axion 撤销",
   "key.axion.redo_action": "Axion 重做",
+  "key.axion.toggle_editor_ui": "切换 Axion 编辑器",
   "key.axion.open_config_screen": "打开 Axion 配置",
   "key.axion.toggle_same_block_magic_select": "切换同方块魔法选择",
   "key.axion.toggle_phantom": "切换 Axion 幽灵模式",
@@ -66,5 +67,8 @@
   "axion.config.magic_select.blocks.save": "保存方块",
   "axion.config.magic_select.blocks.page": "第 %s / %s 页",
   "axion.config.toggle.on": "开",
-  "axion.config.toggle.off": "关"
+  "axion.config.toggle.off": "关",
+  "axion.editor.enabled": "Axion 编辑器已启用 — 按住右键环顾四周，右 Shift 退出",
+  "axion.editor.disabled": "Axion 编辑器已禁用",
+  "axion.editor.requires_creative": "Axion 编辑器需要创造模式"
 }
