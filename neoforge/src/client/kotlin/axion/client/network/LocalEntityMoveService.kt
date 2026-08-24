@@ -60,8 +60,8 @@ object LocalEntityMoveService {
                     toPos = target.position,
                     fromYaw = VersionCompat.INSTANCE.entityGetYaw(entity),
                     fromPitch = VersionCompat.INSTANCE.entityGetPitch(entity),
-                    toYaw = target.yaw,
-                    toPitch = target.pitch,
+                    toYaw = target.yRot,
+                    toPitch = target.xRot,
                 )
             }
             .toList()

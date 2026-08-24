@@ -86,8 +86,8 @@ object HistoryManager {
                         parentEntityId = clone.parentEntityId,
                         entityData = clone.entityData.copy(),
                         pos = clone.pos,
-                        yaw = clone.yaw,
-                        pitch = clone.pitch,
+                        yaw = clone.yRot,
+                        pitch = clone.xRot,
                     )
                 },
                 entityDeletes = plan.entityDeletes.map { delete ->
@@ -96,8 +96,8 @@ object HistoryManager {
                         parentEntityId = delete.parentEntityId,
                         entityData = delete.entityData.copy(),
                         pos = delete.pos,
-                        yaw = delete.yaw,
-                        pitch = delete.pitch,
+                        yaw = delete.yRot,
+                        pitch = delete.xRot,
                     )
                 },
             ),

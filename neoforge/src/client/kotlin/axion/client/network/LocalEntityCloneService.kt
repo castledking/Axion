@@ -101,7 +101,7 @@ object LocalEntityCloneService {
             entity
         } ?: return null
         val cloneEntity = entity as? Entity ?: return null
-        LocalEntityPositioning.apply(cloneEntity, clone.pos, clone.yaw, clone.pitch)
+        LocalEntityPositioning.apply(cloneEntity, clone.pos, clone.yRot, clone.xRot)
         VersionCompat.INSTANCE.worldSpawnNewEntityAndPassengers(world, cloneEntity)
         return cloneEntity
     }
@@ -162,8 +162,8 @@ object LocalEntityCloneService {
                     parentEntityId = parentCloneId,
                     entityData = snapshot,
                     pos = target.position,
-                    yaw = target.yaw,
-                    pitch = target.pitch,
+                    yaw = target.yRot,
+                    pitch = target.xRot,
                 ),
             )
             VersionCompat.INSTANCE.entityGetPassengerList(entity).forEach { passenger ->

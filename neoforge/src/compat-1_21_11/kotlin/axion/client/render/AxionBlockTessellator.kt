@@ -19,7 +19,7 @@ import net.minecraft.world.level.ColorResolver
 import net.minecraft.world.level.lighting.LevelLightEngine
 
 /**
- * Tessellates blocks directly using blockRenderManager.renderBlock() instead of
+ * Tessellates blocks directly using blockRenderManager.renderBatched() instead of
  * the expensive renderBlockAsEntity() path. Caches BakedModel lookups and provides
  * a reusable BlockAndTintGetter for preview regions.
  *
@@ -64,14 +64,14 @@ object AxionBlockTessellator {
         var rendered = false
 
         if (state.renderType == RenderShape.MODEL) {
-            val model = blockRenderManager.getModel(state)
+            val model = blockRenderManager.getBlockModel(state)
             val random = threadLocalRandom.get()
             val parts = threadLocalParts.get()
             parts.clear()
             random.setSeed(state.getSeed(pos))
             model.addCommonParts(random, parts)
             if (parts.isNotEmpty()) {
-                blockRenderManager.renderBlock(state, pos, world, matrixStack, consumer, checkSides, parts)
+                blockRenderManager.renderBatched(state, pos, world, matrixStack, consumer, checkSides, parts)
                 rendered = true
             }
         }

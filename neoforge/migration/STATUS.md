@@ -1,7 +1,7 @@
 # NeoForge migration status (feat/neoforge)
 
-Last updated: 2026-08-24 (WIP #2). Compile state: `:neoforge:compileKotlin` = **~660 errors**
-(1451 -> 728 -> ~660; fabric untouched and green).
+Last updated: 2026-08-24 (WIP #2). Compile state: `:neoforge:compileKotlin` = **~622 errors**
+(1451 -> 728 -> ~660 -> ~622; fabric untouched and green).
 
 ## What was done
 
@@ -76,6 +76,22 @@ API-shape divergences no mapping table covers.
 30 client/.../ClientModeController.kt
 ```
 Full current list: migration/current-errors.txt
+
+### More fixed patterns (WIP #3)
+- RegistryAccess.getOrThrow -> lookupOrThrow; BuiltInRegistries.get returns
+  Optional<Holder> (unwrap .orElse(null)?.value()); getId(int)->getKey(Identifier)
+- Entity: yaw/pitch -> yRot/xRot, refreshPositionAndAngles -> absSnapTo,
+  Level.getOtherEntities -> getEntities(e, box) { true }
+- EntityType.loadEntityWithPassengers(tag, level, reason, processor) ->
+  loadEntityRecursive(tag, level, reason) { ... } (NBT-based overload survives)
+- Entity NBT save/load now via TagValueOutput.createWithContext /
+  TagValueOutput.buildResult(), ProblemReporter.DISCARDING
+- PacketDistributor.sendToServer -> ClientPacketDistributor.sendToServer
+- GuiGraphics.drawTexture -> blit(RenderPipeline, id, x, y, u, v, w, h, texW, texH)
+- Level.playSoundClient -> playSound(null as Entity?, ...)
+- Inventory.mainStacks -> nonEquipmentItems
+- RenderPass.RenderObject -> RenderPass.Draw; sampler cache getClampToEdge(NEAREST)
+- BlockStateParser.block -> parseForBlock; serialize stays on parser object
 
 ### Known remaining mechanical renames
 - `Direction.getFacing(` -> `getNearest(`

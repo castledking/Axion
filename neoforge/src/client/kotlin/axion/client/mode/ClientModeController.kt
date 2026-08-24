@@ -1201,7 +1201,7 @@ object ClientModeController {
             soundGroup.placeSound,
             SoundSource.BLOCKS,
             (soundGroup.volume + 1.0f) / 2.0f,
-            soundGroup.pitch * 0.8f,
+            soundGroup.xRot * 0.8f,
         )
     }
 

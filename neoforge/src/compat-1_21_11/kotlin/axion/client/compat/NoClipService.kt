@@ -1,6 +1,5 @@
 package axion.client.compat
 
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
 import java.util.UUID
@@ -49,7 +48,6 @@ object NoClipService {
             return
         }
         initialized = true
-        ServerTickEvents.END_SERVER_TICK.register(ServerTickEvents.EndTick(::onEndTick))
     }
 
     fun stop(server: MinecraftServer) {
@@ -57,6 +55,10 @@ object NoClipService {
             server.playerList.getPlayer(uuid)?.let { setNoPhysics(it, false) }
         }
         armedPlayers.clear()
+    }
+
+    fun onServerTick(server: MinecraftServer) {
+        onEndTick(server)
     }
 
     private fun onEndTick(server: MinecraftServer) {

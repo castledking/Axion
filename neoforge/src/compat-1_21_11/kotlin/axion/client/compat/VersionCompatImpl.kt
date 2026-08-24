@@ -57,6 +57,7 @@ import net.minecraft.network.chat.MutableComponent
 import net.minecraft.ChatFormatting
 import net.minecraft.server.MinecraftServer
 import net.neoforged.neoforge.client.event.RenderGuiLayerEvent
+import net.neoforged.neoforge.client.network.ClientPacketDistributor
 import net.neoforged.neoforge.network.PacketDistributor
 import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent
@@ -180,7 +181,7 @@ object VersionCompatImpl : VersionCompat {
     }
 
     override fun blockStateToString(state: BlockState): String {
-        return BlockStateParser.serialize(state)
+        return net.minecraft.commands.arguments.blocks.BlockStateParser.serialize(state)
     }
 
     override fun stringToBlockState(str: String): BlockState? {
@@ -348,7 +349,7 @@ object VersionCompatImpl : VersionCompat {
     }
 
     fun sendAxionPayload(payload: AxionPluginPayload) {
-        PacketDistributor.sendToServer(payload)
+        ClientPacketDistributor.sendToServer(payload)
     }
 
     fun supportsChunkedPreview(): Boolean {
@@ -380,7 +381,7 @@ object VersionCompatImpl : VersionCompat {
             if (ShaderPackCompat.shouldDisableDirectGpuPreview()) return false
             val session = ChunkedPreviewLifecycle.acquire(sessionId)
             session.setFromClipboard(clipboard, surfaceClipboard, origins, scale)
-            session.render(context, color, alpha).canPick
+            session.render(context, color, alpha).handled
         } catch (t: Throwable) {
             logger.warn("[Axion GPU] renderChunkedPreview failed for session={} — falling back to CPU path", sessionId, t)
             false
@@ -389,32 +390,32 @@ object VersionCompatImpl : VersionCompat {
 
     // Rendering helpers for 1.21.11
     override fun getBlockRenderManager(client: Any): Any {
-        return (client as Minecraft).blockRenderManager
+        return (client as Minecraft).blockRenderer
     }
 
     override fun getBlockRenderType(state: BlockState): Any {
-        return state.renderType
+        return net.minecraft.client.renderer.ItemBlockRenderTypes.getMovingBlockRenderType(state)
     }
 
     override fun getRenderingSeed(state: BlockState, pos: Any): Long {
-        return state.getRenderingSeed(pos as net.minecraft.core.BlockPos)
+        return state.getSeed(pos as net.minecraft.core.BlockPos)
     }
 
     override fun matrixStackPush(stack: Any): Any {
-        return (stack as com.mojang.blaze3d.vertex.PoseStack).push()
+        return (stack as com.mojang.blaze3d.vertex.PoseStack).pushPose()
     }
 
     override fun matrixStackPop(stack: Any) {
-        (stack as com.mojang.blaze3d.vertex.PoseStack).pop()
+        (stack as com.mojang.blaze3d.vertex.PoseStack).popPose()
     }
 
     override fun blockRenderManagerGetModel(manager: Any, state: BlockState): Any {
-        return (manager as net.minecraft.client.renderer.block.BlockRenderDispatcher).getModel(state)
+        return (manager as net.minecraft.client.renderer.block.BlockRenderDispatcher).getBlockModel(state)
     }
 
     @Suppress("UNCHECKED_CAST")
     override fun blockRenderManagerRenderBlock(manager: Any, state: BlockState, pos: Any, world: Any, matrixStack: Any, consumer: Any, checkSides: Boolean, parts: List<Any>): Boolean {
-        (manager as net.minecraft.client.renderer.block.BlockRenderDispatcher).renderBlock(
+        (manager as net.minecraft.client.renderer.block.BlockRenderDispatcher).renderBatched(
             state,
             pos as net.minecraft.core.BlockPos,
             world as net.minecraft.world.level.BlockAndTintGetter,
@@ -427,7 +428,7 @@ object VersionCompatImpl : VersionCompat {
     }
 
     override fun blockRenderManagerRenderFluid(manager: Any, pos: Any, world: Any, consumer: Any, state: BlockState, fluidState: Any): Boolean {
-        (manager as net.minecraft.client.renderer.block.BlockRenderDispatcher).renderFluid(
+        (manager as net.minecraft.client.renderer.block.BlockRenderDispatcher).renderLiquid(
             pos as net.minecraft.core.BlockPos,
             world as net.minecraft.world.level.BlockAndTintGetter,
             consumer as com.mojang.blaze3d.vertex.VertexConsumer,
@@ -463,11 +464,11 @@ object VersionCompatImpl : VersionCompat {
     }
 
     override fun entityGetYaw(entity: Any): Float {
-        return (entity as net.minecraft.world.entity.Entity).yaw
+        return (entity as net.minecraft.world.entity.Entity).yRot
     }
 
     override fun entityGetPitch(entity: Any): Float {
-        return (entity as net.minecraft.world.entity.Entity).pitch
+        return (entity as net.minecraft.world.entity.Entity).xRot
     }
 
     override fun entityGetPassengerList(entity: Any): List<Any> {
@@ -479,12 +480,12 @@ object VersionCompatImpl : VersionCompat {
     }
 
     override fun entitySetPositionAndAngles(entity: Any, x: Double, y: Double, z: Double, yaw: Float, pitch: Float) {
-        (entity as net.minecraft.world.entity.Entity).refreshPositionAndAngles(x, y, z, yaw, pitch)
+        (entity as net.minecraft.world.entity.Entity).absSnapTo(x, y, z, yaw, pitch)
     }
 
     override fun entityRefreshPositionAndAngles(entity: Any) {
         val e = entity as net.minecraft.world.entity.Entity
-        e.refreshPositionAndAngles(e.x, e.y, e.z, e.yaw, e.pitch)
+        e.absSnapTo(e.x, e.y, e.z, e.yRot, e.xRot)
     }
 
     override fun entityUpdatePassengerPosition(entity: Any, passenger: Any) {
@@ -492,14 +493,13 @@ object VersionCompatImpl : VersionCompat {
     }
 
     override fun entityTypeLoadEntityWithPassengers(tag: CompoundTag, world: Any, spawnReason: Any, entityProcessor: (Any) -> Any): Any? {
-        return net.minecraft.world.entity.EntityType.loadEntityWithPassengers(
+        return net.minecraft.world.entity.EntityType.loadEntityRecursive(
             tag,
-            world as net.minecraft.server.level.ServerLevel,
+            world as net.minecraft.world.level.Level,
             spawnReason as net.minecraft.world.entity.EntitySpawnReason,
-            net.minecraft.world.entity.EntityProcessor { entity ->
-                entityProcessor(entity) as? net.minecraft.world.entity.Entity
-            },
-        )
+        ) { entity ->
+            entityProcessor(entity) as? net.minecraft.world.entity.Entity
+        }
     }
 
     override fun worldSpawnNewEntityAndPassengers(world: Any, entity: Any): Boolean {
@@ -507,19 +507,19 @@ object VersionCompatImpl : VersionCompat {
     }
 
     override fun worldGetOtherEntities(world: Any, entity: Any, box: Any): List<Any> {
-        return (world as net.minecraft.world.level.Level).getOtherEntities(
+        return (world as net.minecraft.world.level.Level).getEntities(
             entity as net.minecraft.world.entity.Entity,
             box as net.minecraft.world.phys.AABB
-        )
+        ) { true }
     }
 
     // Minecraft API helpers for 1.21.11
     override fun clientGetServer(client: Any): Any? {
-        return (client as Minecraft).server
+        return (client as Minecraft).singleplayerServer
     }
 
     override fun clientGetWorldRegistryKey(client: Any): Any? {
-        return (client as Minecraft).world?.registryKey
+        return (client as Minecraft).level?.dimension()
     }
 
     override fun serverExecute(server: Any, task: Runnable) {
@@ -528,20 +528,20 @@ object VersionCompatImpl : VersionCompat {
 
     @Suppress("UNCHECKED_CAST")
     override fun serverGetWorld(server: Any, registryKey: Any): Any? {
-        return (server as net.minecraft.client.server.IntegratedServer).getWorld(registryKey as net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level>)
+        return (server as net.minecraft.client.server.IntegratedServer).getLevel(registryKey as net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level>)
     }
 
     override fun playerSendMessage(player: Any, message: Any, overlay: Boolean) {
-        (player as net.minecraft.world.entity.player.Player).sendMessage(message as net.minecraft.network.chat.Component, overlay)
+        (player as net.minecraft.world.entity.player.Player).displayClientMessage(message as net.minecraft.network.chat.Component, overlay)
     }
 
     // Direction/BlockState API helpers for 1.21.11
     override fun directionGetVector(direction: Any): Any {
-        return (direction as net.minecraft.core.Direction).extents
+        return (direction as net.minecraft.core.Direction).getUnitVec3()
     }
 
     override fun blockStateStringify(state: BlockState): String {
-        return BlockStateParser.serialize(state)
+        return net.minecraft.commands.arguments.blocks.BlockStateParser.serialize(state)
     }
 
     fun rawBlockStateId(state: BlockState): Int {
@@ -550,11 +550,11 @@ object VersionCompatImpl : VersionCompat {
 
     // Registry/BlockStateParser API helpers for 1.21.11
     override fun worldGetRegistryManager(world: Any): Any {
-        return (world as net.minecraft.world.level.Level).registryAccess
+        return (world as net.minecraft.world.level.Level).registryAccess()
     }
 
     override fun blockArgumentParserBlock(registry: Any, state: String): Any {
-        return net.minecraft.items.arguments.blocks.BlockStateParser.block(
+        return net.minecraft.commands.arguments.blocks.BlockStateParser.parseForBlock(
             (registry as RegistryAccess).lookupOrThrow(Registries.BLOCK),
             state,
             false
@@ -587,13 +587,13 @@ object VersionCompatImpl : VersionCompat {
         drawList: List<SectionDrawEntry>,
         uniformSlices: List<GpuBufferSlice>,
     ): Boolean {
-        val renderObjects = ArrayList<RenderPass.RenderObject<Unit>>(drawList.size)
+        val renderObjects = ArrayList<RenderPass.Draw<Unit>>(drawList.size)
         for (i in drawList.indices) {
             val entry = drawList[i]
             val vb = entry.buffer.vertexBufferGpu ?: return false
             val ib = entry.buffer.indexBufferGpu ?: return false
             val slice = uniformSlices[i]
-            renderObjects += RenderPass.RenderObject<Unit>(
+            renderObjects += RenderPass.Draw<Unit>(
                 0, vb, ib, entry.indexType, 0, entry.indexCount,
                 java.util.function.BiConsumer { _, uploader ->
                     uploader.upload("DynamicTransforms", slice)
@@ -651,7 +651,7 @@ object VersionCompatImpl : VersionCompat {
 
     /** The lightmap is read with texelFetch, so it wants plain unmipmapped NEAREST. */
     private fun lightmapSampler(): GpuSampler? = runCatching {
-        RenderSystem.getSamplerCache().get(FilterMode.ORDER_NEAREST)
+        RenderSystem.getSamplerCache().getClampToEdge(com.mojang.blaze3d.textures.FilterMode.NEAREST)
     }.getOrNull()
 
     fun bindTextureToRenderPass(pass: RenderPass, samplerName: String, textureView: GpuTextureView) {
@@ -772,11 +772,11 @@ object VersionCompatImpl : VersionCompat {
         volume: Float,
         pitch: Float
     ) {
-        world.playSoundClient(x, y, z, sound, soundCategory, volume, pitch, false)
+        world.playSound(null as net.minecraft.world.entity.Entity?, x, y, z, sound, soundCategory, volume, pitch)
     }
 
     fun getMainInventoryStacks(inventory: net.minecraft.world.entity.player.Inventory): List<ItemStack> {
-        return inventory.mainStacks
+        return inventory.nonEquipmentItems
     }
 
     fun getScaledMouseX(client: Minecraft): Double {
@@ -805,8 +805,8 @@ object VersionCompatImpl : VersionCompat {
     }
 
     fun captureEntityData(entity: Entity): CompoundTag? {
-        val output = TagValueOutput.create(ProblemReporter.EMPTY, entity.level().registryAccess)
-        return if (entity.saveAsPassenger(output)) output.nbt else null
+        val output = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, entity.registryAccess())
+        return if (entity.saveAsPassenger(output)) output.buildResult() else null
     }
 
     fun drawGuiTexture(
@@ -817,7 +817,7 @@ object VersionCompatImpl : VersionCompat {
         width: Int,
         height: Int,
     ) {
-        context.drawTexture(RenderPipelines.GUI_TEXTURED, texture, x, y, 0.0f, 0.0f, width, height, width, height)
+        context.blit(RenderPipelines.GUI_TEXTURED, texture, x, y, 0.0f, 0.0f, width, height, width, height)
     }
 
     fun renderVanillaButton(
@@ -858,7 +858,7 @@ object VersionCompatImpl : VersionCompat {
         textureWidth: Int,
         textureHeight: Int,
     ) {
-        context.drawTexture(RenderPipelines.GUI_TEXTURED, texture, x, y, u.toFloat(), v.toFloat(), width, height, textureWidth, textureHeight)
+        context.blit(RenderPipelines.GUI_TEXTURED, texture, x, y, u.toFloat(), v.toFloat(), width, height, textureWidth, textureHeight)
     }
 
     private val cameraPosField: Field? by lazy {

@@ -47,7 +47,7 @@ object PreviewBlockTessellator {
                 return@forEach
             }
 
-            val model = blockRenderManager.getModel(state)
+            val model = blockRenderManager.getBlockModel(state)
             parts.clear()
             random.setSeed(state.getSeed(block.pos))
             model.addCommonParts(random, parts)
@@ -61,7 +61,7 @@ object PreviewBlockTessellator {
                 block.pos.y - cameraPos.y,
                 block.pos.z - cameraPos.z,
             )
-            blockRenderManager.renderBlock(
+            blockRenderManager.renderBatched(
                 state,
                 block.pos,
                 previewView,

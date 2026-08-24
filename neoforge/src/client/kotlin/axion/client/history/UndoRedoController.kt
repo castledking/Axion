@@ -14,7 +14,7 @@ object UndoRedoController {
         val server = client.singleplayerServer ?: return false
         val worldKey = client.level?.registryKey
         server.execute {
-            val world = server.getWorld(worldKey) ?: return@execute
+            val world = server.getLevel(worldKey) ?: return@execute
             HistoryManager.undo(world)
         }
         return true
@@ -30,7 +30,7 @@ object UndoRedoController {
         val server = client.singleplayerServer ?: return false
         val worldKey = client.level?.registryKey
         server.execute {
-            val world = server.getWorld(worldKey) ?: return@execute
+            val world = server.getLevel(worldKey) ?: return@execute
             HistoryManager.redo(world)
         }
         return true
