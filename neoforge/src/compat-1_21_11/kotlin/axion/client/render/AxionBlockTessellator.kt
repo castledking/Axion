@@ -145,7 +145,7 @@ object AxionBlockTessellator {
         val statesByPosition: Map<Long, BlockState>,
         private val renderingPos: BlockPos? = null,
     ) : BlockAndTintGetter {
-        private val airState: BlockState = Blocks.AIR.defaultBlockState
+        private val airState: BlockState = Blocks.AIR.defaultBlockState()
 
         override fun getBlockEntity(pos: BlockPos): BlockEntity? = null
 
@@ -201,7 +201,7 @@ object AxionBlockTessellator {
         val statesByPosition: Map<Long, BlockState>,
         private val renderingPos: BlockPos? = null,
     ) : BlockAndTintGetter {
-        private val airState: BlockState = Blocks.AIR.defaultBlockState
+        private val airState: BlockState = Blocks.AIR.defaultBlockState()
 
         override fun getBlockEntity(pos: BlockPos): BlockEntity? = null
 

@@ -24,7 +24,6 @@ object KeyBindingHandler {
     private val boundKeyField: Field? by lazy {
         runCatching {
             KeyMapping::class.java.getDeclaredField("boundKey").also {
-                it.wasAccessibleSinceLastSave = true
             }
         }.getOrElse {
             // Fallback: search for InputUtil/InputConstants.Key typed non-static mutable fields
@@ -34,7 +33,7 @@ object KeyBindingHandler {
                 isKeyClass && !java.lang.reflect.Modifier.isStatic(f.modifiers)
                     && !java.lang.reflect.Modifier.isFinal(f.modifiers)
             }
-            fallback?.also { it.wasAccessibleSinceLastSave = true }
+            fallback?.also { }
             fallback
         }
     }
@@ -86,11 +85,11 @@ object KeyBindingHandler {
 
         val client = Minecraft.getInstance()
         val handle = client.window.handle
-        val keyDown = GLFW.glfwGetKey(handle, keyCode) == GLFW.PRESS
-        val ctrlDown = GLFW.glfwGetKey(handle, GLFW.KEY_LCONTROL) == GLFW.PRESS ||
-            GLFW.glfwGetKey(handle, GLFW.KEY_RCONTROL) == GLFW.PRESS
-        val shiftDown = GLFW.glfwGetKey(handle, GLFW.KEY_LSHIFT) == GLFW.PRESS ||
-            GLFW.glfwGetKey(handle, GLFW.KEY_RSHIFT) == GLFW.PRESS
+        val keyDown = GLFW.glfwGetKey(handle, keyCode) == GLFW.GLFW_PRESS
+        val ctrlDown = GLFW.glfwGetKey(handle, GLFW.KEY_LCONTROL) == GLFW.GLFW_PRESS ||
+            GLFW.glfwGetKey(handle, GLFW.KEY_RCONTROL) == GLFW.GLFW_PRESS
+        val shiftDown = GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_LEFT_SHIFT) == GLFW.GLFW_PRESS ||
+            GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_RIGHT_SHIFT) == GLFW.GLFW_PRESS
         val comboActive = keyDown && ctrlDown && (allowShift || !shiftDown)
         val wasActive = ctrlComboActive.contains(keyCode)
 
@@ -106,7 +105,7 @@ object KeyBindingHandler {
     fun isBoundKeyDown(keyBinding: KeyMapping): Boolean {
         val keyCode = getBoundKeyCode(keyBinding) ?: return false
         if (keyCode == GLFW.GLFW_KEY_UNKNOWN) return false
-        return GLFW.glfwGetKey(Minecraft.getInstance().window.handle, keyCode) == GLFW.PRESS
+        return GLFW.glfwGetKey(Minecraft.getInstance().window.handle, keyCode) == GLFW.GLFW_PRESS
     }
 
     /**

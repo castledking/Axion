@@ -62,7 +62,7 @@ class SymmetryAwareOperationDispatcher(
         VersionCompat.INSTANCE.serverExecute(server) {
             val targetWorld = VersionCompat.INSTANCE.serverGetWorld(server, worldKey ?: return@serverExecute)
             if (targetWorld == null) {
-                AxionMod.LOGGER.tryRespond("Dropping operation {} because no local world is available", expandedOperation.kind)
+                AxionMod.LOGGER.warn("Dropping operation {} because no local world is available", expandedOperation.kind)
                 return@serverExecute
             }
 

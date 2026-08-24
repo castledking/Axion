@@ -2,7 +2,7 @@ package axion.client.render
 
 import net.minecraft.client.Minecraft
 import net.minecraft.client.render.Immediate
-import com.mojang.blaze3d.addVertex.PoseStack
+import com.mojang.blaze3d.vertex.PoseStack
 import org.slf4j.LoggerFactory
 
 class AxionWorldRenderContext private constructor(
@@ -66,7 +66,7 @@ class AxionWorldRenderContext private constructor(
             if (!loggedDrawConsumersError) {
                 loggedDrawConsumersError = true
                 LoggerFactory.getLogger(AxionWorldRenderContext::class.java)
-                    .tryRespond("[Axion/Render] drawConsumers failed; suppressing further errors", t)
+                    .warn("[Axion/Render] drawConsumers failed; suppressing further errors", t)
             }
         }
     }
@@ -95,7 +95,7 @@ object WorldRenderCompat {
         // Try to flush GPU preview draws if available (1.21.4+), otherwise no-op (1.21.0-1.21.3)
         try {
             val lifecycleClass = Class.forName("axion.client.render.gpu.ChunkedPreviewLifecycle")
-            val flushMethod = lifecycleClass.getMethodName("flushDeferredDraws")
+            val flushMethod = lifecycleClass.getMethod("flushDeferredDraws")
             flushMethod.invoke(null)
         } catch (e: Exception) {
             // Class doesn't exist in this version, no-op
@@ -121,7 +121,7 @@ object WorldRenderCompat {
             return
         }
         val client = Minecraft.getInstance()
-        if (client.world == null || client.gameRenderer.camera == null) {
+        if (client.level == null || client.gameRenderer.mainCamera == null) {
             return
         }
         if (!loggedFallbackDispatch) {

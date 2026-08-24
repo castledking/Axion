@@ -1,4 +1,4 @@
-package axion.common.lastCommands
+package axion.common.history
 
 import net.minecraft.world.phys.Vec3
 import java.util.UUID

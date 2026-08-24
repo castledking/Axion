@@ -2,7 +2,7 @@ package axion.client.network
 
 import axion.client.compat.VersionCompatImpl
 import axion.common.compat.VersionCompat
-import axion.common.lastCommands.EntityCloneChange
+import axion.common.history.EntityCloneChange
 import axion.common.operation.CloneEntitiesOperation
 import axion.common.operation.EntityMoveMirrorAxis
 import axion.protocol.IntVector3

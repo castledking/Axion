@@ -455,7 +455,7 @@ object RepeatPreviewRenderer {
                         candidate.pos.z - min.z,
                     ),
                     state = candidate.cell.state,
-                    blockEntityData = candidate.cell.blockData?.copy(),
+                    blockEntityData = candidate.cell.blockEntityData?.copy(),
                 )
             }
 

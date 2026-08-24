@@ -2,7 +2,6 @@ package axion.client.itemStack
 
 import axion.client.current.AxionTarget
 import axion.client.current.blockPosOrNull
-import axion.client.compat.toImmutable
 import axion.client.compat.add
 import net.minecraft.client.Minecraft
 import net.minecraft.core.BlockPos
@@ -14,7 +13,7 @@ object ExtrudePlacementService {
         world: BlockGetter,
         target: AxionTarget,
     ): ExtrudePreviewState? {
-        val origin = target.blockPosOrNull()?.toImmutable() ?: return null
+        val origin = target.blockPosOrNull()?.immutable() ?: return null
         val footprint = LayerDiscoveryService.discoverPlanarFootprint(
             world = world,
             origin = origin,
@@ -31,7 +30,7 @@ object ExtrudePlacementService {
             footprint = footprint,
             sourceState = sourceState,
             direction = direction,
-            extrudePositions = footprint.map { it.add(direction.extents).toImmutable() },
+            extrudePositions = footprint.map { it.add(direction.extents).immutable() },
         )
     }
 }

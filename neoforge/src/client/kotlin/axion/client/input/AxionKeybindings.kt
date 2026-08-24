@@ -93,7 +93,7 @@ object AxionKeybindings {
 
     val openConfigScreen: KeyMapping = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.open_config_screen",
-        GLFW.KEY_RSHIFT,
+        GLFW.GLFW_KEY_RIGHT_SHIFT,
         category,
     )
 

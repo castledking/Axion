@@ -1,7 +1,7 @@
 package axion.client.render
 
 import net.minecraft.client.renderer.rendertype.RenderType
-import com.mojang.blaze3d.addVertex.VertexConsumer
+import com.mojang.blaze3d.vertex.VertexConsumer
 import net.minecraft.client.renderer.MultiBufferSource
 
 fun Any.getBuffer(layer: RenderType): VertexConsumer =

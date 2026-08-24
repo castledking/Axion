@@ -29,7 +29,7 @@ interface VersionCompat {
     fun getAllBlocks(): Collection<Block>
     fun getAllItems(): Collection<Item>
 
-    // ResourceLocation/Identifier operations  
+    // Identifier/Identifier operations  
     fun parseIdentifier(id: String): Identifier
     fun identifierOf(namespace: String, path: String): Identifier
 

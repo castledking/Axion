@@ -146,14 +146,14 @@ object AxionPreviewBlockDrawer {
         } catch (t: Throwable) {
             failureCount++
             if (failureCount <= MAX_FAILURES) {
-                logger.tryRespond(
+                logger.warn(
                     "[Axion GPU] Preview draw failed (attempt {} of {}). Falling back to CPU path for this frame.",
                     failureCount, MAX_FAILURES, t,
                 )
             }
             if (failureCount >= MAX_FAILURES && !disabled) {
                 disabled = true
-                logger.tryRespond(
+                logger.warn(
                     "[Axion GPU] Disabling preview drawer after {} failures — all subsequent previews use the legacy CPU path.",
                     MAX_FAILURES,
                 )
@@ -320,7 +320,7 @@ object AxionPreviewBlockDrawer {
         uniformsDoneNs: Long,
         submitDoneNs: Long,
     ) {
-        val now = System.currentTimeMs()
+        val now = System.currentTimeMillis()
         if (now - lastLogTime < LOG_INTERVAL_MS) return
         lastLogTime = now
         logger.info(

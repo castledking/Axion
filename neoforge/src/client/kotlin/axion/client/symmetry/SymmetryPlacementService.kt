@@ -17,7 +17,7 @@ object SymmetryPlacementService {
         hand: InteractionHand = InteractionHand.MAIN_HAND,
     ): SymmetryPlacementResult? {
         val player = client.player ?: return null
-        val world = client.world ?: return null
+        val world = client.level ?: return null
         val hitResult = client.hitResult as? BlockHitResult ?: return null
         val stack = player.getItemInHand(hand)
         val blockItem = stack.item as? BlockItem ?: return null
@@ -28,12 +28,12 @@ object SymmetryPlacementService {
             return null
         }
 
-        val placementPos = hitResult.blockPos.toImmutable()
+        val placementPos = hitResult.blockPos.immutable()
         if (!world.isInWorldBounds(placementPos)) {
             return null
         }
 
-        val placementState = blockItem.block.defaultBlockState
+        val placementState = blockItem.block.defaultBlockState()
         val derivedPlacements = SymmetryTransformService.activeTransforms(config)
             .asSequence()
             .filterNot { transform ->
@@ -80,9 +80,9 @@ object SymmetryPlacementService {
             derivedPos.add(derivedSide.opposite.extents)
         }
         val hitPos = Vec3(supportPos.x + 0.5, supportPos.y + 0.5, supportPos.z + 0.5).add(
-            derivedSide.offsetX * 0.5,
-            derivedSide.offsetY * 0.5,
-            derivedSide.offsetZ * 0.5,
+            derivedSide.stepX * 0.5,
+            derivedSide.stepY * 0.5,
+            derivedSide.stepZ * 0.5,
         )
         val derivedHit = BlockHitResult(hitPos, derivedSide, supportPos, false)
         val rawContext = BlockPlaceContext(player, hand, stack, derivedHit)
@@ -93,7 +93,7 @@ object SymmetryPlacementService {
 
         return SymmetryPlacementResult.Placement(
             derivedPos,
-            blockItem.block.defaultBlockState,
+            blockItem.block.defaultBlockState(),
         )
     }
 }

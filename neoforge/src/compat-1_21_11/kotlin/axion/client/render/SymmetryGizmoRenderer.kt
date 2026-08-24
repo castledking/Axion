@@ -20,7 +20,7 @@ object SymmetryGizmoRenderer {
         }
 
         val client = Minecraft.getInstance()
-        val camera = client.gameRenderer.camera ?: return
+        val camera = client.gameRenderer.mainCamera ?: return
         val cameraPos = CameraAccess.getPos(camera)
         val consumers = context.consumers()
         val matrixStack = context.matrices()

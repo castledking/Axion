@@ -38,7 +38,7 @@ object SelectionStateRenderer {
                     context = context,
                     scene = BlockPreviewPipeline.SelectionScene(
                         origins = listOf(pendingMagicSelection.region.minCorner()),
-                        selectionClipboard = pendingMagicSelection.clipboardScratchBuffer,
+                        selectionClipboard = pendingMagicSelection.clipboardBuffer,
                         sparse = true,
                         outlineColor = REGION_COLOR,
                         lineWidth = LINE_WIDTH,

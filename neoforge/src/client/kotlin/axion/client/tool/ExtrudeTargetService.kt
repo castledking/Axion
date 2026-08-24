@@ -1,5 +1,6 @@
 package axion.client.itemStack
 
+import axion.client.compat.rotationVecClient
 import axion.client.current.AxionTarget
 import axion.client.current.toDirection
 import axion.client.itemStack.directionGetFacing

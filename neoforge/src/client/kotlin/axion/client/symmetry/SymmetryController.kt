@@ -69,9 +69,9 @@ object SymmetryController {
             anchor = config.anchor.copy(
                 position = quantizeToHalfGrid(
                     config.anchor.position.add(
-                        direction.offsetX * scrollDirection.toDouble() * NUDGE_STEP,
-                        direction.offsetY * scrollDirection.toDouble() * NUDGE_STEP,
-                        direction.offsetZ * scrollDirection.toDouble() * NUDGE_STEP,
+                        direction.stepX * scrollDirection.toDouble() * NUDGE_STEP,
+                        direction.stepY * scrollDirection.toDouble() * NUDGE_STEP,
+                        direction.stepZ * scrollDirection.toDouble() * NUDGE_STEP,
                     ),
                 ),
             ),

@@ -81,15 +81,15 @@ class MagicSelectCustomMaskScreen(
             draftInitialized = true
         }
 
-        nameField = EditBox(textRenderer, leftX, topY, contentWidth, 20, Component.empty())
+        nameField = EditBox(font, leftX, topY, contentWidth, 20, Component.empty())
         nameField.setMaxLength(48)
-        nameField.text = draftName
+        nameField.value = draftName
         nameField.setResponder { draftName = it }
         addWidget(nameField)
         setInitialFocus(nameField)
 
-        searchField = EditBox(textRenderer, leftX, 272, contentWidth, 20, Component.empty())
-        searchField.text = searchQuery
+        searchField = EditBox(font, leftX, 272, contentWidth, 20, Component.empty())
+        searchField.value = searchQuery
         searchField.setResponder {
             searchQuery = it
             page = 0
@@ -108,7 +108,7 @@ class MagicSelectCustomMaskScreen(
                         selectedRuleIds.add(rule.id)
                     }
                     rebuildWidgets()
-                }.dimensions(ruleX, ruleY, 84, 20).build(),
+                }.bounds(ruleX, ruleY, 84, 20).build(),
             )
             ruleX += 92
             if ((index + 1) % 4 == 0) {
@@ -123,7 +123,7 @@ class MagicSelectCustomMaskScreen(
                     page -= 1
                     rebuildWidgets()
                 }
-            }.dimensions(centerX - 130, height - 34, 60, 20).build().apply {
+            }.bounds(centerX - 130, height - 34, 60, 20).build().apply {
                 active = page > 0
             },
         )
@@ -158,8 +158,8 @@ class MagicSelectCustomMaskScreen(
                     }
                 }
                 draftInitialized = false
-                close()
-            }.dimensions(centerX - 64, height - 34, 128, 20).build().apply {
+                onClose()
+            }.bounds(centerX - 64, height - 34, 128, 20).build().apply {
                 active = selectedRuleIds.isNotEmpty() || selectedBlockIds.isNotEmpty()
             },
         )
@@ -170,7 +170,7 @@ class MagicSelectCustomMaskScreen(
                     page += 1
                     rebuildWidgets()
                 }
-            }.dimensions(centerX + 70, height - 34, 60, 20).build().apply {
+            }.bounds(centerX + 70, height - 34, 60, 20).build().apply {
                 active = page + 1 < pageCount()
             },
         )
@@ -181,13 +181,13 @@ class MagicSelectCustomMaskScreen(
                 selectedBlockIds.clear()
                 excludedBlockIds.clear()
                 rebuildWidgets()
-            }.dimensions(centerX - 186, height - 62, 120, 20).build(),
+            }.bounds(centerX - 186, height - 62, 120, 20).build(),
         )
 
         addRenderableWidget(
             Button.builder(Component.translatable("gui.cancel")) {
-                close()
-            }.dimensions(centerX - 60, height - 62, 120, 20).build(),
+                onClose()
+            }.bounds(centerX - 60, height - 62, 120, 20).build(),
         )
 
         if (existingMask != null) {
@@ -199,8 +199,8 @@ class MagicSelectCustomMaskScreen(
                         parent.detachDeletedCustomMask(currentMask.id)
                     }
                     draftInitialized = false
-                    close()
-                }.dimensions(centerX + 70, height - 62, 120, 20).build(),
+                    onClose()
+                }.bounds(centerX + 70, height - 62, 120, 20).build(),
             )
         }
 
@@ -209,7 +209,7 @@ class MagicSelectCustomMaskScreen(
                 Button.builder(Component.empty()) {
                     toggleTile(tile.entry)
                     rebuildWidgets()
-                }.dimensions(tile.x, tile.y, tile.size, tile.size).build().apply {
+                }.bounds(tile.x, tile.y, tile.size, tile.size).build().apply {
                     setAlpha(0f)
                 },
             )
@@ -218,8 +218,8 @@ class MagicSelectCustomMaskScreen(
         updatePagingButtons()
     }
 
-    override fun close() {
-        client?.setScreen(parent)
+    override fun onClose() {
+        minecraft?.setScreen(parent)
     }
 
     override fun render(context: GuiGraphics, mouseX: Int, mouseY: Int, deltaTicks: Float) {
@@ -230,16 +230,16 @@ class MagicSelectCustomMaskScreen(
         val contentWidth = 360
         val leftX = centerX - (contentWidth / 2)
 
-        context.drawCenteredString(textRenderer, screenTitle(), centerX, 18, 0xFFFFFF)
+        context.drawCenteredString(font, screenTitle(), centerX, 18, 0xFFFFFF)
         context.drawCenteredString(
-            textRenderer,
+            font,
             Component.translatable(descriptionKey()),
             centerX,
             30,
             0xBFBFBF,
         )
         context.drawCenteredString(
-            textRenderer,
+            font,
             FormattedNameText.parse(nameField.text.ifEmpty { "New Custom Mask" }),
             centerX,
             62,
@@ -247,7 +247,7 @@ class MagicSelectCustomMaskScreen(
         )
 
         context.drawString(
-            textRenderer,
+            font,
             Component.translatable("axion.config.magic_select.custom_mask.name"),
             leftX,
             26,
@@ -256,7 +256,7 @@ class MagicSelectCustomMaskScreen(
         nameField.render(context, mouseX, mouseY, deltaTicks)
 
         context.drawString(
-            textRenderer,
+            font,
             Component.translatable("axion.config.magic_select.custom_mask.rules"),
             leftX,
             78,
@@ -264,7 +264,7 @@ class MagicSelectCustomMaskScreen(
         )
 
         context.drawString(
-            textRenderer,
+            font,
             Component.translatable("axion.config.magic_select.custom_mask.blocks"),
             leftX,
             250,
@@ -274,7 +274,7 @@ class MagicSelectCustomMaskScreen(
 
         val hoveredTile = tileBounds().firstOrNull { it.contains(mouseX.toDouble(), mouseY.toDouble()) }
         tileBounds().forEach { tile ->
-            val selected = isBlockSelected(tile.entry.id.toString(), tile.entry.block.defaultBlockState)
+            val selected = isBlockSelected(tile.entry.id.toString(), tile.entry.block.defaultBlockState())
             context.fill(tile.x, tile.y, tile.x + tile.size, tile.y + tile.size, 0xAA1A1A1A.toInt())
             context.drawStrokedRectangleCompat(
                 tile.x,
@@ -287,11 +287,11 @@ class MagicSelectCustomMaskScreen(
         }
 
         hoveredTile?.let { tile ->
-            context.drawTooltip(textRenderer, tile.entry.block.asItem().name, mouseX, mouseY)
+            context.drawTooltip(font, tile.entry.block.asItem().name, mouseX, mouseY)
         }
 
         context.drawCenteredString(
-            textRenderer,
+            font,
             Component.translatable("axion.config.magic_select.blocks.page", page + 1, pageCount().coerceAtLeast(1)),
             centerX,
             height - 48,
@@ -313,9 +313,9 @@ class MagicSelectCustomMaskScreen(
         val blockId = entry.id.toString()
         val selectedByRule = selectedRuleIds
             .mapNotNull(MagicSelectRule::fromId)
-            .any { rule -> rule.contains(entry.block.defaultBlockState) }
+            .any { rule -> rule.contains(entry.block.defaultBlockState()) }
         val selectedByCustom = blockId in selectedBlockIds
-        val selectedByEffectiveState = isBlockSelected(blockId, entry.block.defaultBlockState)
+        val selectedByEffectiveState = isBlockSelected(blockId, entry.block.defaultBlockState())
 
         if (selectedByEffectiveState) {
             if (selectedByCustom) {
@@ -381,7 +381,7 @@ class MagicSelectCustomMaskScreen(
         }
         return excludedBlockIds.any { blockId ->
             val block = Identifier.tryParse(blockId)?.let(VersionCompat.INSTANCE::getBlock) ?: return@any false
-            rule.contains(block.defaultBlockState)
+            rule.contains(block.defaultBlockState())
         }
     }
 

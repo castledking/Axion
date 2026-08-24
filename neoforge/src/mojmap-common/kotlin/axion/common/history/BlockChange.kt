@@ -1,4 +1,4 @@
-package axion.common.lastCommands
+package axion.common.history
 
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.core.BlockPos

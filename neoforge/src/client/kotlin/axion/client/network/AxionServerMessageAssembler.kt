@@ -8,7 +8,7 @@ object AxionServerMessageAssembler {
 
     private val partialTransfers = mutableMapOf<Long, PartialTransfer>()
 
-    fun consume(frameBytes: ByteArray, nowMillis: Long = System.currentTimeMs()): AxionServerMessage? {
+    fun consume(frameBytes: ByteArray, nowMillis: Long = System.currentTimeMillis()): AxionServerMessage? {
         evictExpired(nowMillis)
         return when (val frame = AxionTransportCodec.decodeServerFrame(frameBytes)) {
             is AxionTransportCodec.DecodedServerFrame.Complete -> frame.message
@@ -16,7 +16,7 @@ object AxionServerMessageAssembler {
         }
     }
 
-    fun evictExpired(nowMillis: Long = System.currentTimeMs()) {
+    fun evictExpired(nowMillis: Long = System.currentTimeMillis()) {
         partialTransfers.entries.removeAll { (_, partial) ->
             nowMillis - partial.startedAtMillis > CHUNK_TIMEOUT_MILLIS
         }

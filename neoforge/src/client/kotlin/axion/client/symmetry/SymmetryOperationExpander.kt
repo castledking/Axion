@@ -110,7 +110,7 @@ object SymmetryOperationExpander {
                 allPlacements[transformedPos] = SymmetryBlockPlacement(
                     pos = transformedPos,
                     state = placement.state,
-                    blockEntityData = placement.blockData?.copy(),
+                    blockEntityData = placement.blockEntityData?.copy(),
                 )
             }
         }
@@ -122,7 +122,7 @@ object SymmetryOperationExpander {
             .map { transform ->
                 StackRegionOperation(
                     sourceRegion = transformRegion(operation.sourceRegion, config, transform),
-                    clipboardBuffer = operation.clipboardScratchBuffer,
+                    clipboardBuffer = operation.clipboardBuffer,
                     step = SymmetryTransformService.transformVector(operation.step, transform),
                     repeatCount = operation.repeatCount,
                     keepExisting = operation.keepExisting,
@@ -136,7 +136,7 @@ object SymmetryOperationExpander {
             .map { transform ->
                 SmearRegionOperation(
                     sourceRegion = transformRegion(operation.sourceRegion, config, transform),
-                    clipboardBuffer = operation.clipboardScratchBuffer,
+                    clipboardBuffer = operation.clipboardBuffer,
                     step = SymmetryTransformService.transformVector(operation.step, transform),
                     repeatCount = operation.repeatCount,
                 )

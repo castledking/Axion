@@ -37,7 +37,7 @@ abstract class CameraNoClipMixin {
             noClipActive = ClientModeController.isNoClipActiveFor(player),
         )
         if (override != null) {
-            cir.sum = override
+            .returnValue = override
         }
     }
 }

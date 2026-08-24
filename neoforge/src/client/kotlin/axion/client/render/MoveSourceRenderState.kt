@@ -52,7 +52,7 @@ object MoveSourceRenderState {
     }
 
     fun suppressedState(worldIdentity: Any, x: Int, y: Int, z: Int): BlockState? {
-        return if (shouldSuppress(worldIdentity, x, y, z)) Blocks.AIR.defaultBlockState else null
+        return if (shouldSuppress(worldIdentity, x, y, z)) Blocks.AIR.defaultBlockState() else null
     }
 
     /**

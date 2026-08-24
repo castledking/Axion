@@ -45,7 +45,7 @@ object RepeatPreviewLayout {
 
         val normalized = sourceRegion.normalized()
         return (1..minOf(repeatCount, maxRegions)).map { index ->
-            normalized.offset(step.multiply(index)).normalized()
+            normalized.offset(step.scale(index)).normalized()
         }
     }
 
@@ -59,8 +59,8 @@ object RepeatPreviewLayout {
             return null
         }
 
-        val first = sourceRegion.normalized().offset(step.multiply(startIndex)).normalized()
-        val last = sourceRegion.normalized().offset(step.multiply(endIndex)).normalized()
+        val first = sourceRegion.normalized().offset(step.scale(startIndex)).normalized()
+        val last = sourceRegion.normalized().offset(step.scale(endIndex)).normalized()
         val min = BlockPos(
             minOf(first.minCorner().x, last.minCorner().x),
             minOf(first.minCorner().y, last.minCorner().y),

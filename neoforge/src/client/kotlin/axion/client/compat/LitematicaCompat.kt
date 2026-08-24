@@ -42,7 +42,7 @@ object LitematicaCompat {
         return runCatching {
             val field = genericClass.getField("TOOL_ITEM")
             val config = field.get(null) ?: return null
-            val method = stringClass.getMethodName("getStringValue")
+            val method = stringClass.getMethod("getStringValue")
             val configured = method.invoke(config) as? String ?: return null
             configured
                 .substringBefore("[")
@@ -58,7 +58,7 @@ object LitematicaCompat {
         return runCatching {
             val field = genericClass.getField("TOOL_ITEM_ENABLED")
             val config = field.get(null) ?: return false
-            val method = booleanClass.getMethodName("getBooleanValue")
+            val method = booleanClass.getMethod("getBooleanValue")
             method.invoke(config) as? Boolean ?: false
         }.getOrDefault(false)
     }

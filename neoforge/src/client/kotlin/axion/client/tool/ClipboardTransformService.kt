@@ -20,7 +20,7 @@ object ClipboardTransformService {
                 ClipboardCell(
                     offset = transformedOffset(buffer.size, cell.offset, transform),
                     state = transformState(cell.state, transform),
-                    blockEntityData = cell.blockData?.copy(),
+                    blockEntityData = cell.blockEntityData?.copy(),
                 )
             },
         )

@@ -1,7 +1,7 @@
 # NeoForge migration status (feat/neoforge)
 
-Last updated: 2026-08-24. Compile state: `:neoforge:compileKotlin` = **1451 errors** (down
-from "nothing resolves"); fabric build untouched and green.
+Last updated: 2026-08-24 (WIP #2). Compile state: `:neoforge:compileKotlin` = **728 errors**
+(down from 1451 after WIP #1; fabric untouched and green).
 
 ## What was done
 
@@ -34,24 +34,40 @@ from "nothing resolves"); fabric build untouched and green.
      `common/src/main/kotlin`, then run apply_renames.py over `neoforge/src`.
      WARNING: mojmap-common is untracked — `git checkout` does NOT restore it.
 
-## What remains (~1451 diagnostics, concentrated in ~12 files)
+## What remains (~728 diagnostics, concentrated in ~10 files)
 
-Top files: ClientModeController.kt (208), VersionCompatImpl.kt (173),
-PulsingCuboidRenderer.kt (163), MagicSelectRule.kt (163), SelectionBounds.kt (125),
-LocalEntityCloneService.kt (115). These are genuine API-shape divergences no mapping table
-covers, e.g.:
+Top files: VersionCompatImpl.kt (96), AxionHotbarHud.kt (59), MagicSelectRule.kt (42),
+AxionBlockTessellator.kt (41), PreviewDirectionArrowRenderer.kt (32). These are genuine
+API-shape divergences no mapping table covers.
 
-| Yarn idiom | Mojmap equivalent |
-|---|---|
-| `client.world` (field, nullable) | `minecraft.level` (field, non-null) |
-| `player.world` / `entity.world` | `player.level()` / `entity.level()` (method!) |
-| `drawContext.textRenderer` | `guiGraphics.getFont()` / `.font` per receiver |
-| `Button.builder(msg){}.dimensions(x,y,w,h)` | `Button.builder(msg).bounds(x,y,w,h).build()` with `.onPress{}` |
-| `BufferBuilder.vertex(...)` | `addVertex(...)` (present but receiver-typed) |
-| ambiguous `camera`, `pos`, `dimensions`, `INSTANCE` | depends on owner class |
+### Patterns already fixed (do not regress)
+- `client.world` → `client.level`; entity `.world` → `.level()`
+- `client.server` → `client.singleplayerServer`; `client.interactionManager` → `client.gameMode`
+- `GLFW.PRESS/KEY_*SHIFT` → real LWJGL names (LWJGL is never remapped)
+- fabric-only `Method.wasAccessibleSinceLastSave` assignments stripped (interface injection)
+- package corruption repaired: `axion.common.history`, `blaze3d.vertex` (was addVertex)
+- `Identifier` IS `net.minecraft.resources.Identifier` in 1.21.11 (Mojang renamed
+  ResourceLocation → Identifier upstream!). Factories: `Identifier.of(ns, path)`,
+  `.parse(s)`, `fromNamespaceAndPath`.
+- `RegistryOps.of` → `RegistryOps.create`
+- `.dimensions(` → `.bounds(`; `GuiGraphics.guiWidth/guiHeight`;
+  Window keeps `guiScaledWidth`
+- `ClipContext.ShapeType/FluidHandling` → `ClipContext.Block/Fluid`
+- `gameRenderer.camera` → `mainCamera`; `client.mouse` → `mouseHandler`
+- `ci.returnValue` (CallbackInfoReturnable) — beware bogus map entries
+  (`returnValue→sum`, `sumOf→accumulate`, `currentTimeMillis→currentTimeMs`,
+  `removeLast→discardLast`, `stack→DATA_ITEM`) — all reverted; if new bogus renames
+  appear, check rename.json for stdlib/JDK collisions.
+- MatrixStack.Entry import → `com.mojang.blaze3d.vertex.PoseStack.Pose`
+- `font.getWidth(` → `font.width(`; Direction offsetX/Y/Z → stepX/Y/Z;
+  VertexConsumer `.color/.normal` → `.setColor/.setNormal`
 
-Suggested loop for the remaining work: compile → group errors by message+file → fix the
-top pattern → repeat. Each fixed pattern typically clears 20–60 diagnostics.
+### Suggested next loop
+1. `grep "^e:" errs | grep -oE "'[a-zA-Z.]+'" | sort | uniq -c | sort -rn`
+2. Fix the top pattern with a scoped python rule or by hand.
+3. Recompile, repeat. Each fixed pattern clears ~5-30 diagnostics.
+VersionCompatImpl needs the most thought: it bridges text/item/registry APIs that changed
+shape between mappings (EditBox.value, Font.width, ItemStack hints, drawItem → renderItem...).
 
 ## Build commands
 

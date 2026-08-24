@@ -2,7 +2,7 @@ package axion.client.network
 
 import axion.client.compat.VersionCompatImpl
 import axion.common.compat.VersionCompat
-import axion.common.lastCommands.EntityCloneChange
+import axion.common.history.EntityCloneChange
 import axion.common.operation.DeleteEntitiesOperation
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.player.Player

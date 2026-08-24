@@ -56,7 +56,7 @@ object VanillaHudButtonStore {
             ?.takeIf { it.spec == spec }
             ?.widget
             ?: Button.builder(Component.literal(label)) { }
-                .dimensions(x, y, width, height)
+                .bounds(x, y, width, height)
                 .build()
                 .also { buttons[key] = CachedButton(spec, it) }
 

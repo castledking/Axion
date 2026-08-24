@@ -8,7 +8,6 @@ import axion.common.model.BlockRegion
 import axion.common.model.ClipboardBuffer
 import net.minecraft.client.Minecraft
 import axion.client.compat.add
-import axion.client.compat.toImmutable
 import axion.protocol.EntitySelectionMask
 
 object StackPlacementService {
@@ -88,7 +87,7 @@ object StackPlacementService {
             CloneEntitiesOperation(
                 entitySelection = entitySelection,
                 sourceRegion = sourceRegion,
-                destinationOrigin = sourceOrigin.add(step.multiply(index)).toImmutable(),
+                destinationOrigin = sourceOrigin.add(step.scale(index)).immutable(),
             )
         }
     }

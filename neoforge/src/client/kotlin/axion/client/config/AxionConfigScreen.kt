@@ -26,7 +26,7 @@ class AxionConfigScreen(
                     AxionClientConfig.setUseCommandModifierOnMac(!AxionClientConfig.useCommandModifierOnMac())
                     rebuildWidgets()
                 }
-            }.dimensions(centerX - 110, centerY - 55, 220, 20).build().apply {
+            }.bounds(centerX - 110, centerY - 55, 220, 20).build().apply {
                 active = macOnly
             },
         )
@@ -40,20 +40,20 @@ class AxionConfigScreen(
                     AxionClientConfig.setUseSuperModifierOnLinux(!AxionClientConfig.useSuperModifierOnLinux())
                     rebuildWidgets()
                 }
-            }.dimensions(centerX - 110, centerY - 30, 220, 20).build().apply {
+            }.bounds(centerX - 110, centerY - 30, 220, 20).build().apply {
                 active = linuxOnly
             },
         )
 
         infiniteReachRangeField = EditBox(
-            textRenderer,
+            font,
             centerX + 20,
             centerY - 5,
             90,
             20,
             Component.translatable("axion.config.infinite_reach_range"),
         ).apply {
-            text = InfiniteReachRange.display(AxionClientConfig.configuredInfiniteReachRange())
+            value = InfiniteReachRange.display(AxionClientConfig.configuredInfiniteReachRange())
             setMaxLength(12)
             setChangedListener { input ->
                 when {
@@ -70,19 +70,19 @@ class AxionConfigScreen(
             Button.builder(
                 Component.translatable("axion.config.magic_select.templates.button"),
             ) {
-                client?.setScreen(MagicSelectMaskConfigScreen(this))
-            }.dimensions(centerX - 110, centerY + 25, 220, 20).build(),
+                minecraft?.setScreen(MagicSelectMaskConfigScreen(this))
+            }.bounds(centerX - 110, centerY + 25, 220, 20).build(),
         )
 
         addRenderableWidget(
             Button.builder(Component.translatable("gui.done")) {
-                close()
-            }.dimensions(centerX - 100, centerY + 60, 200, 20).build(),
+                onClose()
+            }.bounds(centerX - 100, centerY + 60, 200, 20).build(),
         )
     }
 
-    override fun close() {
-        client?.setScreen(parent)
+    override fun onClose() {
+        minecraft?.setScreen(parent)
     }
 
     override fun render(context: GuiGraphics, mouseX: Int, mouseY: Int, deltaTicks: Float) {
@@ -90,9 +90,9 @@ class AxionConfigScreen(
         context.fill(0, 0, width, height, 0xB0101010.toInt())
         super.render(context, mouseX, mouseY, deltaTicks)
 
-        context.drawCenteredString(textRenderer, title, width / 2, 28, 0xFFFFFF)
+        context.drawCenteredString(font, title, width / 2, 28, 0xFFFFFF)
         context.drawString(
-            textRenderer,
+            font,
             Component.translatable("axion.config.infinite_reach_range"),
             (width / 2) - 110,
             (height / 2) + 1,

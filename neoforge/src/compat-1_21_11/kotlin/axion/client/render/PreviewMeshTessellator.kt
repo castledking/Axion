@@ -8,7 +8,6 @@ import net.minecraft.world.level.block.RenderShape
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.core.BlockPos
 import net.minecraft.world.phys.AABB
-import net.minecraft.util.math.Axis
 import net.minecraft.core.Direction
 import net.minecraft.core.Vec3i
 import java.util.LinkedHashMap
@@ -129,9 +128,9 @@ object PreviewMeshTessellator {
                 }
                 Direction.entries.forEach { face ->
                     val neighborKey = BlockPos.asLong(
-                        cell.offset.x + face.offsetX,
-                        cell.offset.y + face.offsetY,
-                        cell.offset.z + face.offsetZ,
+                        cell.offset.x + face.stepX,
+                        cell.offset.y + face.stepY,
+                        cell.offset.z + face.stepZ,
                     )
                     val neighbor = statesByOffset[neighborKey]
                     if (PreviewOcclusionPolicy.isFaceExposed(neighbor, PreviewOcclusionCompat::isOpaqueFullCube)) {
@@ -230,9 +229,9 @@ object PreviewMeshTessellator {
         face: Direction,
     ): Pair<Int, Int> {
         return when (face.axis) {
-            Axis.X -> blockPos.z to blockPos.y
-            Axis.Y -> blockPos.x to blockPos.z
-            Axis.Z -> blockPos.x to blockPos.y
+            Direction.Axis.X -> blockPos.z to blockPos.y
+            Direction.Axis.Y -> blockPos.x to blockPos.z
+            Direction.Axis.Z -> blockPos.x to blockPos.y
         }
     }
 

@@ -32,8 +32,8 @@ class MagicSelectMaskConfigScreen(
         addRenderableWidget(
             Button.builder(Component.translatable("axion.config.magic_select.add.button")) {
                 val templateId = AxionClientConfig.addMagicSelectTemplate()
-                client?.setScreen(MagicSelectTemplateEditScreen(this, templateId))
-            }.dimensions(leftX, y, contentWidth, 20).build(),
+                minecraft?.setScreen(MagicSelectTemplateEditScreen(this, templateId))
+            }.bounds(leftX, y, contentWidth, 20).build(),
         )
         y += 30
 
@@ -41,7 +41,7 @@ class MagicSelectMaskConfigScreen(
             Button.builder(Component.translatable("axion.config.magic_select.disable_all.button")) {
                 AxionClientConfig.disableAllMagicSelectTemplates()
                 rebuildWidgets()
-            }.dimensions(leftX, y, contentWidth, 20).build(),
+            }.bounds(leftX, y, contentWidth, 20).build(),
         )
         y += 30
 
@@ -49,7 +49,7 @@ class MagicSelectMaskConfigScreen(
             Button.builder(sameBlockSelectLabel()) {
                 AxionClientConfig.toggleSameBlockMagicSelect()
                 rebuildWidgets()
-            }.dimensions(leftX, y, contentWidth, 20).build(),
+            }.bounds(leftX, y, contentWidth, 20).build(),
         )
         y += 30
 
@@ -62,41 +62,41 @@ class MagicSelectMaskConfigScreen(
                 Button.builder(toggleLabel(template.name, template.enabled)) {
                     AxionClientConfig.setMagicSelectTemplateEnabled(template.id, !template.enabled)
                     rebuildWidgets()
-                }.dimensions(toggleX, y, toggleWidth, 20).build(),
+                }.bounds(toggleX, y, toggleWidth, 20).build(),
             )
             addRenderableWidget(
                 Button.builder(Component.translatable("axion.config.magic_select.editWorld.button")) {
-                    client?.setScreen(MagicSelectTemplateEditScreen(this, template.id))
-                }.dimensions(leftX + contentWidth - 50, y, 50, 20).build(),
+                    minecraft?.setScreen(MagicSelectTemplateEditScreen(this, template.id))
+                }.bounds(leftX + contentWidth - 50, y, 50, 20).build(),
             )
             y += 24
         }
 
         addRenderableWidget(
             Button.builder(Component.translatable("gui.back")) {
-                close()
-            }.dimensions(centerX - 100, height - 34, 200, 20).build(),
+                onClose()
+            }.bounds(centerX - 100, height - 34, 200, 20).build(),
         )
     }
 
-    override fun close() {
-        client?.setScreen(parent)
+    override fun onClose() {
+        minecraft?.setScreen(parent)
     }
 
     override fun render(context: GuiGraphics, mouseX: Int, mouseY: Int, deltaTicks: Float) {
         context.fill(0, 0, width, height, 0xB0101010.toInt())
         super.render(context, mouseX, mouseY, deltaTicks)
 
-        context.drawCenteredString(textRenderer, title, width / 2, 20, 0xFFFFFF)
+        context.drawCenteredString(font, title, width / 2, 20, 0xFFFFFF)
         context.drawCenteredString(
-            textRenderer,
+            font,
             Component.translatable("axion.config.magic_select.description"),
             width / 2,
             34,
             0xBFBFBF,
         )
         context.drawCenteredString(
-            textRenderer,
+            font,
             Component.translatable("axion.config.magic_select.description2"),
             width / 2,
             44,

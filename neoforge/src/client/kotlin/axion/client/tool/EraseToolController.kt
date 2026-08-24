@@ -8,7 +8,6 @@ import axion.common.model.BlockRegion
 import axion.common.model.ClipboardState
 import axion.common.model.SelectionState
 import net.minecraft.client.Minecraft
-import axion.client.compat.toImmutable
 
 object EraseToolController {
     fun onEndTick(client: Minecraft) {
@@ -22,7 +21,7 @@ object EraseToolController {
             return false
         }
 
-        val blockPos = SelectionController.currentTarget().blockPosOrNull()?.toImmutable() ?: return false
+        val blockPos = SelectionController.currentTarget().blockPosOrNull()?.immutable() ?: return false
         val nextState = EraseToolState.FirstCornerSet(blockPos)
         AxionClientState.updateEraseToolState(nextState)
         AxionClientState.updateClipboard(ClipboardState.Empty)
@@ -35,7 +34,7 @@ object EraseToolController {
             return false
         }
 
-        val secondCorner = SelectionController.currentTarget().blockPosOrNull()?.toImmutable() ?: return false
+        val secondCorner = SelectionController.currentTarget().blockPosOrNull()?.immutable() ?: return false
         val firstCorner = when (val state = AxionClientState.eraseToolState) {
             // Nothing has been selected yet, so right click is free to mean the
             // instant connected erase rather than "close the box".
@@ -88,12 +87,12 @@ object EraseToolController {
         }
 
         when (val state = AxionClientState.eraseToolState) {
-            is EraseToolState.RegionDefined -> RegionEraseService.erase(state.region, state.clipboardScratchBuffer)
+            is EraseToolState.RegionDefined -> RegionEraseService.erase(state.region, state.clipboardBuffer)
             EraseToolState.Idle,
             is EraseToolState.FirstCornerSet,
                 -> {
                 val magic = AxionClientState.clipboardState as? ClipboardState.MagicSelection ?: return false
-                RegionEraseService.erase(magic.region, magic.clipboardScratchBuffer)
+                RegionEraseService.erase(magic.region, magic.clipboardBuffer)
             }
         }
         reset()
@@ -106,27 +105,27 @@ object EraseToolController {
      * radius. There is no preview to confirm, so nothing is rendered for it.
      */
     fun handleConnectedErase(client: Minecraft): Boolean {
-        val world = client.world ?: return false
-        val seed = SelectionController.currentTarget().blockPosOrNull()?.toImmutable() ?: return false
+        val world = client.level ?: return false
+        val seed = SelectionController.currentTarget().blockPosOrNull()?.immutable() ?: return false
         val result = MagicSelectionService.select(
             world = world,
             center = seed,
             radius = EraseBrushSize.radius(),
         ) ?: return false
-        RegionEraseService.erase(result.region, result.clipboardScratchBuffer)
+        RegionEraseService.erase(result.region, result.clipboardBuffer)
         return true
     }
 
     private fun magicSelect(
         client: Minecraft,
     ): Boolean {
-        val world = client.world ?: return false
-        val seed = SelectionController.currentTarget().blockPosOrNull()?.toImmutable() ?: return false
+        val world = client.level ?: return false
+        val seed = SelectionController.currentTarget().blockPosOrNull()?.immutable() ?: return false
         val result = MagicSelectionService.select(world, seed) ?: return false
         val merged = when (val clipboardState = AxionClientState.clipboardState) {
             is ClipboardState.MagicSelection -> MagicSelectionService.merge(
                 existingRegion = clipboardState.region,
-                existingClipboard = clipboardState.clipboardScratchBuffer,
+                existingClipboard = clipboardState.clipboardBuffer,
                 addition = result,
             )
             ClipboardState.Empty -> result
@@ -134,7 +133,7 @@ object EraseToolController {
         AxionClientState.updateClipboard(
             ClipboardState.MagicSelection(
                 region = merged.region,
-                clipboardBuffer = merged.clipboardScratchBuffer,
+                clipboardBuffer = merged.clipboardBuffer,
             ),
         )
         return true

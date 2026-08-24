@@ -16,7 +16,7 @@ object SelectionController {
     fun onEndTick(client: Minecraft) {
         val modeActive = AxionClientState.globalModeState.infiniteReachEnabled
         currentTarget = if (AxionToolSelectionController.isAxionSlotActive() || modeActive) {
-            SelectionRaycast.raycast(
+            SelectionRaycast.clip(
                 client,
                 if (AxionToolSelectionController.isAxionSlotActive()) {
                     AxionTargeting.DEFAULT_REACH
@@ -47,7 +47,7 @@ object SelectionController {
         }
 
         val blockPos = currentTarget.blockPosOrNull() ?: return false
-        AxionClientState.updateSelection(SelectionState.FirstCornerSet(blockPos.toImmutable()))
+        AxionClientState.updateSelection(SelectionState.FirstCornerSet(blockPos.immutable()))
         return true
     }
 
@@ -61,10 +61,10 @@ object SelectionController {
             SelectionState.Idle -> return false
             is SelectionState.FirstCornerSet -> SelectionState.RegionDefined(
                 firstCorner = state.vert0,
-                secondCorner = blockPos.toImmutable(),
+                secondCorner = blockPos.immutable(),
             )
 
-            is SelectionState.RegionDefined -> state.copy(secondCorner = blockPos.toImmutable())
+            is SelectionState.RegionDefined -> state.copy(secondCorner = blockPos.immutable())
         }
 
         AxionClientState.updateSelection(nextState)
@@ -78,7 +78,7 @@ object SelectionController {
     }
 
     fun expandRegionToCurrentTarget(client: Minecraft, region: BlockRegion): BlockRegion? {
-        val targetBlock = currentTarget.blockPosOrNull()?.toImmutable()
+        val targetBlock = currentTarget.blockPosOrNull()?.immutable()
         val targetHitPos = currentTarget.hitPosOrNull()
         if (targetBlock != null && targetHitPos != null) {
             val outwardFace = SelectionBounds.outwardFaceToward(region, targetBlock, targetHitPos)
@@ -100,8 +100,8 @@ object SelectionController {
         val cameraEntity = client.cameraEntity ?: client.player ?: return null
         val faceHit = SelectionBounds.raycastFace(
             region = region,
-            origin = cameraEntity.getCameraPosVec(1.0f),
-            direction = cameraEntity.getRotationVec(1.0f),
+            origin = cameraEntity.getEyePosition(1.0f),
+            direction = cameraEntity.getViewVector(1.0f),
             maxDistance = AxionTargeting.DEFAULT_REACH,
         ) ?: currentTarget.hitPosOrNull()?.let { hitPos ->
             SelectionBounds.FaceHit(

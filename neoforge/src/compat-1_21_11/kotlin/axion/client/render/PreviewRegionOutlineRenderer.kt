@@ -21,7 +21,7 @@ object PreviewRegionOutlineRenderer {
         }
 
         val client = Minecraft.getInstance()
-        val camera = client.gameRenderer.camera ?: return false
+        val camera = client.gameRenderer.mainCamera ?: return false
         val cameraPos = CameraAccess.getPos(camera)
         val region = ChunkedPreviewRegion.getOrBuild(
             clipboard = clipboard,

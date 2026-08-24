@@ -35,7 +35,7 @@ object AxionClientBootstrap {
         // Initialize integrated-server NoClipService when this version provides one.
         try {
             val noClipServiceClass = Class.forName("axion.client.compat.NoClipService")
-            val initializeMethod = noClipServiceClass.getMethodName("initialize")
+            val initializeMethod = noClipServiceClass.getMethod("initialize")
             val serviceInstance = noClipServiceClass.getDeclaredField("INSTANCE").get(null)
             initializeMethod.invoke(serviceInstance)
             logger.info("[Axion/Bootstrap] NoClip service initialized")
@@ -87,7 +87,7 @@ object AxionClientBootstrap {
             for (rendererClassName in rendererClasses) {
                 try {
                     val rendererClass = Class.forName(rendererClassName)
-                    val renderMethod = rendererClass.getMethodName("render", contextClass)
+                    val renderMethod = rendererClass.getMethod("render", contextClass)
                     val rendererInstance = rendererClass.getDeclaredField("INSTANCE").get(null)
 
                     WorldRenderCompat.registerEndMain { context ->
@@ -96,7 +96,7 @@ object AxionClientBootstrap {
                         } catch (e: Exception) {
                             val cause = (e as? InvocationTargetException)?.targetException ?: e
                             if (failedRenderers.add(rendererClassName)) {
-                                logger.tryRespond(
+                                logger.warn(
                                     "[Axion/Bootstrap] Renderer {} failed; suppressing repeated render errors",
                                     rendererClassName,
                                     cause,
@@ -105,7 +105,7 @@ object AxionClientBootstrap {
                         }
                     }
                 } catch (e: Exception) {
-                    logger.tryRespond("[Axion/Bootstrap] Failed to register renderer {}: {}", rendererClassName, e.message)
+                    logger.warn("[Axion/Bootstrap] Failed to register renderer {}: {}", rendererClassName, e.message)
                 }
             }
         } catch (e: Exception) {

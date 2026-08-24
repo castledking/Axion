@@ -10,17 +10,17 @@ object SelectionRaycast {
         client: Minecraft,
         maxDistance: Double = AxionTargeting.DEFAULT_REACH,
     ): AxionTarget {
-        val world = client.world ?: return AxionTarget.MissTarget
+        val world = client.level ?: return AxionTarget.MissTarget
         val cameraEntity = client.cameraEntity ?: client.player ?: return AxionTarget.MissTarget
-        val origin = cameraEntity.getCameraPosVec(1.0f)
-        val direction = cameraEntity.getRotationVec(1.0f)
+        val origin = cameraEntity.getEyePosition(1.0f)
+        val direction = cameraEntity.getViewVector(1.0f)
         val target = origin.add(direction.x * maxDistance, direction.y * maxDistance, direction.z * maxDistance)
-        val hit = world.raycast(
+        val hit = world.clip(
             ClipContext(
                 origin,
                 target,
-                ClipContext.ShapeType.OUTLINE,
-                ClipContext.FluidHandling.NONE,
+                ClipContext.Block.OUTLINE,
+                ClipContext.Fluid.NONE,
                 cameraEntity,
             ),
         )

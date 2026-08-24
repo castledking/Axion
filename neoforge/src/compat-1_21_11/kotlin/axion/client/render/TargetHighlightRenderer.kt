@@ -18,7 +18,7 @@ object TargetHighlightRenderer {
     fun render(context: AxionWorldRenderContext) {
         val blockPos = currentTargetForRender() ?: return
         val client = Minecraft.getInstance()
-        val camera = client.gameRenderer.camera ?: return
+        val camera = client.gameRenderer.mainCamera ?: return
         val cameraPos = CameraAccess.getPos(camera)
         val consumers = context.consumers()
         val renderLayer = try {
@@ -54,6 +54,6 @@ object TargetHighlightRenderer {
         if (target == AxionTarget.MissTarget) {
             return null
         }
-        return target.blockPosOrNull()?.toImmutable()
+        return target.blockPosOrNull()?.immutable()
     }
 }

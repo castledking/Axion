@@ -7,7 +7,7 @@ import net.minecraft.core.Vec3i
 // Required for cross-version import compatibility. Call sites resolve to the member
 // when one exists (1.21.x); on 26.1 only the extension exists.
 @Suppress("EXTENSION_SHADOWED_BY_MEMBER")
-fun BlockPos.toImmutable(): BlockPos = BlockPos(x, y, z)
+fun BlockPos.immutable(): BlockPos = BlockPos(x, y, z)
 
 fun BlockPos.add(x: Int, y: Int, z: Int): BlockPos = BlockPos(this.x + x, this.y + y, this.z + z)
 fun BlockPos.add(vec: Vec3i): BlockPos = add(vec.x, vec.y, vec.z)

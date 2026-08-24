@@ -1,8 +1,8 @@
 package axion.client.render
 
-import com.mojang.blaze3d.addVertex.VertexConsumer
-import net.minecraft.client.util.math.Entry
-import com.mojang.blaze3d.addVertex.PoseStack
+import com.mojang.blaze3d.vertex.VertexConsumer
+import com.mojang.blaze3d.vertex.PoseStack.Pose
+import com.mojang.blaze3d.vertex.PoseStack
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.shapes.VoxelShape
 import java.lang.reflect.Method
@@ -192,7 +192,7 @@ object VertexRenderingCompat {
 
     private fun emitLine(
         consumer: VertexConsumer,
-        entry: Entry,
+        entry: Pose,
         x1: Float, y1: Float, z1: Float,
         x2: Float, y2: Float, z2: Float,
         red: Int, green: Int, blue: Int, alpha: Int,
@@ -202,9 +202,9 @@ object VertexRenderingCompat {
         val normalY = (y2 - y1).coerceIn(-1f, 1f)
         val normalZ = (z2 - z1).coerceIn(-1f, 1f)
         val lwm = lineWidthMethod
-        consumer.addVertex(entry, x1, y1, z1).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
+        consumer.addVertex(entry, x1, y1, z1).setColor(red, green, blue, alpha).setNormal(entry, normalX, normalY, normalZ)
         lwm?.invoke(consumer, lineWidth)
-        consumer.addVertex(entry, x2, y2, z2).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
+        consumer.addVertex(entry, x2, y2, z2).setColor(red, green, blue, alpha).setNormal(entry, normalX, normalY, normalZ)
         lwm?.invoke(consumer, lineWidth)
     }
 

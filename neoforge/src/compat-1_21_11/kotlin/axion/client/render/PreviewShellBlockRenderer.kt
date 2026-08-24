@@ -28,8 +28,8 @@ object PreviewShellBlockRenderer {
         }
 
         val client = Minecraft.getInstance()
-        val world = client.world ?: return false
-        val camera = client.gameRenderer.camera ?: return false
+        val world = client.level ?: return false
+        val camera = client.gameRenderer.mainCamera ?: return false
         val cameraPos = CameraAccess.getPos(camera)
         val matrixStack = context.matrices()
         val alphaScale = alpha / 255.0f
@@ -77,7 +77,7 @@ object PreviewShellBlockRenderer {
         return rendered > 0
     }
 
-    private fun applyScale(matrixStack: com.mojang.blaze3d.addVertex.PoseStack, scale: Float) {
+    private fun applyScale(matrixStack: com.mojang.blaze3d.vertex.PoseStack, scale: Float) {
         if (scale == 1.0f) {
             return
         }

@@ -13,10 +13,10 @@ import axion.common.model.ClipboardBuffer
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.client.Minecraft
-import com.mojang.blaze3d.addVertex.BufferBuilder
-import com.mojang.blaze3d.addVertex.MeshData
-import com.mojang.blaze3d.addVertex.ByteBufferBuilder
-import com.mojang.blaze3d.addVertex.PoseStack
+import com.mojang.blaze3d.vertex.BufferBuilder
+import com.mojang.blaze3d.vertex.MeshData
+import com.mojang.blaze3d.vertex.ByteBufferBuilder
+import com.mojang.blaze3d.vertex.PoseStack
 import net.minecraft.client.multiplayer.ClientLevel
 import net.minecraft.core.BlockPos
 import net.minecraft.world.phys.Vec3
@@ -37,7 +37,7 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
     private var lastLogTime: Long = 0
     private fun shouldLog(): Boolean {
         if (!DEBUG_LOG) return false
-        val now = System.currentTimeMs()
+        val now = System.currentTimeMillis()
         if (now - lastLogTime < LOG_INTERVAL_MS) return false
         lastLogTime = now
         return true
@@ -152,7 +152,7 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
         if (store.isEmpty()) return ChunkedDrawResult.NO_BUFFERS
 
         val client = Minecraft.getInstance()
-        val world = client.world ?: return ChunkedDrawResult.FAILED
+        val world = client.level ?: return ChunkedDrawResult.FAILED
 
         val log = shouldLog()
         val dirtyCountBefore = if (log) store.dirtySnapshot().size else 0
@@ -162,7 +162,7 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
         } catch (t: Throwable) {
             if (!loggedUploadFailure) {
                 loggedUploadFailure = true
-                logger.tryRespond("[Axion GPU] GPU buffer upload failed in session={} — falling back to legacy CPU path", previewId, t)
+                logger.warn("[Axion GPU] GPU buffer upload failed in session={} — falling back to legacy CPU path", previewId, t)
             }
             renderLegacy(context, world, color, alpha, translationDelta)
             return ChunkedDrawResult.DREW
@@ -182,7 +182,7 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
             return ChunkedDrawResult.DREW
         }
 
-        val camera = client.gameRenderer.camera ?: return ChunkedDrawResult.FAILED
+        val camera = client.gameRenderer.mainCamera ?: return ChunkedDrawResult.FAILED
         val cameraPos = CameraAccess.getPos(camera)
         val baseModelView = Matrix4f(context.matrices().last().pose)
         return drawDeferred(color, alpha, translationDelta, baseModelView, cameraPos)
@@ -230,7 +230,7 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
                     chunkBuffers.remove(sectionKey)?.close()
                     if (!loggedUploadFailure) {
                         loggedUploadFailure = true
-                        logger.tryRespond("[Axion GPU] GPU buffer upload failed for section in session={}", previewId, t)
+                        logger.warn("[Axion GPU] GPU buffer upload failed for section in session={}", previewId, t)
                     }
                 }
                 builtBuffer.close()
@@ -284,7 +284,7 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
         translationDelta: Vec3i,
     ) {
         val client = Minecraft.getInstance()
-        val camera = client.gameRenderer.camera ?: return
+        val camera = client.gameRenderer.mainCamera ?: return
         val cameraPos = CameraAccess.getPos(camera)
         val consumer = TintedAlphaVertexConsumer(
             context.consumers().getBuffer(RenderLayerCompat.blockTranslucentCull()),

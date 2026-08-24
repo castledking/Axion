@@ -5,10 +5,10 @@ import axion.common.model.ClipboardBuffer
 import axion.common.model.ClipboardCell
 import com.mojang.blaze3d.systems.RenderSystem
 import net.minecraft.client.Minecraft
-import com.mojang.blaze3d.addVertex.MeshData
-import com.mojang.blaze3d.addVertex.BufferBuilder
+import com.mojang.blaze3d.vertex.MeshData
+import com.mojang.blaze3d.vertex.BufferBuilder
 import net.minecraft.client.renderer.rendertype.RenderType
-import com.mojang.blaze3d.addVertex.ByteBufferBuilder
+import com.mojang.blaze3d.vertex.ByteBufferBuilder
 import net.minecraft.core.BlockPos
 import java.util.LinkedHashMap
 
@@ -109,7 +109,7 @@ object AxionPreviewTemplateCache {
         if (entry.cachedVertexData.isEmpty() || origins.isEmpty()) return
 
         val client = Minecraft.getInstance()
-        val camera = client.gameRenderer.camera ?: return
+        val camera = client.gameRenderer.mainCamera ?: return
         val cameraPos = CameraAccess.getPos(camera)
         val modelViewStack = RenderSystem.getModelViewStack()
         val scale = entry.scale
@@ -191,7 +191,7 @@ object AxionPreviewTemplateCache {
         maxBlocks: Int,
     ): MeshData? {
         val client = Minecraft.getInstance()
-        val world = client.world ?: return null
+        val world = client.level ?: return null
         val alphaScale = alpha / 255.0f
 
         val surfaceCells = filterSurfaceCells(clipboard.nonAirCells())
@@ -218,7 +218,7 @@ object AxionPreviewTemplateCache {
         // incorrect (often dark) light values for these positions.
         val consumer = TintedAlphaVertexConsumer(bufferBuilder, alphaScale, color, fullBright = true)
 
-        val tessellateStack = com.mojang.blaze3d.addVertex.PoseStack()
+        val tessellateStack = com.mojang.blaze3d.vertex.PoseStack()
 
         // Tessellate at offset positions with camera at (0,0,0)
         val rendered = AxionBlockTessellator.tessellateBatch(
@@ -244,9 +244,9 @@ object AxionPreviewTemplateCache {
             if (cell.state.isAir) return@filter false
             net.minecraft.core.Direction.entries.any { face ->
                 val neighborKey = BlockPos.asLong(
-                    cell.offset.x + face.offsetX,
-                    cell.offset.y + face.offsetY,
-                    cell.offset.z + face.offsetZ,
+                    cell.offset.x + face.stepX,
+                    cell.offset.y + face.stepY,
+                    cell.offset.z + face.stepZ,
                 )
                 val neighborState = stateByPos[neighborKey]
                 neighborState == null || !neighborState.isSolidRender

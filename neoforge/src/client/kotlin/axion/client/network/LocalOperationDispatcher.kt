@@ -27,7 +27,7 @@ class LocalOperationDispatcher : OperationDispatcher {
         VersionCompat.INSTANCE.serverExecute(server, Runnable {
             val targetWorld = VersionCompat.INSTANCE.serverGetWorld(server, worldKey)
             if (targetWorld == null) {
-                AxionMod.LOGGER.tryRespond("Dropping operation {} because no integrated server world is available", operation.kind)
+                AxionMod.LOGGER.warn("Dropping operation {} because no integrated server world is available", operation.kind)
                 return@Runnable
             }
 

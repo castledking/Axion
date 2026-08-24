@@ -9,9 +9,9 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.LightTexture
 import net.minecraft.client.renderer.texture.OverlayTexture
 import net.minecraft.client.renderer.rendertype.RenderType
-import com.mojang.blaze3d.addVertex.VertexConsumer
+import com.mojang.blaze3d.vertex.VertexConsumer
 import net.minecraft.client.renderer.MultiBufferSource
-import com.mojang.blaze3d.addVertex.PoseStack
+import com.mojang.blaze3d.vertex.PoseStack
 import net.minecraft.core.BlockPos
 import net.minecraft.world.phys.AABB
 import org.slf4j.LoggerFactory
@@ -93,7 +93,7 @@ object GhostBlockPreviewRenderer {
                     scale,
                 )
                 if (DEBUG_LOG) {
-                    val now = System.currentTimeMs()
+                    val now = System.currentTimeMillis()
                     if (now - lastLogTime >= LOG_INTERVAL_MS) {
                         lastLogTime = now
                         logger.info(
@@ -128,8 +128,8 @@ object GhostBlockPreviewRenderer {
         }
 
         val client = Minecraft.getInstance()
-        val world = client.world ?: return
-        val camera = client.gameRenderer.camera ?: return
+        val world = client.level ?: return
+        val camera = client.gameRenderer.mainCamera ?: return
         val consumers = context.consumers()
         val fillLayer = try {
             RenderLayerCompat.shaderSafeQuads()
@@ -181,8 +181,8 @@ object GhostBlockPreviewRenderer {
         }
 
         val client = Minecraft.getInstance()
-        val world = client.world ?: return
-        val camera = client.gameRenderer.camera ?: return
+        val world = client.level ?: return
+        val camera = client.gameRenderer.mainCamera ?: return
         val consumers = context.consumers()
         val fillLayer = try {
             RenderLayerCompat.shaderSafeQuads()
@@ -214,9 +214,9 @@ object GhostBlockPreviewRenderer {
 
         // Phase 1: per-frame tessellation from mesh cache
         val client = Minecraft.getInstance()
-        val world = client.world ?: return
+        val world = client.level ?: return
         val matrixStack = context.matrices()
-        val camera = client.gameRenderer.camera ?: return
+        val camera = client.gameRenderer.mainCamera ?: return
         val cameraPos = CameraAccess.getPos(camera)
         val alphaScale = alpha / 255.0f
 
@@ -297,9 +297,9 @@ object GhostBlockPreviewRenderer {
 
         // Phase 1: per-frame tessellation from mesh cache
         val client = Minecraft.getInstance()
-        val world = client.world ?: return
+        val world = client.level ?: return
         val matrixStack = context.matrices()
-        val camera = client.gameRenderer.camera ?: return
+        val camera = client.gameRenderer.mainCamera ?: return
         val cameraPos = CameraAccess.getPos(camera)
         val alphaScale = alpha / 255.0f
 

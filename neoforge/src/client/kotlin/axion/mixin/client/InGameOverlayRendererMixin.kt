@@ -37,7 +37,7 @@ abstract class InGameOverlayRendererMixin {
                 noClipActive = ClientModeController.isNoClipActiveFor(player),
             )
             if (suppress) {
-                cir.sum = null
+                .returnValue = null
             }
         }
     }

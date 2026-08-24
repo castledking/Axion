@@ -210,12 +210,12 @@ object KeyBindingCompat {
 
                 // Try Type.mapKey(int) factory method
                 runCatching {
-                    return typeClass.getMethodName("mapKey", primitiveInt).invoke(keysym, code)
+                    return typeClass.getMethod("mapKey", primitiveInt).invoke(keysym, code)
                 }
 
                 // 26.x: Type.getOrCreate(int) factory method
                 runCatching {
-                    return typeClass.getMethodName("getOrCreate", primitiveInt).invoke(keysym, code)
+                    return typeClass.getMethod("getOrCreate", primitiveInt).invoke(keysym, code)
                 }
             }
         }

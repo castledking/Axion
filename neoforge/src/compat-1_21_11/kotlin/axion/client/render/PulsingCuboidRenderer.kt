@@ -2,12 +2,12 @@ package axion.client.render
 import axion.client.compat.CameraAccess
 
 import axion.client.current.SelectionBounds
-import com.mojang.blaze3d.addVertex.VertexFormat
+import com.mojang.blaze3d.vertex.VertexFormat
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.rendertype.RenderType
-import com.mojang.blaze3d.addVertex.VertexConsumer
-import net.minecraft.client.util.math.Entry
-import com.mojang.blaze3d.addVertex.PoseStack
+import com.mojang.blaze3d.vertex.VertexConsumer
+import com.mojang.blaze3d.vertex.PoseStack.Pose
+import com.mojang.blaze3d.vertex.PoseStack
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import net.minecraft.world.phys.shapes.Shapes
@@ -48,7 +48,7 @@ object PulsingCuboidRenderer {
         maxAlpha: Int = DEFAULT_MAX_ALPHA,
     ) {
         val client = Minecraft.getInstance()
-        val camera = client.gameRenderer.camera ?: return
+        val camera = client.gameRenderer.mainCamera ?: return
         val consumers = context.consumers()
         val cameraPos = CameraAccess.getPos(camera)
         val matrixStack = context.matrices()
@@ -89,7 +89,7 @@ object PulsingCuboidRenderer {
         pulseFillColor: Int = SHELL_PULSE_FILL_COLOR,
     ) {
         val client = Minecraft.getInstance()
-        val camera = client.gameRenderer.camera ?: return
+        val camera = client.gameRenderer.mainCamera ?: return
         val consumers = context.consumers()
         val cameraPos = CameraAccess.getPos(camera)
         val matrixStack = context.matrices()
@@ -138,7 +138,7 @@ object PulsingCuboidRenderer {
         pulseMaxAlpha: Int,
     ) {
         val client = Minecraft.getInstance()
-        val camera = client.gameRenderer.camera ?: return
+        val camera = client.gameRenderer.mainCamera ?: return
         val consumers = context.consumers()
         val cameraPos = CameraAccess.getPos(camera)
         val matrixStack = context.matrices()
@@ -203,7 +203,7 @@ object PulsingCuboidRenderer {
         lineWidth: Float,
     ) {
         val client = Minecraft.getInstance()
-        val camera = client.gameRenderer.camera ?: return
+        val camera = client.gameRenderer.mainCamera ?: return
         val consumers = context.consumers()
         val cameraPos = CameraAccess.getPos(camera)
 
@@ -346,7 +346,7 @@ object PulsingCuboidRenderer {
         val green = (((color shr 8) and 0xFF) * colorScale).roundToInt()
         val blue = ((color and 0xFF) * colorScale).roundToInt()
 
-        val drawMode = layer.drawMode
+        val drawMode = layer.mode
 
         // Cull back faces. Vertices are camera-relative, so the camera is at the
         // origin and a face is only visible when the camera is on its outer side
@@ -378,8 +378,8 @@ object PulsingCuboidRenderer {
 
     private fun emitFace(
         consumer: VertexConsumer,
-        drawMode: VertexFormat.DrawMode,
-        entry: Entry,
+        drawMode: VertexFormat.Mode,
+        entry: Pose,
         x1: Float,
         y1: Float,
         z1: Float,
@@ -401,12 +401,12 @@ object PulsingCuboidRenderer {
         alpha: Int,
     ) {
         when (drawMode) {
-            VertexFormat.DrawMode.QUADS -> emitQuad(
+            VertexFormat.Mode.QUADS -> emitQuad(
                 consumer, entry, x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4,
                 normalX, normalY, normalZ, red, green, blue, alpha,
             )
 
-            VertexFormat.DrawMode.TRIANGLES -> emitTriangles(
+            VertexFormat.Mode.TRIANGLES -> emitTriangles(
                 consumer, entry, x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4,
                 normalX, normalY, normalZ, red, green, blue, alpha,
             )
@@ -420,7 +420,7 @@ object PulsingCuboidRenderer {
 
     private fun emitQuad(
         consumer: VertexConsumer,
-        entry: Entry,
+        entry: Pose,
         x1: Float,
         y1: Float,
         z1: Float,
@@ -441,15 +441,15 @@ object PulsingCuboidRenderer {
         blue: Int,
         alpha: Int,
     ) {
-        consumer.addVertex(entry, x1, y1, z1).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
-        consumer.addVertex(entry, x2, y2, z2).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
-        consumer.addVertex(entry, x3, y3, z3).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
-        consumer.addVertex(entry, x4, y4, z4).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
+        consumer.addVertex(entry, x1, y1, z1).setColor(red, green, blue, alpha).setNormal(entry, normalX, normalY, normalZ)
+        consumer.addVertex(entry, x2, y2, z2).setColor(red, green, blue, alpha).setNormal(entry, normalX, normalY, normalZ)
+        consumer.addVertex(entry, x3, y3, z3).setColor(red, green, blue, alpha).setNormal(entry, normalX, normalY, normalZ)
+        consumer.addVertex(entry, x4, y4, z4).setColor(red, green, blue, alpha).setNormal(entry, normalX, normalY, normalZ)
     }
 
     private fun emitTriangles(
         consumer: VertexConsumer,
-        entry: Entry,
+        entry: Pose,
         x1: Float,
         y1: Float,
         z1: Float,
@@ -476,7 +476,7 @@ object PulsingCuboidRenderer {
 
     private fun emitTriangle(
         consumer: VertexConsumer,
-        entry: Entry,
+        entry: Pose,
         x1: Float,
         y1: Float,
         z1: Float,
@@ -494,9 +494,9 @@ object PulsingCuboidRenderer {
         blue: Int,
         alpha: Int,
     ) {
-        consumer.addVertex(entry, x1, y1, z1).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
-        consumer.addVertex(entry, x2, y2, z2).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
-        consumer.addVertex(entry, x3, y3, z3).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
+        consumer.addVertex(entry, x1, y1, z1).setColor(red, green, blue, alpha).setNormal(entry, normalX, normalY, normalZ)
+        consumer.addVertex(entry, x2, y2, z2).setColor(red, green, blue, alpha).setNormal(entry, normalX, normalY, normalZ)
+        consumer.addVertex(entry, x3, y3, z3).setColor(red, green, blue, alpha).setNormal(entry, normalX, normalY, normalZ)
     }
 
     fun pulsingAlpha(

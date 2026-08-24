@@ -123,7 +123,7 @@ object SavedHotbarController {
         }
 
         val player = client.player
-        if (player == null || client.world == null) {
+        if (player == null || client.level == null) {
             pendingSelectionIndex = null
             return
         }
@@ -176,17 +176,17 @@ object SavedHotbarController {
 
     private fun canPersistActiveHotbar(client: Minecraft): Boolean {
         return client.player != null &&
-            client.world != null &&
+            client.level != null &&
             AxionToolSelectionController.isCreativeModeAllowed() &&
             !AxionToolSelectionController.isAxionSlotActive()
     }
 
     private fun saveCurrentHotbar(client: Minecraft, hotbarIndex: Int) {
         val player = client.player ?: return
-        val world = client.world ?: return
+        val world = client.level ?: return
         val hotbar = SavedHotbarConfig(
             slots = List(HOTBAR_SIZE) { slot ->
-                serializeStack(world.registryManager, player.inventory.getStack(slot))
+                serializeStack(world.registryAccess, player.inventory.getStack(slot))
             },
         )
         hotbar.slots.filterNotNull().forEach(stackCache::remove)
@@ -195,11 +195,11 @@ object SavedHotbarController {
 
     private fun loadSavedHotbar(client: Minecraft, hotbarIndex: Int) {
         val player = client.player ?: return
-        val world = client.world ?: return
-        val interactionManager = client.interactionManager ?: return
+        val world = client.level ?: return
+        val interactionManager = client.gameMode ?: return
         val savedHotbar = AxionClientConfig.savedHotbar(hotbarIndex) ?: SavedHotbarConfig.empty()
         repeat(HOTBAR_SIZE) { slot ->
-            val stack = deserializeStack(world.registryManager, savedHotbar.slots.getOrNull(slot)).copy()
+            val stack = deserializeStack(world.registryAccess, savedHotbar.slots.getOrNull(slot)).copy()
             player.inventory.setStack(slot, stack)
             interactionManager.clickCreativeStack(stack, 36 + slot)
         }
@@ -223,7 +223,7 @@ object SavedHotbarController {
             List(HOTBAR_SIZE) { slot -> player.inventory.getStack(slot).copy() }
         } else {
             val savedHotbar = AxionClientConfig.savedHotbar(index) ?: SavedHotbarConfig.empty()
-            val registryManager = client.world?.registryManager ?: return List(HOTBAR_SIZE) { ItemStack.EMPTY }
+            val registryManager = client.level?.registryAccess ?: return List(HOTBAR_SIZE) { ItemStack.EMPTY }
             List(HOTBAR_SIZE) { slot ->
                 deserializeStack(registryManager, savedHotbar.slots.getOrNull(slot)).copy()
             }

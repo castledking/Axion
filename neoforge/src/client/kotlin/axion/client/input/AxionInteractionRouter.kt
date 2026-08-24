@@ -21,7 +21,6 @@ import axion.client.itemStack.StackToolController
 import axion.common.model.AxionSubtool
 import axion.common.model.ClipboardState
 import axion.client.current.SelectionController
-import axion.client.compat.toImmutable
 import axion.client.current.blockPosOrNull
 import net.minecraft.client.Minecraft
 import net.minecraft.network.chat.Component
@@ -164,21 +163,21 @@ object AxionInteractionRouter {
             AxionSubtool.MOVE,
                 -> eraseDefinedRegion(
                     (AxionClientState.placementToolState as? CloneToolState.RegionDefined)
-                        ?.let { RegionEraseService.Target(it.region, it.clipboardScratchBuffer) }
+                        ?.let { RegionEraseService.Target(it.region, it.clipboardBuffer) }
                         ?: magicSelectionTarget(),
                     PlacementToolController::reset,
                 )
 
             AxionSubtool.STACK -> eraseDefinedRegion(
                 (AxionClientState.stackToolState as? StackToolState.RegionDefined)
-                    ?.let { RegionEraseService.Target(it.region, it.clipboardScratchBuffer) }
+                    ?.let { RegionEraseService.Target(it.region, it.clipboardBuffer) }
                     ?: magicSelectionTarget(),
                 StackToolController::reset,
             )
 
             AxionSubtool.SMEAR -> eraseDefinedRegion(
                 (AxionClientState.smearToolState as? SmearToolState.RegionDefined)
-                    ?.let { RegionEraseService.Target(it.region, it.clipboardScratchBuffer) }
+                    ?.let { RegionEraseService.Target(it.region, it.clipboardBuffer) }
                     ?: magicSelectionTarget(),
                 SmearToolController::reset,
             )
@@ -196,7 +195,7 @@ object AxionInteractionRouter {
      */
     private fun magicSelectionTarget(): RegionEraseService.Target? {
         val magic = AxionClientState.clipboardState as? ClipboardState.MagicSelection ?: return null
-        return RegionEraseService.Target(magic.region, magic.clipboardScratchBuffer)
+        return RegionEraseService.Target(magic.region, magic.clipboardBuffer)
     }
 
     private fun eraseDefinedRegion(target: RegionEraseService.Target?, reset: () -> Unit): Boolean {
@@ -328,11 +327,11 @@ object AxionInteractionRouter {
     }
 
     private fun isMiddleMousePressed(client: Minecraft): Boolean {
-        return GLFW.glfwGetMouseButton(client.window.handle, GLFW.MOUSE_BUTTON_MIDDLE) == GLFW.PRESS
+        return GLFW.glfwGetMouseButton(client.window.handle, GLFW.MOUSE_BUTTON_MIDDLE) == GLFW.GLFW_PRESS
     }
 
     private fun currentTargetBlock(): BlockPos? {
-        return SelectionController.currentTarget().blockPosOrNull()?.toImmutable()
+        return SelectionController.currentTarget().blockPosOrNull()?.immutable()
     }
 
     private fun supportsHeldMiddleMagicSelect(): Boolean {

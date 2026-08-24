@@ -13,7 +13,6 @@ import axion.common.operation.SymmetryBlockPlacement
 import axion.common.operation.SymmetryPlacementOperation
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.core.BlockPos
-import axion.client.compat.toImmutable
 import axion.client.compat.add
 
 object PlacementCommitService {
@@ -72,7 +71,7 @@ object PlacementCommitService {
         val copyAir = AxionClientState.copyAirEnabled
         return SymmetryPlacementOperation(
             preview.destinationClipboardBuffer.cells.mapNotNull { cell ->
-                val destinationPos = preview.destinationRegion.minCorner().add(cell.offset).toImmutable()
+                val destinationPos = preview.destinationRegion.minCorner().add(cell.offset).immutable()
                 if (!copyAir && cell.state.isAir) {
                     null
                 } else if (keepExisting && sourceRegion.contains(destinationPos)) {
@@ -81,7 +80,7 @@ object PlacementCommitService {
                     SymmetryBlockPlacement(
                         pos = destinationPos,
                         state = cell.state,
-                        blockEntityData = cell.blockData?.copy(),
+                        blockEntityData = cell.blockEntityData?.copy(),
                     )
                 }
             },
@@ -129,13 +128,13 @@ object PlacementCommitService {
                 SymmetryBlockPlacement(
                     pos = preview.destinationRegion.minCorner().add(cell.offset),
                     state = cell.state,
-                    blockEntityData = cell.blockData?.copy(),
+                    blockEntityData = cell.blockEntityData?.copy(),
                 )
             }
         }
-        val destinationPositions = destinationPlacements.mapTo(linkedSetOf()) { it.pos.toImmutable() }
+        val destinationPositions = destinationPlacements.mapTo(linkedSetOf()) { it.pos.immutable() }
         val sourcePositions = preview.sourceClipboardBuffer.cells.mapTo(linkedSetOf()) { cell ->
-            preview.sourceRegion.minCorner().add(cell.offset).toImmutable()
+            preview.sourceRegion.minCorner().add(cell.offset).immutable()
         }
         val sourceOnlyAirPlacements = buildList {
             for (immutablePos in sourcePositions) {
@@ -143,7 +142,7 @@ object PlacementCommitService {
                     add(
                         SymmetryBlockPlacement(
                             pos = immutablePos,
-                            state = Blocks.AIR.defaultBlockState,
+                            state = Blocks.AIR.defaultBlockState(),
                             blockEntityData = null,
                         ),
                     )

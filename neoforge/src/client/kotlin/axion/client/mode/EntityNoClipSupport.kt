@@ -38,7 +38,7 @@ object EntityNoClipSupport {
 
         candidates.firstNotNullOfOrNull { name ->
             try {
-                entityClass.getMethodName(name, *parameters)
+                entityClass.getMethod(name, *parameters)
             } catch (_: NoSuchMethodException) {
                 null
             }

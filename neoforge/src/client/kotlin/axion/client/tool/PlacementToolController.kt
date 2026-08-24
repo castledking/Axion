@@ -12,13 +12,12 @@ import axion.protocol.AxionTransportCodec
 import net.minecraft.client.Minecraft
 import net.minecraft.network.chat.Component
 import net.minecraft.core.BlockPos
-import axion.client.compat.toImmutable
 
 object PlacementToolController {
     private val dispatcher = SymmetryAwareOperationDispatcher()
 
     fun onEndTick(client: Minecraft) {
-        if (MoveSourceRenderState.clearIfWorldChanged(client.world)) {
+        if (MoveSourceRenderState.clearIfWorldChanged(client.level)) {
             reset()
             return
         }
@@ -119,15 +118,15 @@ object PlacementToolController {
                             else -> magicSelection.region.start
                         },
                         sourceRegion = magicSelection.region,
-                        clipboardBuffer = magicSelection.clipboardScratchBuffer,
+                        clipboardBuffer = magicSelection.clipboardBuffer,
                         scrollAmount = scrollAmount,
                     ),
                 )
             }
 
             is CloneToolState.RegionDefined -> {
-                val world = client.world ?: return false
-                val clipboard = state.clipboardScratchBuffer ?: ClipboardCaptureService.capture(world, state.region)
+                val world = client.level ?: return false
+                val clipboard = state.clipboardBuffer ?: ClipboardCaptureService.capture(world, state.region)
                 CloneToolState.PreviewingOffset(
                     ClonePlacementService.initialPreview(
                         client = client,
@@ -235,7 +234,7 @@ object PlacementToolController {
             is axion.common.operation.SymmetryPlacementOperation -> operation.placements.size.toLong() * 150L
             is axion.common.operation.CloneEntitiesOperation -> entitySelectionWireEstimate(operation.entitySelection)
             is axion.common.operation.MoveEntitiesOperation -> entitySelectionWireEstimate(operation.entitySelection)
-            is axion.common.operation.CompositeOperation -> operation.operations.accumulate(::estimateOperationSize)
+            is axion.common.operation.CompositeOperation -> operation.operations.sumOf(::estimateOperationSize)
             else -> 1_000L // conservative estimate for other operations
         }
     }
@@ -261,7 +260,7 @@ object PlacementToolController {
     }
 
     private fun reanchorPreview(preview: ClonePreviewState): Boolean {
-        val anchorPos = SelectionController.currentTarget().blockPosOrNull()?.toImmutable() ?: return false
+        val anchorPos = SelectionController.currentTarget().blockPosOrNull()?.immutable() ?: return false
         val nextState = CloneToolState.AwaitingConfirm(
             ClonePlacementService.reanchorPreview(preview, anchorPos),
         )
@@ -273,7 +272,7 @@ object PlacementToolController {
     private fun setFirstCorner(): Boolean {
         val mode = activeMode() ?: return false
         val blockPos = SelectionController.currentTarget().blockPosOrNull() ?: return false
-        val nextState = CloneToolState.FirstCornerSet(mode, blockPos.toImmutable())
+        val nextState = CloneToolState.FirstCornerSet(mode, blockPos.immutable())
         AxionClientState.updatePlacementToolState(nextState)
         AxionClientState.updateClipboard(ClipboardState.Empty)
         syncSelectionState(nextState)
@@ -292,9 +291,9 @@ object PlacementToolController {
 
         val nextState = CloneToolState.RegionDefined(
             mode,
-            currentFirstCorner.toImmutable(),
-            secondCorner.toImmutable(),
-            BlockRegion(currentFirstCorner.toImmutable(), secondCorner.toImmutable()).normalized(),
+            currentFirstCorner.immutable(),
+            secondCorner.immutable(),
+            BlockRegion(currentFirstCorner.immutable(), secondCorner.immutable()).normalized(),
             null,
         )
         AxionClientState.updatePlacementToolState(nextState)
@@ -307,13 +306,13 @@ object PlacementToolController {
         client: Minecraft,
     ): Boolean {
         activeMode() ?: return false
-        val world = client.world ?: return false
-        val seed = SelectionController.currentTarget().blockPosOrNull()?.toImmutable() ?: return false
+        val world = client.level ?: return false
+        val seed = SelectionController.currentTarget().blockPosOrNull()?.immutable() ?: return false
         val result = MagicSelectionService.select(world, seed) ?: return false
         val merged = when (val clipboardState = AxionClientState.clipboardState) {
             is ClipboardState.MagicSelection -> MagicSelectionService.merge(
                 existingRegion = clipboardState.region,
-                existingClipboard = clipboardState.clipboardScratchBuffer,
+                existingClipboard = clipboardState.clipboardBuffer,
                 addition = result,
             )
             ClipboardState.Empty -> result
@@ -321,7 +320,7 @@ object PlacementToolController {
         AxionClientState.updateClipboard(
             ClipboardState.MagicSelection(
                 region = merged.region,
-                clipboardBuffer = merged.clipboardScratchBuffer,
+                clipboardBuffer = merged.clipboardBuffer,
             ),
         )
         return true

@@ -29,7 +29,7 @@ object AxionTickHandler {
     private var lastObservedWorld: ClientLevel? = null
 
     fun onEndTick(client: Minecraft) {
-        observeWorldLifecycle(client.world)
+        observeWorldLifecycle(client.level)
         AxionServerConnection.onEndTick()
         SelectionController.onEndTick(client)
         AxionInteractionRouter.onEndTick(client)

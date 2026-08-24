@@ -1,5 +1,6 @@
 package axion.client.itemStack
 
+import axion.client.compat.rotationVecClient
 import axion.common.model.BlockRegion
 import axion.common.model.ClipboardBuffer
 import axion.protocol.EntitySelectionMask
@@ -51,7 +52,7 @@ object ClonePlacementService {
             return preview
         }
 
-        val delta = direction.extents.multiply(scrollDirection)
+        val delta = direction.extents.scale(scrollDirection)
         return createPreview(
             mode = preview.mode,
             firstCorner = preview.firstCorner,

@@ -89,13 +89,13 @@ object AngelPlacementController {
         if (AxionToolSelectionController.isAxionSlotActive()) {
             return null
         }
-        val world = client.world ?: return null
+        val world = client.level ?: return null
         val stack = player.getItemInHand(InteractionHand.MAIN_HAND)
         val blockItem = stack.item as? BlockItem ?: return null
 
         val cameraEntity = client.cameraEntity ?: player
-        val origin = cameraEntity.getCameraPosVec(1.0f)
-        val look = cameraEntity.getRotationVec(1.0f)
+        val origin = cameraEntity.getEyePosition(1.0f)
+        val look = cameraEntity.getViewVector(1.0f)
 
         // Angel only fills the gap when the crosshair finds nothing. Reach the
         // same distance the active capabilities would, so infinite reach really
@@ -105,12 +105,12 @@ object AngelPlacementController {
         } else {
             AngelPlacementPolicy.GHOST_DISTANCE
         }
-        val hit = world.raycast(
+        val hit = world.clip(
             ClipContext(
                 origin,
-                origin.add(look.multiply(searchDistance)),
-                ClipContext.ShapeType.OUTLINE,
-                ClipContext.FluidHandling.NONE,
+                origin.add(look.scale(searchDistance)),
+                ClipContext.Block.OUTLINE,
+                ClipContext.Fluid.NONE,
                 cameraEntity,
             ),
         )
@@ -122,7 +122,7 @@ object AngelPlacementController {
             return null
         }
 
-        val ghostCenter = origin.add(look.multiply(AngelPlacementPolicy.GHOST_DISTANCE))
+        val ghostCenter = origin.add(look.scale(AngelPlacementPolicy.GHOST_DISTANCE))
         val pos = blockPosOfFloored(ghostCenter)
         // The ray came back empty, so this is open air. Checking isAir keeps the
         // guard on API that exists in every namespace, unlike isReplaceable.
@@ -157,12 +157,12 @@ object AngelPlacementController {
         look: Vec3,
     ): BlockState? {
         val player = client.player ?: return null
-        val world = client.world ?: return null
+        val world = client.level ?: return null
         val side = nearestDirection(-look.x, -look.y, -look.z)
         val hitPos = Vec3(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5).add(
-            side.offsetX * 0.5,
-            side.offsetY * 0.5,
-            side.offsetZ * 0.5,
+            side.stepX * 0.5,
+            side.stepY * 0.5,
+            side.stepZ * 0.5,
         )
         val context = object : BlockPlaceContext(
             world,

@@ -1,5 +1,6 @@
 package axion.client.itemStack
 
+import axion.client.compat.rotationVecClient
 import axion.client.AxionClientState
 import axion.client.current.SelectionController
 import axion.client.current.blockPosOrNull
@@ -11,7 +12,6 @@ import axion.common.model.SelectionState
 import net.minecraft.client.Minecraft
 import axion.client.itemStack.ClipboardTransformService
 import axion.client.itemStack.PlacementMirrorAxis
-import axion.client.compat.toImmutable
 
 object StackToolController {
     private val dispatcher = SymmetryAwareOperationDispatcher()
@@ -108,15 +108,15 @@ object StackToolController {
                         else -> magicSelection.region.start
                     },
                     sourceRegion = magicSelection.region,
-                    clipboardBuffer = magicSelection.clipboardScratchBuffer,
+                    clipboardBuffer = magicSelection.clipboardBuffer,
                     scrollAmount = scrollAmount,
                 ) ?: return false
                 StackToolState.PreviewingStack(preview)
             }
 
             is StackToolState.RegionDefined -> {
-                val world = client.world ?: return false
-                val clipboard = state.clipboardScratchBuffer ?: ClipboardCaptureService.capture(world, state.region)
+                val world = client.level ?: return false
+                val clipboard = state.clipboardBuffer ?: ClipboardCaptureService.capture(world, state.region)
                 val preview = StackPlacementService.createInitialPreview(
                     client = client,
                     firstCorner = state.firstCorner,
@@ -134,7 +134,7 @@ object StackToolController {
                         state.preview.firstCorner,
                         state.preview.sourceRegion.oppositeCorner(state.preview.firstCorner),
                         state.preview.sourceRegion,
-                        state.preview.clipboardScratchBuffer,
+                        state.preview.clipboardBuffer,
                     )
                 } else {
                     StackToolState.PreviewingStack(preview)
@@ -183,7 +183,7 @@ object StackToolController {
     }
 
     private fun setFirstCorner(): Boolean {
-        val firstCorner = SelectionController.currentTarget().blockPosOrNull()?.toImmutable() ?: return false
+        val firstCorner = SelectionController.currentTarget().blockPosOrNull()?.immutable() ?: return false
         val nextState = StackToolState.FirstCornerSet(firstCorner)
         AxionClientState.updateStackToolState(nextState)
         AxionClientState.updateClipboard(ClipboardState.Empty)
@@ -192,7 +192,7 @@ object StackToolController {
     }
 
     private fun setSecondCorner(): Boolean {
-        val secondCorner = SelectionController.currentTarget().blockPosOrNull()?.toImmutable() ?: return false
+        val secondCorner = SelectionController.currentTarget().blockPosOrNull()?.immutable() ?: return false
         val firstCorner = when (val state = AxionClientState.stackToolState) {
             StackToolState.Idle -> return false
             is StackToolState.FirstCornerSet -> state.firstCorner
@@ -214,13 +214,13 @@ object StackToolController {
     private fun magicSelect(
         client: Minecraft,
     ): Boolean {
-        val world = client.world ?: return false
-        val seed = SelectionController.currentTarget().blockPosOrNull()?.toImmutable() ?: return false
+        val world = client.level ?: return false
+        val seed = SelectionController.currentTarget().blockPosOrNull()?.immutable() ?: return false
         val result = MagicSelectionService.select(world, seed) ?: return false
         val merged = when (val clipboardState = AxionClientState.clipboardState) {
             is ClipboardState.MagicSelection -> MagicSelectionService.merge(
                 existingRegion = clipboardState.region,
-                existingClipboard = clipboardState.clipboardScratchBuffer,
+                existingClipboard = clipboardState.clipboardBuffer,
                 addition = result,
             )
             ClipboardState.Empty -> result
@@ -228,7 +228,7 @@ object StackToolController {
         AxionClientState.updateClipboard(
             ClipboardState.MagicSelection(
                 region = merged.region,
-                clipboardBuffer = merged.clipboardScratchBuffer,
+                clipboardBuffer = merged.clipboardBuffer,
             ),
         )
         return true

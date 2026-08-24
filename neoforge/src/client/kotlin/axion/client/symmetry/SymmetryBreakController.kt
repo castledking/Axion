@@ -31,7 +31,7 @@ object SymmetryBreakController {
         val target = ModeTargeting.currentBlockTarget(client) ?: return false
         return dispatchDerivedBreaks(
             client,
-            target.hitResult.blockPos.toImmutable(),
+            target.hitResult.blockPos.immutable(),
             interactionOrigin = SymmetryBreakOriginPolicy.forPrimaryBreak(
                 AxionClientState.globalModeState.infiniteReachEnabled,
             ),
@@ -48,7 +48,7 @@ object SymmetryBreakController {
             return false
         }
 
-        val world = client.world ?: return false
+        val world = client.level ?: return false
         val derivedPositions = SymmetryTransformService.transformedBlocks(config, primaryPos)
             .asSequence()
             .filterNot { it == primaryPos }

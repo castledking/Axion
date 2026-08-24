@@ -18,7 +18,7 @@ import com.mojang.blaze3d.platform.DepthTestFunction
 import com.mojang.blaze3d.buffers.GpuBufferSlice
 import com.mojang.blaze3d.systems.RenderPass
 import com.mojang.blaze3d.systems.RenderSystem
-import com.mojang.blaze3d.addVertex.VertexFormat
+import com.mojang.blaze3d.vertex.VertexFormat
 import com.mojang.blaze3d.textures.FilterMode
 import com.mojang.blaze3d.textures.GpuTextureView
 import io.netty.buffer.Unpooled
@@ -73,7 +73,7 @@ import org.slf4j.LoggerFactory
 object VersionCompatImpl : VersionCompat {
     private val logger = LoggerFactory.getLogger(VersionCompatImpl::class.java)
     private var currentAtlasSampler: GpuSampler? = null
-    private val previewShellPipelines = java.util.EnumMap<VertexFormat.DrawMode, RenderPipeline>(VertexFormat.DrawMode::class.java)
+    private val previewShellPipelines = java.util.EnumMap<VertexFormat.Mode, RenderPipeline>(VertexFormat.Mode::class.java)
 
     private val clientTickHandlers = mutableListOf<(Minecraft) -> Unit>()
     private val clientStoppingHandlers = mutableListOf<(Minecraft) -> Unit>()
@@ -116,21 +116,21 @@ object VersionCompatImpl : VersionCompat {
                         m.name, m.parameterTypes.joinToString { it.simpleName }, m.returnType.simpleName)
                 }
             } else {
-                logger.tryRespond("[Axion GPU] No DynamicUniforms methods returning GpuBufferSlice found. All methods:")
+                logger.warn("[Axion GPU] No DynamicUniforms methods returning GpuBufferSlice found. All methods:")
                 net.minecraft.client.renderer.DynamicUniforms::class.java.methods.forEach { m ->
-                    logger.tryRespond("  {}({}) -> {}", m.name, m.parameterTypes.joinToString { it.simpleName }, m.returnType.simpleName)
+                    logger.warn("  {}({}) -> {}", m.name, m.parameterTypes.joinToString { it.simpleName }, m.returnType.simpleName)
                 }
             }
         }
     }
 
     private fun getRegistryManager(): RegistryAccess? {
-        return Minecraft.getInstance().world?.registryManager
+        return Minecraft.getInstance().world?.registryAccess
     }
 
     private fun getRegistryOps(): com.mojang.serialization.DynamicOps<Tag>? {
         val registryManager = getRegistryManager() ?: return null
-        return RegistryOps.of(NbtOps.INSTANCE, registryManager)
+        return RegistryOps.create(NbtOps.INSTANCE, registryManager)
     }
 
     private fun registryManagerOrThrow(): RegistryAccess {
@@ -267,7 +267,7 @@ object VersionCompatImpl : VersionCompat {
     }
 
     fun changeLocalGameMode(client: Minecraft, gameModeId: String): Boolean {
-        val server = client.server ?: return false
+        val server = client.singleplayerServer ?: return false
         val playerId = client.player?.uuid ?: return false
         val gameMode = when (gameModeId.lowercase()) {
             "survival" -> net.minecraft.world.level.GameType.SURVIVAL
@@ -281,7 +281,7 @@ object VersionCompatImpl : VersionCompat {
         return true
     }
 
-    fun hasLocalServer(client: Minecraft): Boolean = client.server != null
+    fun hasLocalServer(client: Minecraft): Boolean = client.singleplayerServer != null
 
     fun runOnRenderThread(client: Minecraft, task: Runnable) {
         client.execute(task)
@@ -293,7 +293,7 @@ object VersionCompatImpl : VersionCompat {
 
     fun captureBlockEntity(world: net.minecraft.world.level.Level, pos: BlockPos): BlockEntityDataSnapshot? {
         val blockEntity = world.getBlockEntity(pos) ?: return null
-        return BlockEntityDataSnapshot(blockEntity.saveWithFullMetadata(world.registryManager).copy())
+        return BlockEntityDataSnapshot(blockEntity.saveWithFullMetadata(world.registryAccess).copy())
     }
 
     fun applyBlockEntity(world: net.minecraft.world.level.Level, write: BlockWrite, suppressUpdates: Boolean = true) {
@@ -305,7 +305,7 @@ object VersionCompatImpl : VersionCompat {
                 modernCallbacksAvailable = true,
             ),
         )
-        val payload = write.blockData
+        val payload = write.blockEntityData
         if (payload == null) {
             world.removeBlockEntity(write.pos)
             val provider = write.state.block as? net.minecraft.world.level.block.EntityBlock ?: return
@@ -319,7 +319,7 @@ object VersionCompatImpl : VersionCompat {
         restored.putInt("x", write.pos.x)
         restored.putInt("y", write.pos.y)
         restored.putInt("z", write.pos.z)
-        val blockEntity = net.minecraft.world.level.block.entity.BlockEntity.createFromNbt(write.pos, write.state, restored, world.registryManager)
+        val blockEntity = net.minecraft.world.level.block.entity.BlockEntity.createFromNbt(write.pos, write.state, restored, world.registryAccess)
             ?: return
         world.removeBlockEntity(write.pos)
         world.getChunk(write.pos.x shr 4, write.pos.z shr 4).setBlockEntity(blockEntity)
@@ -389,7 +389,7 @@ object VersionCompatImpl : VersionCompat {
             session.setFromClipboard(clipboard, surfaceClipboard, origins, scale)
             session.render(context, color, alpha).canPick
         } catch (t: Throwable) {
-            logger.tryRespond("[Axion GPU] renderChunkedPreview failed for session={} — falling back to CPU path", sessionId, t)
+            logger.warn("[Axion GPU] renderChunkedPreview failed for session={} — falling back to CPU path", sessionId, t)
             false
         }
     }
@@ -408,11 +408,11 @@ object VersionCompatImpl : VersionCompat {
     }
 
     override fun matrixStackPush(stack: Any): Any {
-        return (stack as com.mojang.blaze3d.addVertex.PoseStack).push()
+        return (stack as com.mojang.blaze3d.vertex.PoseStack).push()
     }
 
     override fun matrixStackPop(stack: Any) {
-        (stack as com.mojang.blaze3d.addVertex.PoseStack).pop()
+        (stack as com.mojang.blaze3d.vertex.PoseStack).pop()
     }
 
     override fun blockRenderManagerGetModel(manager: Any, state: BlockState): Any {
@@ -425,8 +425,8 @@ object VersionCompatImpl : VersionCompat {
             state,
             pos as net.minecraft.core.BlockPos,
             world as net.minecraft.world.level.BlockAndTintGetter,
-            matrixStack as com.mojang.blaze3d.addVertex.PoseStack,
-            consumer as com.mojang.blaze3d.addVertex.VertexConsumer,
+            matrixStack as com.mojang.blaze3d.vertex.PoseStack,
+            consumer as com.mojang.blaze3d.vertex.VertexConsumer,
             checkSides,
             parts as List<net.minecraft.client.renderer.block.model.BlockModelPart>
         )
@@ -437,7 +437,7 @@ object VersionCompatImpl : VersionCompat {
         (manager as net.minecraft.client.renderer.block.BlockRenderDispatcher).renderFluid(
             pos as net.minecraft.core.BlockPos,
             world as net.minecraft.world.level.BlockAndTintGetter,
-            consumer as com.mojang.blaze3d.addVertex.VertexConsumer,
+            consumer as com.mojang.blaze3d.vertex.VertexConsumer,
             state,
             fluidState as net.minecraft.world.level.material.FluidState
         )
@@ -557,7 +557,7 @@ object VersionCompatImpl : VersionCompat {
 
     // Registry/BlockStateParser API helpers for 1.21.11
     override fun worldGetRegistryManager(world: Any): Any {
-        return (world as net.minecraft.world.level.Level).registryManager
+        return (world as net.minecraft.world.level.Level).registryAccess
     }
 
     override fun blockArgumentParserBlock(registry: Any, state: String): Any {
@@ -584,7 +584,7 @@ object VersionCompatImpl : VersionCompat {
             logger.info("[Axion GPU] drawMultipleIndexed not available (API mismatch), using per-section draw loop")
             false
         } catch (e: Exception) {
-            logger.tryRespond("[Axion GPU] drawMultipleIndexed failed at runtime, using per-section draw loop", e)
+            logger.warn("[Axion GPU] drawMultipleIndexed failed at runtime, using per-section draw loop", e)
             false
         }
     }
@@ -636,7 +636,7 @@ object VersionCompatImpl : VersionCompat {
         } catch (e: Exception) {
             if (!loggedAtlasResult) {
                 loggedAtlasResult = true
-                logger.tryRespond("[Axion GPU] Atlas lookup failed", e)
+                logger.warn("[Axion GPU] Atlas lookup failed", e)
             }
             currentAtlasSampler = null
             null
@@ -677,7 +677,7 @@ object VersionCompatImpl : VersionCompat {
         try {
             pass.bindTexture(samplerName, textureView, sampler)
         } catch (e: Exception) {
-            logger.tryRespond("[Axion GPU] bindTexture failed for {}", samplerName, e)
+            logger.warn("[Axion GPU] bindTexture failed for {}", samplerName, e)
         }
     }
 
@@ -704,7 +704,7 @@ object VersionCompatImpl : VersionCompat {
         DepthTestFunction.LEQUAL_DEPTH_TEST
     }
 
-    fun getPreviewShellPipeline(vertexFormat: VertexFormat, drawMode: VertexFormat.DrawMode): RenderPipeline? {
+    fun getPreviewShellPipeline(vertexFormat: VertexFormat, drawMode: VertexFormat.Mode): RenderPipeline? {
         return try {
             previewShellPipelines.computeIfAbsent(drawMode) {
                 RenderPipeline.builder(RenderPipelines.MATRICES_PROJECTION_SNIPPET)
@@ -725,7 +725,7 @@ object VersionCompatImpl : VersionCompat {
         } catch (t: Throwable) {
             if (!loggedPipelineCreation) {
                 loggedPipelineCreation = true
-                logger.tryRespond("[Axion GPU] Custom preview pipeline creation failed (1.21.9?), will use render layer pipeline", t)
+                logger.warn("[Axion GPU] Custom preview pipeline creation failed (1.21.9?), will use render layer pipeline", t)
             }
             null
         }
@@ -787,11 +787,11 @@ object VersionCompatImpl : VersionCompat {
     }
 
     fun getScaledMouseX(client: Minecraft): Double {
-        return client.mouse.getScaledXPos(client.window)
+        return client.mouseHandler.getScaledXPos(client.window)
     }
 
     fun getScaledMouseY(client: Minecraft): Double {
-        return client.mouse.getScaledYPos(client.window)
+        return client.mouseHandler.getScaledYPos(client.window)
     }
 
     fun registerHudElements(
@@ -812,7 +812,7 @@ object VersionCompatImpl : VersionCompat {
     }
 
     fun captureEntityData(entity: Entity): CompoundTag? {
-        val output = TagValueOutput.create(ProblemReporter.EMPTY, entity.level().registryManager)
+        val output = TagValueOutput.create(ProblemReporter.EMPTY, entity.level().registryAccess)
         return if (entity.saveAsPassenger(output)) output.nbt else null
     }
 

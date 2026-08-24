@@ -22,7 +22,7 @@ object SymmetryWritePlanExpander {
                 writesByPosition[transformedPos] = BlockWrite(
                     pos = transformedPos,
                     state = write.state,
-                    blockEntityData = write.blockData?.copy(),
+                    blockEntityData = write.blockEntityData?.copy(),
                 )
             }
         }

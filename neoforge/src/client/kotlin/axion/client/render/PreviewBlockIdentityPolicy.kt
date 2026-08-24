@@ -73,7 +73,7 @@ object PreviewBlockIdentityPolicy {
                 isAir = cell.state.isAir,
                 remoteAxionSessionAvailable = remoteAxionSessionAvailable,
             )
-            if (resolvedState == cell.state && cell.blockData == null) {
+            if (resolvedState == cell.state && cell.blockEntityData == null) {
                 cell
             } else {
                 changed = true

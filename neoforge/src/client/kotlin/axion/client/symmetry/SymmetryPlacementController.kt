@@ -92,7 +92,7 @@ object SymmetryPlacementController {
         client: Minecraft,
         operation: axion.common.operation.SymmetryPlacementOperation,
     ) {
-        val world = client.world ?: return
+        val world = client.level ?: return
         operation.placements.forEach { placement ->
             val soundGroup = placement.state.soundGroup
             VersionCompatImpl.playSoundClient(

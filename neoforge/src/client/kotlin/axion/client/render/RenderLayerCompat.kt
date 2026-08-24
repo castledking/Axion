@@ -19,7 +19,7 @@ object RenderLayerCompat {
         )
         RenderType::class.java.declaredFields.firstOrNull { field ->
             renderSetupClasses.any { setupClass -> field.type == setupClass }
-        }?.also { field -> field.wasAccessibleSinceLastSave = true }
+        }
     }
 
     /**
@@ -192,7 +192,6 @@ object RenderLayerCompat {
                 method.parameterTypes[0] == String::class.java &&
                 method.parameterTypes[1].isInstance(renderSetup)
         } ?: error("Missing pipeline-backed RenderType factory")
-        factory.wasAccessibleSinceLastSave = true
         return factory.invoke(null, name, renderSetup) as RenderType
     }
 
@@ -268,7 +267,7 @@ object RenderLayerCompat {
                     method.name in names &&
                     RenderType::class.java.isAssignableFrom(method.returnType)
             }
-            ?.also { it.wasAccessibleSinceLastSave = true }
+            ?.also { }
     }
 
     private fun findStaticLayerField(owner: Class<*>, fieldNames: List<String>): java.lang.reflect.Field? {
@@ -279,7 +278,7 @@ object RenderLayerCompat {
                     field.name in fieldNames &&
                     RenderType::class.java.isAssignableFrom(field.type)
             }
-            ?.also { it.wasAccessibleSinceLastSave = true }
+            ?.also { }
     }
 
     private fun createXrayQuadsLayer(): RenderType {
@@ -325,7 +324,6 @@ object RenderLayerCompat {
                 method.parameterCount == 0 &&
                 method.returnType.enclosingClass == paramsClass
         } ?: return null
-        builderFactory.wasAccessibleSinceLastSave = true
         val builder = builderFactory.invoke(null)
 
         listOf(
@@ -340,7 +338,6 @@ object RenderLayerCompat {
                     method.parameterTypes[0].isInstance(phase) &&
                     method.returnType.isAssignableFrom(builder.javaClass)
             } ?: return null
-            setter.wasAccessibleSinceLastSave = true
             setter.invoke(builder, phase)
         }
 
@@ -349,7 +346,6 @@ object RenderLayerCompat {
                 method.parameterTypes[0] == Boolean::class.javaPrimitiveType &&
                 method.returnType == paramsClass
         } ?: return null
-        build.wasAccessibleSinceLastSave = true
         val params = build.invoke(builder, false)
         // The factory accepts a VertexFormat instance, but POSITION_COLOR is
         // declared on the separate VertexFormats holder class. Looking the
@@ -362,7 +358,6 @@ object RenderLayerCompat {
         ) {
             return null
         }
-        factory.wasAccessibleSinceLastSave = true
         return factory.invoke(
             null,
             "axion_xray_quads",
@@ -423,7 +418,6 @@ object RenderLayerCompat {
                 Modifier.isStatic(candidate.modifiers) && candidate.name in fieldNames
             }
             ?: error("Missing mapped field on ${ownerClass.name}; candidates=${fieldNames.joinToString()}")
-        field.wasAccessibleSinceLastSave = true
         return field.get(null)
     }
 
@@ -435,7 +429,7 @@ object RenderLayerCompat {
         if (inheritedSnippet != null) {
             Array.set(snippets, 0, inheritedSnippet)
         }
-        var builder = pipelineClass.getMethodName("builder", snippets.javaClass).invoke(null, snippets)
+        var builder = pipelineClass.getMethod("builder", snippets.javaClass).invoke(null, snippets)
         builder = invokeBuilder(builder, "withLocation", "pipeline/axion_xray_quads")
         builder = invokeBuilder(builder, "withVertexShader", "core/rendertype_lightning")
         builder = invokeBuilder(builder, "withFragmentShader", "core/rendertype_lightning")
@@ -443,7 +437,7 @@ object RenderLayerCompat {
         builder = invokeIfPresent(builder, "withCull", false)
         builder = configureNoDepth(builder)
         builder = configureVertexFormat(builder)
-        return builder.javaClass.getMethodName("build").invoke(builder).let(::registerPipelineIfPossible)
+        return builder.javaClass.getMethod("build").invoke(builder).let(::registerPipelineIfPossible)
     }
 
     /**
@@ -506,7 +500,6 @@ object RenderLayerCompat {
                     it.name in fieldNames
             }
             if (field != null) {
-                field.wasAccessibleSinceLastSave = true
                 return field.get(null)
             }
         }
@@ -574,7 +567,6 @@ object RenderLayerCompat {
                 method.parameterTypes[0].isInstance(pipeline) &&
                 method.returnType.enclosingClass == renderSetupClass
         } ?: return null
-        builderFactory.wasAccessibleSinceLastSave = true
         val builder = builderFactory.invoke(null, pipeline)
         // RenderSetup's builder API changed again in 26.1: translucent uploads
         // are marked with sortOnUpload(), the buffer setter is streamingBufferSize(), and
@@ -590,7 +582,6 @@ object RenderLayerCompat {
                 method.returnType.isAssignableFrom(builder.javaClass)
         }
         if (bufferSetter != null) {
-            bufferSetter.wasAccessibleSinceLastSave = true
             bufferSetter.invoke(builder, 1536)
         } else if (invokeIfPresent(builder, "expectedBufferSize", 1536) == null) {
             invokeIfPresent(builder, "bufferSize", 1536)
@@ -599,12 +590,10 @@ object RenderLayerCompat {
             method.parameterCount == 0 &&
                 method.returnType == renderSetupClass
         }
-        build?.wasAccessibleSinceLastSave = true
         val renderSetup = build?.invoke(builder)
             ?: invokeIfPresent(builder, "build")
             ?: invokeIfPresent(builder, "createRenderSetup")
             ?: return null
-        factory.wasAccessibleSinceLastSave = true
         return factory.invoke(null, "axion_xray_quads", renderSetup) as RenderType
     }
 
@@ -623,16 +612,13 @@ object RenderLayerCompat {
                 method.parameterCount == 0 &&
                 method.returnType.enclosingClass == paramsClass
         } ?: return null
-        builderFactory.wasAccessibleSinceLastSave = true
         val builder = builderFactory.invoke(null)
         val build = builder.javaClass.declaredMethods.firstOrNull { method ->
             method.parameterCount == 1 &&
                 method.parameterTypes[0] == Boolean::class.javaPrimitiveType &&
                 method.returnType == paramsClass
         } ?: return null
-        build.wasAccessibleSinceLastSave = true
         val params = build.invoke(builder, false)
-        factory.wasAccessibleSinceLastSave = true
         return factory.invoke(null, "axion_xray_quads", 1536, pipeline, params) as RenderType
     }
 
@@ -648,7 +634,6 @@ object RenderLayerCompat {
                 method.parameterTypes[0].isInstance(pipeline) &&
                 method.returnType.isInstance(pipeline)
         } ?: return pipeline
-        register.wasAccessibleSinceLastSave = true
         return register.invoke(null, pipeline) ?: pipeline
     }
 
@@ -656,7 +641,7 @@ object RenderLayerCompat {
         val mappings = listOf(
             RuntimeFieldMapping(
                 "named",
-                "com.mojang.blaze3d.addVertex.DefaultVertexFormat",
+                "com.mojang.blaze3d.vertex.DefaultVertexFormat",
                 "POSITION_COLOR",
                 "Lnet/minecraft/client/render/VertexFormat;",
             ),
@@ -668,7 +653,7 @@ object RenderLayerCompat {
             ),
         )
         candidateClasses(
-            "com.mojang.blaze3d.addVertex.DefaultVertexFormat",
+            "com.mojang.blaze3d.vertex.DefaultVertexFormat",
             "net.minecraft.class_290",
         ).forEach { owner ->
             runCatching {
@@ -679,7 +664,7 @@ object RenderLayerCompat {
                 )
             }
         }
-        return staticField("com.mojang.blaze3d.addVertex.DefaultVertexFormat", "POSITION_COLOR")
+        return staticField("com.mojang.blaze3d.vertex.DefaultVertexFormat", "POSITION_COLOR")
     }
 
     private fun quadsDrawMode(): Any {
@@ -698,7 +683,7 @@ object RenderLayerCompat {
             ),
             RuntimeFieldMapping(
                 "intermediary",
-                "com.mojang.blaze3d.addVertex.VertexFormat\$class_5596",
+                "com.mojang.blaze3d.vertex.VertexFormat\$class_5596",
                 "field_27382",
                 "Lcom/mojang/blaze3d/vertex/VertexFormat\$class_5596;",
             ),
@@ -706,8 +691,8 @@ object RenderLayerCompat {
         candidateClasses(
             "net.minecraft.client.render.VertexFormat\$DrawMode",
             "net.minecraft.class_293\$class_5596",
-            "com.mojang.blaze3d.addVertex.VertexFormat\$DrawMode",
-            "com.mojang.blaze3d.addVertex.VertexFormat\$class_5596",
+            "com.mojang.blaze3d.vertex.VertexFormat\$DrawMode",
+            "com.mojang.blaze3d.vertex.VertexFormat\$class_5596",
             // 26.2 promoted the draw mode out of VertexFormat entirely.
             "com.mojang.blaze3d.PrimitiveTopology",
         ).forEach { owner ->
@@ -719,8 +704,8 @@ object RenderLayerCompat {
                 )
             }
         }
-        return staticFieldOrNull("com.mojang.blaze3d.addVertex.VertexFormat\$DrawMode", "QUADS")
-            ?: staticFieldOrNull("com.mojang.blaze3d.addVertex.VertexFormat\$Mode", "QUADS")
+        return staticFieldOrNull("com.mojang.blaze3d.vertex.VertexFormat\$DrawMode", "QUADS")
+            ?: staticFieldOrNull("com.mojang.blaze3d.vertex.VertexFormat\$Mode", "QUADS")
             ?: staticField("com.mojang.blaze3d.PrimitiveTopology", "QUADS")
     }
 
@@ -764,7 +749,7 @@ object RenderLayerCompat {
 
     private fun logResolveFailure(key: String, methodNames: Set<String>, fieldNames: List<String>) {
         if (!loggedWarnings.add("resolve-$key")) return
-        logger.tryRespond(
+        logger.warn(
             "[RenderLayerCompat] Failed to resolve {}. methodCandidates={} fieldCandidates={} layerClass={} factories={}",
             key,
             methodNames.joinToString(),
@@ -785,8 +770,8 @@ object RenderLayerCompat {
                 .take(30)
                 .map { "${it.name}:${it.type.name}" }
                 .joinToString()
-            logger.tryRespond("[RenderLayerCompat] {} static no-arg methods: {}", owner.name, methods)
-            logger.tryRespond("[RenderLayerCompat] {} static fields: {}", owner.name, fields)
+            logger.warn("[RenderLayerCompat] {} static no-arg methods: {}", owner.name, methods)
+            logger.warn("[RenderLayerCompat] {} static fields: {}", owner.name, fields)
         }
     }
 }

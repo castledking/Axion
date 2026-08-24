@@ -11,7 +11,6 @@ import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
 import net.minecraft.core.Vec3i
 import net.minecraft.world.level.Level
-import axion.client.compat.toImmutable
 import axion.client.compat.add
 import java.util.ArrayDeque
 
@@ -120,7 +119,7 @@ object MagicSelectionService {
         clipboard: ClipboardBuffer,
     ) {
         clipboard.cells.forEach { cell ->
-            destination[origin.add(cell.offset).toImmutable()] = cell.copy()
+            destination[origin.add(cell.offset).immutable()] = cell.copy()
         }
     }
 
@@ -133,7 +132,7 @@ object MagicSelectionService {
         val selected = linkedSetOf<BlockPos>()
         val visited = mutableSetOf<BlockPos>()
         val queue = ArrayDeque<BlockPos>()
-        val centerPos = center.toImmutable()
+        val centerPos = center.immutable()
 
         visited += centerPos
         queue += centerPos
@@ -148,7 +147,7 @@ object MagicSelectionService {
             selected += pos
 
             Direction.entries.forEach { direction ->
-                val next = pos.add(direction.extents).toImmutable()
+                val next = pos.add(direction.extents).immutable()
                 if (next in visited || !withinRadius(centerPos, next, radiusSquared)) {
                     return@forEach
                 }

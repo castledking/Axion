@@ -5,14 +5,14 @@ import net.minecraft.client.Minecraft
 
 object UndoRedoController {
     fun undo(client: Minecraft): Boolean {
-        if (client.server == null) {
+        if (client.singleplayerServer == null) {
             val entry = HistoryManager.peekUndoEntry() ?: return false
             AxionServerConnection.requestUndo(entry.id)
             return true
         }
 
-        val server = client.server ?: return false
-        val worldKey = client.world?.registryKey
+        val server = client.singleplayerServer ?: return false
+        val worldKey = client.level?.registryKey
         server.execute {
             val world = server.getWorld(worldKey) ?: return@execute
             HistoryManager.undo(world)
@@ -21,14 +21,14 @@ object UndoRedoController {
     }
 
     fun redo(client: Minecraft): Boolean {
-        if (client.server == null) {
+        if (client.singleplayerServer == null) {
             val entry = HistoryManager.peekRedoEntry() ?: return false
             AxionServerConnection.requestRedo(entry.id)
             return true
         }
 
-        val server = client.server ?: return false
-        val worldKey = client.world?.registryKey
+        val server = client.singleplayerServer ?: return false
+        val worldKey = client.level?.registryKey
         server.execute {
             val world = server.getWorld(worldKey) ?: return@execute
             HistoryManager.redo(world)

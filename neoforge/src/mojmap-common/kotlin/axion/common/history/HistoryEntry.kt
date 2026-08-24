@@ -1,4 +1,4 @@
-package axion.common.lastCommands
+package axion.common.history
 
 data class HistoryEntry(
     val id: Long,

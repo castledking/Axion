@@ -68,8 +68,8 @@ class MagicSelectBlockPickerScreen(
             selectedBlockIds = template.customBlockIds.toMutableSet()
         }
 
-        searchField = EditBox(textRenderer, centerX - 130, topY, 260, 20, Component.empty())
-        searchField.text = searchQuery
+        searchField = EditBox(font, centerX - 130, topY, 260, 20, Component.empty())
+        searchField.value = searchQuery
         searchField.setResponder {
             searchQuery = it
             page = 0
@@ -84,7 +84,7 @@ class MagicSelectBlockPickerScreen(
                     page -= 1
                     rebuildWidgets()
                 }
-            }.dimensions(centerX - 130, height - 34, 60, 20).build().apply {
+            }.bounds(centerX - 130, height - 34, 60, 20).build().apply {
                 active = page > 0
             },
         )
@@ -92,8 +92,8 @@ class MagicSelectBlockPickerScreen(
         addRenderableWidget(
             Button.builder(Component.translatable("axion.config.magic_select.blocks.save")) {
                 AxionClientConfig.setMagicSelectTemplateCustomBlocks(template.id, selectedBlockIds.toSet())
-                close()
-            }.dimensions(centerX - 64, height - 34, 128, 20).build(),
+                onClose()
+            }.bounds(centerX - 64, height - 34, 128, 20).build(),
         )
 
         nextPageButton = addRenderableWidget(
@@ -102,7 +102,7 @@ class MagicSelectBlockPickerScreen(
                     page += 1
                     rebuildWidgets()
                 }
-            }.dimensions(centerX + 70, height - 34, 60, 20).build().apply {
+            }.bounds(centerX + 70, height - 34, 60, 20).build().apply {
                 active = page + 1 < pageCount()
             },
         )
@@ -111,7 +111,7 @@ class MagicSelectBlockPickerScreen(
             addRenderableWidget(
                 Button.builder(Component.empty()) {
                     toggleTile(tile.entry)
-                }.dimensions(tile.x, tile.y, tile.size, tile.size).build().apply {
+                }.bounds(tile.x, tile.y, tile.size, tile.size).build().apply {
                     setAlpha(0f)
                 },
             )
@@ -120,8 +120,8 @@ class MagicSelectBlockPickerScreen(
         updatePagingButtons()
     }
 
-    override fun close() {
-        client?.setScreen(parent)
+    override fun onClose() {
+        minecraft?.setScreen(parent)
     }
 
     override fun render(context: GuiGraphics, mouseX: Int, mouseY: Int, deltaTicks: Float) {
@@ -129,9 +129,9 @@ class MagicSelectBlockPickerScreen(
         super.render(context, mouseX, mouseY, deltaTicks)
 
         val centerX = width / 2
-        context.drawCenteredString(textRenderer, title, centerX, 18, 0xFFFFFF)
+        context.drawCenteredString(font, title, centerX, 18, 0xFFFFFF)
         context.drawCenteredString(
-            textRenderer,
+            font,
             Component.translatable("axion.config.magic_select.blocks.description"),
             centerX,
             30,
@@ -154,11 +154,11 @@ class MagicSelectBlockPickerScreen(
         }
 
         hoveredTile?.let { tile ->
-            context.drawTooltip(textRenderer, tile.entry.block.asItem().name, mouseX, mouseY)
+            context.drawTooltip(font, tile.entry.block.asItem().name, mouseX, mouseY)
         }
 
         context.drawCenteredString(
-            textRenderer,
+            font,
             Component.translatable("axion.config.magic_select.blocks.page", page + 1, pageCount().coerceAtLeast(1)),
             centerX,
             height - 48,

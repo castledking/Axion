@@ -3,9 +3,9 @@ package axion.client.render
 import com.mojang.blaze3d.buffers.GpuBuffer
 import com.mojang.blaze3d.systems.RenderPass
 import com.mojang.blaze3d.systems.RenderSystem
-import com.mojang.blaze3d.addVertex.VertexFormat
-import com.mojang.blaze3d.addVertex.MeshData
-import net.minecraft.client.render.DrawMode
+import com.mojang.blaze3d.vertex.VertexFormat
+import com.mojang.blaze3d.vertex.MeshData
+import com.mojang.blaze3d.vertex.VertexFormat
 import java.util.function.Supplier
 
 /**
@@ -23,7 +23,7 @@ class AxionPreviewBuffer : AutoCloseable {
     private var indexCount: Int = 0
     private var indexType: VertexFormat.IndexType = VertexFormat.IndexType.SHORT
     private var vertexCount: Int = 0
-    private var drawMode: DrawMode = DrawMode.TRIANGLES
+    private var drawMode: VertexFormat.Mode = VertexFormat.Mode.TRIANGLES
     private var uploaded: Boolean = false
 
     val isUploaded: Boolean get() = uploaded
@@ -41,10 +41,10 @@ class AxionPreviewBuffer : AutoCloseable {
     val indexCountValue: Int get() = indexCount
 
     /** Expose vertex format for custom preview pipelines. */
-    val vertexFormatValue: com.mojang.blaze3d.addVertex.VertexFormat get() = RenderLayerCompat.blockTranslucentCull().format
+    val vertexFormatValue: com.mojang.blaze3d.vertex.VertexFormat get() = RenderLayerCompat.blockTranslucentCull().format
 
     /** Expose draw mode for custom preview pipelines. */
-    val drawModeValue: DrawMode get() = drawMode
+    val drawModeValue: VertexFormat.Mode get() = drawMode
 
     /**
      * Upload a MeshData to GPU. Follows ChunkRenderData.upload pattern:

@@ -1,10 +1,11 @@
 package axion.client.render
+import axion.client.compat.rotationVecClient
 import axion.client.compat.CameraAccess
 
 import axion.client.current.SelectionBounds
 import axion.common.model.BlockRegion
 import net.minecraft.client.Minecraft
-import com.mojang.blaze3d.addVertex.VertexConsumer
+import com.mojang.blaze3d.vertex.VertexConsumer
 import net.minecraft.world.phys.AABB
 import net.minecraft.core.Direction
 import net.minecraft.world.phys.Vec3
@@ -31,7 +32,7 @@ object PreviewDirectionArrowRenderer {
     fun render(context: AxionWorldRenderContext, region: BlockRegion, direction: Vec3i) {
         val axis = dominantAxis(direction) ?: return
         val client = Minecraft.getInstance()
-        val camera = client.gameRenderer.camera ?: return
+        val camera = client.gameRenderer.mainCamera ?: return
         val consumers = context.consumers()
         val entry = context.matrices().last()
         val cameraPos = CameraAccess.getPos(camera)
@@ -39,9 +40,9 @@ object PreviewDirectionArrowRenderer {
         val box = SelectionBounds.outlineBox(SelectionBounds.regionBox(region.normalized()))
 
         val arrow = when (axis) {
-            Axis.X -> arrowAlongX(box, direction.x >= 0)
-            Axis.Y -> arrowAlongY(box, direction.y >= 0)
-            Axis.Z -> arrowAlongZ(box, direction.z >= 0)
+            Direction.Axis.X -> arrowAlongX(box, direction.x >= 0)
+            Direction.Axis.Y -> arrowAlongY(box, direction.y >= 0)
+            Direction.Axis.Z -> arrowAlongZ(box, direction.z >= 0)
         }
         renderArrowGeometry(
             consumer = consumer,
@@ -62,7 +63,7 @@ object PreviewDirectionArrowRenderer {
         val startX = if (positive) box.maxX + ARROW_OFFSET else box.minX - ARROW_OFFSET
         return ArrowData(
             start = Vec3(startX, y, z),
-            axis = Axis.X,
+            axis = Direction.Axis.X,
             positive = positive,
             color = X_COLOR,
         )
@@ -74,7 +75,7 @@ object PreviewDirectionArrowRenderer {
         val startY = if (positive) box.maxY + ARROW_OFFSET else box.minY - ARROW_OFFSET
         return ArrowData(
             start = Vec3(x, startY, z),
-            axis = Axis.Y,
+            axis = Direction.Axis.Y,
             positive = positive,
             color = Y_COLOR,
         )
@@ -86,7 +87,7 @@ object PreviewDirectionArrowRenderer {
         val startZ = if (positive) box.maxZ + ARROW_OFFSET else box.minZ - ARROW_OFFSET
         return ArrowData(
             start = Vec3(x, y, startZ),
-            axis = Axis.Z,
+            axis = Direction.Axis.Z,
             positive = positive,
             color = Z_COLOR,
         )
@@ -99,8 +100,8 @@ object PreviewDirectionArrowRenderer {
         arrow: ArrowData,
     ) {
         val basis = axisBasis(arrow.axis, arrow.positive)
-        val shaftEnd = arrow.start.add(basis.forward.multiply(SHAFT_LENGTH))
-        val tipCenter = shaftEnd.add(basis.forward.multiply(HEAD_LENGTH))
+        val shaftEnd = arrow.start.add(basis.forward.scale(SHAFT_LENGTH))
+        val tipCenter = shaftEnd.add(basis.forward.scale(HEAD_LENGTH))
 
         emitPrism(
             consumer = consumer,
@@ -169,8 +170,8 @@ object PreviewDirectionArrowRenderer {
     }
 
     private fun squareCorners(center: Vec3, right: Vec3, up: Vec3, radius: Double): Array<Vec3> {
-        val rightOffset = right.multiply(radius)
-        val upOffset = up.multiply(radius)
+        val rightOffset = right.scale(radius)
+        val upOffset = up.scale(radius)
         return arrayOf(
             center.add(rightOffset).add(upOffset),
             center.subtract(rightOffset).add(upOffset),
@@ -210,23 +211,23 @@ object PreviewDirectionArrowRenderer {
             (point.x - cameraPos.x).toFloat(),
             (point.y - cameraPos.y).toFloat(),
             (point.z - cameraPos.z).toFloat(),
-        ).color(red, green, blue, ALPHA)
+        ).setColor(red, green, blue, ALPHA)
     }
 
-    private fun axisBasis(axis: Axis, positive: Boolean): AxisBasis {
+    private fun axisBasis(axis: Direction.Axis, positive: Boolean): AxisBasis {
         val sign = if (positive) 1.0 else -1.0
         return when (axis) {
-            Axis.X -> AxisBasis(
+            Direction.Axis.X -> AxisBasis(
                 forward = Vec3(sign, 0.0, 0.0),
                 right = Vec3(0.0, 0.0, 1.0),
                 up = Vec3(0.0, 1.0, 0.0),
             )
-            Axis.Y -> AxisBasis(
+            Direction.Axis.Y -> AxisBasis(
                 forward = Vec3(0.0, sign, 0.0),
                 right = Vec3(1.0, 0.0, 0.0),
                 up = Vec3(0.0, 0.0, 1.0),
             )
-            Axis.Z -> AxisBasis(
+            Direction.Axis.Z -> AxisBasis(
                 forward = Vec3(0.0, 0.0, sign),
                 right = Vec3(1.0, 0.0, 0.0),
                 up = Vec3(0.0, 1.0, 0.0),
@@ -234,21 +235,21 @@ object PreviewDirectionArrowRenderer {
         }
     }
 
-    private fun dominantAxis(direction: Vec3i): Axis? {
+    private fun dominantAxis(direction: Vec3i): Direction.Axis? {
         val ax = abs(direction.x)
         val ay = abs(direction.y)
         val az = abs(direction.z)
         return when (maxOf(ax, ay, az)) {
             0 -> null
-            ax -> Axis.X
-            ay -> Axis.Y
-            else -> Axis.Z
+            ax -> Direction.Axis.X
+            ay -> Direction.Axis.Y
+            else -> Direction.Axis.Z
         }
     }
 
     private data class ArrowData(
         val start: Vec3,
-        val axis: Axis,
+        val axis: Direction.Axis,
         val positive: Boolean,
         val color: Int,
     )
@@ -259,7 +260,7 @@ object PreviewDirectionArrowRenderer {
         val up: Vec3,
     )
 
-    private enum class Axis {
+    private enum class Direction.Axis {
         X,
         Y,
         Z,

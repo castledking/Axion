@@ -177,8 +177,8 @@ class NetworkOperationDispatcher(
                 val source = operation.sourceRegion.normalized()
                 StackRegionRequest(
                     sourceOrigin = source.minCorner().toProtocolVector(),
-                    clipboardSize = operation.clipboardScratchBuffer.size.toProtocolVector(),
-                    cells = operation.clipboardScratchBuffer.cells.map { it.toPayload() },
+                    clipboardSize = operation.clipboardBuffer.size.toProtocolVector(),
+                    cells = operation.clipboardBuffer.cells.map { it.toPayload() },
                     step = operation.step.toProtocolVector(),
                     repeatCount = operation.repeatCount,
                     keepExisting = operation.keepExisting,
@@ -189,8 +189,8 @@ class NetworkOperationDispatcher(
                 val source = operation.sourceRegion.normalized()
                 SmearRegionRequest(
                     sourceOrigin = source.minCorner().toProtocolVector(),
-                    clipboardSize = operation.clipboardScratchBuffer.size.toProtocolVector(),
-                    cells = operation.clipboardScratchBuffer.cells.map { it.toPayload() },
+                    clipboardSize = operation.clipboardBuffer.size.toProtocolVector(),
+                    cells = operation.clipboardBuffer.cells.map { it.toPayload() },
                     step = operation.step.toProtocolVector(),
                     repeatCount = operation.repeatCount,
                 )
@@ -212,7 +212,7 @@ class NetworkOperationDispatcher(
                     PlacedBlockPayload(
                         pos = placement.pos.toProtocolVector(),
                         blockState = VersionCompat.INSTANCE.blockStateStringify(placement.state),
-                        blockEntityData = placement.blockData?.nbt?.toString(),
+                        blockEntityData = placement.blockEntityData?.nbt?.toString(),
                     )
                 },
             )

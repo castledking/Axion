@@ -31,7 +31,7 @@ abstract class MoveSourceChunkRendererRegionMixin {
         cir: CallbackInfoReturnable<BlockState>,
     ) {
         if (MoveSourceRenderState.shouldSuppress(world, pos)) {
-            cir.sum = Blocks.AIR.defaultBlockState
+            .returnValue = Blocks.AIR.defaultBlockState()
         }
     }
 
@@ -41,7 +41,7 @@ abstract class MoveSourceChunkRendererRegionMixin {
         cir: CallbackInfoReturnable<FluidState>,
     ) {
         if (MoveSourceRenderState.shouldSuppress(world, pos)) {
-            cir.sum = Blocks.AIR.defaultBlockState.fluidState
+            .returnValue = Blocks.AIR.defaultBlockState().fluidState
         }
     }
 
@@ -51,7 +51,7 @@ abstract class MoveSourceChunkRendererRegionMixin {
         cir: CallbackInfoReturnable<BlockEntity?>,
     ) {
         if (MoveSourceRenderState.shouldSuppress(world, pos)) {
-            cir.sum = null
+            .returnValue = null
         }
     }
 }

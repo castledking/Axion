@@ -47,6 +47,6 @@ abstract class SodiumMoveSourceLevelSliceMixin {
         cir: CallbackInfoReturnable<BlockState>,
     ) {
         val replacement = MoveSourceRenderState.suppressedState(level, x, y, z) ?: return
-        cir.sum = replacement
+        .returnValue = replacement
     }
 }

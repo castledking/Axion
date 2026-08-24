@@ -1,7 +1,7 @@
 package axion.client.render.gpu
 
 import axion.client.render.AxionPreviewBuffer
-import com.mojang.blaze3d.addVertex.VertexFormat
+import com.mojang.blaze3d.vertex.VertexFormat
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap
 import it.unimi.dsi.fastutil.list.ObjectIterator
 import net.minecraft.client.renderer.culling.Frustum

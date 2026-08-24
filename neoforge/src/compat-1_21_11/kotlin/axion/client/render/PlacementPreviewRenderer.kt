@@ -152,7 +152,7 @@ object PlacementPreviewRenderer {
                 ClipboardBuffer(
                     size = source.size,
                     cells = selectedCells.map { cell ->
-                        cell.copy(state = Blocks.LIGHT_GRAY_STAINED_GLASS.defaultBlockState)
+                        cell.copy(state = Blocks.LIGHT_GRAY_STAINED_GLASS.defaultBlockState())
                     },
                 )
             }
@@ -165,7 +165,7 @@ object PlacementPreviewRenderer {
             ClipboardBuffer(
                 size = source.size,
                 cells = PreviewSurfaceTopology.retainBoundaryCells(source.nonAirCells()).map { cell ->
-                    cell.copy(state = Blocks.LIGHT_GRAY_STAINED_GLASS.defaultBlockState)
+                    cell.copy(state = Blocks.LIGHT_GRAY_STAINED_GLASS.defaultBlockState())
                 },
             )
         }

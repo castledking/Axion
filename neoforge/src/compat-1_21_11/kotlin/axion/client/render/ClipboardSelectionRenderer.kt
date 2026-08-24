@@ -11,7 +11,7 @@ import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.client.Minecraft
 import com.mojang.blaze3d.vertex.VertexConsumer
-import net.minecraft.client.util.math.Entry
+import com.mojang.blaze3d.vertex.PoseStack.Pose
 import com.mojang.blaze3d.vertex.PoseStack
 import net.minecraft.core.BlockPos
 import net.minecraft.world.phys.AABB
@@ -229,7 +229,7 @@ object ClipboardSelectionRenderer {
         }
 
         val client = Minecraft.getInstance()
-        val camera = client.gameRenderer.camera ?: return false
+        val camera = client.gameRenderer.mainCamera ?: return false
         val cameraPos = CameraAccess.getPos(camera)
         val consumers = context.consumers()
         val matrixStack = context.matrices()
@@ -340,7 +340,7 @@ object ClipboardSelectionRenderer {
         val matrixStack = context.matrices()
         val consumers = context.consumers()
         val client = Minecraft.getInstance()
-        val camera = client.gameRenderer.camera ?: return false
+        val camera = client.gameRenderer.mainCamera ?: return false
         val cameraPos = CameraAccess.getPos(camera)
         val overlayCellCount = geometry.boxes.size.toLong() * origins.size.toLong()
         val renderBaseOverlay = overlayCellCount <= MAX_BASE_OVERLAY_CELLS.toLong()
@@ -618,7 +618,7 @@ object ClipboardSelectionRenderer {
 
     private fun emitLineVertex(
         consumer: VertexConsumer,
-        entry: Entry,
+        entry: Pose,
         x: Float,
         y: Float,
         z: Float,
@@ -665,9 +665,9 @@ object ClipboardSelectionRenderer {
                 occupiedCells.filter { cell ->
                     Direction.entries.any { face ->
                         val neighbor = statesByOffset[BlockPos.asLong(
-                            cell.offset.x + face.offsetX,
-                            cell.offset.y + face.offsetY,
-                            cell.offset.z + face.offsetZ,
+                            cell.offset.x + face.stepX,
+                            cell.offset.y + face.stepY,
+                            cell.offset.z + face.stepZ,
                         )]
                         PreviewOcclusionPolicy.isFaceExposed(neighbor, PreviewOcclusionCompat::isOpaqueFullCube)
                     }
@@ -678,9 +678,9 @@ object ClipboardSelectionRenderer {
 
     private fun glassStateFor(color: Int): BlockState {
         return when (color and 0x00FFFFFF) {
-            0x00CC5656 -> Blocks.RED_STAINED_GLASS.defaultBlockState
-            0x007C98FF -> Blocks.LIGHT_BLUE_STAINED_GLASS.defaultBlockState
-            else -> Blocks.LIGHT_GRAY_STAINED_GLASS.defaultBlockState
+            0x00CC5656 -> Blocks.RED_STAINED_GLASS.defaultBlockState()
+            0x007C98FF -> Blocks.LIGHT_BLUE_STAINED_GLASS.defaultBlockState()
+            else -> Blocks.LIGHT_GRAY_STAINED_GLASS.defaultBlockState()
         }
     }
 }

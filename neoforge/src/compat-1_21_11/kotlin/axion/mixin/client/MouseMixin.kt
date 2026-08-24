@@ -7,7 +7,7 @@ import axion.client.input.AxionModifierKeys
 import axion.client.mode.ClientModeController
 import axion.mixin.compat.currentScreenOf
 import net.minecraft.client.Minecraft
-import net.minecraft.client.MouseHandlerHandler
+import net.minecraft.client.MouseHandler
 import net.minecraft.client.input.MouseButtonInfo
 import org.spongepowered.asm.mixin.Mixin
 import org.spongepowered.asm.mixin.injection.At
@@ -35,7 +35,7 @@ abstract class MouseMixin {
             return
         }
 
-        if (currentScreenOf(client) != null || action != GLFW.PRESS) {
+        if (currentScreenOf(client) != null || action != GLFW.GLFW_PRESS) {
             return
         }
 

@@ -6,7 +6,7 @@ import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.level.block.entity.BlockEntity
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.block.model.BlockModelPart
-import com.mojang.blaze3d.addVertex.PoseStack
+import com.mojang.blaze3d.vertex.PoseStack
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
 import net.minecraft.util.RandomSource
@@ -26,8 +26,8 @@ object PreviewBlockTessellator {
         }
 
         val client = Minecraft.getInstance()
-        val world = client.world ?: return false
-        val camera = client.gameRenderer.camera ?: return false
+        val world = client.level ?: return false
+        val camera = client.gameRenderer.mainCamera ?: return false
         val blockRenderManager = client.blockRenderManager
         val previewView = PreviewRegionBlockRenderView(world, region.statesByPosition)
         val matrices = context.matrices()

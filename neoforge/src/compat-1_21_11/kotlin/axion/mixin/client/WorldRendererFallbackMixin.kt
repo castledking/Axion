@@ -4,7 +4,7 @@ import axion.client.render.WorldRenderCompat
 import net.minecraft.client.Camera
 import net.minecraft.client.renderer.LevelRenderer
 import net.minecraft.client.renderer.state.LevelRenderState
-import com.mojang.blaze3d.addVertex.PoseStack
+import com.mojang.blaze3d.vertex.PoseStack
 import org.slf4j.LoggerFactory
 import org.spongepowered.asm.mixin.Mixin
 import org.spongepowered.asm.mixin.injection.At
@@ -25,7 +25,7 @@ abstract class WorldRendererFallbackMixin {
     // Modern signatures (MC 1.21.9+)
 
     @Inject(
-        method = ["renderBlockDamage(Lcom.mojang.blaze3d.addVertex.PoseStack;Lnet.minecraft.client.renderer.MultiBufferSource\$Immediate;Lnet.minecraft.client.renderer.state.LevelRenderState;)V"],
+        method = ["renderBlockDamage(Lcom.mojang.blaze3d.vertex.PoseStack;Lnet.minecraft.client.renderer.MultiBufferSource\$Immediate;Lnet.minecraft.client.renderer.state.LevelRenderState;)V"],
         at = [At("TAIL")],
     )
     private fun axionFallbackAfterBlockDamageModern(
@@ -45,7 +45,7 @@ abstract class WorldRendererFallbackMixin {
     }
 
     @Inject(
-        method = ["renderTargetBlockOutline(Lnet.minecraft.client.renderer.MultiBufferSource\$Immediate;Lcom.mojang.blaze3d.addVertex.PoseStack;ZLnet.minecraft.client.renderer.state.LevelRenderState;)V"],
+        method = ["renderTargetBlockOutline(Lnet.minecraft.client.renderer.MultiBufferSource\$Immediate;Lcom.mojang.blaze3d.vertex.PoseStack;ZLnet.minecraft.client.renderer.state.LevelRenderState;)V"],
         at = [At("TAIL")],
     )
     private fun axionFallbackAfterTargetOutlineModern(

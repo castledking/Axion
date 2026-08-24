@@ -25,7 +25,7 @@ object BuildPlacementService {
         hand: InteractionHand = InteractionHand.MAIN_HAND,
     ): SymmetryPlacementOperation? {
         val player = client.player ?: return null
-        val world = client.world ?: return null
+        val world = client.level ?: return null
         val stack = player.getItemInHand(hand)
         val blockItem = stack.item as? BlockItem ?: return null
 
@@ -86,7 +86,7 @@ object BuildPlacementService {
         hand: InteractionHand = InteractionHand.MAIN_HAND,
     ): SymmetryPlacementOperation? {
         val player = client.player ?: return null
-        val world = client.world ?: return null
+        val world = client.level ?: return null
         val stack = player.getItemInHand(hand)
         val blockItem = stack.item as? BlockItem ?: return null
 
@@ -247,7 +247,7 @@ object BuildPlacementService {
         if (!placementContext.canPlace()) {
             return null
         }
-        val placementPos = placementContext.blockPos.toImmutable()
+        val placementPos = placementContext.blockPos.immutable()
         val placementState = blockItem.block.getPlacementState(placementContext) ?: return null
         if (!placementState.canPlaceAt(world, placementPos)) {
             return null
@@ -281,9 +281,9 @@ object BuildPlacementService {
             val supportPos = pos.offset(face.opposite)
             if (world.getBlockState(supportPos).isAir) continue
             val hitPos = centerOf(supportPos).add(
-                face.offsetX * 0.5,
-                face.offsetY * 0.5,
-                face.offsetZ * 0.5,
+                face.stepX * 0.5,
+                face.stepY * 0.5,
+                face.stepZ * 0.5,
             )
             val rawContext = BlockPlaceContext(
                 player,
@@ -296,7 +296,7 @@ object BuildPlacementService {
             val placementState = blockItem.block.getPlacementState(placementContext) ?: continue
             if (!placementState.canPlaceAt(world, pos)) continue
             if (wouldCollideWithPlayer(world, player, pos, placementState)) return null
-            return SymmetryBlockPlacement(pos.toImmutable(), placementState)
+            return SymmetryBlockPlacement(pos.immutable(), placementState)
         }
         return null
     }
@@ -315,7 +315,7 @@ object BuildPlacementService {
             hand = hand,
             stack = stack,
             blockItem = blockItem,
-            pos = hitResult.blockPos.toImmutable(),
+            pos = hitResult.blockPos.immutable(),
             hitResult = hitResult,
         ) ?: return null
         return PlacementResult(
@@ -353,7 +353,7 @@ object BuildPlacementService {
         }
 
         return SymmetryBlockPlacement(
-            pos = pos.toImmutable(),
+            pos = pos.immutable(),
             state = placementState,
         )
     }
@@ -369,9 +369,9 @@ object BuildPlacementService {
     ): SymmetryBlockPlacement? {
         val supportPos = pos.offset(side.opposite)
         val hitPos = centerOf(supportPos).add(
-            side.offsetX * 0.5,
-            side.offsetY * 0.5,
-            side.offsetZ * 0.5,
+            side.stepX * 0.5,
+            side.stepY * 0.5,
+            side.stepZ * 0.5,
         )
         return createReplacePlacementAt(
             world = world,

@@ -80,7 +80,7 @@ object ChunkedPreviewLifecycle {
             ArrayList(deferredDraws).also { deferredDraws.clear() }
         }
         if (DEBUG_LOG) {
-            val now = System.currentTimeMs()
+            val now = System.currentTimeMillis()
             if (now - lastLogTime >= LOG_INTERVAL_MS) {
                 lastLogTime = now
                 logger.info(

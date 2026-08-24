@@ -38,7 +38,6 @@ object DepthRenderCompat {
                 method.parameterTypes[0].isInstance(layer)
         }
         if (layerFlush != null) {
-            layerFlush.wasAccessibleSinceLastSave = true
             layerFlush.invoke(consumers, layer)
             return
         }
@@ -48,7 +47,6 @@ object DepthRenderCompat {
                 (method.name == "draw" || method.name == "endBatch") && method.parameterCount == 0
             }
             ?: return
-        fullFlush.wasAccessibleSinceLastSave = true
         fullFlush.invoke(consumers)
     }
 }

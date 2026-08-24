@@ -45,7 +45,7 @@ object RegionEraseService {
             clipboard.cells.map { cell ->
                 SymmetryBlockPlacement(
                     pos = region.minCorner().add(cell.offset),
-                    state = Blocks.AIR.defaultBlockState,
+                    state = Blocks.AIR.defaultBlockState(),
                     blockEntityData = null,
                 )
             },

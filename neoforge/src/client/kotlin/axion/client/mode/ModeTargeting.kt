@@ -19,13 +19,13 @@ object ModeTargeting {
     fun currentBlockTarget(client: Minecraft): BlockTarget? {
         val player = client.player ?: return null
         val cameraEntity = client.cameraEntity ?: player
-        val origin = cameraEntity.getCameraPosVec(1.0f)
+        val origin = cameraEntity.getEyePosition(1.0f)
         val vanillaReach = blockInteractionRangeOf(player)
         val vanillaCrosshair = currentVanillaCrosshairBlock(client)
         val hitResult = if (vanillaCrosshair != null) {
             vanillaCrosshair
         } else if (AxionClientState.globalModeState.infiniteReachEnabled) {
-            val selectionTarget = SelectionRaycast.raycast(client, AxionClientConfig.infiniteReachRange())
+            val selectionTarget = SelectionRaycast.clip(client, AxionClientConfig.infiniteReachRange())
             when (selectionTarget) {
                 is AxionTarget.FaceTarget -> BlockHitResult(
                     selectionTarget.hitPos,
@@ -56,7 +56,7 @@ object ModeTargeting {
                 else -> null
             }
         } ?: return null
-        val squaredDistance = origin.squaredDistanceTo(hitResult.pos)
+        val squaredDistance = origin.distanceToSqr(hitResult.pos)
         val beyondVanillaReach = if (vanillaCrosshair != null) {
             false
         } else {

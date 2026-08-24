@@ -9,7 +9,6 @@ import axion.common.model.BlockRegion
 import axion.common.model.ClipboardState
 import axion.common.model.SelectionState
 import net.minecraft.client.Minecraft
-import axion.client.compat.toImmutable
 
 object SmearToolController {
     private val dispatcher = SymmetryAwareOperationDispatcher()
@@ -106,15 +105,15 @@ object SmearToolController {
                         else -> magicSelection.region.start
                     },
                     sourceRegion = magicSelection.region,
-                    clipboardBuffer = magicSelection.clipboardScratchBuffer,
+                    clipboardBuffer = magicSelection.clipboardBuffer,
                     scrollAmount = scrollAmount,
                 ) ?: return false
                 SmearToolState.PreviewingSmear(preview)
             }
 
             is SmearToolState.RegionDefined -> {
-                val world = client.world ?: return false
-                val clipboard = state.clipboardScratchBuffer ?: ClipboardCaptureService.capture(world, state.region)
+                val world = client.level ?: return false
+                val clipboard = state.clipboardBuffer ?: ClipboardCaptureService.capture(world, state.region)
                 val preview = SmearPlacementService.createInitialPreview(
                     client = client,
                     firstCorner = state.firstCorner,
@@ -132,7 +131,7 @@ object SmearToolController {
                         state.preview.firstCorner,
                         state.preview.sourceRegion.oppositeCorner(state.preview.firstCorner),
                         state.preview.sourceRegion,
-                        state.preview.clipboardScratchBuffer,
+                        state.preview.clipboardBuffer,
                     )
                 } else {
                     SmearToolState.PreviewingSmear(preview)
@@ -159,7 +158,7 @@ object SmearToolController {
     }
 
     private fun setFirstCorner(): Boolean {
-        val firstCorner = SelectionController.currentTarget().blockPosOrNull()?.toImmutable() ?: return false
+        val firstCorner = SelectionController.currentTarget().blockPosOrNull()?.immutable() ?: return false
         val nextState = SmearToolState.FirstCornerSet(firstCorner)
         AxionClientState.updateSmearToolState(nextState)
         AxionClientState.updateClipboard(ClipboardState.Empty)
@@ -168,7 +167,7 @@ object SmearToolController {
     }
 
     private fun setSecondCorner(): Boolean {
-        val secondCorner = SelectionController.currentTarget().blockPosOrNull()?.toImmutable() ?: return false
+        val secondCorner = SelectionController.currentTarget().blockPosOrNull()?.immutable() ?: return false
         val firstCorner = when (val state = AxionClientState.smearToolState) {
             SmearToolState.Idle -> return false
             is SmearToolState.FirstCornerSet -> state.firstCorner
@@ -190,13 +189,13 @@ object SmearToolController {
     private fun magicSelect(
         client: Minecraft,
     ): Boolean {
-        val world = client.world ?: return false
-        val seed = SelectionController.currentTarget().blockPosOrNull()?.toImmutable() ?: return false
+        val world = client.level ?: return false
+        val seed = SelectionController.currentTarget().blockPosOrNull()?.immutable() ?: return false
         val result = MagicSelectionService.select(world, seed) ?: return false
         val merged = when (val clipboardState = AxionClientState.clipboardState) {
             is ClipboardState.MagicSelection -> MagicSelectionService.merge(
                 existingRegion = clipboardState.region,
-                existingClipboard = clipboardState.clipboardScratchBuffer,
+                existingClipboard = clipboardState.clipboardBuffer,
                 addition = result,
             )
             ClipboardState.Empty -> result
@@ -204,7 +203,7 @@ object SmearToolController {
         AxionClientState.updateClipboard(
             ClipboardState.MagicSelection(
                 region = merged.region,
-                clipboardBuffer = merged.clipboardScratchBuffer,
+                clipboardBuffer = merged.clipboardBuffer,
             ),
         )
         return true

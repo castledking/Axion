@@ -55,8 +55,8 @@ class MagicSelectTemplateEditScreen(
         val leftX = centerX - (contentWidth / 2)
         var y = 118
 
-        nameField = EditBox(textRenderer, leftX, 88, contentWidth, 20, Component.empty())
-        nameField.text = draftName
+        nameField = EditBox(font, leftX, 88, contentWidth, 20, Component.empty())
+        nameField.value = draftName
         nameField.setMaxLength(48)
         nameField.setResponder { draftName = it }
         addWidget(nameField)
@@ -65,8 +65,8 @@ class MagicSelectTemplateEditScreen(
         addRenderableWidget(
             Button.builder(Component.translatable("axion.config.magic_select.editWorld.new_custom_mask")) {
                 persistDraft(currentTemplate)
-                client?.setScreen(MagicSelectCustomMaskScreen(this, currentTemplate.id))
-            }.dimensions(leftX, y, contentWidth, 20).build(),
+                minecraft?.setScreen(MagicSelectCustomMaskScreen(this, currentTemplate.id))
+            }.bounds(leftX, y, contentWidth, 20).build(),
         )
         y += 30
 
@@ -82,13 +82,13 @@ class MagicSelectTemplateEditScreen(
                         selectedCustomMaskIds.add(mask.id)
                     }
                     rebuildWidgets()
-                }.dimensions(toggleX, y, toggleWidth, 20).build(),
+                }.bounds(toggleX, y, toggleWidth, 20).build(),
             )
             addRenderableWidget(
                 Button.builder(Component.translatable("axion.config.magic_select.editWorld.button")) {
                     persistDraft(currentTemplate)
-                    client?.setScreen(MagicSelectCustomMaskScreen(this, currentTemplate.id, mask.id))
-                }.dimensions(leftX + contentWidth - 50, y, 50, 20).build(),
+                    minecraft?.setScreen(MagicSelectCustomMaskScreen(this, currentTemplate.id, mask.id))
+                }.bounds(leftX + contentWidth - 50, y, 50, 20).build(),
             )
             y += 24
         }
@@ -102,27 +102,27 @@ class MagicSelectTemplateEditScreen(
                     ),
                 )
                 draftInitialized = false
-                close()
-            }.dimensions(leftX, height - 34, 96, 20).build(),
+                onClose()
+            }.bounds(leftX, height - 34, 96, 20).build(),
         )
 
         addRenderableWidget(
             Button.builder(Component.translatable("gui.back")) {
-                close()
-            }.dimensions(centerX - 40, height - 62, 80, 20).build(),
+                onClose()
+            }.bounds(centerX - 40, height - 62, 80, 20).build(),
         )
 
         addRenderableWidget(
             Button.builder(Component.translatable("axion.config.magic_select.editWorld.delete")) {
                 AxionClientConfig.deleteMagicSelectTemplate(currentTemplate.id)
                 draftInitialized = false
-                close()
-            }.dimensions(leftX + contentWidth - 96, height - 34, 96, 20).build(),
+                onClose()
+            }.bounds(leftX + contentWidth - 96, height - 34, 96, 20).build(),
         )
     }
 
-    override fun close() {
-        client?.setScreen(parent)
+    override fun onClose() {
+        minecraft?.setScreen(parent)
     }
 
     fun attachCreatedCustomMask(maskId: String) {
@@ -141,16 +141,16 @@ class MagicSelectTemplateEditScreen(
         val contentWidth = 360
         val leftX = centerX - (contentWidth / 2)
 
-        context.drawCenteredString(textRenderer, title, centerX, 20, 0xFFFFFF)
+        context.drawCenteredString(font, title, centerX, 20, 0xFFFFFF)
         context.drawCenteredString(
-            textRenderer,
+            font,
             Component.translatable("axion.config.magic_select.editWorld.description"),
             centerX,
             34,
             0xBFBFBF,
         )
         context.drawCenteredString(
-            textRenderer,
+            font,
             FormattedNameText.parse(nameField.text.ifEmpty { template.name }),
             centerX,
             58,
@@ -158,7 +158,7 @@ class MagicSelectTemplateEditScreen(
         )
 
         context.drawString(
-            textRenderer,
+            font,
             Component.translatable("axion.config.magic_select.editWorld.name"),
             leftX,
             74,
@@ -167,7 +167,7 @@ class MagicSelectTemplateEditScreen(
         nameField.render(context, mouseX, mouseY, deltaTicks)
 
         context.drawString(
-            textRenderer,
+            font,
             Component.translatable("axion.config.magic_select.editWorld.masks"),
             leftX,
             104,
@@ -176,7 +176,7 @@ class MagicSelectTemplateEditScreen(
 
         if (rows.isEmpty()) {
             context.drawCenteredString(
-                textRenderer,
+                font,
                 Component.translatable("axion.config.magic_select.editWorld.no_masks"),
                 centerX,
                 148,
@@ -199,7 +199,7 @@ class MagicSelectTemplateEditScreen(
 
         rows.firstOrNull { it.containsToggle(mouseX.toDouble(), mouseY.toDouble()) }?.let { row ->
             context.drawTooltip(
-                textRenderer,
+                font,
                 activeTemplatesTooltip(row.mask.id),
                 mouseX,
                 mouseY,

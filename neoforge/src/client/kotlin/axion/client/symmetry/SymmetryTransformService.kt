@@ -91,9 +91,9 @@ object SymmetryTransformService {
             transform
         )
         return Direction.entries.first { candidate ->
-            candidate.offsetX == transformed.x &&
-                candidate.offsetY == transformed.y &&
-                candidate.offsetZ == transformed.z
+            candidate.stepX == transformed.x &&
+                candidate.stepY == transformed.y &&
+                candidate.stepZ == transformed.z
         }
     }
 
