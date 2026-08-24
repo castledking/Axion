@@ -2,7 +2,7 @@ package axion.client.compat
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
 import net.minecraft.server.MinecraftServer
-import net.minecraft.server.network.ServerPlayerEntity
+import net.minecraft.server.level.ServerPlayer
 import java.util.UUID
 
 /**
@@ -26,7 +26,7 @@ object NoClipService {
         }
     }
 
-    fun setArmed(player: ServerPlayerEntity, armed: Boolean) {
+    fun setArmed(player: ServerPlayer, armed: Boolean) {
         if (armed) {
             armedPlayers += player.uuid
         } else {
@@ -35,12 +35,12 @@ object NoClipService {
         applyState(player)
     }
 
-    fun clear(player: ServerPlayerEntity) {
+    fun clear(player: ServerPlayer) {
         armedPlayers -= player.uuid
         setNoPhysics(player, false)
     }
 
-    fun isEnabled(player: ServerPlayerEntity): Boolean {
+    fun isEnabled(player: ServerPlayer): Boolean {
         return armedPlayers.contains(player.uuid)
     }
 
@@ -54,14 +54,14 @@ object NoClipService {
 
     fun stop(server: MinecraftServer) {
         armedPlayers.toList().forEach { uuid ->
-            server.playerManager.getPlayer(uuid)?.let { setNoPhysics(it, false) }
+            server.playerList.getPlayer(uuid)?.let { setNoPhysics(it, false) }
         }
         armedPlayers.clear()
     }
 
     private fun onEndTick(server: MinecraftServer) {
         armedPlayers.toList().forEach { uuid ->
-            val player = server.playerManager.getPlayer(uuid)
+            val player = server.playerList.getPlayer(uuid)
             if (player == null) {
                 armedPlayers -= uuid
             } else {
@@ -70,12 +70,12 @@ object NoClipService {
         }
     }
 
-    private fun applyState(player: ServerPlayerEntity) {
+    private fun applyState(player: ServerPlayer) {
         setNoPhysics(player, armedPlayers.contains(player.uuid))
     }
 
-    private fun setNoPhysics(player: ServerPlayerEntity, active: Boolean) {
-        player.noClip = active
+    private fun setNoPhysics(player: ServerPlayer, active: Boolean) {
+        player.noPhysics = active
         if (active) {
             player.setOnGround(false)
             player.horizontalCollision = false

@@ -2,18 +2,18 @@ package axion.mixin.client
 
 import axion.client.mode.ClientModeController
 import axion.client.mode.EntityNoClipSupport
-import net.minecraft.client.network.ClientPlayerEntity
-import net.minecraft.entity.MovementType
-import net.minecraft.util.math.Vec3d
+import net.minecraft.client.player.LocalPlayer
+import net.minecraft.world.entity.MoverType
+import net.minecraft.world.phys.Vec3
 import org.spongepowered.asm.mixin.Mixin
 import org.spongepowered.asm.mixin.injection.At
 import org.spongepowered.asm.mixin.injection.Inject
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo
 
-@Mixin(ClientPlayerEntity::class)
+@Mixin(LocalPlayer::class)
 abstract class ClientPlayerEntityMixin {
     @Suppress("CAST_NEVER_SUCCEEDS")
-    private fun self(): ClientPlayerEntity = this as ClientPlayerEntity
+    private fun self(): LocalPlayer = this as LocalPlayer
 
     @Inject(method = ["tickMovement"], at = [At("HEAD")], require = 0)
     private fun axionApplyNoClipBeforeMovement(ci: CallbackInfo) {
@@ -28,7 +28,7 @@ abstract class ClientPlayerEntityMixin {
     }
 
     @Inject(method = ["move"], at = [At("HEAD")], cancellable = true, require = 0)
-    private fun axionApplyNoClipClientMovement(type: MovementType, movement: Vec3d, ci: CallbackInfo) {
+    private fun axionApplyNoClipClientMovement(type: MoverType, movement: Vec3, ci: CallbackInfo) {
         val player = self()
         if (!ClientModeController.isNoClipActiveFor(player)) {
             return

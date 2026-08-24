@@ -1,10 +1,10 @@
 package axion.client.render
 
-import net.minecraft.client.world.ClientWorld
+import net.minecraft.client.multiplayer.ClientLevel
 
 internal object MoveSourceRenderInvalidator {
     fun invalidate(
-        world: ClientWorld,
+        world: ClientLevel,
         sections: Set<MoveSourceRenderState.SectionCoordinate>,
     ) {
         sections.forEach { section ->

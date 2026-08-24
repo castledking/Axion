@@ -7,28 +7,28 @@ import axion.client.config.AxionConfigScreen
 import axion.client.hotbar.AxionAltMenuController
 import axion.client.hotbar.SavedHotbarController
 import axion.client.hotbar.SavedHotbarGameModeController
-import axion.client.history.UndoRedoController
+import axion.client.lastCommands.UndoRedoController
 import axion.client.mode.ClientModeController
 import axion.client.network.AxionServerConnection
-import axion.client.selection.SelectionController
+import axion.client.current.SelectionController
 import axion.client.symmetry.SymmetryController
-import axion.client.tool.AxionToolSelectionController
-import axion.client.tool.EraseToolController
-import axion.client.tool.ExtrudeToolController
-import axion.client.tool.PlacementToolController
-import axion.client.tool.SmearToolController
-import axion.client.tool.StackToolController
-import net.minecraft.client.MinecraftClient
-import net.minecraft.client.world.ClientWorld
+import axion.client.itemStack.AxionToolSelectionController
+import axion.client.itemStack.EraseToolController
+import axion.client.itemStack.ExtrudeToolController
+import axion.client.itemStack.PlacementToolController
+import axion.client.itemStack.SmearToolController
+import axion.client.itemStack.StackToolController
+import net.minecraft.client.Minecraft
+import net.minecraft.client.multiplayer.ClientLevel
 
 object AxionTickHandler {
     // Tracks the world identity to detect dimension changes / world unloads.
     // When the world reference flips (including to null), every chunked
     // preview session is closed so GPU/CPU caches don't leak into the next
     // world with stale absolute-coord chunks.
-    private var lastObservedWorld: ClientWorld? = null
+    private var lastObservedWorld: ClientLevel? = null
 
-    fun onEndTick(client: MinecraftClient) {
+    fun onEndTick(client: Minecraft) {
         observeWorldLifecycle(client.world)
         AxionServerConnection.onEndTick()
         SelectionController.onEndTick(client)
@@ -43,30 +43,30 @@ object AxionTickHandler {
         SavedHotbarController.onEndTick(client)
         ClientModeController.enforceCreativeMode(client)
         AxionAltMenuController.onEndTick(client)
-        if (client.currentScreen == null && !AxionAltMenuController.isActive(client)) {
+        if (client.screen == null && !AxionAltMenuController.isActive(client)) {
             ClientModeController.handleToggleKeypresses(client)
 
-            while (AxionKeybindings.selectAxionTool.wasPressed()) {
+            while (AxionKeybindings.selectAxionTool.consumeClick()) {
                 if (!AxionToolSelectionController.isAxionSlotActive()) {
                     SavedHotbarController.flushActiveHotbar(client)
                 }
                 AxionToolSelectionController.toggleAxionTool(player.inventory.selectedSlot)
             }
 
-            while (AxionKeybindings.nextSubtool.wasPressed()) {
+            while (AxionKeybindings.nextSubtool.consumeClick()) {
                 AxionToolSelectionController.cycleSubtool(step = 1)
             }
 
-            while (AxionKeybindings.previousSubtool.wasPressed()) {
+            while (AxionKeybindings.previousSubtool.consumeClick()) {
                 AxionToolSelectionController.cycleSubtool(step = -1)
             }
 
-            while (AxionKeybindings.toolDeleteAction.wasPressed()) {
+            while (AxionKeybindings.toolDeleteAction.consumeClick()) {
                 AxionInteractionRouter.handleDeleteAction(client)
             }
 
             // Use wasCtrlComboPressed for modifier combos (Ctrl+R, Ctrl+F) because MC 1.21.8+
-            // suppresses KeyBinding.isPressed when modifier keys are held, and wasPressed()
+            // suppresses KeyBinding.isDown when modifier keys are held, and consumeClick()
             // can be consumed by conflicting vanilla bindings. wasCtrlComboPressed reads both
             // keys directly from GLFW and edge-detects the combo, bypassing both issues.
             if (KeyBindingHandler.wasCtrlComboPressed(AxionKeybindings.symmetryToggleRotation, allowShift = false)) {
@@ -93,16 +93,16 @@ object AxionTickHandler {
                 UndoRedoController.redo(client)
             }
 
-            while (AxionKeybindings.openConfigScreen.wasPressed()) {
-                client.setScreen(AxionConfigScreen(client.currentScreen))
+            while (AxionKeybindings.openConfigScreen.consumeClick()) {
+                client.setScreen(AxionConfigScreen(client.screen))
             }
 
-            while (AxionKeybindings.toggleSameBlockMagicSelect.wasPressed()) {
+            while (AxionKeybindings.toggleSameBlockMagicSelect.consumeClick()) {
                 val enabled = AxionClientConfig.toggleSameBlockMagicSelect()
-                client.inGameHud.setOverlayMessage(
-                    net.minecraft.text.Text.translatable(
+                client.gui.setOverlayMessage(
+                    net.minecraft.network.chat.Component.translatable(
                         "axion.config.magic_select.same_block_select.overlay",
-                        net.minecraft.text.Text.translatable(
+                        net.minecraft.network.chat.Component.translatable(
                             if (enabled) {
                                 "axion.config.toggle.on"
                             } else {
@@ -124,7 +124,7 @@ object AxionTickHandler {
         ExtrudeToolController.onEndTick(client)
     }
 
-    private fun observeWorldLifecycle(currentWorld: ClientWorld?) {
+    private fun observeWorldLifecycle(currentWorld: ClientLevel?) {
         if (currentWorld === lastObservedWorld) return
         // World changed (joined a server, switched dimension, returned to title).
         // Free any cached preview chunks — their absolute coordinates are no

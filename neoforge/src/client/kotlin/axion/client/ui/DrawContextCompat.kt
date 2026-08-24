@@ -1,8 +1,8 @@
 package axion.client.ui
 
-import net.minecraft.client.gui.DrawContext
+import net.minecraft.client.gui.GuiGraphics
 
-fun DrawContext.drawStrokedRectangleCompat(x: Int, y: Int, width: Int, height: Int, color: Int) {
+fun GuiGraphics.drawStrokedRectangleCompat(x: Int, y: Int, width: Int, height: Int, color: Int) {
     if (width <= 0 || height <= 0) {
         return
     }

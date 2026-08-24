@@ -1,11 +1,11 @@
-package axion.client.tool
+package axion.client.itemStack
 
-import net.minecraft.block.BlockState
-import net.minecraft.util.math.BlockPos
+import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.core.BlockPos
 import net.minecraft.util.math.Axis
-import net.minecraft.util.math.Direction
-import net.minecraft.util.math.Vec3i
-import net.minecraft.world.BlockView
+import net.minecraft.core.Direction
+import net.minecraft.core.Vec3i
+import net.minecraft.world.level.BlockGetter
 import axion.client.compat.toImmutable
 import axion.client.compat.add
 import java.util.ArrayDeque
@@ -15,7 +15,7 @@ object LayerDiscoveryService {
     private const val MAX_RADIUS: Int = 32
 
     fun discoverPlanarFootprint(
-        world: BlockView,
+        world: BlockGetter,
         origin: BlockPos,
         direction: Direction,
     ): List<BlockPos> {
@@ -46,7 +46,7 @@ object LayerDiscoveryService {
     }
 
     private fun isEligibleNeighbor(
-        world: BlockView,
+        world: BlockGetter,
         origin: BlockPos,
         candidate: BlockPos,
         axis: Axis,

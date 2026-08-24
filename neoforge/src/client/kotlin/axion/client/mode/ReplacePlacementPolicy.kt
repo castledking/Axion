@@ -1,6 +1,6 @@
 package axion.client.mode
 
-import net.minecraft.util.math.Direction
+import net.minecraft.core.Direction
 
 object ReplacePlacementPolicy {
     private const val REPLACE_COOLDOWN_TICKS: Int = 2

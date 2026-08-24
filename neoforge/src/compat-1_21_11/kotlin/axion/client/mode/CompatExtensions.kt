@@ -1,7 +1,7 @@
 package axion.client.mode
 
-import net.minecraft.entity.player.PlayerEntity
+import net.minecraft.world.entity.player.Player
 
-fun PlayerEntity.blockInteractionRange(): Double = blockInteractionRange
+fun Player.blockInteractionRange(): Double = blockInteractionRange
 
-fun blockInteractionRangeOf(player: PlayerEntity): Double = player.blockInteractionRange()
+fun blockInteractionRangeOf(player: Player): Double = player.blockInteractionRange()

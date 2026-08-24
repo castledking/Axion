@@ -1,18 +1,18 @@
 package axion.client.render
 import axion.client.compat.CameraAccess
 
-import net.minecraft.block.BlockRenderType
-import net.minecraft.block.BlockState
-import net.minecraft.block.entity.BlockEntity
-import net.minecraft.client.MinecraftClient
-import net.minecraft.client.render.model.BlockModelPart
-import net.minecraft.client.util.math.MatrixStack
-import net.minecraft.util.math.BlockPos
-import net.minecraft.util.math.Direction
-import net.minecraft.util.math.random.Random
-import net.minecraft.world.BlockRenderView
-import net.minecraft.world.biome.ColorResolver
-import net.minecraft.world.chunk.light.LightingProvider
+import net.minecraft.world.level.block.RenderShape
+import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.world.level.block.entity.BlockEntity
+import net.minecraft.client.Minecraft
+import net.minecraft.client.renderer.block.model.BlockModelPart
+import com.mojang.blaze3d.addVertex.PoseStack
+import net.minecraft.core.BlockPos
+import net.minecraft.core.Direction
+import net.minecraft.util.RandomSource
+import net.minecraft.world.level.BlockAndTintGetter
+import net.minecraft.world.level.ColorResolver
+import net.minecraft.world.level.lighting.LevelLightEngine
 
 object PreviewBlockTessellator {
     fun render(
@@ -25,7 +25,7 @@ object PreviewBlockTessellator {
             return false
         }
 
-        val client = MinecraftClient.getInstance()
+        val client = Minecraft.getInstance()
         val world = client.world ?: return false
         val camera = client.gameRenderer.camera ?: return false
         val blockRenderManager = client.blockRenderManager
@@ -39,18 +39,18 @@ object PreviewBlockTessellator {
         )
 
         var rendered = false
-        val random = Random.create()
+        val random = RandomSource.create()
         val parts = ArrayList<BlockModelPart>(16)
         region.surfaceBlocks.forEach { block ->
             val state = block.state
-            if (state.isAir || state.renderType != BlockRenderType.MODEL) {
+            if (state.isAir || state.renderType != RenderShape.MODEL) {
                 return@forEach
             }
 
             val model = blockRenderManager.getModel(state)
             parts.clear()
-            random.setSeed(state.getRenderingSeed(block.pos))
-            model.addParts(random, parts)
+            random.setSeed(state.getSeed(block.pos))
+            model.addCommonParts(random, parts)
             if (parts.isEmpty()) {
                 return@forEach
             }
@@ -78,11 +78,11 @@ object PreviewBlockTessellator {
     }
 
     private class PreviewRegionBlockRenderView(
-        private val world: net.minecraft.client.world.ClientWorld,
+        private val world: net.minecraft.client.multiplayer.ClientLevel,
         private val statesByPosition: Map<Long, BlockState>,
-    ) : BlockRenderView {
+    ) : BlockAndTintGetter {
         override fun getBlockEntity(pos: BlockPos): BlockEntity? {
-            return if (statesByPosition.containsKey(pos.asLong())) null else world.getBlockEntity(pos)
+            return if (statesByPosition.contains(pos.asLong())) null else world.getBlockEntity(pos)
         }
 
         override fun getBlockState(pos: BlockPos): BlockState {
@@ -97,7 +97,7 @@ object PreviewBlockTessellator {
 
         override fun getBrightness(direction: Direction, shaded: Boolean): Float = world.getBrightness(direction, shaded)
 
-        override fun getLightingProvider(): LightingProvider = world.lightingProvider
+        override fun getLightingProvider(): LevelLightEngine = world.lightEngine
 
         override fun getColor(pos: BlockPos, colorResolver: ColorResolver): Int = world.getColor(pos, colorResolver)
     }

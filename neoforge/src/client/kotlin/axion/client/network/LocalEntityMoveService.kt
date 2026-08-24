@@ -3,25 +3,25 @@ package axion.client.network
 import axion.common.compat.VersionCompat
 import axion.common.operation.EntityMoveMirrorAxis
 import axion.common.operation.MoveEntitiesOperation
-import net.minecraft.entity.Entity
-import net.minecraft.entity.player.PlayerEntity
-import net.minecraft.server.world.ServerWorld
-import net.minecraft.util.math.BlockPos
-import net.minecraft.util.math.Box
-import net.minecraft.util.math.Vec3d
-import net.minecraft.world.World
+import net.minecraft.world.entity.Entity
+import net.minecraft.world.entity.player.Player
+import net.minecraft.server.level.ServerLevel
+import net.minecraft.core.BlockPos
+import net.minecraft.world.phys.AABB
+import net.minecraft.world.phys.Vec3
+import net.minecraft.world.level.Level
 import axion.protocol.IntVector3
 import java.util.UUID
 import kotlin.math.atan2
 import kotlin.math.sqrt
 
 object LocalEntityMoveService {
-    fun plan(world: World, operation: MoveEntitiesOperation): List<EntityMovePlan> {
-        val serverWorld = world as? ServerWorld ?: return emptyList()
+    fun plan(world: Level, operation: MoveEntitiesOperation): List<EntityMovePlan> {
+        val serverWorld = world as? ServerLevel ?: return emptyList()
         val source = operation.sourceRegion.normalized()
         val sourceMin = source.minCorner()
         val sourceMax = source.maxCorner()
-        val queryBox = Box(
+        val queryBox = AABB(
             sourceMin.x.toDouble(),
             sourceMin.y.toDouble(),
             sourceMin.z.toDouble(),
@@ -35,7 +35,7 @@ object LocalEntityMoveService {
         )
         val seen = linkedSetOf<UUID>()
         return serverWorld.getEntitiesByClass(Entity::class.java, queryBox) { entity ->
-            entity !is PlayerEntity &&
+            entity !is Player &&
                 !VersionCompat.INSTANCE.entityIsRemoved(entity) &&
                 entityMatcher.containsFeet(
                     VersionCompat.INSTANCE.entityGetX(entity),
@@ -46,13 +46,13 @@ object LocalEntityMoveService {
             .asSequence()
             .map(::rootEntity)
             .filter { entity ->
-                entity !is PlayerEntity &&
+                entity !is Player &&
                     !VersionCompat.INSTANCE.entityIsRemoved(entity) &&
                     VersionCompat.INSTANCE.entityGetVehicle(entity) == null &&
                     seen.add(VersionCompat.INSTANCE.entityGetUuid(entity))
             }
             .map { entity ->
-                val currentPos = Vec3d(VersionCompat.INSTANCE.entityGetX(entity), VersionCompat.INSTANCE.entityGetY(entity), VersionCompat.INSTANCE.entityGetZ(entity))
+                val currentPos = Vec3(VersionCompat.INSTANCE.entityGetX(entity), VersionCompat.INSTANCE.entityGetY(entity), VersionCompat.INSTANCE.entityGetZ(entity))
                 val target = transformEntity(currentPos, directionFromAngles(VersionCompat.INSTANCE.entityGetYaw(entity), VersionCompat.INSTANCE.entityGetPitch(entity)), sourceMin, sourceMax, operation)
                 EntityMovePlan(
                     entityId = VersionCompat.INSTANCE.entityGetUuid(entity),
@@ -67,11 +67,11 @@ object LocalEntityMoveService {
             .toList()
     }
 
-    fun apply(world: World, moves: List<EntityMovePlan>, reverse: Boolean = false) {
-        val serverWorld = world as? ServerWorld ?: return
+    fun apply(world: Level, moves: List<EntityMovePlan>, reverse: Boolean = false) {
+        val serverWorld = world as? ServerLevel ?: return
         moves.forEach { move ->
             val entity = serverWorld.getEntity(move.entityId) ?: return@forEach
-            if (entity is PlayerEntity) {
+            if (entity is Player) {
                 return@forEach
             }
             val targetPos = if (reverse) move.fromPos else move.toPos
@@ -99,8 +99,8 @@ object LocalEntityMoveService {
     }
 
     private fun transformEntity(
-        position: Vec3d,
-        direction: Vec3d,
+        position: Vec3,
+        direction: Vec3,
         sourceMin: BlockPos,
         sourceMax: BlockPos,
         operation: MoveEntitiesOperation,
@@ -111,9 +111,9 @@ object LocalEntityMoveService {
         val sizeY = sourceMax.y - sourceMin.y + 1.0
         val mirrored = when (operation.mirrorAxis) {
             EntityMoveMirrorAxis.NONE -> relative
-            EntityMoveMirrorAxis.X -> Vec3d(sizeX - relative.x, relative.y, relative.z)
-            EntityMoveMirrorAxis.Y -> Vec3d(relative.x, sizeY - relative.y, relative.z)
-            EntityMoveMirrorAxis.Z -> Vec3d(relative.x, relative.y, sizeZ - relative.z)
+            EntityMoveMirrorAxis.X -> Vec3(sizeX - relative.x, relative.y, relative.z)
+            EntityMoveMirrorAxis.Y -> Vec3(relative.x, sizeY - relative.y, relative.z)
+            EntityMoveMirrorAxis.Z -> Vec3(relative.x, relative.y, sizeZ - relative.z)
         }
         val rotatedPosition = rotatePosition(mirrored, sizeX, sizeZ, operation.rotationQuarterTurns)
         val transformedDirection = rotateDirection(mirrorDirection(direction, operation.mirrorAxis), operation.rotationQuarterTurns)
@@ -129,47 +129,47 @@ object LocalEntityMoveService {
         )
     }
 
-    private fun rotatePosition(position: Vec3d, sizeX: Double, sizeZ: Double, turns: Int): Vec3d {
+    private fun rotatePosition(position: Vec3, sizeX: Double, sizeZ: Double, turns: Int): Vec3 {
         return when (Math.floorMod(turns, 4)) {
             0 -> position
-            1 -> Vec3d(sizeZ - position.z, position.y, position.x)
-            2 -> Vec3d(sizeX - position.x, position.y, sizeZ - position.z)
-            else -> Vec3d(position.z, position.y, sizeX - position.x)
+            1 -> Vec3(sizeZ - position.z, position.y, position.x)
+            2 -> Vec3(sizeX - position.x, position.y, sizeZ - position.z)
+            else -> Vec3(position.z, position.y, sizeX - position.x)
         }
     }
 
-    private fun mirrorDirection(direction: Vec3d, axis: EntityMoveMirrorAxis): Vec3d {
+    private fun mirrorDirection(direction: Vec3, axis: EntityMoveMirrorAxis): Vec3 {
         return when (axis) {
             EntityMoveMirrorAxis.NONE -> direction
-            EntityMoveMirrorAxis.X -> Vec3d(-direction.x, direction.y, direction.z)
-            EntityMoveMirrorAxis.Y -> Vec3d(direction.x, -direction.y, direction.z)
-            EntityMoveMirrorAxis.Z -> Vec3d(direction.x, direction.y, -direction.z)
+            EntityMoveMirrorAxis.X -> Vec3(-direction.x, direction.y, direction.z)
+            EntityMoveMirrorAxis.Y -> Vec3(direction.x, -direction.y, direction.z)
+            EntityMoveMirrorAxis.Z -> Vec3(direction.x, direction.y, -direction.z)
         }
     }
 
-    private fun rotateDirection(direction: Vec3d, turns: Int): Vec3d {
+    private fun rotateDirection(direction: Vec3, turns: Int): Vec3 {
         return when (Math.floorMod(turns, 4)) {
             0 -> direction
-            1 -> Vec3d(-direction.z, direction.y, direction.x)
-            2 -> Vec3d(-direction.x, direction.y, -direction.z)
-            else -> Vec3d(direction.z, direction.y, -direction.x)
+            1 -> Vec3(-direction.z, direction.y, direction.x)
+            2 -> Vec3(-direction.x, direction.y, -direction.z)
+            else -> Vec3(direction.z, direction.y, -direction.x)
         }
     }
 
-    private fun directionToYaw(direction: Vec3d): Float {
+    private fun directionToYaw(direction: Vec3): Float {
         return Math.toDegrees(atan2(-direction.x, direction.z)).toFloat()
     }
 
-    private fun directionToPitch(direction: Vec3d): Float {
+    private fun directionToPitch(direction: Vec3): Float {
         val horizontal = sqrt(direction.x * direction.x + direction.z * direction.z)
         return Math.toDegrees(-atan2(direction.y, horizontal)).toFloat()
     }
 
-    private fun directionFromAngles(yaw: Float, pitch: Float): Vec3d {
+    private fun directionFromAngles(yaw: Float, pitch: Float): Vec3 {
         val yawRadians = Math.toRadians(yaw.toDouble())
         val pitchRadians = Math.toRadians(pitch.toDouble())
         val cosPitch = kotlin.math.cos(pitchRadians)
-        return Vec3d(
+        return Vec3(
             -kotlin.math.sin(yawRadians) * cosPitch,
             -kotlin.math.sin(pitchRadians),
             kotlin.math.cos(yawRadians) * cosPitch,
@@ -177,7 +177,7 @@ object LocalEntityMoveService {
     }
 
     private data class EntityTarget(
-        val position: Vec3d,
+        val position: Vec3,
         val yaw: Float,
         val pitch: Float,
     )

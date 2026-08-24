@@ -7,10 +7,10 @@ import axion.client.config.MagicSelectMaskConfigScreen
 import axion.client.config.MagicSelectTemplateEditScreen
 import axion.client.ui.drawStrokedRectangleCompat
 import axion.common.compat.VersionCompat
-import net.minecraft.client.MinecraftClient
-import net.minecraft.client.font.TextRenderer
-import net.minecraft.client.gui.DrawContext
-import net.minecraft.util.Identifier
+import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.Font
+import net.minecraft.client.gui.GuiGraphics
+import net.minecraft.resources.Identifier
 
 object AxionToolHintHud {
     private const val PANEL_BACKGROUND: Int = 0x8A0D0F10.toInt()
@@ -37,10 +37,10 @@ object AxionToolHintHud {
         )
     }
 
-    fun render(context: DrawContext, tickCounter: net.minecraft.client.render.RenderTickCounter) {
-        val client = MinecraftClient.getInstance()
+    fun render(context: GuiGraphics, tickCounter: net.minecraft.client.DeltaTracker) {
+        val client = Minecraft.getInstance()
         client.player ?: return
-        if (client.options.hudHidden || shouldSuppressForScreen(client.currentScreen)) {
+        if (client.options.hideGui || shouldSuppressForScreen(client.screen)) {
             return
         }
 
@@ -52,7 +52,7 @@ object AxionToolHintHud {
         renderKeyHints(context, textRenderer, hints.keyHints)
     }
 
-    private fun shouldSuppressForScreen(screen: net.minecraft.client.gui.screen.Screen?): Boolean {
+    private fun shouldSuppressForScreen(screen: net.minecraft.client.gui.screens.Screen?): Boolean {
         return screen is AxionConfigScreen ||
             screen is MagicSelectMaskConfigScreen ||
             screen is MagicSelectTemplateEditScreen ||
@@ -60,17 +60,17 @@ object AxionToolHintHud {
     }
 
     private fun renderCrosshairHints(
-        context: DrawContext,
-        textRenderer: TextRenderer,
+        context: GuiGraphics,
+        textRenderer: Font,
         hints: List<CrosshairHint>,
     ) {
         if (hints.isEmpty()) {
             return
         }
 
-        val centerX = context.scaledWindowWidth / 2
+        val centerX = context.guiScaledWidth / 2
         val rowHeight = ICON_SIZE + CROSSHAIR_ROW_GAP
-        var y = (context.scaledWindowHeight / 2) + CROSSHAIR_TOP_OFFSET
+        var y = (context.guiScaledHeight / 2) + CROSSHAIR_TOP_OFFSET
 
         hints.forEach { hint ->
             when (hint) {
@@ -81,8 +81,8 @@ object AxionToolHintHud {
                     mouseTextures[hint.icon]?.let { texture ->
                         VersionCompatImpl.drawGuiTexture(context, texture, x, y, ICON_SIZE, ICON_SIZE)
                     }
-                    val textY = y + (ICON_SIZE - textRenderer.fontHeight) / 2 + 1
-                    context.drawTextWithShadow(
+                    val textY = y + (ICON_SIZE - textRenderer.lineHeight) / 2 + 1
+                    context.drawString(
                         textRenderer,
                         hint.action,
                         x + ICON_SIZE + ICON_TEXT_GAP,
@@ -97,10 +97,10 @@ object AxionToolHintHud {
                     val actionWidth = textRenderer.getWidth(hint.action)
                     val totalWidth = keyWidth + sepWidth + actionWidth
                     val x = centerX - totalWidth / 2
-                    val textY = y + (ICON_SIZE - textRenderer.fontHeight) / 2 + 1
-                    context.drawTextWithShadow(textRenderer, hint.key, x, textY, INPUT_COLOR)
-                    context.drawTextWithShadow(textRenderer, separator, x + keyWidth, textY, TEXT_COLOR)
-                    context.drawTextWithShadow(textRenderer, hint.action, x + keyWidth + sepWidth, textY, TEXT_COLOR)
+                    val textY = y + (ICON_SIZE - textRenderer.lineHeight) / 2 + 1
+                    context.drawString(textRenderer, hint.key, x, textY, INPUT_COLOR)
+                    context.drawString(textRenderer, separator, x + keyWidth, textY, TEXT_COLOR)
+                    context.drawString(textRenderer, hint.action, x + keyWidth + sepWidth, textY, TEXT_COLOR)
                 }
             }
             y += rowHeight
@@ -108,8 +108,8 @@ object AxionToolHintHud {
     }
 
     private fun renderHotbarStatus(
-        context: DrawContext,
-        textRenderer: TextRenderer,
+        context: GuiGraphics,
+        textRenderer: Font,
         status: String?,
     ) {
         if (status == null) {
@@ -117,21 +117,21 @@ object AxionToolHintHud {
         }
 
         val width = textRenderer.getWidth(status)
-        val x = (context.scaledWindowWidth - width) / 2
-        val y = context.scaledWindowHeight - 48
+        val x = (context.guiScaledWidth - width) / 2
+        val y = context.guiScaledHeight - 48
         context.fill(
             x - PANEL_PADDING_X,
             y - PANEL_PADDING_Y,
             x + width + PANEL_PADDING_X,
-            y + textRenderer.fontHeight + PANEL_PADDING_Y,
+            y + textRenderer.lineHeight + PANEL_PADDING_Y,
             PANEL_BACKGROUND,
         )
-        context.drawTextWithShadow(textRenderer, status, x, y, HOTBAR_STATUS_COLOR)
+        context.drawString(textRenderer, status, x, y, HOTBAR_STATUS_COLOR)
     }
 
     private fun renderKeyHints(
-        context: DrawContext,
-        textRenderer: TextRenderer,
+        context: GuiGraphics,
+        textRenderer: Font,
         hints: List<ToolHintEntry>,
     ) {
         if (hints.isEmpty()) {
@@ -140,11 +140,11 @@ object AxionToolHintHud {
 
         val lines = hints.map { "${it.input} - ${it.action}" }
         val contentWidth = lines.maxOf(textRenderer::getWidth)
-        val lineHeight = textRenderer.fontHeight
+        val lineHeight = textRenderer.lineHeight
         val panelWidth = contentWidth + (PANEL_PADDING_X * 2)
         val panelHeight = (lineHeight * lines.size) + (KEY_LINE_GAP * (lines.size - 1)) + (PANEL_PADDING_Y * 2)
-        val x = context.scaledWindowWidth - RIGHT_MARGIN - panelWidth
-        val y = context.scaledWindowHeight - BOTTOM_MARGIN - panelHeight
+        val x = context.guiScaledWidth - RIGHT_MARGIN - panelWidth
+        val y = context.guiScaledHeight - BOTTOM_MARGIN - panelHeight
 
         context.fill(x, y, x + panelWidth, y + panelHeight, PANEL_BACKGROUND)
         context.drawStrokedRectangleCompat(x, y, panelWidth, panelHeight, PANEL_BORDER)
@@ -155,10 +155,10 @@ object AxionToolHintHud {
             val separator = " - "
             val action = hint.action
             val textX = x + PANEL_PADDING_X
-            context.drawTextWithShadow(textRenderer, input, textX, cursorY, INPUT_COLOR)
+            context.drawString(textRenderer, input, textX, cursorY, INPUT_COLOR)
             val actionX = textX + textRenderer.getWidth(input + separator)
-            context.drawTextWithShadow(textRenderer, separator, textX + textRenderer.getWidth(input), cursorY, TEXT_COLOR)
-            context.drawTextWithShadow(textRenderer, action, actionX, cursorY, TEXT_COLOR)
+            context.drawString(textRenderer, separator, textX + textRenderer.getWidth(input), cursorY, TEXT_COLOR)
+            context.drawString(textRenderer, action, actionX, cursorY, TEXT_COLOR)
             cursorY += lineHeight + KEY_LINE_GAP
         }
     }

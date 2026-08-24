@@ -1,6 +1,6 @@
 package axion.client.network
 
-import axion.client.config.defaultState
+import axion.client.config.defaultBlockState
 import axion.common.compat.VersionCompat
 import axion.common.model.BlockEntityDataSnapshot
 import axion.common.model.BlockRegion
@@ -17,22 +17,22 @@ import axion.common.operation.MoveEntitiesOperation
 import axion.common.operation.SmearRegionOperation
 import axion.common.operation.StackRegionOperation
 import axion.common.operation.SymmetryPlacementOperation
-import net.minecraft.block.BlockState
-import net.minecraft.block.Blocks
-import net.minecraft.util.math.BlockPos
-import net.minecraft.util.math.Vec3i
+import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.world.level.block.Blocks
+import net.minecraft.core.BlockPos
+import net.minecraft.core.Vec3i
 import axion.client.compat.blockPosIterate
 import axion.client.compat.toImmutable
 import axion.client.compat.add
-import net.minecraft.world.World
+import net.minecraft.world.level.Level
 
 class LocalWritePlanner {
-    fun plan(world: World, operation: EditOperation): WritePlan {
+    fun plan(world: Level, operation: EditOperation): WritePlan {
         val overlay = linkedMapOf<BlockPos, BlockWrite>()
         val writes = mutableListOf<BlockWrite>()
         val entityMoves = mutableListOf<EntityMovePlan>()
-        val entityClones = mutableListOf<axion.common.history.EntityCloneChange>()
-        val entityDeletes = mutableListOf<axion.common.history.EntityCloneChange>()
+        val entityClones = mutableListOf<axion.common.lastCommands.EntityCloneChange>()
+        val entityDeletes = mutableListOf<axion.common.lastCommands.EntityCloneChange>()
         appendWrites(world, operation, overlay, writes, entityMoves, entityClones, entityDeletes)
         return WritePlan(
             label = operationLabel(operation),
@@ -44,13 +44,13 @@ class LocalWritePlanner {
     }
 
     private fun appendWrites(
-        world: World,
+        world: Level,
         operation: EditOperation,
         overlay: MutableMap<BlockPos, BlockWrite>,
         writes: MutableList<BlockWrite>,
         entityMoves: MutableList<EntityMovePlan>,
-        entityClones: MutableList<axion.common.history.EntityCloneChange>,
-        entityDeletes: MutableList<axion.common.history.EntityCloneChange>,
+        entityClones: MutableList<axion.common.lastCommands.EntityCloneChange>,
+        entityDeletes: MutableList<axion.common.lastCommands.EntityCloneChange>,
     ) {
         when (operation) {
             is CloneEntitiesOperation -> entityClones += LocalEntityCloneService.plan(world, operation)
@@ -70,7 +70,7 @@ class LocalWritePlanner {
     }
 
     private fun appendClone(
-        world: World,
+        world: Level,
         operation: CloneRegionOperation,
         overlay: MutableMap<BlockPos, BlockWrite>,
         writes: MutableList<BlockWrite>,
@@ -93,12 +93,12 @@ class LocalWritePlanner {
     ) {
         val region = operation.region.normalized()
         blockPosIterate(region.minCorner(), region.maxCorner()).forEach { pos ->
-            appendWrite(pos.toImmutable(), Blocks.AIR.defaultState, null, overlay, writes)
+            appendWrite(pos.toImmutable(), Blocks.AIR.defaultBlockState, null, overlay, writes)
         }
     }
 
     private fun appendFilteredClone(
-        world: World,
+        world: Level,
         operation: FilteredCloneRegionOperation,
         overlay: MutableMap<BlockPos, BlockWrite>,
         writes: MutableList<BlockWrite>,
@@ -125,7 +125,7 @@ class LocalWritePlanner {
     }
 
     private fun appendStack(
-        world: World,
+        world: Level,
         operation: StackRegionOperation,
         overlay: MutableMap<BlockPos, BlockWrite>,
         writes: MutableList<BlockWrite>,
@@ -137,7 +137,7 @@ class LocalWritePlanner {
         val source = operation.sourceRegion.normalized()
         for (index in 1..operation.repeatCount) {
             val destinationOrigin = source.minCorner().add(operation.step.multiply(index))
-            operation.clipboardBuffer.cells.forEach { cell ->
+            operation.clipboardScratchBuffer.cells.forEach { cell ->
                 val destinationPos = destinationOrigin.add(cell.offset).toImmutable()
                 if (operation.keepExisting && !currentStateAt(world, overlay, destinationPos).isAir) {
                     return@forEach
@@ -148,12 +148,12 @@ class LocalWritePlanner {
     }
 
     private fun appendSmear(
-        world: World,
+        world: Level,
         operation: SmearRegionOperation,
         overlay: MutableMap<BlockPos, BlockWrite>,
         writes: MutableList<BlockWrite>,
     ) {
-        val smearOffsets = axion.client.tool.RegionRepeatPlacementService.smearOffsets(
+        val smearOffsets = axion.client.itemStack.RegionRepeatPlacementService.smearOffsets(
             operation.step,
             operation.repeatCount,
         )
@@ -163,12 +163,12 @@ class LocalWritePlanner {
 
         val source = operation.sourceRegion.normalized()
         val sourceOrigin = source.minCorner()
-        val sourcePositions = operation.clipboardBuffer.cells.mapTo(linkedSetOf()) { cell ->
+        val sourcePositions = operation.clipboardScratchBuffer.cells.mapTo(linkedSetOf()) { cell ->
             sourceOrigin.add(cell.offset).toImmutable()
         }
         val candidates = linkedMapOf<BlockPos, SmearCandidate>()
 
-        operation.clipboardBuffer.cells.forEach { cell ->
+        operation.clipboardScratchBuffer.cells.forEach { cell ->
             if (cell.state.isAir) {
                 return@forEach
             }
@@ -203,7 +203,7 @@ class LocalWritePlanner {
     }
 
     private fun appendExtrude(
-        world: World,
+        world: Level,
         operation: ExtrudeOperation,
         overlay: MutableMap<BlockPos, BlockWrite>,
         writes: MutableList<BlockWrite>,
@@ -228,7 +228,7 @@ class LocalWritePlanner {
             ExtrudeMode.SHRINK -> {
                 operation.footprint.forEach { sourcePos ->
                     if (currentStateAt(world, overlay, sourcePos) == operation.sourceState) {
-                        appendWrite(sourcePos, Blocks.AIR.defaultState, null, overlay, writes)
+                        appendWrite(sourcePos, Blocks.AIR.defaultBlockState, null, overlay, writes)
                     }
                 }
             }
@@ -259,7 +259,7 @@ class LocalWritePlanner {
     }
 
     private fun captureRegionCells(
-        world: World,
+        world: Level,
         region: BlockRegion,
         overlay: MutableMap<BlockPos, BlockWrite>,
     ): List<CapturedCell> {
@@ -280,7 +280,7 @@ class LocalWritePlanner {
     }
 
     private fun currentStateAt(
-        world: World,
+        world: Level,
         overlay: Map<BlockPos, BlockWrite>,
         pos: BlockPos,
     ): BlockState {
@@ -288,7 +288,7 @@ class LocalWritePlanner {
     }
 
     private fun currentBlockEntityAt(
-        world: World,
+        world: Level,
         overlay: Map<BlockPos, BlockWrite>,
         pos: BlockPos,
     ): BlockEntityDataSnapshot? {

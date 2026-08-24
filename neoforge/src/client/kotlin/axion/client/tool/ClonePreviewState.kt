@@ -1,9 +1,9 @@
-package axion.client.tool
+package axion.client.itemStack
 
 import axion.common.model.BlockRegion
 import axion.common.model.ClipboardBuffer
-import net.minecraft.util.math.BlockPos
-import net.minecraft.util.math.Vec3i
+import net.minecraft.core.BlockPos
+import net.minecraft.core.Vec3i
 import axion.protocol.EntitySelectionMask
 
 data class ClonePreviewState(

@@ -1,4 +1,4 @@
-package axion.client.tool
+package axion.client.itemStack
 
 import axion.common.model.BlockRegion
 import axion.common.model.ClipboardBuffer
@@ -7,18 +7,18 @@ import axion.common.operation.CompositeOperation
 import axion.common.operation.EditOperation
 import axion.common.operation.SmearRegionOperation
 import axion.common.operation.StackRegionOperation
-import axion.client.tool.directionGetFacing
-import axion.client.tool.floorMod
+import axion.client.itemStack.directionGetFacing
+import axion.client.itemStack.floorMod
 import axion.client.compat.blockPosIterate
 import axion.client.compat.add
 import axion.client.compat.toImmutable
 import axion.client.compat.ORIGIN
-import net.minecraft.block.Blocks
-import net.minecraft.client.MinecraftClient
-import net.minecraft.util.math.BlockPos
+import net.minecraft.world.level.block.Blocks
+import net.minecraft.client.Minecraft
+import net.minecraft.core.BlockPos
 import net.minecraft.util.math.Axis
-import net.minecraft.util.math.Direction
-import net.minecraft.util.math.Vec3i
+import net.minecraft.core.Direction
+import net.minecraft.core.Vec3i
 import kotlin.math.abs
 
 object RegionRepeatPlacementService {
@@ -28,7 +28,7 @@ object RegionRepeatPlacementService {
     }
 
     fun createInitialPreview(
-        client: MinecraftClient,
+        client: Minecraft,
         firstCorner: BlockPos,
         sourceRegion: BlockRegion,
         clipboardBuffer: ClipboardBuffer,
@@ -70,7 +70,7 @@ object RegionRepeatPlacementService {
     }
 
     fun nudgePreview(
-        client: MinecraftClient,
+        client: Minecraft,
         preview: RepeatRegionPreview,
         scrollAmount: Double,
         mode: Mode,
@@ -357,8 +357,8 @@ object RegionRepeatPlacementService {
                             absolutePos.y - min.y,
                             absolutePos.z - min.z,
                         ),
-                        state = cell?.state ?: Blocks.AIR.defaultState,
-                        blockEntityData = cell?.blockEntityData?.copy(),
+                        state = cell?.state ?: Blocks.AIR.defaultBlockState,
+                        blockEntityData = cell?.blockData?.copy(),
                     ),
                 )
             }
@@ -400,7 +400,7 @@ object RegionRepeatPlacementService {
         )
     }
 
-    private fun dominantLookDirection(client: MinecraftClient): Direction {
+    private fun dominantLookDirection(client: Minecraft): Direction {
         val look = client.player?.rotationVecClient ?: return Direction.UP
         return directionGetFacing(look)
     }

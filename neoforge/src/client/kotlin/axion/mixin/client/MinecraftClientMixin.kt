@@ -4,17 +4,17 @@ import axion.client.input.AxionInteractionRouter
 import axion.client.input.AxionPrimaryActionRouting
 import axion.client.input.AxionShortcutPreemption
 import axion.client.mode.ClientModeController
-import net.minecraft.client.MinecraftClient
+import net.minecraft.client.Minecraft
 import org.spongepowered.asm.mixin.Mixin
 import org.spongepowered.asm.mixin.injection.At
 import org.spongepowered.asm.mixin.injection.Inject
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable
 
-@Mixin(MinecraftClient::class)
+@Mixin(Minecraft::class)
 abstract class MinecraftClientMixin {
     @Suppress("CAST_NEVER_SUCCEEDS")
-    private fun self(): MinecraftClient = this as MinecraftClient
+    private fun self(): Minecraft = this as Minecraft
 
     // Drain a conflicting vanilla offhand click before its packet is emitted.
     @Inject(method = ["handleInputEvents", "handleKeybinds"], at = [At("HEAD")], require = 0)
@@ -22,7 +22,7 @@ abstract class MinecraftClientMixin {
         AxionShortcutPreemption.suppressConflictingOffhandSwap(self())
     }
 
-    // Yarn name: doAttack (1.21.x)
+    // Yarn name: startAttack (1.21.x)
     @Inject(method = ["doAttack"], at = [At("HEAD")], cancellable = true, require = 0)
     private fun axionHandlePrimaryAction(ci: CallbackInfoReturnable<Boolean>) {
         axionHandlePrimaryActionImpl(ci)
@@ -71,7 +71,7 @@ abstract class MinecraftClientMixin {
         }
     }
 
-    // Yarn name: doItemUse (1.21.x)
+    // Yarn name: startUseItem (1.21.x)
     @Inject(method = ["doItemUse"], at = [At("HEAD")], cancellable = true, require = 0)
     private fun axionHandleSecondaryAction(ci: CallbackInfo) {
         axionHandleSecondaryActionImpl(ci)
@@ -158,7 +158,7 @@ abstract class MinecraftClientMixin {
         }
     }
 
-    // Yarn name: doItemPick (1.21.x)
+    // Yarn name: pickBlock (1.21.x)
     @Inject(method = ["doItemPick"], at = [At("HEAD")], cancellable = true, require = 0)
     private fun axionHandleMiddleAction(ci: CallbackInfo) {
         axionHandleMiddleActionImpl(ci)

@@ -3,12 +3,12 @@ package axion.client.network
 import axion.common.compat.VersionCompat
 import axion.common.operation.ClearRegionOperation
 import axion.common.operation.CloneRegionOperation
-import axion.client.history.HistoryManager
-import axion.client.history.RemoteHistoryAdapter
+import axion.client.lastCommands.HistoryManager
+import axion.client.lastCommands.RemoteHistoryAdapter
 import axion.client.compat.VersionCompatImpl
 import axion.common.operation.CompositeOperation
 import axion.common.operation.EditOperation
-import net.minecraft.client.MinecraftClient
+import net.minecraft.client.Minecraft
 import axion.common.operation.ExtrudeOperation
 import axion.common.operation.FilteredCloneRegionOperation
 import axion.common.operation.MoveEntitiesOperation
@@ -36,7 +36,7 @@ import axion.protocol.PlaceBlocksRequest
 import axion.protocol.PlacedBlockPayload
 import axion.protocol.SmearRegionRequest
 import axion.protocol.StackRegionRequest
-import net.minecraft.command.argument.BlockArgumentParser
+import net.minecraft.items.arguments.blocks.BlockStateParser
 
 class NetworkOperationDispatcher(
     private val recordHistory: Boolean = true,
@@ -68,10 +68,10 @@ class NetworkOperationDispatcher(
             // Show action bar alert for Disconnected state (no plugin installed)
             if (state == AxionServerConnection.State.Disconnected) {
                 VersionCompatImpl.notifyPlayer(
-                    MinecraftClient.getInstance().player,
+                    Minecraft.getInstance().player,
                     VersionCompatImpl.formatText(
                         VersionCompatImpl.createLiteral("⚠ Axion server plugin required for multiplayer editing"),
-                        net.minecraft.util.Formatting.RED,
+                        net.minecraft.ChatFormatting.RED,
                     ),
                     true,
                 )
@@ -177,8 +177,8 @@ class NetworkOperationDispatcher(
                 val source = operation.sourceRegion.normalized()
                 StackRegionRequest(
                     sourceOrigin = source.minCorner().toProtocolVector(),
-                    clipboardSize = operation.clipboardBuffer.size.toProtocolVector(),
-                    cells = operation.clipboardBuffer.cells.map { it.toPayload() },
+                    clipboardSize = operation.clipboardScratchBuffer.size.toProtocolVector(),
+                    cells = operation.clipboardScratchBuffer.cells.map { it.toPayload() },
                     step = operation.step.toProtocolVector(),
                     repeatCount = operation.repeatCount,
                     keepExisting = operation.keepExisting,
@@ -189,8 +189,8 @@ class NetworkOperationDispatcher(
                 val source = operation.sourceRegion.normalized()
                 SmearRegionRequest(
                     sourceOrigin = source.minCorner().toProtocolVector(),
-                    clipboardSize = operation.clipboardBuffer.size.toProtocolVector(),
-                    cells = operation.clipboardBuffer.cells.map { it.toPayload() },
+                    clipboardSize = operation.clipboardScratchBuffer.size.toProtocolVector(),
+                    cells = operation.clipboardScratchBuffer.cells.map { it.toPayload() },
                     step = operation.step.toProtocolVector(),
                     repeatCount = operation.repeatCount,
                 )
@@ -198,7 +198,7 @@ class NetworkOperationDispatcher(
 
             is ExtrudeOperation -> ExtrudeRequest(
                 origin = operation.origin.toProtocolVector(),
-                direction = (VersionCompat.INSTANCE.directionGetVector(operation.direction) as net.minecraft.util.math.Vec3i).toProtocolVector(),
+                direction = (VersionCompat.INSTANCE.directionGetVector(operation.direction) as net.minecraft.core.Vec3i).toProtocolVector(),
                 expectedState = VersionCompat.INSTANCE.blockStateStringify(operation.sourceState),
                 mode = when (operation.mode) {
                     axion.common.operation.ExtrudeMode.EXTEND -> AxionExtrudeMode.EXTEND
@@ -212,7 +212,7 @@ class NetworkOperationDispatcher(
                     PlacedBlockPayload(
                         pos = placement.pos.toProtocolVector(),
                         blockState = VersionCompat.INSTANCE.blockStateStringify(placement.state),
-                        blockEntityData = placement.blockEntityData?.nbt?.toString(),
+                        blockEntityData = placement.blockData?.nbt?.toString(),
                     )
                 },
             )
@@ -222,11 +222,11 @@ class NetworkOperationDispatcher(
     }
 }
 
-private fun net.minecraft.util.math.BlockPos.toProtocolVector(): IntVector3 {
+private fun net.minecraft.core.BlockPos.toProtocolVector(): IntVector3 {
     return IntVector3(x, y, z)
 }
 
-private fun net.minecraft.util.math.Vec3i.toProtocolVector(): IntVector3 {
+private fun net.minecraft.core.Vec3i.toProtocolVector(): IntVector3 {
     return IntVector3(x, y, z)
 }
 

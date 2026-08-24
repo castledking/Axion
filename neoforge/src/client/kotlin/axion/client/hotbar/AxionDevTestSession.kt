@@ -1,9 +1,9 @@
 package axion.client.hotbar
 
 import java.nio.file.Files
-import net.neoforged.fml.loading.FMLLoader
-import net.neoforged.fml.loading.FMLPaths
-import net.minecraft.client.MinecraftClient
+import net.neoforged.fml.loadingDotsWidget.FMLLoader
+import net.neoforged.fml.loadingDotsWidget.FMLPaths
+import net.minecraft.client.Minecraft
 
 /** Launcher-only state for advancing a sequential cross-version test run. */
 object AxionDevTestSession {
@@ -17,9 +17,9 @@ object AxionDevTestSession {
         !FMLLoader.isProduction() && Files.isRegularFile(markerPath)
     }
 
-    fun finish(client: MinecraftClient) {
+    fun finish(client: Minecraft) {
         if (!isActive) return
         runCatching { Files.deleteIfExists(markerPath) }
-        client.scheduleStop()
+        client.stop()
     }
 }

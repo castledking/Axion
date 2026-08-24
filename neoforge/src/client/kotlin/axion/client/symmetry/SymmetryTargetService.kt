@@ -1,12 +1,12 @@
 package axion.client.symmetry
 
-import axion.client.selection.AxionTarget
+import axion.client.current.AxionTarget
 import axion.client.symmetry.directionGetFacing
 import axion.common.model.SymmetryMirrorAxis
 import axion.common.model.SymmetryAnchor
-import net.minecraft.client.MinecraftClient
-import net.minecraft.util.math.Direction
-import net.minecraft.util.math.Vec3d
+import net.minecraft.client.Minecraft
+import net.minecraft.core.Direction
+import net.minecraft.world.phys.Vec3
 import kotlin.math.abs
 import kotlin.math.round
 
@@ -23,15 +23,15 @@ object SymmetryTargetService {
         }
     }
 
-    fun resolveNudgeDirection(client: MinecraftClient, target: AxionTarget): Direction {
+    fun resolveNudgeDirection(client: Minecraft, target: AxionTarget): Direction {
         return when (target) {
             is AxionTarget.FaceTarget -> target.face.direction
-            is AxionTarget.BlockTarget -> directionGetFacing(client.player?.rotationVecClient ?: Vec3d(0.0, 1.0, 0.0))
-            AxionTarget.MissTarget -> directionGetFacing(client.player?.rotationVecClient ?: Vec3d(0.0, 1.0, 0.0))
+            is AxionTarget.BlockTarget -> directionGetFacing(client.player?.rotationVecClient ?: Vec3(0.0, 1.0, 0.0))
+            AxionTarget.MissTarget -> directionGetFacing(client.player?.rotationVecClient ?: Vec3(0.0, 1.0, 0.0))
         }
     }
 
-    fun resolveMirrorAxis(client: MinecraftClient): SymmetryMirrorAxis {
+    fun resolveMirrorAxis(client: Minecraft): SymmetryMirrorAxis {
         val look = client.player?.rotationVecClient ?: return SymmetryMirrorAxis.X
         val ax = abs(look.x)
         val ay = abs(look.y)
@@ -43,8 +43,8 @@ object SymmetryTargetService {
         }
     }
 
-    private fun quantizeToHalfGrid(pos: Vec3d): Vec3d {
-        return Vec3d(
+    private fun quantizeToHalfGrid(pos: Vec3): Vec3 {
+        return Vec3(
             quantizeToHalf(pos.x),
             quantizeToHalf(pos.y),
             quantizeToHalf(pos.z),

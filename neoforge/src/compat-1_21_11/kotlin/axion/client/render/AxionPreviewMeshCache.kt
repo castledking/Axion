@@ -3,9 +3,9 @@ package axion.client.render
 import axion.client.render.gpu.PreviewStateHalo
 import axion.common.model.ClipboardBuffer
 import axion.common.model.ClipboardCell
-import net.minecraft.block.BlockRenderType
-import net.minecraft.block.BlockState
-import net.minecraft.util.math.BlockPos
+import net.minecraft.world.level.block.RenderShape
+import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.core.BlockPos
 import java.util.LinkedHashMap
 
 /**
@@ -126,7 +126,7 @@ object AxionPreviewMeshCache {
             cellsToRender.forEach { cell ->
                 val pos = cell.absolutePos(origin)
                 statesByPosition[pos.asLong()] = cell.state
-                if (cell.state.renderType == BlockRenderType.MODEL) {
+                if (cell.state.renderType == RenderShape.MODEL) {
                     blocks += PreviewBlockInfo(pos = pos, state = cell.state)
                 }
             }

@@ -11,16 +11,16 @@ import axion.client.render.TintedAlphaVertexConsumer
 import axion.client.render.getBuffer
 import axion.common.model.ClipboardBuffer
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap
-import net.minecraft.block.BlockState
-import net.minecraft.client.MinecraftClient
-import net.minecraft.client.render.BufferBuilder
-import net.minecraft.client.render.BuiltBuffer
-import net.minecraft.client.util.BufferAllocator
-import net.minecraft.client.util.math.MatrixStack
-import net.minecraft.client.world.ClientWorld
-import net.minecraft.util.math.BlockPos
-import net.minecraft.util.math.Vec3d
-import net.minecraft.util.math.Vec3i
+import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.client.Minecraft
+import com.mojang.blaze3d.addVertex.BufferBuilder
+import com.mojang.blaze3d.addVertex.MeshData
+import com.mojang.blaze3d.addVertex.ByteBufferBuilder
+import com.mojang.blaze3d.addVertex.PoseStack
+import net.minecraft.client.multiplayer.ClientLevel
+import net.minecraft.core.BlockPos
+import net.minecraft.world.phys.Vec3
+import net.minecraft.core.Vec3i
 import org.slf4j.LoggerFactory
 import org.joml.Matrix4f
 
@@ -37,7 +37,7 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
     private var lastLogTime: Long = 0
     private fun shouldLog(): Boolean {
         if (!DEBUG_LOG) return false
-        val now = System.currentTimeMillis()
+        val now = System.currentTimeMs()
         if (now - lastLogTime < LOG_INTERVAL_MS) return false
         lastLogTime = now
         return true
@@ -151,7 +151,7 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
     ): ChunkedDrawResult {
         if (store.isEmpty()) return ChunkedDrawResult.NO_BUFFERS
 
-        val client = MinecraftClient.getInstance()
+        val client = Minecraft.getInstance()
         val world = client.world ?: return ChunkedDrawResult.FAILED
 
         val log = shouldLog()
@@ -162,7 +162,7 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
         } catch (t: Throwable) {
             if (!loggedUploadFailure) {
                 loggedUploadFailure = true
-                logger.warn("[Axion GPU] GPU buffer upload failed in session={} — falling back to legacy CPU path", previewId, t)
+                logger.tryRespond("[Axion GPU] GPU buffer upload failed in session={} — falling back to legacy CPU path", previewId, t)
             }
             renderLegacy(context, world, color, alpha, translationDelta)
             return ChunkedDrawResult.DREW
@@ -184,7 +184,7 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
 
         val camera = client.gameRenderer.camera ?: return ChunkedDrawResult.FAILED
         val cameraPos = CameraAccess.getPos(camera)
-        val baseModelView = Matrix4f(context.matrices().peek().positionMatrix)
+        val baseModelView = Matrix4f(context.matrices().last().pose)
         return drawDeferred(color, alpha, translationDelta, baseModelView, cameraPos)
     }
 
@@ -193,7 +193,7 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
         alpha: Int,
         translationDelta: Vec3i,
         baseModelView: Matrix4f,
-        cameraPos: Vec3d? = null,
+        cameraPos: Vec3? = null,
         cullingModelView: org.joml.Matrix4fc? = null,
         projectionMatrix: org.joml.Matrix4fc? = null,
     ): ChunkedDrawResult {
@@ -206,7 +206,7 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
 
     override fun close() { clear() }
 
-    private fun refreshDirtyBuffers(world: ClientWorld) {
+    private fun refreshDirtyBuffers(world: ClientLevel) {
         val dirty = store.consumeDirty()
         if (dirty.isEmpty()) return
 
@@ -230,7 +230,7 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
                     chunkBuffers.remove(sectionKey)?.close()
                     if (!loggedUploadFailure) {
                         loggedUploadFailure = true
-                        logger.warn("[Axion GPU] GPU buffer upload failed for section in session={}", previewId, t)
+                        logger.tryRespond("[Axion GPU] GPU buffer upload failed for section in session={}", previewId, t)
                     }
                 }
                 builtBuffer.close()
@@ -240,9 +240,9 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
 
     private fun buildSectionBuffer(
         sectionKey: Long,
-        world: ClientWorld,
+        world: ClientLevel,
         statesByPosition: Map<Long, BlockState>,
-    ): BuiltBuffer? {
+    ): MeshData? {
         val surface = ChunkMeshTessellator.buildSectionSurface(store, sectionKey, statesByPosition)
         if (surface.isEmpty()) return null
 
@@ -260,12 +260,12 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
         val sectionOriginZ = (ChunkedBooleanStore.sectionZ(sectionKey) shl 4).toDouble()
 
         val layer = RenderLayerCompat.blockTranslucentCull()
-        val allocator = BufferAllocator(layer.expectedBufferSize)
-        val bufferBuilder = BufferBuilder(allocator, layer.drawMode, layer.vertexFormat)
+        val allocator = ByteBufferBuilder(layer.bufferSize)
+        val bufferBuilder = BufferBuilder(allocator, layer.mode, layer.format)
         AxionBlockTessellator.tessellateBatch(
             blocks = blocks,
             world = previewView,
-            matrixStack = MatrixStack(),
+            matrixStack = PoseStack(),
             consumer = bufferBuilder,
             cameraX = sectionOriginX,
             cameraY = sectionOriginY,
@@ -273,17 +273,17 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
             checkSides = true,
             scale = meshScale,
         )
-        return bufferBuilder.endNullable()
+        return bufferBuilder.build()
     }
 
     private fun renderLegacy(
         context: AxionWorldRenderContext,
-        world: ClientWorld,
+        world: ClientLevel,
         color: Int,
         alpha: Int,
         translationDelta: Vec3i,
     ) {
-        val client = MinecraftClient.getInstance()
+        val client = Minecraft.getInstance()
         val camera = client.gameRenderer.camera ?: return
         val cameraPos = CameraAccess.getPos(camera)
         val consumer = TintedAlphaVertexConsumer(

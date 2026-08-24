@@ -1,6 +1,6 @@
-package axion.client.history
+package axion.client.lastCommands
 
-import axion.common.history.HistoryEntry
+import axion.common.lastCommands.HistoryEntry
 import axion.protocol.OperationBatchResult
 
 object RemoteHistoryAdapter {
@@ -15,7 +15,7 @@ object RemoteHistoryAdapter {
         // depend on runtime-mapped Minecraft parsers.
         return HistoryEntry(
             id = transactionId,
-            timestampMillis = System.currentTimeMillis(),
+            timestampMillis = System.currentTimeMs(),
             label = label,
             changes = emptyList(),
         )

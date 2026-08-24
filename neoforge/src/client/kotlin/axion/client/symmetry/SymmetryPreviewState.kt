@@ -1,7 +1,7 @@
 package axion.client.symmetry
 
 import axion.common.model.SymmetryAnchor
-import net.minecraft.util.math.BlockPos
+import net.minecraft.core.BlockPos
 
 data class SymmetryPreviewState(
     val anchor: SymmetryAnchor,

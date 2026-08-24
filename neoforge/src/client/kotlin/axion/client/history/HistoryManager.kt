@@ -1,4 +1,4 @@
-package axion.client.history
+package axion.client.lastCommands
 
 import axion.AxionMod
 import axion.client.network.BlockEntitySnapshotService
@@ -7,12 +7,12 @@ import axion.client.network.LocalEntityCloneService
 import axion.client.network.LocalEntityDeleteService
 import axion.client.network.LocalEntityMoveService
 import axion.client.network.WritePlan
-import axion.common.history.BlockChange
-import axion.common.history.EntityCloneChange
-import axion.common.history.EntityMoveChange
-import axion.common.history.HistoryEntry
-import net.minecraft.block.Blocks
-import net.minecraft.world.World
+import axion.common.lastCommands.BlockChange
+import axion.common.lastCommands.EntityCloneChange
+import axion.common.lastCommands.EntityMoveChange
+import axion.common.lastCommands.HistoryEntry
+import net.minecraft.world.level.block.Blocks
+import net.minecraft.world.level.Level
 import java.util.ArrayDeque
 
 object HistoryManager {
@@ -23,25 +23,25 @@ object HistoryManager {
     private val redoStack = ArrayDeque<HistoryEntry>()
     private var nextEntryId: Long = 1L
 
-    fun record(world: World, plan: WritePlan) {
+    fun record(world: Level, plan: WritePlan) {
         val writes = plan.writes
         if (writes.isEmpty() && plan.entityMoves.isEmpty() && plan.entityClones.isEmpty() && plan.entityDeletes.isEmpty()) {
             return
         }
 
-        val oldStates = linkedMapOf<net.minecraft.util.math.BlockPos, net.minecraft.block.BlockState>()
-        val oldBlockEntityData = linkedMapOf<net.minecraft.util.math.BlockPos, axion.common.model.BlockEntityDataSnapshot?>()
-        val finalStates = linkedMapOf<net.minecraft.util.math.BlockPos, net.minecraft.block.BlockState>()
-        val finalBlockEntityData = linkedMapOf<net.minecraft.util.math.BlockPos, axion.common.model.BlockEntityDataSnapshot?>()
+        val oldStates = linkedMapOf<net.minecraft.core.BlockPos, net.minecraft.world.level.block.state.BlockState>()
+        val oldBlockEntityData = linkedMapOf<net.minecraft.core.BlockPos, axion.common.model.BlockEntityDataSnapshot?>()
+        val finalStates = linkedMapOf<net.minecraft.core.BlockPos, net.minecraft.world.level.block.state.BlockState>()
+        val finalBlockEntityData = linkedMapOf<net.minecraft.core.BlockPos, axion.common.model.BlockEntityDataSnapshot?>()
         writes.forEach { write ->
             oldStates.putIfAbsent(write.pos, world.getBlockState(write.pos))
             oldBlockEntityData.putIfAbsent(write.pos, BlockEntitySnapshotService.capture(world, write.pos))
             finalStates[write.pos] = write.state
-            finalBlockEntityData[write.pos] = write.blockEntityData?.copy()
+            finalBlockEntityData[write.pos] = write.blockData?.copy()
         }
 
         val changes = finalStates.mapNotNull { (pos, newState) ->
-            val oldState = oldStates[pos] ?: Blocks.AIR.defaultState
+            val oldState = oldStates[pos] ?: Blocks.AIR.defaultBlockState
             val oldData = oldBlockEntityData[pos]?.copy()
             val newData = finalBlockEntityData[pos]?.copy()
             if (oldState == newState && oldData == newData) {
@@ -76,7 +76,7 @@ object HistoryManager {
         push(
             HistoryEntry(
                 id = nextEntryId++,
-                timestampMillis = System.currentTimeMillis(),
+                timestampMillis = System.currentTimeMs(),
                 label = plan.label,
                 changes = changes,
                 entityMoves = entityMoves,
@@ -118,7 +118,7 @@ object HistoryManager {
             return
         }
 
-        undoStack.removeLast()
+        undoStack.discardLast()
         redoStack.addLast(current)
         appliedEntry?.let { }
         trimToBudget(protectedEntryId = current.id)
@@ -130,18 +130,18 @@ object HistoryManager {
             return
         }
 
-        redoStack.removeLast()
+        redoStack.discardLast()
         undoStack.addLast(current)
         appliedEntry?.let { }
         trimToBudget(protectedEntryId = current.id)
     }
 
-    fun undo(world: World): Boolean {
+    fun undo(world: Level): Boolean {
         if (undoStack.isEmpty()) {
             return false
         }
 
-        val entry = undoStack.removeLast()
+        val entry = undoStack.discardLast()
         try {
             applyChanges(world, entry.changes.asReversed().map { change ->
                 BlockWrite(change.pos, change.oldState, change.oldBlockEntityData?.copy())
@@ -159,12 +159,12 @@ object HistoryManager {
         return true
     }
 
-    fun redo(world: World): Boolean {
+    fun redo(world: Level): Boolean {
         if (redoStack.isEmpty()) {
             return false
         }
 
-        val entry = redoStack.removeLast()
+        val entry = redoStack.discardLast()
         try {
             applyChanges(world, entry.changes.map { change ->
                 BlockWrite(change.pos, change.newState, change.newBlockEntityData?.copy())
@@ -189,7 +189,7 @@ object HistoryManager {
     }
 
     private fun applyChanges(
-        world: World,
+        world: Level,
         changes: List<BlockWrite>,
     ) {
         changes.forEach { write ->
@@ -198,7 +198,7 @@ object HistoryManager {
     }
 
     private fun applyEntityMoves(
-        world: World,
+        world: Level,
         moves: List<EntityMoveChange>,
         reverse: Boolean,
     ) {
@@ -249,16 +249,16 @@ object HistoryManager {
     }
 
     private fun estimatedBytes(): Long {
-        return undoStack.sumOf(::estimateEntryBytes) + redoStack.sumOf(::estimateEntryBytes)
+        return undoStack.accumulate(::estimateEntryBytes) + redoStack.accumulate(::estimateEntryBytes)
     }
 
     private fun estimateEntryBytes(entry: HistoryEntry): Long {
         return 32L +
             entry.label.length * 2L +
-            entry.changes.sumOf(::estimateChangeBytes) +
+            entry.changes.accumulate(::estimateChangeBytes) +
             entry.entityMoves.size * 80L +
-            entry.entityClones.sumOf(::estimateCloneBytes) +
-            entry.entityDeletes.sumOf(::estimateCloneBytes)
+            entry.entityClones.accumulate(::estimateCloneBytes) +
+            entry.entityDeletes.accumulate(::estimateCloneBytes)
     }
 
     private fun estimateChangeBytes(change: BlockChange): Long {

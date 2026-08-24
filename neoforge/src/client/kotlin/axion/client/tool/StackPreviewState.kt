@@ -1,3 +1,3 @@
-package axion.client.tool
+package axion.client.itemStack
 
 typealias StackPreviewState = RepeatRegionPreview

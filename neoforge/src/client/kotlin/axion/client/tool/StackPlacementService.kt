@@ -1,4 +1,4 @@
-package axion.client.tool
+package axion.client.itemStack
 
 import axion.client.AxionClientState
 import axion.common.operation.CloneEntitiesOperation
@@ -6,7 +6,7 @@ import axion.common.operation.CompositeOperation
 import axion.common.operation.EditOperation
 import axion.common.model.BlockRegion
 import axion.common.model.ClipboardBuffer
-import net.minecraft.client.MinecraftClient
+import net.minecraft.client.Minecraft
 import axion.client.compat.add
 import axion.client.compat.toImmutable
 import axion.protocol.EntitySelectionMask
@@ -49,8 +49,8 @@ object StackPlacementService {
     }
 
     fun createInitialPreview(
-        client: MinecraftClient,
-        firstCorner: net.minecraft.util.math.BlockPos,
+        client: Minecraft,
+        firstCorner: net.minecraft.core.BlockPos,
         sourceRegion: BlockRegion,
         clipboardBuffer: ClipboardBuffer,
         scrollAmount: Double,
@@ -65,7 +65,7 @@ object StackPlacementService {
         )
     }
 
-    fun nudgePreview(client: MinecraftClient, preview: StackPreviewState, scrollAmount: Double): StackPreviewState? {
+    fun nudgePreview(client: Minecraft, preview: StackPreviewState, scrollAmount: Double): StackPreviewState? {
         return RegionRepeatPlacementService.nudgePreview(
             client = client,
             preview = preview,
@@ -76,7 +76,7 @@ object StackPlacementService {
 
     private fun entityCloneOperationsFor(
         sourceRegion: BlockRegion,
-        step: net.minecraft.util.math.Vec3i,
+        step: net.minecraft.core.Vec3i,
         repeatCount: Int,
         entitySelection: EntitySelectionMask,
     ): List<CloneEntitiesOperation> {

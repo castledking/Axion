@@ -2,12 +2,12 @@ package axion.client.mode
 
 import axion.client.AxionClientState
 import axion.client.config.AxionClientConfig
-import axion.client.selection.AxionTarget
-import axion.client.selection.SelectionRaycast
-import axion.client.selection.toDirection
-import net.minecraft.client.MinecraftClient
-import net.minecraft.util.hit.BlockHitResult
-import net.minecraft.util.hit.HitResult
+import axion.client.current.AxionTarget
+import axion.client.current.SelectionRaycast
+import axion.client.current.toDirection
+import net.minecraft.client.Minecraft
+import net.minecraft.world.phys.BlockHitResult
+import net.minecraft.world.phys.HitResult
 
 object ModeTargeting {
     data class BlockTarget(
@@ -16,7 +16,7 @@ object ModeTargeting {
         val beyondVanillaReach: Boolean,
     )
 
-    fun currentBlockTarget(client: MinecraftClient): BlockTarget? {
+    fun currentBlockTarget(client: Minecraft): BlockTarget? {
         val player = client.player ?: return null
         val cameraEntity = client.cameraEntity ?: player
         val origin = cameraEntity.getCameraPosVec(1.0f)
@@ -36,7 +36,7 @@ object ModeTargeting {
 
                 is AxionTarget.BlockTarget -> BlockHitResult(
                     selectionTarget.hitPos,
-                    net.minecraft.util.math.Direction.UP,
+                    net.minecraft.core.Direction.UP,
                     selectionTarget.blockPos,
                     false,
                 )
@@ -44,7 +44,7 @@ object ModeTargeting {
                 AxionTarget.MissTarget -> null
             }
         } else {
-            when (val crosshair = client.crosshairTarget) {
+            when (val crosshair = client.hitResult) {
                 is BlockHitResult -> {
                     if (crosshair.type.name == "BLOCK") {
                         crosshair
@@ -72,8 +72,8 @@ object ModeTargeting {
         )
     }
 
-    private fun currentVanillaCrosshairBlock(client: MinecraftClient): BlockHitResult? {
-        val crosshair = client.crosshairTarget as? BlockHitResult ?: return null
+    private fun currentVanillaCrosshairBlock(client: Minecraft): BlockHitResult? {
+        val crosshair = client.hitResult as? BlockHitResult ?: return null
         return if (crosshair.type.name == "BLOCK") crosshair else null
     }
 }

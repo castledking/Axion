@@ -1,10 +1,10 @@
 package axion.client.render
 
 import axion.client.AxionClientState
-import axion.client.selection.SelectionBounds
-import axion.client.tool.PlacementToolController
-import axion.client.tool.StackToolController
-import axion.client.tool.AxionToolSelectionController
+import axion.client.current.SelectionBounds
+import axion.client.itemStack.PlacementToolController
+import axion.client.itemStack.StackToolController
+import axion.client.itemStack.AxionToolSelectionController
 import axion.common.model.AxionSubtool
 import axion.common.model.SelectionState
 
@@ -38,7 +38,7 @@ object SelectionStateRenderer {
                     context = context,
                     scene = BlockPreviewPipeline.SelectionScene(
                         origins = listOf(pendingMagicSelection.region.minCorner()),
-                        selectionClipboard = pendingMagicSelection.clipboardBuffer,
+                        selectionClipboard = pendingMagicSelection.clipboardScratchBuffer,
                         sparse = true,
                         outlineColor = REGION_COLOR,
                         lineWidth = LINE_WIDTH,
@@ -60,7 +60,7 @@ object SelectionStateRenderer {
                         sparse = false,
                         outlineColor = REGION_COLOR,
                         lineWidth = LINE_WIDTH,
-                        aggregateBox = SelectionBounds.blockBox(state.firstCorner),
+                        aggregateBox = SelectionBounds.blockBox(state.vert0),
                         baseFillColor = SELECTION_BASE_FILL_COLOR,
                         baseAlpha = SELECTION_BASE_FILL_ALPHA,
                         pulseFillColor = SELECTION_PULSE_FILL_COLOR,

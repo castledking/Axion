@@ -1,13 +1,13 @@
-package axion.client.selection
+package axion.client.current
 
-import net.minecraft.client.MinecraftClient
-import net.minecraft.util.hit.BlockHitResult
-import net.minecraft.util.hit.HitResult
-import net.minecraft.world.RaycastContext
+import net.minecraft.client.Minecraft
+import net.minecraft.world.phys.BlockHitResult
+import net.minecraft.world.phys.HitResult
+import net.minecraft.world.level.ClipContext
 
 object SelectionRaycast {
     fun raycast(
-        client: MinecraftClient,
+        client: Minecraft,
         maxDistance: Double = AxionTargeting.DEFAULT_REACH,
     ): AxionTarget {
         val world = client.world ?: return AxionTarget.MissTarget
@@ -16,11 +16,11 @@ object SelectionRaycast {
         val direction = cameraEntity.getRotationVec(1.0f)
         val target = origin.add(direction.x * maxDistance, direction.y * maxDistance, direction.z * maxDistance)
         val hit = world.raycast(
-            RaycastContext(
+            ClipContext(
                 origin,
                 target,
-                RaycastContext.ShapeType.OUTLINE,
-                RaycastContext.FluidHandling.NONE,
+                ClipContext.ShapeType.OUTLINE,
+                ClipContext.FluidHandling.NONE,
                 cameraEntity,
             ),
         )

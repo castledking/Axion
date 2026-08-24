@@ -64,14 +64,14 @@ class PermissiveOperationValidator : OperationValidator {
                 blocksPerBatch = operation.sourceRegion.volume(),
             )
             is StackRegionOperation -> OperationEstimate(
-                totalWrites = operation.clipboardBuffer.cells.size.toLong() * operation.repeatCount,
-                clipboardCells = operation.clipboardBuffer.cells.size,
-                blocksPerBatch = operation.clipboardBuffer.cells.size.toLong() * operation.repeatCount,
+                totalWrites = operation.clipboardScratchBuffer.cells.size.toLong() * operation.repeatCount,
+                clipboardCells = operation.clipboardScratchBuffer.cells.size,
+                blocksPerBatch = operation.clipboardScratchBuffer.cells.size.toLong() * operation.repeatCount,
             )
             is SmearRegionOperation -> OperationEstimate(
-                totalWrites = operation.clipboardBuffer.cells.size.toLong() * operation.repeatCount,
-                clipboardCells = operation.clipboardBuffer.cells.size,
-                blocksPerBatch = operation.clipboardBuffer.cells.size.toLong() * operation.repeatCount,
+                totalWrites = operation.clipboardScratchBuffer.cells.size.toLong() * operation.repeatCount,
+                clipboardCells = operation.clipboardScratchBuffer.cells.size,
+                blocksPerBatch = operation.clipboardScratchBuffer.cells.size.toLong() * operation.repeatCount,
             )
             is ExtrudeOperation -> OperationEstimate(
                 totalWrites = operation.footprint.size.toLong(),

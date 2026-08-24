@@ -7,4 +7,4 @@ package axion.client.compat
  * outright in the 26.x official namespace, so the shared mixin refers to it
  * through this alias rather than spelling either form directly.
  */
-typealias AxionBlockStateBase = net.minecraft.block.AbstractBlock.AbstractBlockState
+typealias AxionBlockStateBase = net.minecraft.world.level.block.state.BlockBehaviour.AbstractBlockState

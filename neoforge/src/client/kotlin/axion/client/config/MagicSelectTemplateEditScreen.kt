@@ -2,18 +2,18 @@ package axion.client.config
 
 import axion.client.ui.FormattedNameText
 import axion.client.ui.drawStrokedRectangleCompat
-import net.minecraft.client.gui.DrawContext
-import net.minecraft.client.gui.screen.Screen
-import net.minecraft.client.gui.widget.ButtonWidget
-import net.minecraft.client.gui.widget.TextFieldWidget
-import net.minecraft.text.MutableText
-import net.minecraft.text.Text
-import net.minecraft.util.Formatting
+import net.minecraft.client.gui.GuiGraphics
+import net.minecraft.client.gui.screens.Screen
+import net.minecraft.client.gui.components.Button
+import net.minecraft.client.gui.components.EditBox
+import net.minecraft.network.chat.MutableComponent
+import net.minecraft.network.chat.Component
+import net.minecraft.ChatFormatting
 
 class MagicSelectTemplateEditScreen(
     private val parent: Screen?,
     private val templateId: String,
-) : Screen(Text.translatable("axion.config.magic_select.edit.title")) {
+) : Screen(Component.translatable("axion.config.magic_select.editWorld.title")) {
     private data class MaskRow(
         val mask: MagicSelectCustomMask,
         val contentX: Int,
@@ -29,7 +29,7 @@ class MagicSelectTemplateEditScreen(
         }
     }
 
-    private lateinit var nameField: TextFieldWidget
+    private lateinit var nameField: EditBox
     private var selectedCustomMaskIds: MutableSet<String> = linkedSetOf()
     private var draftName: String = ""
     private var draftInitialized: Boolean = false
@@ -55,15 +55,15 @@ class MagicSelectTemplateEditScreen(
         val leftX = centerX - (contentWidth / 2)
         var y = 118
 
-        nameField = TextFieldWidget(textRenderer, leftX, 88, contentWidth, 20, Text.empty())
+        nameField = EditBox(textRenderer, leftX, 88, contentWidth, 20, Component.empty())
         nameField.text = draftName
         nameField.setMaxLength(48)
-        nameField.setChangedListener { draftName = it }
-        addSelectableChild(nameField)
+        nameField.setResponder { draftName = it }
+        addWidget(nameField)
         setInitialFocus(nameField)
 
-        addDrawableChild(
-            ButtonWidget.builder(Text.translatable("axion.config.magic_select.edit.new_custom_mask")) {
+        addRenderableWidget(
+            Button.builder(Component.translatable("axion.config.magic_select.editWorld.new_custom_mask")) {
                 persistDraft(currentTemplate)
                 client?.setScreen(MagicSelectCustomMaskScreen(this, currentTemplate.id))
             }.dimensions(leftX, y, contentWidth, 20).build(),
@@ -74,18 +74,18 @@ class MagicSelectTemplateEditScreen(
             val toggleX = leftX + 46
             val toggleWidth = contentWidth - 100
             rows += MaskRow(mask = mask, contentX = leftX, y = y, toggleX = toggleX, toggleWidth = toggleWidth)
-            addDrawableChild(
-                ButtonWidget.builder(toggleLabel(mask.name, mask.id in selectedCustomMaskIds)) {
+            addRenderableWidget(
+                Button.builder(toggleLabel(mask.name, mask.id in selectedCustomMaskIds)) {
                     if (mask.id in selectedCustomMaskIds) {
                         selectedCustomMaskIds.remove(mask.id)
                     } else {
                         selectedCustomMaskIds.add(mask.id)
                     }
-                    clearAndInit()
+                    rebuildWidgets()
                 }.dimensions(toggleX, y, toggleWidth, 20).build(),
             )
-            addDrawableChild(
-                ButtonWidget.builder(Text.translatable("axion.config.magic_select.edit.button")) {
+            addRenderableWidget(
+                Button.builder(Component.translatable("axion.config.magic_select.editWorld.button")) {
                     persistDraft(currentTemplate)
                     client?.setScreen(MagicSelectCustomMaskScreen(this, currentTemplate.id, mask.id))
                 }.dimensions(leftX + contentWidth - 50, y, 50, 20).build(),
@@ -93,8 +93,8 @@ class MagicSelectTemplateEditScreen(
             y += 24
         }
 
-        addDrawableChild(
-            ButtonWidget.builder(Text.translatable("axion.config.magic_select.edit.save")) {
+        addRenderableWidget(
+            Button.builder(Component.translatable("axion.config.magic_select.editWorld.save")) {
                 AxionClientConfig.updateMagicSelectTemplate(
                     currentTemplate.copy(
                         name = nameField.text.trim().ifEmpty { currentTemplate.name },
@@ -106,14 +106,14 @@ class MagicSelectTemplateEditScreen(
             }.dimensions(leftX, height - 34, 96, 20).build(),
         )
 
-        addDrawableChild(
-            ButtonWidget.builder(Text.translatable("gui.back")) {
+        addRenderableWidget(
+            Button.builder(Component.translatable("gui.back")) {
                 close()
             }.dimensions(centerX - 40, height - 62, 80, 20).build(),
         )
 
-        addDrawableChild(
-            ButtonWidget.builder(Text.translatable("axion.config.magic_select.edit.delete")) {
+        addRenderableWidget(
+            Button.builder(Component.translatable("axion.config.magic_select.editWorld.delete")) {
                 AxionClientConfig.deleteMagicSelectTemplate(currentTemplate.id)
                 draftInitialized = false
                 close()
@@ -133,7 +133,7 @@ class MagicSelectTemplateEditScreen(
         selectedCustomMaskIds.remove(maskId)
     }
 
-    override fun render(context: DrawContext, mouseX: Int, mouseY: Int, deltaTicks: Float) {
+    override fun render(context: GuiGraphics, mouseX: Int, mouseY: Int, deltaTicks: Float) {
         context.fill(0, 0, width, height, 0xB0101010.toInt())
         super.render(context, mouseX, mouseY, deltaTicks)
 
@@ -141,15 +141,15 @@ class MagicSelectTemplateEditScreen(
         val contentWidth = 360
         val leftX = centerX - (contentWidth / 2)
 
-        context.drawCenteredTextWithShadow(textRenderer, title, centerX, 20, 0xFFFFFF)
-        context.drawCenteredTextWithShadow(
+        context.drawCenteredString(textRenderer, title, centerX, 20, 0xFFFFFF)
+        context.drawCenteredString(
             textRenderer,
-            Text.translatable("axion.config.magic_select.edit.description"),
+            Component.translatable("axion.config.magic_select.editWorld.description"),
             centerX,
             34,
             0xBFBFBF,
         )
-        context.drawCenteredTextWithShadow(
+        context.drawCenteredString(
             textRenderer,
             FormattedNameText.parse(nameField.text.ifEmpty { template.name }),
             centerX,
@@ -157,27 +157,27 @@ class MagicSelectTemplateEditScreen(
             0xFFFFFF,
         )
 
-        context.drawTextWithShadow(
+        context.drawString(
             textRenderer,
-            Text.translatable("axion.config.magic_select.edit.name"),
+            Component.translatable("axion.config.magic_select.editWorld.name"),
             leftX,
             74,
             0xFFFFFF,
         )
         nameField.render(context, mouseX, mouseY, deltaTicks)
 
-        context.drawTextWithShadow(
+        context.drawString(
             textRenderer,
-            Text.translatable("axion.config.magic_select.edit.masks"),
+            Component.translatable("axion.config.magic_select.editWorld.masks"),
             leftX,
             104,
             0xFFFFFF,
         )
 
         if (rows.isEmpty()) {
-            context.drawCenteredTextWithShadow(
+            context.drawCenteredString(
                 textRenderer,
-                Text.translatable("axion.config.magic_select.edit.no_masks"),
+                Component.translatable("axion.config.magic_select.editWorld.no_masks"),
                 centerX,
                 148,
                 0x8A8A8A,
@@ -216,14 +216,14 @@ class MagicSelectTemplateEditScreen(
         )
     }
 
-    private fun toggleLabel(name: String, enabled: Boolean): Text {
-        return Text.empty()
+    private fun toggleLabel(name: String, enabled: Boolean): Component {
+        return Component.empty()
             .append(FormattedNameText.parse(name))
-            .append(Text.literal(": "))
-            .append(Text.translatable(if (enabled) "axion.config.toggle.on" else "axion.config.toggle.off"))
+            .append(Component.literal(": "))
+            .append(Component.translatable(if (enabled) "axion.config.toggle.on" else "axion.config.toggle.off"))
     }
 
-    private fun activeTemplatesTooltip(maskId: String): List<Text> {
+    private fun activeTemplatesTooltip(maskId: String): List<Component> {
         val activeTemplates = AxionClientConfig.magicSelectTemplates()
             .map { template ->
                 if (template.id == templateId) {
@@ -236,21 +236,21 @@ class MagicSelectTemplateEditScreen(
 
         if (activeTemplates.isEmpty()) {
             return listOf(
-                Text.literal("Active in templates:").formatted(Formatting.GRAY),
-                Text.literal("None").formatted(Formatting.DARK_GRAY),
+                Component.literal("Active in templates:").formatted(ChatFormatting.GRAY),
+                Component.literal("None").formatted(ChatFormatting.DARK_GRAY),
             )
         }
 
-        val lines = mutableListOf<Text>()
-        lines += Text.literal("Active in templates:").formatted(Formatting.GRAY)
+        val lines = mutableListOf<Component>()
+        lines += Component.literal("Active in templates:").formatted(ChatFormatting.GRAY)
         activeTemplates.forEach { template ->
             lines += bulletLine(FormattedNameText.parse(template.name))
         }
         return lines
     }
 
-    private fun bulletLine(content: Text): Text {
-        val line: MutableText = Text.literal("• ").formatted(Formatting.GRAY)
+    private fun bulletLine(content: Component): Component {
+        val line: MutableComponent = Component.literal("• ").formatted(ChatFormatting.GRAY)
         line.append(content)
         return line
     }

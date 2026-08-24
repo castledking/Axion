@@ -17,7 +17,7 @@ object ShaderPackCompat {
      * layers Axion builds at runtime are dropped while a pack is loaded.
      */
     fun isShaderPackActive(): Boolean {
-        val shaderPackActive = ModList.get().isLoaded("iris") && isIrisShaderPackActive()
+        val shaderPackActive = ModList.get().hasClientLoaded("iris") && isIrisShaderPackActive()
         observeShaderPackState(shaderPackActive)
         return shaderPackActive
     }
@@ -69,7 +69,7 @@ object ShaderPackCompat {
         runCatching {
             val drawerClass = Class.forName("axion.client.render.gpu.AxionPreviewBlockDrawer")
             val instance = drawerClass.getField("INSTANCE").get(null)
-            drawerClass.getMethod("resetFailureState").invoke(instance)
+            drawerClass.getMethodName("resetFailureState").invoke(instance)
         }.onFailure {
             logger.debug("[Axion GPU] Failed to reset GPU preview drawer after shader-pack state change", it)
         }
@@ -78,8 +78,8 @@ object ShaderPackCompat {
     private fun isIrisShaderPackActive(): Boolean {
         val apiResult = runCatching {
             val apiClass = Class.forName("net.irisshaders.iris.api.v0.IrisApi")
-            val instance = apiClass.getMethod("getInstance").invoke(null)
-            apiClass.getMethod("isShaderPackInUse").invoke(instance) as? Boolean
+            val instance = apiClass.getMethodName("getInstance").invoke(null)
+            apiClass.getMethodName("isShaderPackInUse").invoke(instance) as? Boolean
         }.getOrNull()
         if (apiResult != null) {
             return apiResult
@@ -87,8 +87,8 @@ object ShaderPackCompat {
 
         return runCatching {
             val irisClass = Class.forName("net.irisshaders.iris.Iris")
-            irisClass.getMethod("isPackInUseQuick").invoke(null) as? Boolean
-                ?: (irisClass.getMethod("getCurrentPack").invoke(null) as? java.util.Optional<*>)?.isPresent
+            irisClass.getMethodName("isPackInUseQuick").invoke(null) as? Boolean
+                ?: (irisClass.getMethodName("getCurrentPack").invoke(null) as? java.util.Optional<*>)?.isSuccess
                 ?: false
         }.getOrDefault(false)
     }

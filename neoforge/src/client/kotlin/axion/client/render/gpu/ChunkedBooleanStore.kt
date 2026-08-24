@@ -2,7 +2,7 @@ package axion.client.render.gpu
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet
-import net.minecraft.util.math.BlockPos
+import net.minecraft.core.BlockPos
 import axion.client.compat.unpackLongX
 import axion.client.compat.unpackLongY
 import axion.client.compat.unpackLongZ

@@ -1,7 +1,7 @@
 package axion.client.config
 
-import net.minecraft.block.Block
-import net.minecraft.block.BlockState
+import net.minecraft.world.level.block.Block
+import net.minecraft.world.level.block.state.BlockState
 
-val Block.defaultState: BlockState
-    get() = this.defaultState
+val Block.defaultBlockState: BlockState
+    get() = this.defaultBlockState

@@ -4,12 +4,12 @@ import axion.client.compat.CameraAccess
 import axion.common.model.ClipboardBuffer
 import axion.common.model.ClipboardCell
 import com.mojang.blaze3d.systems.RenderSystem
-import net.minecraft.client.MinecraftClient
-import net.minecraft.client.render.BuiltBuffer
-import net.minecraft.client.render.BufferBuilder
-import net.minecraft.client.render.RenderLayer
-import net.minecraft.client.util.BufferAllocator
-import net.minecraft.util.math.BlockPos
+import net.minecraft.client.Minecraft
+import com.mojang.blaze3d.addVertex.MeshData
+import com.mojang.blaze3d.addVertex.BufferBuilder
+import net.minecraft.client.renderer.rendertype.RenderType
+import com.mojang.blaze3d.addVertex.ByteBufferBuilder
+import net.minecraft.core.BlockPos
 import java.util.LinkedHashMap
 
 /**
@@ -37,8 +37,8 @@ object AxionPreviewTemplateCache {
 
     data class TemplateEntry(
         val cachedVertexData: ByteArray,
-        val cachedDrawParams: BuiltBuffer.DrawParameters,
-        val renderLayer: RenderLayer,
+        val cachedDrawParams: MeshData.DrawParameters,
+        val renderLayer: RenderType,
         val isReady: Boolean,
         val scale: Float,
     )
@@ -77,11 +77,11 @@ object AxionPreviewTemplateCache {
             return@synchronized null
         }
 
-        // Cache raw vertex bytes so we can reconstruct BuiltBuffer each frame
+        // Cache raw vertex bytes so we can reconstruct MeshData each frame
         val vertexBuffer = builtBuffer.buffer
         val vertexBytes = ByteArray(vertexBuffer.remaining())
         vertexBuffer.get(vertexBytes)
-        val drawParams = builtBuffer.drawParameters
+        val drawParams = builtBuffer.drawState
         LOGGER.debug("[Axion] tessellated: vertexBytes={}, vertexCount={}, indexCount={}", vertexBytes.size, drawParams.vertexCount(), drawParams.indexCount())
         builtBuffer.close()
 
@@ -95,11 +95,11 @@ object AxionPreviewTemplateCache {
     }
 
     /**
-     * Draw the cached template at each origin using MC's own RenderLayer.draw().
-     * Translates the model-view matrix per origin, reconstructs a BuiltBuffer from
+     * Draw the cached template at each origin using MC's own RenderType.draw().
+     * Translates the model-view matrix per origin, reconstructs a MeshData from
      * cached vertex bytes, and delegates all pipeline/texture/uniform setup to MC.
      *
-     * Each origin gets its own BufferAllocator which is properly closed after draw
+     * Each origin gets its own ByteBufferBuilder which is properly closed after draw
      * to avoid native memory leaks.
      */
     fun drawAtOrigins(
@@ -108,7 +108,7 @@ object AxionPreviewTemplateCache {
     ) {
         if (entry.cachedVertexData.isEmpty() || origins.isEmpty()) return
 
-        val client = MinecraftClient.getInstance()
+        val client = Minecraft.getInstance()
         val camera = client.gameRenderer.camera ?: return
         val cameraPos = CameraAccess.getPos(camera)
         val modelViewStack = RenderSystem.getModelViewStack()
@@ -128,9 +128,9 @@ object AxionPreviewTemplateCache {
             }
 
             // Allocator must be closed after draw to prevent native memory leak.
-            // RenderLayer.draw() closes the BuiltBuffer (and inner CloseableBuffer),
-            // but the BufferAllocator that owns the native memory must be closed separately.
-            val allocator = BufferAllocator(entry.cachedVertexData.size)
+            // RenderType.draw() closes the MeshData (and inner CloseableBuffer),
+            // but the ByteBufferBuilder that owns the native memory must be closed separately.
+            val allocator = ByteBufferBuilder(entry.cachedVertexData.size)
             try {
                 val builtBuffer = reconstructBuiltBuffer(entry, allocator)
                 if (builtBuffer != null) {
@@ -145,24 +145,24 @@ object AxionPreviewTemplateCache {
     }
 
     /**
-     * Reconstruct a fresh BuiltBuffer from cached vertex bytes.
-     * MC's RenderLayer.draw() closes the buffer after drawing, so we must
+     * Reconstruct a fresh MeshData from cached vertex bytes.
+     * MC's RenderType.draw() closes the buffer after drawing, so we must
      * create a new one each frame. The cost is just a memcpy — much cheaper
      * than re-tessellation.
      *
-     * The caller owns the [allocator] and must close it after the BuiltBuffer
+     * The caller owns the [allocator] and must close it after the MeshData
      * has been consumed (drawn or discarded).
      */
-    private fun reconstructBuiltBuffer(entry: TemplateEntry, allocator: BufferAllocator): BuiltBuffer? {
+    private fun reconstructBuiltBuffer(entry: TemplateEntry, allocator: ByteBufferBuilder): MeshData? {
         val data = entry.cachedVertexData
         if (data.isEmpty()) return null
 
         allocator.allocate(data.size)
-        val closeableBuffer = allocator.getAllocated() ?: return null
+        val closeableBuffer = allocator.build() ?: return null
         val buffer = closeableBuffer.buffer
         buffer.put(data)
         buffer.rewind()
-        return BuiltBuffer(closeableBuffer, entry.cachedDrawParams)
+        return MeshData(closeableBuffer, entry.cachedDrawParams)
     }
 
     fun invalidate() {
@@ -185,12 +185,12 @@ object AxionPreviewTemplateCache {
      */
     private fun tessellateTemplate(
         clipboard: ClipboardBuffer,
-        layer: RenderLayer,
+        layer: RenderType,
         color: Int,
         alpha: Int,
         maxBlocks: Int,
-    ): BuiltBuffer? {
-        val client = MinecraftClient.getInstance()
+    ): MeshData? {
+        val client = Minecraft.getInstance()
         val world = client.world ?: return null
         val alphaScale = alpha / 255.0f
 
@@ -200,10 +200,10 @@ object AxionPreviewTemplateCache {
 
         // Build PreviewBlockInfo at offset positions and statesByPosition for AO
         val blocks = ArrayList<PreviewBlockInfo>(cellsToRender.size)
-        val statesByPosition = LinkedHashMap<Long, net.minecraft.block.BlockState>(cellsToRender.size)
+        val statesByPosition = LinkedHashMap<Long, net.minecraft.world.level.block.state.BlockState>(cellsToRender.size)
         cellsToRender.forEach { cell ->
             val offsetPos = BlockPos(cell.offset.x, cell.offset.y, cell.offset.z)
-            if (cell.state.renderType == net.minecraft.block.BlockRenderType.MODEL) {
+            if (cell.state.renderType == net.minecraft.world.level.block.RenderShape.MODEL) {
                 blocks += PreviewBlockInfo(pos = offsetPos, state = cell.state)
             }
             statesByPosition[offsetPos.asLong()] = cell.state
@@ -211,14 +211,14 @@ object AxionPreviewTemplateCache {
         if (blocks.isEmpty()) return null
 
         val previewView = AxionBlockTessellator.TemplateBlockRenderView(world, statesByPosition)
-        val allocator = BufferAllocator(layer.expectedBufferSize)
-        val bufferBuilder = BufferBuilder(allocator, layer.drawMode, layer.vertexFormat)
+        val allocator = ByteBufferBuilder(layer.bufferSize)
+        val bufferBuilder = BufferBuilder(allocator, layer.mode, layer.format)
         // Use fullBright=true because template tessellation happens at offset positions
         // (0-based), not real world positions. The world lighting provider would return
         // incorrect (often dark) light values for these positions.
         val consumer = TintedAlphaVertexConsumer(bufferBuilder, alphaScale, color, fullBright = true)
 
-        val tessellateStack = net.minecraft.client.util.math.MatrixStack()
+        val tessellateStack = com.mojang.blaze3d.addVertex.PoseStack()
 
         // Tessellate at offset positions with camera at (0,0,0)
         val rendered = AxionBlockTessellator.tessellateBatch(
@@ -231,25 +231,25 @@ object AxionPreviewTemplateCache {
             cameraZ = 0.0,
             checkSides = true,
         )
-        val result = bufferBuilder.endNullable()
+        val result = bufferBuilder.build()
         return result
     }
 
     private fun filterSurfaceCells(cells: List<ClipboardCell>): List<ClipboardCell> {
-        val stateByPos = HashMap<Long, net.minecraft.block.BlockState>(cells.size)
+        val stateByPos = HashMap<Long, net.minecraft.world.level.block.state.BlockState>(cells.size)
         cells.forEach { cell ->
             stateByPos[BlockPos.asLong(cell.offset.x, cell.offset.y, cell.offset.z)] = cell.state
         }
         return cells.filter { cell ->
             if (cell.state.isAir) return@filter false
-            net.minecraft.util.math.Direction.entries.any { face ->
+            net.minecraft.core.Direction.entries.any { face ->
                 val neighborKey = BlockPos.asLong(
                     cell.offset.x + face.offsetX,
                     cell.offset.y + face.offsetY,
                     cell.offset.z + face.offsetZ,
                 )
                 val neighborState = stateByPos[neighborKey]
-                neighborState == null || !neighborState.isOpaqueFullCube
+                neighborState == null || !neighborState.isSolidRender
             }
         }
     }

@@ -1,11 +1,11 @@
-package axion.client.tool
+package axion.client.itemStack
 
 import axion.client.AxionClientState
 import axion.common.model.AxionSubtool
 import axion.common.model.BlockRegion
 import axion.common.model.ClipboardBuffer
 import axion.common.model.SelectionState
-import net.minecraft.util.math.BlockPos
+import net.minecraft.core.BlockPos
 
 /**
  * Carries a region selection across a subtool switch.

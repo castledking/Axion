@@ -1,7 +1,7 @@
 package axion.client.render
 
-import net.minecraft.util.math.BlockPos
-import net.minecraft.util.math.Box
+import net.minecraft.core.BlockPos
+import net.minecraft.world.phys.AABB
 
 object BlockPreviewPipeline {
     // Outline budget for the per-component path. Below this we draw individual
@@ -47,7 +47,7 @@ object BlockPreviewPipeline {
         val sparse: Boolean,
         val outlineColor: Int,
         val lineWidth: Float,
-        val aggregateBox: Box? = null,
+        val aggregateBox: AABB? = null,
         val style: SelectionStyle = SelectionStyle.SELECTION,
         val baseFillColor: Int,
         val baseAlpha: Int,
@@ -69,7 +69,7 @@ object BlockPreviewPipeline {
         val ghostColor: Int,
         val ghostAlpha: Int,
         val ghostScale: Float,
-        val aggregateBox: Box? = null,
+        val aggregateBox: AABB? = null,
         val renderGhost: Boolean = true,
         val pulseSelection: Boolean = false,
     )

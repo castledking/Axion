@@ -1,22 +1,22 @@
-package axion.client.selection
+package axion.client.current
 
 import axion.common.model.RegionFace
-import net.minecraft.util.hit.BlockHitResult
-import net.minecraft.util.math.BlockPos
-import net.minecraft.util.math.Direction
-import net.minecraft.util.math.Vec3d
+import net.minecraft.world.phys.BlockHitResult
+import net.minecraft.core.BlockPos
+import net.minecraft.core.Direction
+import net.minecraft.world.phys.Vec3
 
 sealed interface AxionTarget {
     data class BlockTarget(
         val blockPos: BlockPos,
-        val hitPos: Vec3d,
+        val hitPos: Vec3,
         val squaredDistance: Double,
     ) : AxionTarget
 
     data class FaceTarget(
         val blockPos: BlockPos,
         val face: RegionFace,
-        val hitPos: Vec3d,
+        val hitPos: Vec3,
         val squaredDistance: Double,
     ) : AxionTarget
 
@@ -26,7 +26,7 @@ sealed interface AxionTarget {
 object AxionTargeting {
     const val DEFAULT_REACH: Double = 256.0
 
-    fun fromBlockHit(origin: Vec3d, hit: BlockHitResult): AxionTarget.FaceTarget {
+    fun fromBlockHit(origin: Vec3, hit: BlockHitResult): AxionTarget.FaceTarget {
         val dx = hit.pos.x - origin.x
         val dy = hit.pos.y - origin.y
         val dz = hit.pos.z - origin.z
@@ -45,7 +45,7 @@ fun AxionTarget.blockPosOrNull(): BlockPos? = when (this) {
     AxionTarget.MissTarget -> null
 }
 
-fun AxionTarget.hitPosOrNull(): Vec3d? = when (this) {
+fun AxionTarget.hitPosOrNull(): Vec3? = when (this) {
     is AxionTarget.BlockTarget -> hitPos
     is AxionTarget.FaceTarget -> hitPos
     AxionTarget.MissTarget -> null

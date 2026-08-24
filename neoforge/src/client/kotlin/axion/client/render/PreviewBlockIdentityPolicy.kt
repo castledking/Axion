@@ -1,7 +1,7 @@
 package axion.client.render
 
 import axion.common.model.ClipboardBuffer
-import net.minecraft.block.BlockState
+import net.minecraft.world.level.block.state.BlockState
 import java.util.WeakHashMap
 
 /**
@@ -73,7 +73,7 @@ object PreviewBlockIdentityPolicy {
                 isAir = cell.state.isAir,
                 remoteAxionSessionAvailable = remoteAxionSessionAvailable,
             )
-            if (resolvedState == cell.state && cell.blockEntityData == null) {
+            if (resolvedState == cell.state && cell.blockData == null) {
                 cell
             } else {
                 changed = true

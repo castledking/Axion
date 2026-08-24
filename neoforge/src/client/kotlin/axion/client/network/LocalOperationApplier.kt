@@ -2,15 +2,15 @@ package axion.client.network
 
 import axion.common.operation.EditOperation
 import axion.common.operation.OperationApplier
-import net.minecraft.world.World
+import net.minecraft.world.level.Level
 
 class LocalOperationApplier : OperationApplier {
-    override fun apply(world: World, operation: EditOperation) {
+    override fun apply(world: Level, operation: EditOperation) {
         val planner = LocalWritePlanner()
         apply(world, planner.plan(world, operation))
     }
 
-    fun apply(world: World, plan: WritePlan, suppressBlockUpdates: Boolean = true) {
+    fun apply(world: Level, plan: WritePlan, suppressBlockUpdates: Boolean = true) {
         plan.writes.forEach { write ->
             BlockEntitySnapshotService.apply(world, write, suppressBlockUpdates)
         }

@@ -1,7 +1,7 @@
 package axion.client.render.gpu
 
-import net.minecraft.block.BlockState
-import net.minecraft.util.math.BlockPos
+import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.core.BlockPos
 
 /**
  * Builds per-section "exposed surface" lists from a [ChunkedBooleanStore].
@@ -121,7 +121,7 @@ object ChunkMeshTessellator {
     /**
      * Returns true iff every face of cell (x,y,z) is occluded by an opaque
      * full cube neighbor. When [statesByPosition] is provided, a neighbor
-     * only counts as an occluder if its [BlockState.isOpaqueFullCube] is
+     * only counts as an occluder if its [BlockState.isSolidRender] is
      * true. Without state data, falls back to presence-only checks.
      */
     @PublishedApi
@@ -209,7 +209,7 @@ object ChunkMeshTessellator {
     }
 
     private fun isOpaqueFullCubeCompat(state: BlockState): Boolean {
-        return PreviewOcclusionCompat.isOpaqueFullCube(state)
+        return PreviewOcclusionCompat.isSolidRender(state)
     }
 
     /** Counts occupied cells in a section without iterating bits one-at-a-time. */

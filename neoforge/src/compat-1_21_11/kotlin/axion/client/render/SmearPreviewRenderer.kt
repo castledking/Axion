@@ -1,7 +1,7 @@
 package axion.client.render
 
-import axion.client.tool.RegionRepeatPlacementService
-import axion.client.tool.SmearToolController
+import axion.client.itemStack.RegionRepeatPlacementService
+import axion.client.itemStack.SmearToolController
 
 object SmearPreviewRenderer {
     private const val DESTINATION_COLOR: Int = 0xFF7EC8E3.toInt()

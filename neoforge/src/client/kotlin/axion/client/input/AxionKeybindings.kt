@@ -1,133 +1,133 @@
 package axion.client.input
 
 import axion.AxionMod
-import net.minecraft.client.option.KeyBinding
+import net.minecraft.client.KeyMapping
 import org.lwjgl.glfw.GLFW
 
 object AxionKeybindings {
     private const val category: String = "keycategory.${AxionMod.MOD_ID}.general"
 
-    val selectAxionTool: KeyBinding = KeyBindingCompat.create(
+    val selectAxionTool: KeyMapping = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.select_axion_tool",
-        GLFW.GLFW_KEY_G,
+        GLFW.KEY_G,
         category,
     )
 
-    val nextSubtool: KeyBinding = KeyBindingCompat.create(
+    val nextSubtool: KeyMapping = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.next_subtool",
         GLFW.GLFW_KEY_UNKNOWN,
         category,
     )
 
-    val previousSubtool: KeyBinding = KeyBindingCompat.create(
+    val previousSubtool: KeyMapping = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.previous_subtool",
         GLFW.GLFW_KEY_UNKNOWN,
         category,
     )
 
-    val toggleNoClip: KeyBinding = KeyBindingCompat.create(
+    val toggleNoClip: KeyMapping = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.toggle_noclip",
         GLFW.GLFW_KEY_UNKNOWN,
         category,
     )
 
-    val toggleReplaceMode: KeyBinding = KeyBindingCompat.create(
+    val toggleReplaceMode: KeyMapping = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.toggle_replace_mode",
         GLFW.GLFW_KEY_UNKNOWN,
         category,
     )
 
-    val toggleInfiniteReach: KeyBinding = KeyBindingCompat.create(
+    val toggleInfiniteReach: KeyMapping = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.toggle_infinite_reach",
         GLFW.GLFW_KEY_UNKNOWN,
         category,
     )
 
-    val toggleBulldozer: KeyBinding = KeyBindingCompat.create(
+    val toggleBulldozer: KeyMapping = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.toggle_bulldozer",
         GLFW.GLFW_KEY_UNKNOWN,
         category,
     )
 
-    val toggleFastPlace: KeyBinding = KeyBindingCompat.create(
+    val toggleFastPlace: KeyMapping = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.toggle_fast_place",
         GLFW.GLFW_KEY_UNKNOWN,
         category,
     )
 
-    val toolDeleteAction: KeyBinding = KeyBindingCompat.create(
+    val toolDeleteAction: KeyMapping = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.tool_delete_action",
-        GLFW.GLFW_KEY_DELETE,
+        GLFW.KEY_DELETE,
         category,
     )
 
-    val symmetryToggleRotation: KeyBinding = KeyBindingCompat.create(
+    val symmetryToggleRotation: KeyMapping = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.symmetry_toggle_rotation",
-        GLFW.GLFW_KEY_R,
+        GLFW.KEY_R,
         category,
     )
 
-    val symmetryToggleMirror: KeyBinding = KeyBindingCompat.create(
+    val symmetryToggleMirror: KeyMapping = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.symmetry_toggle_mirror",
-        GLFW.GLFW_KEY_F,
+        GLFW.KEY_F,
         category,
     )
 
-    val symmetryToggleConstruct: KeyBinding = KeyBindingCompat.create(
+    val symmetryToggleConstruct: KeyMapping = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.symmetry_toggle_construct",
-        GLFW.GLFW_KEY_C,
+        GLFW.KEY_C,
         category,
     )
 
-    val undoAction: KeyBinding = KeyBindingCompat.create(
+    val undoAction: KeyMapping = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.undo_action",
-        GLFW.GLFW_KEY_Z,
+        GLFW.KEY_Z,
         category,
     )
 
-    val redoAction: KeyBinding = KeyBindingCompat.create(
+    val redoAction: KeyMapping = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.redo_action",
-        GLFW.GLFW_KEY_Y,
+        GLFW.KEY_Y,
         category,
     )
 
-    val openConfigScreen: KeyBinding = KeyBindingCompat.create(
+    val openConfigScreen: KeyMapping = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.open_config_screen",
-        GLFW.GLFW_KEY_RIGHT_SHIFT,
+        GLFW.KEY_RSHIFT,
         category,
     )
 
-    val toggleSameBlockMagicSelect: KeyBinding = KeyBindingCompat.create(
+    val toggleSameBlockMagicSelect: KeyMapping = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.toggle_same_block_magic_select",
         GLFW.GLFW_KEY_UNKNOWN,
         category,
     )
 
-    val togglePhantom: KeyBinding = KeyBindingCompat.create(
+    val togglePhantom: KeyMapping = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.toggle_phantom",
         GLFW.GLFW_KEY_UNKNOWN,
         category,
     )
 
-    val toggleNoUpdates: KeyBinding = KeyBindingCompat.create(
+    val toggleNoUpdates: KeyMapping = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.toggle_no_updates",
         GLFW.GLFW_KEY_UNKNOWN,
         category,
     )
 
-    val toggleForcePlace: KeyBinding = KeyBindingCompat.create(
+    val toggleForcePlace: KeyMapping = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.toggle_force_place",
         GLFW.GLFW_KEY_UNKNOWN,
         category,
     )
 
-    val toggleAngelPlacement: KeyBinding = KeyBindingCompat.create(
+    val toggleAngelPlacement: KeyMapping = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.toggle_angel_placement",
         GLFW.GLFW_KEY_UNKNOWN,
         category,
     )
 
-    fun register(registerer: (KeyBinding) -> Unit) {
+    fun register(registerer: (KeyMapping) -> Unit) {
         registerer(selectAxionTool)
         registerer(nextSubtool)
         registerer(previousSubtool)

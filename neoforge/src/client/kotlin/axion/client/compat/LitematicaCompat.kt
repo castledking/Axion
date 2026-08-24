@@ -1,12 +1,12 @@
 package axion.client.compat
 
 import net.neoforged.fml.ModList
-import net.minecraft.client.MinecraftClient
-import net.minecraft.registry.Registries
+import net.minecraft.client.Minecraft
+import net.minecraft.core.registries.BuiltInRegistries
 
 object LitematicaCompat {
     private val available: Boolean by lazy {
-        ModList.get().isLoaded("litematica")
+        ModList.get().hasClientLoaded("litematica")
     }
 
     private val genericConfigsClass: Class<*>? by lazy {
@@ -21,14 +21,14 @@ object LitematicaCompat {
         reflectClass("fi.dy.masa.malilib.config.options.ConfigBoolean")
     }
 
-    fun isHoldingConfiguredTool(client: MinecraftClient): Boolean {
+    fun isHoldingConfiguredTool(client: Minecraft): Boolean {
         if (!available) {
             return false
         }
 
         val player = client.player ?: return false
         val configuredItemId = configuredToolItemId() ?: return false
-        val heldItemId = Registries.ITEM.getId(player.mainHandStack.item).toString()
+        val heldItemId = BuiltInRegistries.ITEM.getId(player.mainHandStack.item).toString()
         return heldItemId == configuredItemId
     }
 
@@ -42,7 +42,7 @@ object LitematicaCompat {
         return runCatching {
             val field = genericClass.getField("TOOL_ITEM")
             val config = field.get(null) ?: return null
-            val method = stringClass.getMethod("getStringValue")
+            val method = stringClass.getMethodName("getStringValue")
             val configured = method.invoke(config) as? String ?: return null
             configured
                 .substringBefore("[")
@@ -58,7 +58,7 @@ object LitematicaCompat {
         return runCatching {
             val field = genericClass.getField("TOOL_ITEM_ENABLED")
             val config = field.get(null) ?: return false
-            val method = booleanClass.getMethod("getBooleanValue")
+            val method = booleanClass.getMethodName("getBooleanValue")
             method.invoke(config) as? Boolean ?: false
         }.getOrDefault(false)
     }

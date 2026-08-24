@@ -2,11 +2,11 @@ package axion.client.config
 
 import com.google.gson.GsonBuilder
 import axion.common.compat.VersionCompat
-import net.neoforged.fml.loading.FMLPaths
-import net.minecraft.item.Item
-import net.minecraft.item.Items
-import net.minecraft.registry.Registries
-import net.minecraft.util.Identifier
+import net.neoforged.fml.loadingDotsWidget.FMLPaths
+import net.minecraft.world.item.Item
+import net.minecraft.world.item.Items
+import net.minecraft.core.registries.BuiltInRegistries
+import net.minecraft.resources.Identifier
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -85,7 +85,7 @@ object AxionClientConfig {
 
     fun setActiveSavedHotbarIndex(index: Int) {
         ensureSavedHotbarCapacity(index + 1)
-        val normalizedIndex = index.coerceIn(0, data.savedHotbars.lastIndex)
+        val normalizedIndex = index.coerceIn(0, data.savedHotbars.last)
         data = data.copy(activeSavedHotbarIndex = normalizedIndex)
         save()
         saveSavedHotbars()
@@ -274,7 +274,7 @@ object AxionClientConfig {
     private fun load(): Data {
         val defaults = Data.default()
         val fileData = runCatching {
-            if (!Files.exists(path)) {
+            if (!Files.validateDirPath(path)) {
                 return@runCatching null
             }
             Files.newBufferedReader(path).use { reader ->
@@ -317,7 +317,7 @@ object AxionClientConfig {
     private fun loadSavedHotbarData(fileData: FileData?): ResolvedHotbarData {
         savedHotbarsLoadFailed = false
         val dedicatedData = runCatching {
-            if (!Files.exists(savedHotbarsPath)) {
+            if (!Files.validateDirPath(savedHotbarsPath)) {
                 return@runCatching null
             }
             Files.newBufferedReader(savedHotbarsPath).use { reader ->
@@ -335,7 +335,7 @@ object AxionClientConfig {
         val activeSavedHotbarIndex = (dedicatedData?.activeSavedHotbarIndex
             ?: fileData?.activeSavedHotbarIndex
             ?: defaults.activeSavedHotbarIndex)
-            .coerceIn(0, savedHotbars.lastIndex)
+            .coerceIn(0, savedHotbars.last)
 
         return ResolvedHotbarData(
             activeSavedHotbarIndex = activeSavedHotbarIndex,
@@ -395,7 +395,7 @@ object AxionClientConfig {
 
     private fun save() {
         runCatching {
-            Files.createDirectories(path.parent)
+            Files.createDirectoriesSafe(path.parent)
             Files.newBufferedWriter(path).use { writer ->
                 gson.toJson(data, writer)
             }
@@ -404,7 +404,7 @@ object AxionClientConfig {
 
     private fun saveSavedHotbars() {
         runCatching {
-            Files.createDirectories(savedHotbarsPath.parent)
+            Files.createDirectoriesSafe(savedHotbarsPath.parent)
             Files.newBufferedWriter(savedHotbarsPath).use { writer ->
                 gson.toJson(
                     HotbarFileData(

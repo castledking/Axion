@@ -1,4 +1,4 @@
-package axion.client.tool
+package axion.client.itemStack
 
 enum class PlacementMirrorAxis {
     NONE,

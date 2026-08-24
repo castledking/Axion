@@ -1,13 +1,13 @@
-package axion.client.tool
+package axion.client.itemStack
 
-import axion.client.selection.AxionTarget
-import axion.client.selection.toDirection
-import axion.client.tool.directionGetFacing
-import net.minecraft.client.MinecraftClient
-import net.minecraft.util.math.Direction
+import axion.client.current.AxionTarget
+import axion.client.current.toDirection
+import axion.client.itemStack.directionGetFacing
+import net.minecraft.client.Minecraft
+import net.minecraft.core.Direction
 
 object ExtrudeTargetService {
-    fun resolveDirection(client: MinecraftClient, target: AxionTarget): Direction {
+    fun resolveDirection(client: Minecraft, target: AxionTarget): Direction {
         return when (target) {
             is AxionTarget.FaceTarget -> target.face.toDirection()
             is AxionTarget.BlockTarget -> dominantLookDirection(client)
@@ -15,7 +15,7 @@ object ExtrudeTargetService {
         }
     }
 
-    private fun dominantLookDirection(client: MinecraftClient): Direction {
+    private fun dominantLookDirection(client: Minecraft): Direction {
         val look = client.player?.rotationVecClient ?: return Direction.UP
         return directionGetFacing(look)
     }

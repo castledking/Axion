@@ -4,13 +4,13 @@ import axion.client.render.gpu.PreviewOcclusionCompat
 import axion.client.render.gpu.PreviewOcclusionPolicy
 import axion.common.model.ClipboardBuffer
 import axion.common.model.ClipboardCell
-import net.minecraft.block.BlockRenderType
-import net.minecraft.block.BlockState
-import net.minecraft.util.math.BlockPos
-import net.minecraft.util.math.Box
+import net.minecraft.world.level.block.RenderShape
+import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.core.BlockPos
+import net.minecraft.world.phys.AABB
 import net.minecraft.util.math.Axis
-import net.minecraft.util.math.Direction
-import net.minecraft.util.math.Vec3i
+import net.minecraft.core.Direction
+import net.minecraft.core.Vec3i
 import java.util.LinkedHashMap
 import kotlin.math.abs
 
@@ -29,7 +29,7 @@ object PreviewMeshTessellator {
     private data class ResolvedFace(
         val state: BlockState,
         val face: Direction,
-        val bounds: Box,
+        val bounds: AABB,
         val blockPos: BlockPos,
     )
 
@@ -75,7 +75,7 @@ object PreviewMeshTessellator {
         boundedOrigins.forEach { origin ->
             template.exposedFaces.forEach { exposedFace ->
                 val blockPos = origin.add(exposedFace.offset)
-                val bounds = Box(
+                val bounds = AABB(
                     blockPos.x.toDouble(),
                     blockPos.y.toDouble(),
                     blockPos.z.toDouble(),
@@ -124,7 +124,7 @@ object PreviewMeshTessellator {
             val exposedFaces = ArrayList<ExposedFace>(occupiedCells.size * 2)
             occupiedCells.forEach { cell ->
                 val state = cell.state
-                if (state.isAir || state.renderType != BlockRenderType.MODEL) {
+                if (state.isAir || state.renderType != RenderShape.MODEL) {
                     return@forEach
                 }
                 Direction.entries.forEach { face ->
@@ -184,7 +184,7 @@ object PreviewMeshTessellator {
                 }
 
                 var width = 1
-                while (cells.containsKey((start.first + width) to start.second) && !visited.contains((start.first + width) to start.second)) {
+                while (cells.contains((start.first + width) to start.second) && !visited.contains((start.first + width) to start.second)) {
                     width++
                 }
 
@@ -193,7 +193,7 @@ object PreviewMeshTessellator {
                     val nextRow = start.second + height
                     val fullRow = (0 until width).all { dx ->
                         val coord = (start.first + dx) to nextRow
-                        cells.containsKey(coord) && !visited.contains(coord)
+                        cells.contains(coord) && !visited.contains(coord)
                     }
                     if (!fullRow) {
                         break
@@ -257,11 +257,11 @@ object PreviewMeshTessellator {
         maxA: Int,
         maxB: Int,
         plane: Int,
-    ): Box {
+    ): AABB {
         return when (face) {
             Direction.WEST,
             Direction.EAST,
-                -> Box(
+                -> AABB(
                     plane.toDouble(),
                     minB.toDouble(),
                     minA.toDouble(),
@@ -272,7 +272,7 @@ object PreviewMeshTessellator {
 
             Direction.DOWN,
             Direction.UP,
-                -> Box(
+                -> AABB(
                     minA.toDouble(),
                     plane.toDouble(),
                     minB.toDouble(),
@@ -283,7 +283,7 @@ object PreviewMeshTessellator {
 
             Direction.NORTH,
             Direction.SOUTH,
-                -> Box(
+                -> AABB(
                     minA.toDouble(),
                     minB.toDouble(),
                     plane.toDouble(),
@@ -295,7 +295,7 @@ object PreviewMeshTessellator {
     }
 
     private fun isFullCube(
-        box: Box,
+        box: AABB,
         blockPos: BlockPos,
     ): Boolean {
         return abs(box.minX - blockPos.x.toDouble()) <= 0.0001 &&

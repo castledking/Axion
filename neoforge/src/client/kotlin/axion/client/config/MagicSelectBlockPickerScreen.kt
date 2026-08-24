@@ -2,21 +2,21 @@ package axion.client.config
 
 import axion.client.ui.drawStrokedRectangleCompat
 import axion.common.compat.VersionCompat
-import net.minecraft.block.Block
-import net.minecraft.client.gui.DrawContext
-import net.minecraft.client.gui.screen.Screen
-import net.minecraft.client.gui.widget.ButtonWidget
-import net.minecraft.client.gui.widget.TextFieldWidget
-import net.minecraft.item.Items
-import net.minecraft.registry.Registries
-import net.minecraft.text.Text
-import net.minecraft.util.Identifier
+import net.minecraft.world.level.block.Block
+import net.minecraft.client.gui.GuiGraphics
+import net.minecraft.client.gui.screens.Screen
+import net.minecraft.client.gui.components.Button
+import net.minecraft.client.gui.components.EditBox
+import net.minecraft.world.item.Items
+import net.minecraft.core.registries.BuiltInRegistries
+import net.minecraft.network.chat.Component
+import net.minecraft.resources.Identifier
 import kotlin.math.ceil
 
 class MagicSelectBlockPickerScreen(
     private val parent: Screen?,
     private val templateId: String,
-) : Screen(Text.translatable("axion.config.magic_select.blocks.title")) {
+) : Screen(Component.translatable("axion.config.magic_select.blocks.title")) {
     private data class BlockEntry(
         val block: Block,
         val id: Identifier,
@@ -34,15 +34,15 @@ class MagicSelectBlockPickerScreen(
         }
     }
 
-    private lateinit var searchField: TextFieldWidget
-    private lateinit var prevPageButton: ButtonWidget
-    private lateinit var nextPageButton: ButtonWidget
+    private lateinit var searchField: EditBox
+    private lateinit var prevPageButton: Button
+    private lateinit var nextPageButton: Button
     private var selectedBlockIds: MutableSet<String> = linkedSetOf()
     private var page: Int = 0
     private var searchQuery: String = ""
 
     private val allBlocks: List<BlockEntry> by lazy {
-        Registries.BLOCK.mapNotNull { block ->
+        BuiltInRegistries.BLOCK.mapNotNull { block ->
             val item = block.asItem()
             if (item == Items.AIR) {
                 null
@@ -68,39 +68,39 @@ class MagicSelectBlockPickerScreen(
             selectedBlockIds = template.customBlockIds.toMutableSet()
         }
 
-        searchField = TextFieldWidget(textRenderer, centerX - 130, topY, 260, 20, Text.empty())
+        searchField = EditBox(textRenderer, centerX - 130, topY, 260, 20, Component.empty())
         searchField.text = searchQuery
-        searchField.setChangedListener {
+        searchField.setResponder {
             searchQuery = it
             page = 0
             updatePagingButtons()
         }
-        addSelectableChild(searchField)
+        addWidget(searchField)
         setInitialFocus(searchField)
 
-        prevPageButton = addDrawableChild(
-            ButtonWidget.builder(Text.translatable("axion.config.magic_select.blocks.prev")) {
+        prevPageButton = addRenderableWidget(
+            Button.builder(Component.translatable("axion.config.magic_select.blocks.prev")) {
                 if (page > 0) {
                     page -= 1
-                    clearAndInit()
+                    rebuildWidgets()
                 }
             }.dimensions(centerX - 130, height - 34, 60, 20).build().apply {
                 active = page > 0
             },
         )
 
-        addDrawableChild(
-            ButtonWidget.builder(Text.translatable("axion.config.magic_select.blocks.save")) {
+        addRenderableWidget(
+            Button.builder(Component.translatable("axion.config.magic_select.blocks.save")) {
                 AxionClientConfig.setMagicSelectTemplateCustomBlocks(template.id, selectedBlockIds.toSet())
                 close()
             }.dimensions(centerX - 64, height - 34, 128, 20).build(),
         )
 
-        nextPageButton = addDrawableChild(
-            ButtonWidget.builder(Text.translatable("axion.config.magic_select.blocks.next")) {
+        nextPageButton = addRenderableWidget(
+            Button.builder(Component.translatable("axion.config.magic_select.blocks.next")) {
                 if (page + 1 < pageCount()) {
                     page += 1
-                    clearAndInit()
+                    rebuildWidgets()
                 }
             }.dimensions(centerX + 70, height - 34, 60, 20).build().apply {
                 active = page + 1 < pageCount()
@@ -108,8 +108,8 @@ class MagicSelectBlockPickerScreen(
         )
 
         tileBounds().forEach { tile ->
-            addDrawableChild(
-                ButtonWidget.builder(Text.empty()) {
+            addRenderableWidget(
+                Button.builder(Component.empty()) {
                     toggleTile(tile.entry)
                 }.dimensions(tile.x, tile.y, tile.size, tile.size).build().apply {
                     setAlpha(0f)
@@ -124,15 +124,15 @@ class MagicSelectBlockPickerScreen(
         client?.setScreen(parent)
     }
 
-    override fun render(context: DrawContext, mouseX: Int, mouseY: Int, deltaTicks: Float) {
+    override fun render(context: GuiGraphics, mouseX: Int, mouseY: Int, deltaTicks: Float) {
         context.fill(0, 0, width, height, 0xB0101010.toInt())
         super.render(context, mouseX, mouseY, deltaTicks)
 
         val centerX = width / 2
-        context.drawCenteredTextWithShadow(textRenderer, title, centerX, 18, 0xFFFFFF)
-        context.drawCenteredTextWithShadow(
+        context.drawCenteredString(textRenderer, title, centerX, 18, 0xFFFFFF)
+        context.drawCenteredString(
             textRenderer,
-            Text.translatable("axion.config.magic_select.blocks.description"),
+            Component.translatable("axion.config.magic_select.blocks.description"),
             centerX,
             30,
             0xBFBFBF,
@@ -157,9 +157,9 @@ class MagicSelectBlockPickerScreen(
             context.drawTooltip(textRenderer, tile.entry.block.asItem().name, mouseX, mouseY)
         }
 
-        context.drawCenteredTextWithShadow(
+        context.drawCenteredString(
             textRenderer,
-            Text.translatable("axion.config.magic_select.blocks.page", page + 1, pageCount().coerceAtLeast(1)),
+            Component.translatable("axion.config.magic_select.blocks.page", page + 1, pageCount().coerceAtLeast(1)),
             centerX,
             height - 48,
             0x8A8A8A,

@@ -4,7 +4,7 @@ import axion.AxionMod
 import axion.client.AxionClientBootstrap
 import axion.client.compat.VersionCompatImpl
 import axion.client.input.AxionKeybindings
-import net.minecraft.client.MinecraftClient
+import net.minecraft.client.Minecraft
 import net.neoforged.api.distmarker.Dist
 import net.neoforged.bus.api.IEventBus
 import net.neoforged.bus.api.SubscribeEvent
@@ -65,19 +65,19 @@ object NeoForgeClientEvents {
     @JvmStatic
     @SubscribeEvent
     fun onClientTick(event: ClientTickEvent.Post) {
-        VersionCompatImpl.fireClientTick(MinecraftClient.getInstance())
+        VersionCompatImpl.fireClientTick(Minecraft.getInstance())
     }
 
     @JvmStatic
     @SubscribeEvent
     fun onPlayerLogin(event: ClientPlayerNetworkEvent.LoggingIn) {
-        VersionCompatImpl.firePlayJoin(MinecraftClient.getInstance())
+        VersionCompatImpl.firePlayJoin(Minecraft.getInstance())
     }
 
     @JvmStatic
     @SubscribeEvent
     fun onPlayerLogout(event: ClientPlayerNetworkEvent.LoggingOut) {
-        VersionCompatImpl.firePlayDisconnect(MinecraftClient.getInstance())
+        VersionCompatImpl.firePlayDisconnect(Minecraft.getInstance())
     }
 
     @JvmStatic

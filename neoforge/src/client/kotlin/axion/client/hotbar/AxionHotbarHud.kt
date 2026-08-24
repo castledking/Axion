@@ -3,16 +3,16 @@ package axion.client.hotbar
 import axion.client.AxionClientState
 import axion.client.compat.VersionCompatImpl
 import axion.client.input.AxionModifierKeys
-import axion.client.tool.AxionToolSelectionController
+import axion.client.itemStack.AxionToolSelectionController
 import axion.client.ui.drawStrokedRectangleCompat
 import axion.common.compat.VersionCompat
 import axion.common.model.AxionSubtool
 import kotlin.math.sqrt
-import net.minecraft.client.MinecraftClient
-import net.minecraft.client.gui.DrawContext
-import net.minecraft.item.ItemStack
-import net.minecraft.util.Arm
-import net.minecraft.util.Identifier
+import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.GuiGraphics
+import net.minecraft.world.item.ItemStack
+import net.minecraft.world.entity.HumanoidArm
+import net.minecraft.resources.Identifier
 
 object AxionHotbarHud {
     private val HOTBAR_SWAPPER_TEXTURE: Identifier by lazy {
@@ -106,10 +106,10 @@ object AxionHotbarHud {
 
     private data class SpriteRegion(val u: Int, val v: Int, val w: Int, val h: Int)
 
-    fun render(context: DrawContext, tickCounter: net.minecraft.client.render.RenderTickCounter) {
-        val client = MinecraftClient.getInstance()
+    fun render(context: GuiGraphics, tickCounter: net.minecraft.client.DeltaTracker) {
+        val client = Minecraft.getInstance()
         client.player ?: return
-        if (client.options.hudHidden) {
+        if (client.options.hideGui) {
             return
         }
         if (!AxionToolSelectionController.isCreativeModeAllowed()) {
@@ -122,8 +122,8 @@ object AxionHotbarHud {
 
         val sideSlot = AxionHudLayout.sideSlot(
             client = client,
-            screenWidth = context.scaledWindowWidth,
-            screenHeight = context.scaledWindowHeight,
+            screenWidth = context.guiScaledWidth,
+            screenHeight = context.guiScaledHeight,
         )
 
         val axionSelected = AxionToolSelectionController.isAxionSelected()
@@ -138,7 +138,7 @@ object AxionHotbarHud {
             sideSlot = sideSlot,
             activeSubtool = activeSubtool,
             hovered = if (expandedTools) {
-                AxionAltMenuController.hoveredSubtool(client, context.scaledWindowWidth, context.scaledWindowHeight)
+                AxionAltMenuController.hoveredSubtool(client, context.guiScaledWidth, context.guiScaledHeight)
             } else {
                 null
             },
@@ -173,7 +173,7 @@ object AxionHotbarHud {
     }
 
     private fun renderToolStack(
-        context: DrawContext,
+        context: GuiGraphics,
         sideSlot: AxionHudLayout.SlotBounds,
         activeSubtool: AxionSubtool,
         hovered: AxionSubtool?,
@@ -243,7 +243,7 @@ object AxionHotbarHud {
     }
 
     private fun drawToolSwapperRegion(
-        context: DrawContext,
+        context: GuiGraphics,
         x: Int,
         y: Int,
         u: Int,
@@ -266,7 +266,7 @@ object AxionHotbarHud {
     }
 
     private fun drawHotbarSwapperRegion(
-        context: DrawContext,
+        context: GuiGraphics,
         u: Int,
         v: Int,
         x: Int,
@@ -289,7 +289,7 @@ object AxionHotbarHud {
     }
 
     private fun drawHotbarSwapperRegion(
-        context: DrawContext,
+        context: GuiGraphics,
         region: SpriteRegion,
         x: Int,
         y: Int,
@@ -298,7 +298,7 @@ object AxionHotbarHud {
     }
 
     private data class PendingTooltip(
-        val textRenderer: net.minecraft.client.font.TextRenderer,
+        val textRenderer: net.minecraft.client.gui.Font,
         val lines: List<Pair<String, Int>>,
         val x: Int,
         val y: Int,
@@ -307,8 +307,8 @@ object AxionHotbarHud {
     private var pendingTooltip: PendingTooltip? = null
 
     private fun renderSavedHotbarOverlay(
-        context: DrawContext,
-        client: MinecraftClient,
+        context: GuiGraphics,
+        client: Minecraft,
     ) {
         val matrices = context.matrices
         pushMatrices(matrices)
@@ -317,24 +317,24 @@ object AxionHotbarHud {
         try {
             val page = SavedHotbarController.selectedPage()
             val displayRows = SavedHotbarController.displayHotbarsForSelectedPage(client)
-            val rowBounds = AxionHudLayout.savedHotbarRows(context.scaledWindowWidth, context.scaledWindowHeight, page)
+            val rowBounds = AxionHudLayout.savedHotbarRows(context.guiScaledWidth, context.guiScaledHeight, page)
 
             // 9×9 grid background
-            val centerX = context.scaledWindowWidth / 2
-            drawHotbarSwapperRegion(context, HOTBAR_GRID_BG, centerX - 91, context.scaledWindowHeight - 182)
+            val centerX = context.guiScaledWidth / 2
+            drawHotbarSwapperRegion(context, HOTBAR_GRID_BG, centerX - 91, context.guiScaledHeight - 182)
             renderSavedHotbarActionButtons(context, client, page)
             if (AxionDevTestSession.isActive) {
                 renderFinishTestingButton(
                     context,
                     AxionHudLayout.finishTestingSavedHotbarBounds(
-                        context.scaledWindowWidth,
-                        context.scaledWindowHeight,
+                        context.guiScaledWidth,
+                        context.guiScaledHeight,
                         page,
                     ),
                 )
             }
 
-            val hoveredSlot = findHoveredSlot(client, context.scaledWindowWidth, context.scaledWindowHeight, rowBounds)
+            val hoveredSlot = findHoveredSlot(client, context.guiScaledWidth, context.guiScaledHeight, rowBounds)
 
             rowBounds.zip(displayRows).forEach { (bounds, display) ->
                 if (display.selected) {
@@ -344,7 +344,7 @@ object AxionHotbarHud {
             }
 
             val topBounds = rowBounds.last()
-            context.drawTextWithShadow(
+            context.drawString(
                 client.textRenderer,
                 "Page ${page + 1}",
                 topBounds.x + topBounds.width + 8,
@@ -367,8 +367,8 @@ object AxionHotbarHud {
     }
 
     private fun renderSavedHotbarActionButtons(
-        context: DrawContext,
-        client: MinecraftClient,
+        context: GuiGraphics,
+        client: Minecraft,
         page: Int,
     ) {
         val player = client.player ?: return
@@ -379,8 +379,8 @@ object AxionHotbarHud {
         }
 
         AxionHudLayout.savedHotbarActionButtons(
-            context.scaledWindowWidth,
-            context.scaledWindowHeight,
+            context.guiScaledWidth,
+            context.guiScaledHeight,
             page,
         ).filterNot { bounds ->
             AxionDevTestSession.isActive && bounds.action == SavedHotbarMenuAction.CREATE_DISPLAY_ENTITY
@@ -400,8 +400,8 @@ object AxionHotbarHud {
     }
 
     private fun renderTooltipNow(
-        context: DrawContext,
-        textRenderer: net.minecraft.client.font.TextRenderer,
+        context: GuiGraphics,
+        textRenderer: net.minecraft.client.gui.Font,
         lines: List<Pair<String, Int>>,
         x: Int,
         y: Int,
@@ -413,15 +413,15 @@ object AxionHotbarHud {
         val bgX = x + 12
         val bgY = y - 12
         val bgW = maxWidth + padding * 2
-        val bgH = lines.size * (textRenderer.fontHeight + 2) + padding
-        val screenWidth = context.scaledWindowWidth
-        val screenHeight = context.scaledWindowHeight
+        val bgH = lines.size * (textRenderer.lineHeight + 2) + padding
+        val screenWidth = context.guiScaledWidth
+        val screenHeight = context.guiScaledHeight
         val clampedBgX = bgX.coerceIn(0, screenWidth - bgW)
         val clampedBgY = bgY.coerceIn(0, screenHeight - bgH)
         context.fill(clampedBgX, clampedBgY, clampedBgX + bgW, clampedBgY + bgH, 0xF0100010.toInt())
         context.drawStrokedRectangleCompat(clampedBgX, clampedBgY, bgW, bgH, 0x505000FF)
         lines.forEachIndexed { i, (text, color) ->
-            context.drawTextWithShadow(textRenderer, text, clampedBgX + padding, clampedBgY + padding + i * (textRenderer.fontHeight + 2), opaqueTextColor(color))
+            context.drawString(textRenderer, text, clampedBgX + padding, clampedBgY + padding + i * (textRenderer.lineHeight + 2), opaqueTextColor(color))
         }
     }
 
@@ -434,8 +434,8 @@ object AxionHotbarHud {
     }
 
     private fun renderTooltip(
-        context: DrawContext,
-        textRenderer: net.minecraft.client.font.TextRenderer,
+        context: GuiGraphics,
+        textRenderer: net.minecraft.client.gui.Font,
         lines: List<Pair<String, Int>>,
         x: Int,
         y: Int,
@@ -469,7 +469,7 @@ object AxionHotbarHud {
     }
 
     /** Calls drawStackOverlay if it exists (1.21.4+), otherwise falls back to drawItemInSlot (1.21.0-1.21.1). */
-    private fun drawStackOverlayReflective(context: DrawContext, textRenderer: net.minecraft.client.font.TextRenderer, stack: ItemStack, x: Int, y: Int) {
+    private fun drawStackOverlayReflective(context: GuiGraphics, textRenderer: net.minecraft.client.gui.Font, stack: ItemStack, x: Int, y: Int) {
         context.javaClass.methods.firstOrNull { method ->
             method.name == "drawStackOverlay" && method.parameterCount == 4
         }?.invoke(context, textRenderer, stack, x, y) ?: run {
@@ -480,24 +480,24 @@ object AxionHotbarHud {
     }
 
     private fun renderFlyingSpeedSlider(
-        context: DrawContext,
-        client: MinecraftClient,
+        context: GuiGraphics,
+        client: Minecraft,
         page: Int,
     ) {
         if (client.player?.abilities?.allowFlying != true) return
 
-        val bounds = AxionHudLayout.flyingSpeedSliderBounds(context.scaledWindowWidth, context.scaledWindowHeight, page)
+        val bounds = AxionHudLayout.flyingSpeedSliderBounds(context.guiScaledWidth, context.guiScaledHeight, page)
         val multiplier = AxionClientState.flySpeedMultiplier
 
-        val plusHovered = AxionAltMenuController.isHoveringFlyingSpeedPlusButton(client, context.scaledWindowWidth, context.scaledWindowHeight)
-        val minusHovered = AxionAltMenuController.isHoveringFlyingSpeedMinusButton(client, context.scaledWindowWidth, context.scaledWindowHeight)
+        val plusHovered = AxionAltMenuController.isHoveringFlyingSpeedPlusButton(client, context.guiScaledWidth, context.guiScaledHeight)
+        val minusHovered = AxionAltMenuController.isHoveringFlyingSpeedMinusButton(client, context.guiScaledWidth, context.guiScaledHeight)
 
         val plus = bounds.plusButton
         drawHotbarSwapperRegion(context, if (plusHovered) FLY_PLUS_HOVER else FLY_PLUS, plus.x, plus.y)
 
         val percentageText = "${(multiplier * 100).toInt()}%"
-        val labelY = plus.y - client.textRenderer.fontHeight - 2
-        context.drawCenteredTextWithShadow(client.textRenderer, percentageText, plus.x + plus.width / 2, labelY, TEXT_IDLE)
+        val labelY = plus.y - client.textRenderer.lineHeight - 2
+        context.drawCenteredString(client.textRenderer, percentageText, plus.x + plus.width / 2, labelY, TEXT_IDLE)
 
         val track = bounds.track
         val flyAmount = sqrt(((multiplier - 1.0f) / 8.99f).coerceIn(0f, 1f))
@@ -516,26 +516,26 @@ object AxionHotbarHud {
     }
 
     private fun renderToolboxButton(
-        context: DrawContext,
-        client: MinecraftClient,
+        context: GuiGraphics,
+        client: Minecraft,
     ) {
-        val bounds = AxionHudLayout.toolboxSlotBounds(client, context.scaledWindowWidth, context.scaledWindowHeight)
-        val hovered = AxionAltMenuController.isHoveringToolboxButton(client, context.scaledWindowWidth, context.scaledWindowHeight)
+        val bounds = AxionHudLayout.toolboxSlotBounds(client, context.guiScaledWidth, context.guiScaledHeight)
+        val hovered = AxionAltMenuController.isHoveringToolboxButton(client, context.guiScaledWidth, context.guiScaledHeight)
         val centerOffset = (bounds.size - 20) / 2
         drawHotbarSwapperRegion(context, if (hovered) TOOLBOX_SLOT_HOVER else TOOLBOX_SLOT, bounds.x + centerOffset, bounds.y + centerOffset)
         drawHotbarSwapperRegion(context, WRENCH, bounds.x + centerOffset + 2, bounds.y + centerOffset + 2)
     }
 
     private fun renderBinSlot(
-        context: DrawContext,
-        client: MinecraftClient,
+        context: GuiGraphics,
+        client: Minecraft,
     ) {
-        val centerX = context.scaledWindowWidth / 2
+        val centerX = context.guiScaledWidth / 2
         val mainX = when (client.options.mainArm.value) {
-            Arm.LEFT -> centerX - 109
-            Arm.RIGHT -> centerX + 109
+            HumanoidArm.LEFT -> centerX - 109
+            HumanoidArm.RIGHT -> centerX + 109
         }
-        val screenHeight = context.scaledWindowHeight
+        val screenHeight = context.guiScaledHeight
         val mouseX = VersionCompatImpl.getScaledMouseX(client).toInt()
         val mouseY = VersionCompatImpl.getScaledMouseY(client).toInt()
         val hovered = mouseX >= mainX - 11 && mouseX < mainX + 13 && mouseY >= screenHeight - 22 && mouseY < screenHeight
@@ -551,8 +551,8 @@ object AxionHotbarHud {
     }
 
     private fun renderGrabbedItem(
-        context: DrawContext,
-        client: MinecraftClient,
+        context: GuiGraphics,
+        client: Minecraft,
     ) {
         val stack = AxionAltMenuController.grabbedStack
         if (!stack.isEmpty) {
@@ -564,15 +564,15 @@ object AxionHotbarHud {
     }
 
     private fun renderCapabilities(
-        context: DrawContext,
-        client: MinecraftClient,
+        context: GuiGraphics,
+        client: Minecraft,
     ) {
-        val centerX = context.scaledWindowWidth / 2
+        val centerX = context.guiScaledWidth / 2
         val offX = when (client.options.mainArm.value) {
-            Arm.LEFT -> centerX + 107
-            Arm.RIGHT -> centerX - 107
+            HumanoidArm.LEFT -> centerX + 107
+            HumanoidArm.RIGHT -> centerX - 107
         }
-        val screenHeight = context.scaledWindowHeight
+        val screenHeight = context.guiScaledHeight
         val mouseX = VersionCompatImpl.getScaledMouseX(client).toInt()
         val mouseY = VersionCompatImpl.getScaledMouseY(client).toInt()
 
@@ -594,7 +594,7 @@ object AxionHotbarHud {
 
 
     private fun findHoveredSlot(
-        client: MinecraftClient,
+        client: Minecraft,
         screenWidth: Int,
         screenHeight: Int,
         rowBounds: List<AxionHudLayout.SavedHotbarRowBounds>,
@@ -614,12 +614,12 @@ object AxionHotbarHud {
         return null
     }
 
-    private fun renderSlotHover(context: DrawContext, x: Int, y: Int) {
+    private fun renderSlotHover(context: GuiGraphics, x: Int, y: Int) {
         context.fill(x, y, x + 16, y + 16, 0x80FFFFFF.toInt())
     }
 
     private fun renderSavedHotbarItems(
-        context: DrawContext,
+        context: GuiGraphics,
         startX: Int,
         startY: Int,
         rowIndex: Int,
@@ -636,28 +636,28 @@ object AxionHotbarHud {
             }
             if (!stack.isEmpty) {
                 context.drawItem(stack, slotX + 2, startY + 2)
-                drawStackOverlayReflective(context, MinecraftClient.getInstance().textRenderer, stack, slotX + 2, startY + 2)
+                drawStackOverlayReflective(context, Minecraft.getInstance().textRenderer, stack, slotX + 2, startY + 2)
             }
         }
     }
 
     private fun renderSavedHotbarPageButtons(
-        context: DrawContext,
-        client: MinecraftClient,
+        context: GuiGraphics,
+        client: Minecraft,
         page: Int,
     ) {
         val hovered = AxionAltMenuController.hoveringSavedHotbarPageButton(
             client,
-            context.scaledWindowWidth,
-            context.scaledWindowHeight,
+            context.guiScaledWidth,
+            context.guiScaledHeight,
         )
-        AxionHudLayout.savedHotbarPageButtons(context.scaledWindowWidth, context.scaledWindowHeight, page).forEach { button ->
+        AxionHudLayout.savedHotbarPageButtons(context.guiScaledWidth, context.guiScaledHeight, page).forEach { button ->
             val isHovered = hovered?.direction == button.direction
             val borderColor = if (isHovered) BORDER_HOVER else BORDER_NEUTRAL
             context.fill(button.x, button.y, button.x + button.width, button.y + button.height, OUTER_BACKGROUND)
             context.fill(button.x + 1, button.y + 1, button.x + button.width - 1, button.y + button.height - 1, INNER_BACKGROUND)
             context.drawStrokedRectangleCompat(button.x, button.y, button.width, button.height, borderColor)
-            context.drawCenteredTextWithShadow(
+            context.drawCenteredString(
                 client.textRenderer,
                 if (button.direction > 0) "↑" else "↓",
                 button.x + (button.width / 2),
@@ -668,7 +668,7 @@ object AxionHotbarHud {
     }
 
     private fun renderMiddleClickToggle(
-        context: DrawContext,
+        context: GuiGraphics,
         sideSlot: AxionHudLayout.SlotBounds,
     ) {
         val bounds = AxionHudLayout.middleClickToggleBounds(sideSlot)
@@ -688,14 +688,14 @@ object AxionHotbarHud {
     }
 
     private fun renderFinishTestingButton(
-        context: DrawContext,
+        context: GuiGraphics,
         sideSlot: AxionHudLayout.SlotBounds,
     ) {
         renderFinishTestingButton(context, AxionHudLayout.finishTestingBounds(sideSlot))
     }
 
     private fun renderFinishTestingButton(
-        context: DrawContext,
+        context: GuiGraphics,
         bounds: AxionHudLayout.ToggleButtonBounds,
     ) {
         VanillaHudButtonStore.render(
@@ -710,7 +710,7 @@ object AxionHotbarHud {
     }
 
     private fun renderKeepExistingToggle(
-        context: DrawContext,
+        context: GuiGraphics,
         sideSlot: AxionHudLayout.SlotBounds,
     ) {
         val bounds = AxionHudLayout.keepExistingToggleBounds(sideSlot)
@@ -730,7 +730,7 @@ object AxionHotbarHud {
     }
 
     private fun renderCopyEntitiesToggle(
-        context: DrawContext,
+        context: GuiGraphics,
         sideSlot: AxionHudLayout.SlotBounds,
     ) {
         val bounds = AxionHudLayout.copyEntitiesToggleBounds(sideSlot)
@@ -750,7 +750,7 @@ object AxionHotbarHud {
     }
 
     private fun renderCopyAirToggle(
-        context: DrawContext,
+        context: GuiGraphics,
         sideSlot: AxionHudLayout.SlotBounds,
     ) {
         val bounds = AxionHudLayout.copyAirToggleBounds(sideSlot)

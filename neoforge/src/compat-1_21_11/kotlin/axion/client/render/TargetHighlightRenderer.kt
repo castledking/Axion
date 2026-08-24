@@ -2,14 +2,14 @@ package axion.client.render
 import axion.client.compat.CameraAccess
 
 import axion.client.AxionClientState
-import axion.client.selection.AxionTarget
-import axion.client.selection.SelectionBounds
-import axion.client.selection.SelectionController
-import axion.client.selection.blockPosOrNull
-import axion.client.tool.AxionToolSelectionController
-import net.minecraft.client.MinecraftClient
-import net.minecraft.client.render.RenderLayer
-import net.minecraft.util.shape.VoxelShapes
+import axion.client.current.AxionTarget
+import axion.client.current.SelectionBounds
+import axion.client.current.SelectionController
+import axion.client.current.blockPosOrNull
+import axion.client.itemStack.AxionToolSelectionController
+import net.minecraft.client.Minecraft
+import net.minecraft.client.renderer.rendertype.RenderType
+import net.minecraft.world.phys.shapes.Shapes
 
 object TargetHighlightRenderer {
     private const val TARGET_COLOR: Int = 0xFF000000.toInt()
@@ -17,7 +17,7 @@ object TargetHighlightRenderer {
 
     fun render(context: AxionWorldRenderContext) {
         val blockPos = currentTargetForRender() ?: return
-        val client = MinecraftClient.getInstance()
+        val client = Minecraft.getInstance()
         val camera = client.gameRenderer.camera ?: return
         val cameraPos = CameraAccess.getPos(camera)
         val consumers = context.consumers()
@@ -34,7 +34,7 @@ object TargetHighlightRenderer {
         VertexRenderingCompat.drawOutline(
             matrixStack,
             consumer,
-            VoxelShapes.cuboid(box),
+            Shapes.create(box),
             -cameraPos.x,
             -cameraPos.y,
             -cameraPos.z,
@@ -43,7 +43,7 @@ object TargetHighlightRenderer {
         )
     }
 
-    private fun currentTargetForRender(): net.minecraft.util.math.BlockPos? {
+    private fun currentTargetForRender(): net.minecraft.core.BlockPos? {
         val toolActive = AxionToolSelectionController.isAxionSlotActive()
         val modeActive = AxionClientState.globalModeState.infiniteReachEnabled
         if (!toolActive && !modeActive) {

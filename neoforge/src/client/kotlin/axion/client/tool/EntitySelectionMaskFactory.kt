@@ -1,9 +1,9 @@
-package axion.client.tool
+package axion.client.itemStack
 
 import axion.common.model.ClipboardBuffer
 import axion.protocol.EntitySelectionMask
 import axion.protocol.IntVector3
-import net.minecraft.util.math.Vec3i
+import net.minecraft.core.Vec3i
 
 internal fun ClipboardBuffer.toEntitySelectionMask(): EntitySelectionMask {
     val volume = size.x.toLong() * size.y.toLong() * size.z.toLong()

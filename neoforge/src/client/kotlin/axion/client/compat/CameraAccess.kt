@@ -1,7 +1,7 @@
 package axion.client.compat
 
-import net.minecraft.client.render.Camera
-import net.minecraft.util.math.Vec3d
+import net.minecraft.client.Camera
+import net.minecraft.world.phys.Vec3
 import java.lang.reflect.Field
 import java.lang.reflect.Method
 
@@ -10,7 +10,7 @@ object CameraAccess {
         try {
             Camera::class.java.getDeclaredField("pos").apply { isAccessible = true }
         } catch (_: NoSuchFieldException) {
-            Camera::class.java.declaredFields.firstOrNull { it.type == Vec3d::class.java }
+            Camera::class.java.declaredFields.firstOrNull { it.type == Vec3::class.java }
                 ?.apply { isAccessible = true }
         }
     }
@@ -19,21 +19,21 @@ object CameraAccess {
         Camera::class.java.methods.firstOrNull { it.name == "position" && it.parameterCount == 0 }
             ?: Camera::class.java.methods.firstOrNull { it.name == "getPos" && it.parameterCount == 0 }
             ?: Camera::class.java.methods.firstOrNull {
-                it.parameterCount == 0 && it.returnType == Vec3d::class.java
+                it.parameterCount == 0 && it.returnType == Vec3::class.java
             }
     }
 
-    fun getPos(camera: Camera): Vec3d {
+    fun getPos(camera: Camera): Vec3 {
         positionMethod?.let { method ->
             try {
-                return method.invoke(camera) as Vec3d
+                return method.invoke(camera) as Vec3
             } catch (_: Exception) {}
         }
 
         val field = posField
         if (field != null) {
             try {
-                return field.get(camera) as Vec3d
+                return field.get(camera) as Vec3
             } catch (_: Exception) {}
         }
 

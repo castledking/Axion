@@ -1,10 +1,10 @@
-package axion.client.selection
+package axion.client.current
 
 import axion.common.model.BlockRegion
 import axion.common.model.RegionFace
-import net.minecraft.util.math.BlockPos
-import net.minecraft.util.math.Box
-import net.minecraft.util.math.Vec3d
+import net.minecraft.core.BlockPos
+import net.minecraft.world.phys.AABB
+import net.minecraft.world.phys.Vec3
 import kotlin.math.abs
 
 object SelectionBounds {
@@ -12,8 +12,8 @@ object SelectionBounds {
     private const val FACE_THICKNESS: Double = 0.045
     private const val RAY_EPSILON: Double = 1.0e-7
 
-    fun blockBox(pos: BlockPos): Box {
-        return Box(
+    fun blockBox(pos: BlockPos): AABB {
+        return AABB(
             pos.x.toDouble(),
             pos.y.toDouble(),
             pos.z.toDouble(),
@@ -23,23 +23,23 @@ object SelectionBounds {
         )
     }
 
-    fun regionBox(region: BlockRegion): Box = region.normalized().toBox()
+    fun regionBox(region: BlockRegion): AABB = region.normalized().toBox()
 
-    fun outlineBox(box: Box): Box = box.expand(OUTLINE_PADDING, OUTLINE_PADDING, OUTLINE_PADDING)
+    fun outlineBox(box: AABB): AABB = box.expand(OUTLINE_PADDING, OUTLINE_PADDING, OUTLINE_PADDING)
 
-    fun faceBox(pos: BlockPos, face: RegionFace): Box {
+    fun faceBox(pos: BlockPos, face: RegionFace): AABB {
         val box = blockBox(pos)
         return when (face) {
-            RegionFace.DOWN -> Box(box.minX, box.minY, box.minZ, box.maxX, box.minY + FACE_THICKNESS, box.maxZ)
-            RegionFace.UP -> Box(box.minX, box.maxY - FACE_THICKNESS, box.minZ, box.maxX, box.maxY, box.maxZ)
-            RegionFace.NORTH -> Box(box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.minZ + FACE_THICKNESS)
-            RegionFace.SOUTH -> Box(box.minX, box.minY, box.maxZ - FACE_THICKNESS, box.maxX, box.maxY, box.maxZ)
-            RegionFace.WEST -> Box(box.minX, box.minY, box.minZ, box.minX + FACE_THICKNESS, box.maxY, box.maxZ)
-            RegionFace.EAST -> Box(box.maxX - FACE_THICKNESS, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ)
+            RegionFace.DOWN -> AABB(box.minX, box.minY, box.minZ, box.maxX, box.minY + FACE_THICKNESS, box.maxZ)
+            RegionFace.UP -> AABB(box.minX, box.maxY - FACE_THICKNESS, box.minZ, box.maxX, box.maxY, box.maxZ)
+            RegionFace.NORTH -> AABB(box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.minZ + FACE_THICKNESS)
+            RegionFace.SOUTH -> AABB(box.minX, box.minY, box.maxZ - FACE_THICKNESS, box.maxX, box.maxY, box.maxZ)
+            RegionFace.WEST -> AABB(box.minX, box.minY, box.minZ, box.minX + FACE_THICKNESS, box.maxY, box.maxZ)
+            RegionFace.EAST -> AABB(box.maxX - FACE_THICKNESS, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ)
         }
     }
 
-    fun pickFace(region: BlockRegion, point: Vec3d): RegionFace {
+    fun pickFace(region: BlockRegion, point: Vec3): RegionFace {
         val box = regionBox(region)
         val distances = listOf(
             RegionFace.WEST to abs(point.x - box.minX),
@@ -53,10 +53,10 @@ object SelectionBounds {
         return distances.minBy { it.second }.first
     }
 
-    fun outwardFaceToward(region: BlockRegion, target: BlockPos, point: Vec3d): RegionFace? {
+    fun outwardFaceToward(region: BlockRegion, target: BlockPos, point: Vec3): RegionFace? {
         val normalized = region.normalized()
         val box = regionBox(normalized)
-        val center = Vec3d(target.x + 0.5, target.y + 0.5, target.z + 0.5)
+        val center = Vec3(target.x + 0.5, target.y + 0.5, target.z + 0.5)
         val candidates = buildList {
             if (target.x < normalized.start.x) {
                 add(
@@ -127,7 +127,7 @@ object SelectionBounds {
         )?.face
     }
 
-    fun raycastFace(region: BlockRegion, origin: Vec3d, direction: Vec3d, maxDistance: Double): FaceHit? {
+    fun raycastFace(region: BlockRegion, origin: Vec3, direction: Vec3, maxDistance: Double): FaceHit? {
         val box = regionBox(region)
         var tMin = 0.0
         var tMax = maxDistance
@@ -196,7 +196,7 @@ object SelectionBounds {
         )
     }
 
-    private fun contains(region: BlockRegion, point: Vec3d): Boolean {
+    private fun contains(region: BlockRegion, point: Vec3): Boolean {
         val box = regionBox(region)
         return point.x in box.minX..box.maxX &&
             point.y in box.minY..box.maxY &&
@@ -205,7 +205,7 @@ object SelectionBounds {
 
     data class FaceHit(
         val face: RegionFace,
-        val point: Vec3d,
+        val point: Vec3,
     )
 
     private data class Candidate(

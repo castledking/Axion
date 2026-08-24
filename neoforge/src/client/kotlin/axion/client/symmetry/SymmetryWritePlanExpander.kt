@@ -11,7 +11,7 @@ object SymmetryWritePlanExpander {
         }
 
         val resolvedConfig = config ?: return plan
-        val writesByPosition = linkedMapOf<net.minecraft.util.math.BlockPos, BlockWrite>()
+        val writesByPosition = linkedMapOf<net.minecraft.core.BlockPos, BlockWrite>()
         SymmetryTransformService.activeTransforms(resolvedConfig).forEach { transform ->
             plan.writes.forEach { write ->
                 val transformedPos = SymmetryTransformService.transformBlock(
@@ -22,7 +22,7 @@ object SymmetryWritePlanExpander {
                 writesByPosition[transformedPos] = BlockWrite(
                     pos = transformedPos,
                     state = write.state,
-                    blockEntityData = write.blockEntityData?.copy(),
+                    blockEntityData = write.blockData?.copy(),
                 )
             }
         }

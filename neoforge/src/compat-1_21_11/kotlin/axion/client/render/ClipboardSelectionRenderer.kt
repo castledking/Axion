@@ -3,21 +3,21 @@ import axion.client.compat.CameraAccess
 
 import axion.client.render.gpu.PreviewOcclusionCompat
 import axion.client.render.gpu.PreviewOcclusionPolicy
-import axion.client.selection.SelectionBounds
+import axion.client.current.SelectionBounds
 import axion.common.model.BlockRegion
 import axion.common.model.ClipboardCell
 import axion.common.model.ClipboardBuffer
-import net.minecraft.block.BlockState
-import net.minecraft.block.Blocks
-import net.minecraft.client.MinecraftClient
-import net.minecraft.client.render.VertexConsumer
+import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.world.level.block.Blocks
+import net.minecraft.client.Minecraft
+import com.mojang.blaze3d.vertex.VertexConsumer
 import net.minecraft.client.util.math.Entry
-import net.minecraft.client.util.math.MatrixStack
-import net.minecraft.util.math.BlockPos
-import net.minecraft.util.math.Box
-import net.minecraft.util.math.Direction
-import net.minecraft.util.shape.VoxelShape
-import net.minecraft.util.shape.VoxelShapes
+import com.mojang.blaze3d.vertex.PoseStack
+import net.minecraft.core.BlockPos
+import net.minecraft.world.phys.AABB
+import net.minecraft.core.Direction
+import net.minecraft.world.phys.shapes.VoxelShape
+import net.minecraft.world.phys.shapes.Shapes
 import java.util.WeakHashMap
 import kotlin.math.roundToInt
 
@@ -52,19 +52,19 @@ object ClipboardSelectionRenderer {
         }
     }
 
-    // VoxelShapes.union becomes very expensive when magic-select accumulates
+    // Shapes.union becomes very expensive when magic-select accumulates
     // separated blobs. Keep the single-shape path small, then switch to a
     // linear boundary-edge builder so multiple middle-click blobs do not
     // rebuild one giant outline synchronously on the render thread.
     //
     // Above this, build exact merged boundary edges instead of using
-    // VoxelShapes.union. That preserves the selected block set without the
+    // Shapes.union. That preserves the selected block set without the
     // visible per-block segmentation or O(n^2) shape merge cost.
     private const val MAX_SINGLE_SHAPE_UNION_CELLS: Int = 256
 
     private data class CachedGeometry(
         val shape: VoxelShape?,
-        val boxes: List<Box>,
+        val boxes: List<AABB>,
         val componentOutlines: List<ComponentOutline>,
     )
 
@@ -228,7 +228,7 @@ object ClipboardSelectionRenderer {
             return false
         }
 
-        val client = MinecraftClient.getInstance()
+        val client = Minecraft.getInstance()
         val camera = client.gameRenderer.camera ?: return false
         val cameraPos = CameraAccess.getPos(camera)
         val consumers = context.consumers()
@@ -263,9 +263,9 @@ object ClipboardSelectionRenderer {
 
         // Only build expensive VoxelShape for outline if under the limit
         if (!useFastPath) {
-            var shape: VoxelShape = VoxelShapes.empty()
+            var shape: VoxelShape = Shapes.empty()
             positions.forEach { pos ->
-                shape = VoxelShapes.union(shape, VoxelShapes.cuboid(SelectionBounds.blockBox(pos)))
+                shape = Shapes.union(shape, Shapes.create(SelectionBounds.blockBox(pos)))
             }
 
             VertexRenderingCompat.drawOutline(
@@ -285,7 +285,7 @@ object ClipboardSelectionRenderer {
                 VertexRenderingCompat.drawOutline(
                     matrixStack,
                     lineConsumer,
-                    VoxelShapes.cuboid(SelectionBounds.blockBox(pos)),
+                    Shapes.create(SelectionBounds.blockBox(pos)),
                     -cameraPos.x,
                     -cameraPos.y,
                     -cameraPos.z,
@@ -339,7 +339,7 @@ object ClipboardSelectionRenderer {
         val geometry = geometryFor(clipboard)
         val matrixStack = context.matrices()
         val consumers = context.consumers()
-        val client = MinecraftClient.getInstance()
+        val client = Minecraft.getInstance()
         val camera = client.gameRenderer.camera ?: return false
         val cameraPos = CameraAccess.getPos(camera)
         val overlayCellCount = geometry.boxes.size.toLong() * origins.size.toLong()
@@ -468,15 +468,15 @@ object ClipboardSelectionRenderer {
     private fun geometryFor(clipboard: ClipboardBuffer): CachedGeometry {
         return geometryCache.getOrPut(clipboard) {
             val visibleCells = surfaceCells(clipboard)
-            val boxes = ArrayList<Box>(visibleCells.size)
+            val boxes = ArrayList<AABB>(visibleCells.size)
             visibleCells.forEach { cell ->
                 boxes += SelectionBounds.blockBox(BlockPos.ORIGIN.add(cell.offset))
             }
             if (visibleCells.size <= MAX_SINGLE_SHAPE_UNION_CELLS) {
                 // Small selection: build merged VoxelShape for smooth outline
-                var shape: VoxelShape = VoxelShapes.empty()
+                var shape: VoxelShape = Shapes.empty()
                 boxes.forEach { box ->
-                    shape = VoxelShapes.union(shape, VoxelShapes.cuboid(box))
+                    shape = Shapes.union(shape, Shapes.create(box))
                 }
                 CachedGeometry(shape = shape, boxes = boxes, componentOutlines = emptyList())
             } else {
@@ -582,7 +582,7 @@ object ClipboardSelectionRenderer {
     }
 
     private fun renderBoundaryEdges(
-        matrixStack: MatrixStack,
+        matrixStack: PoseStack,
         consumer: VertexConsumer,
         edges: List<BoundaryEdge>,
         originX: Double,
@@ -594,7 +594,7 @@ object ClipboardSelectionRenderer {
         color: Int,
         lineWidth: Float,
     ) {
-        val entry = matrixStack.peek()
+        val entry = matrixStack.last()
         val red = (color shr 16) and 0xFF
         val green = (color shr 8) and 0xFF
         val blue = color and 0xFF
@@ -678,9 +678,9 @@ object ClipboardSelectionRenderer {
 
     private fun glassStateFor(color: Int): BlockState {
         return when (color and 0x00FFFFFF) {
-            0x00CC5656 -> Blocks.RED_STAINED_GLASS.defaultState
-            0x007C98FF -> Blocks.LIGHT_BLUE_STAINED_GLASS.defaultState
-            else -> Blocks.LIGHT_GRAY_STAINED_GLASS.defaultState
+            0x00CC5656 -> Blocks.RED_STAINED_GLASS.defaultBlockState
+            0x007C98FF -> Blocks.LIGHT_BLUE_STAINED_GLASS.defaultBlockState
+            else -> Blocks.LIGHT_GRAY_STAINED_GLASS.defaultBlockState
         }
     }
 }

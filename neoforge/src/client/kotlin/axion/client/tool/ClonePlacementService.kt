@@ -1,14 +1,14 @@
-package axion.client.tool
+package axion.client.itemStack
 
 import axion.common.model.BlockRegion
 import axion.common.model.ClipboardBuffer
 import axion.protocol.EntitySelectionMask
-import axion.client.tool.directionGetFacing
+import axion.client.itemStack.directionGetFacing
 import axion.client.compat.add
-import net.minecraft.client.MinecraftClient
-import net.minecraft.util.math.BlockPos
-import net.minecraft.util.math.Direction
-import net.minecraft.util.math.Vec3i
+import net.minecraft.client.Minecraft
+import net.minecraft.core.BlockPos
+import net.minecraft.core.Direction
+import net.minecraft.core.Vec3i
 
 object ClonePlacementService {
     fun createPreview(
@@ -41,7 +41,7 @@ object ClonePlacementService {
     }
 
     fun nudgePreview(
-        client: MinecraftClient,
+        client: Minecraft,
         preview: ClonePreviewState,
         scrollAmount: Double,
     ): ClonePreviewState {
@@ -51,7 +51,7 @@ object ClonePlacementService {
             return preview
         }
 
-        val delta = direction.vector.multiply(scrollDirection)
+        val delta = direction.extents.multiply(scrollDirection)
         return createPreview(
             mode = preview.mode,
             firstCorner = preview.firstCorner,
@@ -64,7 +64,7 @@ object ClonePlacementService {
     }
 
     fun initialPreview(
-        client: MinecraftClient,
+        client: Minecraft,
         mode: PlacementToolMode,
         firstCorner: BlockPos,
         sourceRegion: BlockRegion,
@@ -108,12 +108,12 @@ object ClonePlacementService {
             sourceRegion = preview.sourceRegion,
             clipboardBuffer = preview.sourceClipboardBuffer,
             offset = preview.offset,
-            transform = preview.transform.rotateClockwise(),
+            transform = preview.transform.getClockWise(),
             entitySelection = preview.entitySelection,
         )
     }
 
-    fun mirrorPreview(preview: ClonePreviewState, client: MinecraftClient): ClonePreviewState {
+    fun mirrorPreview(preview: ClonePreviewState, client: Minecraft): ClonePreviewState {
         val axis = dominantMirrorAxis(client)
         return createPreview(
             mode = preview.mode,
@@ -126,12 +126,12 @@ object ClonePlacementService {
         )
     }
 
-    private fun dominantLookDirection(client: MinecraftClient): Direction {
+    private fun dominantLookDirection(client: Minecraft): Direction {
         val look = client.player?.rotationVecClient ?: return Direction.UP
         return directionGetFacing(look)
     }
 
-    private fun dominantMirrorAxis(client: MinecraftClient): PlacementMirrorAxis {
+    private fun dominantMirrorAxis(client: Minecraft): PlacementMirrorAxis {
         val look = client.player?.rotationVecClient ?: return PlacementMirrorAxis.X
         val ax = kotlin.math.abs(look.x)
         val ay = kotlin.math.abs(look.y)

@@ -1,4 +1,4 @@
-package axion.client.tool
+package axion.client.itemStack
 
 import axion.client.AxionClientState
 import axion.client.compat.add
@@ -11,7 +11,7 @@ import axion.common.operation.DeleteEntitiesOperation
 import axion.common.operation.EditOperation
 import axion.common.operation.SymmetryBlockPlacement
 import axion.common.operation.SymmetryPlacementOperation
-import net.minecraft.block.Blocks
+import net.minecraft.world.level.block.Blocks
 
 /**
  * Shared "clear this region" dispatch.
@@ -45,7 +45,7 @@ object RegionEraseService {
             clipboard.cells.map { cell ->
                 SymmetryBlockPlacement(
                     pos = region.minCorner().add(cell.offset),
-                    state = Blocks.AIR.defaultState,
+                    state = Blocks.AIR.defaultBlockState,
                     blockEntityData = null,
                 )
             },

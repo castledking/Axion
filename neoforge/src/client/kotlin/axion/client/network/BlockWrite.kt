@@ -1,8 +1,8 @@
 package axion.client.network
 
 import axion.common.model.BlockEntityDataSnapshot
-import net.minecraft.block.BlockState
-import net.minecraft.util.math.BlockPos
+import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.core.BlockPos
 
 data class BlockWrite(
     val pos: BlockPos,

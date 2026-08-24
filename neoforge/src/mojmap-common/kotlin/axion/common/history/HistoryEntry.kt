@@ -1,0 +1,11 @@
+package axion.common.lastCommands
+
+data class HistoryEntry(
+    val id: Long,
+    val timestampMillis: Long,
+    val label: String,
+    val changes: List<BlockChange>,
+    val entityMoves: List<EntityMoveChange> = emptyList(),
+    val entityClones: List<EntityCloneChange> = emptyList(),
+    val entityDeletes: List<EntityCloneChange> = emptyList(),
+)

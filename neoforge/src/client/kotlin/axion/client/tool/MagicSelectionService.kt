@@ -1,16 +1,16 @@
-package axion.client.tool
+package axion.client.itemStack
 
 import axion.client.config.AxionClientConfig
 import axion.client.network.BlockEntitySnapshotService
 import axion.common.model.BlockRegion
 import axion.common.model.ClipboardBuffer
 import axion.common.model.ClipboardCell
-import net.minecraft.block.BlockState
-import net.minecraft.registry.Registries
-import net.minecraft.util.math.BlockPos
-import net.minecraft.util.math.Direction
-import net.minecraft.util.math.Vec3i
-import net.minecraft.world.World
+import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.core.registries.BuiltInRegistries
+import net.minecraft.core.BlockPos
+import net.minecraft.core.Direction
+import net.minecraft.core.Vec3i
+import net.minecraft.world.level.Level
 import axion.client.compat.toImmutable
 import axion.client.compat.add
 import java.util.ArrayDeque
@@ -41,7 +41,7 @@ object MagicSelectionService {
         return brushRadius
     }
 
-    fun select(world: World, center: BlockPos, radius: Int = brushRadius): Result? {
+    fun select(world: Level, center: BlockPos, radius: Int = brushRadius): Result? {
         val radiusSquared = radius * radius
         val seedState = world.getBlockState(center)
         if (seedState.isAir) {
@@ -125,7 +125,7 @@ object MagicSelectionService {
     }
 
     private fun collectConnectedSelection(
-        world: World,
+        world: Level,
         center: BlockPos,
         radiusSquared: Int,
         seedState: BlockState,
@@ -148,7 +148,7 @@ object MagicSelectionService {
             selected += pos
 
             Direction.entries.forEach { direction ->
-                val next = pos.add(direction.vector).toImmutable()
+                val next = pos.add(direction.extents).toImmutable()
                 if (next in visited || !withinRadius(centerPos, next, radiusSquared)) {
                     return@forEach
                 }
@@ -203,14 +203,14 @@ object MagicSelectionService {
         if (seedId in template.customBlockIds) {
             return true
         }
-        if (template.rules().any { rule -> rule.includes(seedState) }) {
+        if (template.rules().any { rule -> rule.contains(seedState) }) {
             return true
         }
         return template.selectedCustomMaskIds
             .mapNotNull(AxionClientConfig::customMaskById)
             .any { mask ->
                 seedId !in mask.excludedBlockIds &&
-                    (seedId in mask.customBlockIds || mask.rules().any { rule -> rule.includes(seedState) })
+                    (seedId in mask.customBlockIds || mask.rules().any { rule -> rule.contains(seedState) })
             }
     }
 
@@ -220,7 +220,7 @@ object MagicSelectionService {
         candidateState: BlockState,
     ): Boolean {
         return groupMatches(
-            ruleMatcher = { state -> template.rules().any { rule -> rule.includes(state) } },
+            ruleMatcher = { state -> template.rules().any { rule -> rule.contains(state) } },
             customBlockIds = template.customBlockIds,
             excludedBlockIds = emptySet(),
             seedState = seedState,
@@ -234,7 +234,7 @@ object MagicSelectionService {
         candidateState: BlockState,
     ): Boolean {
         return groupMatches(
-            ruleMatcher = { state -> mask.rules().any { rule -> rule.includes(state) } },
+            ruleMatcher = { state -> mask.rules().any { rule -> rule.contains(state) } },
             customBlockIds = mask.customBlockIds,
             excludedBlockIds = mask.excludedBlockIds,
             seedState = seedState,
@@ -279,5 +279,5 @@ object MagicSelectionService {
         return seedId in customBlockIds && candidateId in customBlockIds
     }
 
-    private fun blockId(state: BlockState): String = Registries.BLOCK.getId(state.block).toString()
+    private fun blockId(state: BlockState): String = BuiltInRegistries.BLOCK.getId(state.block).toString()
 }

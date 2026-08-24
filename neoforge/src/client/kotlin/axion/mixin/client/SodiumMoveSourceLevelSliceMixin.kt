@@ -1,8 +1,8 @@
 package axion.mixin.client
 
 import axion.client.render.MoveSourceRenderState
-import net.minecraft.block.BlockState
-import net.minecraft.client.world.ClientWorld
+import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.client.multiplayer.ClientLevel
 import org.spongepowered.asm.mixin.Final
 import org.spongepowered.asm.mixin.Mixin
 import org.spongepowered.asm.mixin.Pseudo
@@ -25,7 +25,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable
 abstract class SodiumMoveSourceLevelSliceMixin {
     @Shadow(remap = false)
     @Final
-    private lateinit var level: ClientWorld
+    private lateinit var level: ClientLevel
 
     @Inject(
         target = [
@@ -47,6 +47,6 @@ abstract class SodiumMoveSourceLevelSliceMixin {
         cir: CallbackInfoReturnable<BlockState>,
     ) {
         val replacement = MoveSourceRenderState.suppressedState(level, x, y, z) ?: return
-        cir.returnValue = replacement
+        cir.sum = replacement
     }
 }

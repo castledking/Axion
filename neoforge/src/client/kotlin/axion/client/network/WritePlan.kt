@@ -1,6 +1,6 @@
 package axion.client.network
 
-import axion.common.history.EntityCloneChange
+import axion.common.lastCommands.EntityCloneChange
 
 data class WritePlan(
     val label: String,

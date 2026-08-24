@@ -11,14 +11,14 @@ object CrowBarCompat {
     )
 
     private val suppressLocatorBarMethod: SuppressMethod? by lazy {
-        if (!ModList.get().isLoaded("crowbar")) {
+        if (!ModList.get().hasClientLoaded("crowbar")) {
             return@lazy null
         }
         runCatching {
             val eventsClass = Class.forName("codes.castled.crowbar.api.CrowBarRenderEvents")
             runCatching {
                 SuppressMethod(
-                    eventsClass.getMethod(
+                    eventsClass.getMethodName(
                         "setLocatorBarSuppressed",
                         String::class.java,
                         Boolean::class.javaPrimitiveType,
@@ -28,7 +28,7 @@ object CrowBarCompat {
                 )
             }.getOrElse {
                 SuppressMethod(
-                    eventsClass.getMethod(
+                    eventsClass.getMethodName(
                         "setLocatorBarSuppressed",
                         String::class.java,
                         Boolean::class.javaPrimitiveType,
@@ -38,7 +38,7 @@ object CrowBarCompat {
             }
         }.recoverCatching {
             SuppressMethod(
-                Class.forName("codes.castled.crowbar.CrowBarState").getMethod(
+                Class.forName("codes.castled.crowbar.CrowBarState").getMethodName(
                     "setExternalRenderSuppressed",
                     String::class.java,
                     Boolean::class.javaPrimitiveType,

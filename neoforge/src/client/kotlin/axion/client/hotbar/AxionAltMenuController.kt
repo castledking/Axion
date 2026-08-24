@@ -7,13 +7,13 @@ import axion.client.compat.VersionCompatImpl
 import axion.client.config.AxionClientConfig
 import axion.client.config.AxionConfigScreen
 import axion.client.input.AxionModifierKeys
-import axion.client.tool.AxionToolSelectionController
+import axion.client.itemStack.AxionToolSelectionController
 import axion.common.compat.VersionCompat
 import axion.common.model.AxionSubtool
-import net.minecraft.client.MinecraftClient
-import net.minecraft.text.Text
-import net.minecraft.item.ItemStack
-import net.minecraft.util.Arm
+import net.minecraft.client.Minecraft
+import net.minecraft.network.chat.Component
+import net.minecraft.world.item.ItemStack
+import net.minecraft.world.entity.HumanoidArm
 import java.util.Base64
 import org.lwjgl.glfw.GLFW
 
@@ -27,19 +27,19 @@ object AxionAltMenuController {
     private var grabbedSlotIndex: Int = -1
     private var grabbedFromLive: Boolean = false
 
-    fun isActive(client: MinecraftClient): Boolean {
-        return client.currentScreen == null &&
+    fun isActive(client: Minecraft): Boolean {
+        return client.screen == null &&
             AxionToolSelectionController.isAxionSelected() &&
             AxionModifierKeys.isAltDown(client) &&
             !LitematicaCompat.isHoldingConfiguredTool(client)
     }
 
-    fun isAnyAltOverlayActive(client: MinecraftClient): Boolean {
+    fun isAnyAltOverlayActive(client: Minecraft): Boolean {
         return isActive(client) || SavedHotbarController.isOverlayActive(client)
     }
 
-    fun onEndTick(client: MinecraftClient) {
-        if (client.currentScreen != null) {
+    fun onEndTick(client: Minecraft) {
+        if (client.screen != null) {
             restoreGrabbedItem(client)
             CrowBarCompat.setLocatorBarSuppressed(false)
             return
@@ -47,14 +47,14 @@ object AxionAltMenuController {
 
         // Handle continuous slider dragging
         if (isDraggingSlider) {
-            handleFlyingSpeedSliderDrag(client, client.window.scaledWidth, client.window.scaledHeight)
+            handleFlyingSpeedSliderDrag(client, client.window.guiScaledWidth, client.window.guiScaledHeight)
         }
 
         val active = isAnyAltOverlayActive(client)
         CrowBarCompat.setLocatorBarSuppressed(active, keepVanillaLocatorBar = false)
         if (active) {
-            if (client.mouse.isCursorLocked) {
-                client.mouse.unlockCursor()
+            if (client.mouse.isMouseGrabbed) {
+                client.mouse.releaseMouse()
                 cursorUnlockedByAxion = true
             }
             return
@@ -63,13 +63,13 @@ object AxionAltMenuController {
         // Restore any grabbed item when overlay closes
         restoreGrabbedItem(client)
 
-        if (cursorUnlockedByAxion && !client.mouse.isCursorLocked) {
-            client.mouse.lockCursor()
+        if (cursorUnlockedByAxion && !client.mouse.isMouseGrabbed) {
+            client.mouse.grabMouse()
         }
         cursorUnlockedByAxion = false
     }
 
-    fun hoveredSubtool(client: MinecraftClient, screenWidth: Int, screenHeight: Int): AxionSubtool? {
+    fun hoveredSubtool(client: Minecraft, screenWidth: Int, screenHeight: Int): AxionSubtool? {
         if (!isActive(client)) {
             return null
         }
@@ -82,7 +82,7 @@ object AxionAltMenuController {
         )
     }
 
-    fun isHoveringMiddleClickToggle(client: MinecraftClient, screenWidth: Int, screenHeight: Int): Boolean {
+    fun isHoveringMiddleClickToggle(client: Minecraft, screenWidth: Int, screenHeight: Int): Boolean {
         if (!isActive(client)) {
             return false
         }
@@ -95,7 +95,7 @@ object AxionAltMenuController {
         )
     }
 
-    fun isHoveringFinishTesting(client: MinecraftClient, screenWidth: Int, screenHeight: Int): Boolean {
+    fun isHoveringFinishTesting(client: Minecraft, screenWidth: Int, screenHeight: Int): Boolean {
         if (!isAnyAltOverlayActive(client) || !AxionDevTestSession.isActive) {
             return false
         }
@@ -116,7 +116,7 @@ object AxionAltMenuController {
         )
     }
 
-    fun isHoveringKeepExistingToggle(client: MinecraftClient, screenWidth: Int, screenHeight: Int): Boolean {
+    fun isHoveringKeepExistingToggle(client: Minecraft, screenWidth: Int, screenHeight: Int): Boolean {
         if (!isActive(client)) {
             return false
         }
@@ -129,7 +129,7 @@ object AxionAltMenuController {
         )
     }
 
-    fun isHoveringCopyEntitiesToggle(client: MinecraftClient, screenWidth: Int, screenHeight: Int): Boolean {
+    fun isHoveringCopyEntitiesToggle(client: Minecraft, screenWidth: Int, screenHeight: Int): Boolean {
         if (!isActive(client)) {
             return false
         }
@@ -142,7 +142,7 @@ object AxionAltMenuController {
         )
     }
 
-    fun isHoveringCopyAirToggle(client: MinecraftClient, screenWidth: Int, screenHeight: Int): Boolean {
+    fun isHoveringCopyAirToggle(client: Minecraft, screenWidth: Int, screenHeight: Int): Boolean {
         if (!isActive(client)) {
             return false
         }
@@ -156,7 +156,7 @@ object AxionAltMenuController {
     }
 
     fun hoveringSavedHotbarPageButton(
-        client: MinecraftClient,
+        client: Minecraft,
         screenWidth: Int,
         screenHeight: Int,
     ): AxionHudLayout.SavedHotbarPageButtonBounds? {
@@ -174,7 +174,7 @@ object AxionAltMenuController {
     }
 
     fun hoveringSavedHotbarActionButton(
-        client: MinecraftClient,
+        client: Minecraft,
         screenWidth: Int,
         screenHeight: Int,
     ): AxionHudLayout.SavedHotbarActionButtonBounds? {
@@ -192,7 +192,7 @@ object AxionAltMenuController {
     }
 
     fun hoveringSavedHotbarRow(
-        client: MinecraftClient,
+        client: Minecraft,
         screenWidth: Int,
         screenHeight: Int,
     ): AxionHudLayout.SavedHotbarRowBounds? {
@@ -211,18 +211,18 @@ object AxionAltMenuController {
 
     private var isDraggingSlider: Boolean = false
 
-    fun isHoveringFlyingSpeedTrack(client: MinecraftClient, screenWidth: Int, screenHeight: Int): Boolean {
+    fun isHoveringFlyingSpeedTrack(client: Minecraft, screenWidth: Int, screenHeight: Int): Boolean {
         if (!SavedHotbarController.isOverlayActive(client)) {
             return false
         }
         val bounds = AxionHudLayout.flyingSpeedSliderBounds(screenWidth, screenHeight, SavedHotbarController.selectedPage())
-        return bounds.track.contains(
+        return bounds.connect.contains(
             VersionCompatImpl.getScaledMouseX(client),
             VersionCompatImpl.getScaledMouseY(client),
         )
     }
 
-    fun isHoveringFlyingSpeedPlusButton(client: MinecraftClient, screenWidth: Int, screenHeight: Int): Boolean {
+    fun isHoveringFlyingSpeedPlusButton(client: Minecraft, screenWidth: Int, screenHeight: Int): Boolean {
         if (!SavedHotbarController.isOverlayActive(client)) {
             return false
         }
@@ -233,7 +233,7 @@ object AxionAltMenuController {
         )
     }
 
-    fun isHoveringFlyingSpeedMinusButton(client: MinecraftClient, screenWidth: Int, screenHeight: Int): Boolean {
+    fun isHoveringFlyingSpeedMinusButton(client: Minecraft, screenWidth: Int, screenHeight: Int): Boolean {
         if (!SavedHotbarController.isOverlayActive(client)) {
             return false
         }
@@ -244,7 +244,7 @@ object AxionAltMenuController {
         )
     }
 
-    fun isHoveringToolboxButton(client: MinecraftClient, screenWidth: Int, screenHeight: Int): Boolean {
+    fun isHoveringToolboxButton(client: Minecraft, screenWidth: Int, screenHeight: Int): Boolean {
         if (!SavedHotbarController.isOverlayActive(client)) {
             return false
         }
@@ -257,19 +257,19 @@ object AxionAltMenuController {
             mouseY < bounds.y + bounds.size
     }
 
-    fun isHoveringBinSlot(client: MinecraftClient, screenWidth: Int, screenHeight: Int): Boolean {
+    fun isHoveringBinSlot(client: Minecraft, screenWidth: Int, screenHeight: Int): Boolean {
         if (!SavedHotbarController.isOverlayActive(client)) return false
         val centerX = screenWidth / 2
         val mainX = when (client.options.mainArm.value) {
-            Arm.LEFT -> centerX - 109
-            Arm.RIGHT -> centerX + 109
+            HumanoidArm.LEFT -> centerX - 109
+            HumanoidArm.RIGHT -> centerX + 109
         }
         val mouseX = VersionCompatImpl.getScaledMouseX(client)
         val mouseY = VersionCompatImpl.getScaledMouseY(client)
         return mouseX >= mainX - 11 && mouseX < mainX + 13 && mouseY >= screenHeight - 22 && mouseY < screenHeight
     }
 
-    private fun findAnySlotAtPosition(client: MinecraftClient, screenWidth: Int, screenHeight: Int): Pair<Int, Int>? {
+    private fun findAnySlotAtPosition(client: Minecraft, screenWidth: Int, screenHeight: Int): Pair<Int, Int>? {
         val page = SavedHotbarController.selectedPage()
         val rows = AxionHudLayout.savedHotbarRows(screenWidth, screenHeight, page)
         val mouseX = VersionCompatImpl.getScaledMouseX(client).toInt()
@@ -287,7 +287,7 @@ object AxionAltMenuController {
         return null
     }
 
-    private fun grabItemAtSlot(client: MinecraftClient, hotbarIndex: Int, slotIndex: Int): Boolean {
+    private fun grabItemAtSlot(client: Minecraft, hotbarIndex: Int, slotIndex: Int): Boolean {
         val world = client.world ?: return false
         val player = client.player ?: return false
         val activeIndex = SavedHotbarController.activeIndex()
@@ -296,7 +296,7 @@ object AxionAltMenuController {
             if (stack.isEmpty) return false
             val copy = stack.copy()
             player.inventory.setStack(slotIndex, ItemStack.EMPTY)
-            client.interactionManager?.clickCreativeStack(ItemStack.EMPTY, 36 + slotIndex)
+            client.gameMode?.clickCreativeStack(ItemStack.EMPTY, 36 + slotIndex)
             grabbedStack = copy
             grabbedHotbarIndex = hotbarIndex
             grabbedSlotIndex = slotIndex
@@ -316,7 +316,7 @@ object AxionAltMenuController {
         }
     }
 
-    private fun placeGrabbedItemAtSlot(client: MinecraftClient, hotbarIndex: Int, slotIndex: Int): Boolean {
+    private fun placeGrabbedItemAtSlot(client: Minecraft, hotbarIndex: Int, slotIndex: Int): Boolean {
         val world = client.world ?: return false
         val player = client.player ?: return false
         val heldStack = grabbedStack
@@ -326,7 +326,7 @@ object AxionAltMenuController {
             val existing = player.inventory.getStack(slotIndex)
             val existingStack = if (existing.isEmpty) null else existing.copy()
             player.inventory.setStack(slotIndex, heldStack.copy())
-            client.interactionManager?.clickCreativeStack(heldStack.copy(), 36 + slotIndex)
+            client.gameMode?.clickCreativeStack(heldStack.copy(), 36 + slotIndex)
             if (existingStack != null) {
                 grabbedStack = existingStack
                 grabbedHotbarIndex = hotbarIndex
@@ -355,12 +355,12 @@ object AxionAltMenuController {
         return true
     }
 
-    private fun restoreGrabbedItem(client: MinecraftClient) {
+    private fun restoreGrabbedItem(client: Minecraft) {
         if (grabbedStack.isEmpty) return
         val player = client.player ?: return cancelGrab()
         if (grabbedFromLive) {
             player.inventory.setStack(grabbedSlotIndex, grabbedStack.copy())
-            client.interactionManager?.clickCreativeStack(grabbedStack.copy(), 36 + grabbedSlotIndex)
+            client.gameMode?.clickCreativeStack(grabbedStack.copy(), 36 + grabbedSlotIndex)
         } else if (grabbedData != null) {
             SavedHotbarController.setSlotItem(grabbedHotbarIndex, grabbedSlotIndex, grabbedData)
         } else {
@@ -382,7 +382,7 @@ object AxionAltMenuController {
         grabbedFromLive = false
     }
 
-    fun handleFlyingSpeedSliderDrag(client: MinecraftClient, screenWidth: Int, screenHeight: Int) {
+    fun handleFlyingSpeedSliderDrag(client: Minecraft, screenWidth: Int, screenHeight: Int) {
         if (!isDraggingSlider) return
         val bounds = AxionHudLayout.flyingSpeedSliderBounds(screenWidth, screenHeight, SavedHotbarController.selectedPage())
         val mouseY = VersionCompatImpl.getScaledMouseY(client)
@@ -390,8 +390,8 @@ object AxionAltMenuController {
         AxionClientState.updateFlySpeedMultiplier(newValue)
     }
 
-    fun handleFlyingSpeedSliderScroll(client: MinecraftClient, scrollDelta: Double): Boolean {
-        if (!isHoveringFlyingSpeedTrack(client, client.window.scaledWidth, client.window.scaledHeight)) {
+    fun handleFlyingSpeedSliderScroll(client: Minecraft, scrollDelta: Double): Boolean {
+        if (!isHoveringFlyingSpeedTrack(client, client.window.guiScaledWidth, client.window.guiScaledHeight)) {
             return false
         }
         val currentValue = AxionClientState.flySpeedMultiplier
@@ -426,13 +426,13 @@ object AxionAltMenuController {
         }
     }
 
-    private fun handleCapabilityClick(client: MinecraftClient): Boolean {
-        val screenWidth = client.window.scaledWidth
-        val screenHeight = client.window.scaledHeight
+    private fun handleCapabilityClick(client: Minecraft): Boolean {
+        val screenWidth = client.window.guiScaledWidth
+        val screenHeight = client.window.guiScaledHeight
         val centerX = screenWidth / 2
         val offX = when (client.options.mainArm.value) {
-            Arm.LEFT -> centerX + 107
-            Arm.RIGHT -> centerX - 107
+            HumanoidArm.LEFT -> centerX + 107
+            HumanoidArm.RIGHT -> centerX - 107
         }
         val mouseX = VersionCompatImpl.getScaledMouseX(client)
         val mouseY = VersionCompatImpl.getScaledMouseY(client)
@@ -460,7 +460,7 @@ object AxionAltMenuController {
                     if (player != null) {
                         VersionCompat.INSTANCE.playerSendMessage(
                             player,
-                            Text.literal("${if (enabled) "Enabled" else "Disabled"}: $name"),
+                            Component.literal("${if (enabled) "Enabled" else "Disabled"}: $name"),
                             true,
                         )
                     }
@@ -471,18 +471,18 @@ object AxionAltMenuController {
         return false
     }
 
-    fun handleMouseButton(client: MinecraftClient, button: Int, action: Int): Boolean {
+    fun handleMouseButton(client: Minecraft, button: Int, action: Int): Boolean {
         if (SavedHotbarController.isOverlayActive(client)) {
-            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && action == GLFW.GLFW_PRESS) {
-                if (isHoveringFinishTesting(client, client.window.scaledWidth, client.window.scaledHeight)) {
+            if (button == GLFW.MOUSE_BUTTON_LEFT && action == GLFW.PRESS) {
+                if (isHoveringFinishTesting(client, client.window.guiScaledWidth, client.window.guiScaledHeight)) {
                     VanillaHudButtonStore.click(client, VanillaHudButtonStore.FINISH_TESTING, button)
                     AxionDevTestSession.finish(client)
                     return true
                 }
                 hoveringSavedHotbarActionButton(
                     client,
-                    client.window.scaledWidth,
-                    client.window.scaledHeight,
+                    client.window.guiScaledWidth,
+                    client.window.guiScaledHeight,
                 )?.let { actionButton ->
                     VanillaHudButtonStore.click(
                         client,
@@ -497,7 +497,7 @@ object AxionAltMenuController {
                     return true
                 }
 
-                val slot = findAnySlotAtPosition(client, client.window.scaledWidth, client.window.scaledHeight)
+                val slot = findAnySlotAtPosition(client, client.window.guiScaledWidth, client.window.guiScaledHeight)
 
                 if (slot != null) {
                     if (!grabbedStack.isEmpty) {
@@ -509,31 +509,31 @@ object AxionAltMenuController {
                     }
                 }
 
-                if (!grabbedStack.isEmpty && isHoveringBinSlot(client, client.window.scaledWidth, client.window.scaledHeight)) {
+                if (!grabbedStack.isEmpty && isHoveringBinSlot(client, client.window.guiScaledWidth, client.window.guiScaledHeight)) {
                     cancelGrab()
                     return true
                 }
 
-                if (grabbedStack.isEmpty && isHoveringBinSlot(client, client.window.scaledWidth, client.window.scaledHeight) && AxionModifierKeys.isShiftDown(client)) {
+                if (grabbedStack.isEmpty && isHoveringBinSlot(client, client.window.guiScaledWidth, client.window.guiScaledHeight) && AxionModifierKeys.isShiftDown(client)) {
                     SavedHotbarController.clearPage(SavedHotbarController.selectedPage())
                     return true
                 }
 
-                if (isHoveringFlyingSpeedPlusButton(client, client.window.scaledWidth, client.window.scaledHeight)) {
+                if (isHoveringFlyingSpeedPlusButton(client, client.window.guiScaledWidth, client.window.guiScaledHeight)) {
                     val newValue = (AxionClientState.flySpeedMultiplier + 0.5f).coerceAtMost(9.99f)
                     AxionClientState.updateFlySpeedMultiplier(newValue)
                     return true
                 }
 
-                if (isHoveringFlyingSpeedMinusButton(client, client.window.scaledWidth, client.window.scaledHeight)) {
+                if (isHoveringFlyingSpeedMinusButton(client, client.window.guiScaledWidth, client.window.guiScaledHeight)) {
                     val newValue = (AxionClientState.flySpeedMultiplier - 0.5f).coerceAtLeast(1.0f)
                     AxionClientState.updateFlySpeedMultiplier(newValue)
                     return true
                 }
 
-                if (isHoveringFlyingSpeedTrack(client, client.window.scaledWidth, client.window.scaledHeight)) {
+                if (isHoveringFlyingSpeedTrack(client, client.window.guiScaledWidth, client.window.guiScaledHeight)) {
                     isDraggingSlider = true
-                    handleFlyingSpeedSliderDrag(client, client.window.scaledWidth, client.window.scaledHeight)
+                    handleFlyingSpeedSliderDrag(client, client.window.guiScaledWidth, client.window.guiScaledHeight)
                     return true
                 }
 
@@ -541,7 +541,7 @@ object AxionAltMenuController {
                     return true
                 }
 
-                if (isHoveringToolboxButton(client, client.window.scaledWidth, client.window.scaledHeight)) {
+                if (isHoveringToolboxButton(client, client.window.guiScaledWidth, client.window.guiScaledHeight)) {
                     cursorUnlockedByAxion = false
                     isDraggingSlider = false
                     client.setScreen(AxionConfigScreen(null))
@@ -550,8 +550,8 @@ object AxionAltMenuController {
 
                 hoveringSavedHotbarPageButton(
                     client,
-                    client.window.scaledWidth,
-                    client.window.scaledHeight,
+                    client.window.guiScaledWidth,
+                    client.window.guiScaledHeight,
                 )?.let { buttonBounds ->
                     SavedHotbarController.changePage(buttonBounds.direction)
                     return true
@@ -559,19 +559,19 @@ object AxionAltMenuController {
 
                 hoveringSavedHotbarRow(
                     client,
-                    client.window.scaledWidth,
-                    client.window.scaledHeight,
+                    client.window.guiScaledWidth,
+                    client.window.guiScaledHeight,
                 )?.let { rowBounds ->
                     SavedHotbarController.selectHotbar(rowBounds.index)
                 }
             }
 
-            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && action == GLFW.GLFW_RELEASE) {
+            if (button == GLFW.MOUSE_BUTTON_LEFT && action == GLFW.RELEASE) {
                 isDraggingSlider = false
             }
 
             if (isDraggingSlider) {
-                handleFlyingSpeedSliderDrag(client, client.window.scaledWidth, client.window.scaledHeight)
+                handleFlyingSpeedSliderDrag(client, client.window.guiScaledWidth, client.window.guiScaledHeight)
             }
             return true
         }
@@ -580,36 +580,36 @@ object AxionAltMenuController {
             return false
         }
 
-        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && action == GLFW.GLFW_PRESS) {
-            if (isHoveringFinishTesting(client, client.window.scaledWidth, client.window.scaledHeight)) {
+        if (button == GLFW.MOUSE_BUTTON_LEFT && action == GLFW.PRESS) {
+            if (isHoveringFinishTesting(client, client.window.guiScaledWidth, client.window.guiScaledHeight)) {
                 VanillaHudButtonStore.click(client, VanillaHudButtonStore.FINISH_TESTING, button)
                 AxionDevTestSession.finish(client)
                 return true
             }
-            if (isHoveringMiddleClickToggle(client, client.window.scaledWidth, client.window.scaledHeight)) {
+            if (isHoveringMiddleClickToggle(client, client.window.guiScaledWidth, client.window.guiScaledHeight)) {
                 VanillaHudButtonStore.click(client, VanillaHudButtonStore.MIDDLE_CLICK, button)
                 AxionClientState.updateMiddleClickMagicSelect(!AxionClientState.middleClickMagicSelectEnabled)
                 return true
             }
-            if (isHoveringKeepExistingToggle(client, client.window.scaledWidth, client.window.scaledHeight)) {
+            if (isHoveringKeepExistingToggle(client, client.window.guiScaledWidth, client.window.guiScaledHeight)) {
                 VanillaHudButtonStore.click(client, VanillaHudButtonStore.KEEP_EXISTING, button)
                 AxionClientState.updateKeepExisting(!AxionClientState.keepExistingEnabled)
                 return true
             }
-            if (isHoveringCopyEntitiesToggle(client, client.window.scaledWidth, client.window.scaledHeight)) {
+            if (isHoveringCopyEntitiesToggle(client, client.window.guiScaledWidth, client.window.guiScaledHeight)) {
                 VanillaHudButtonStore.click(client, VanillaHudButtonStore.COPY_ENTITIES, button)
                 AxionClientState.updateCopyEntities(!AxionClientState.copyEntitiesEnabled)
                 return true
             }
-            if (isHoveringCopyAirToggle(client, client.window.scaledWidth, client.window.scaledHeight)) {
+            if (isHoveringCopyAirToggle(client, client.window.guiScaledWidth, client.window.guiScaledHeight)) {
                 VanillaHudButtonStore.click(client, VanillaHudButtonStore.COPY_AIR, button)
                 AxionClientState.updateCopyAir(!AxionClientState.copyAirEnabled)
                 return true
             }
             hoveredSubtool(
                 client = client,
-                screenWidth = client.window.scaledWidth,
-                screenHeight = client.window.scaledHeight,
+                screenWidth = client.window.guiScaledWidth,
+                screenHeight = client.window.guiScaledHeight,
             )?.let(AxionToolSelectionController::selectSubtool)
         }
         return true

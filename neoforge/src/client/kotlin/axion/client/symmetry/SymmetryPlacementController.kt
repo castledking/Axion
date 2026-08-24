@@ -6,14 +6,14 @@ import axion.client.mode.AxionCapabilityPolicy
 import axion.client.mode.BuildPlacementService
 import axion.client.mode.InfiniteReachInteractionPolicy
 import axion.client.mode.ModeTargeting
-import axion.client.tool.AxionToolSelectionController
+import axion.client.itemStack.AxionToolSelectionController
 import axion.client.symmetry.SymmetryAwareOperationDispatcher
 import axion.common.model.SymmetryConfig
 import axion.common.model.SymmetryState
 import axion.protocol.AxionInteractionOrigin
-import net.minecraft.client.MinecraftClient
-import net.minecraft.sound.SoundCategory
-import net.minecraft.util.Hand
+import net.minecraft.client.Minecraft
+import net.minecraft.sounds.SoundSource
+import net.minecraft.world.InteractionHand
 
 object SymmetryPlacementController {
     private val dispatcher = SymmetryAwareOperationDispatcher(
@@ -24,12 +24,12 @@ object SymmetryPlacementController {
         suppressBlockUpdates = AxionCapabilityPolicy::suppressBlockUpdates,
     )
 
-    fun updatePreview(client: MinecraftClient): Boolean {
+    fun updatePreview(client: Minecraft): Boolean {
         AxionClientState.updateSymmetryPreview(null)
         return false
     }
 
-    fun handleUse(client: MinecraftClient): Boolean {
+    fun handleUse(client: Minecraft): Boolean {
         if (!AxionToolSelectionController.isCreativeModeAllowed()) {
             return false
         }
@@ -51,7 +51,7 @@ object SymmetryPlacementController {
         if (InfiniteReachInteractionPolicy.shouldYieldToVanilla(
                 infiniteReachEnabled = state.infiniteReachEnabled,
                 replaceModeEnabled = false,
-                vanillaTargetPresent = client.crosshairTarget?.type?.name?.let { it != "MISS" } == true,
+                vanillaTargetPresent = client.hitResult?.type?.name?.let { it != "MISS" } == true,
                 axionOwnsPlacement = state.forcePlaceEnabled || state.noUpdatesEnabled,
             )
         ) {
@@ -77,7 +77,7 @@ object SymmetryPlacementController {
             AxionInteractionOrigin.INFINITE_REACH -> infiniteReachDispatcher
         }.dispatch(operation)
         playPlacementEffects(client, operation)
-        client.player?.swingHand(Hand.MAIN_HAND)
+        client.player?.swing(InteractionHand.MAIN_HAND)
         return true
     }
 
@@ -89,7 +89,7 @@ object SymmetryPlacementController {
     }
 
     private fun playPlacementEffects(
-        client: MinecraftClient,
+        client: Minecraft,
         operation: axion.common.operation.SymmetryPlacementOperation,
     ) {
         val world = client.world ?: return
@@ -101,7 +101,7 @@ object SymmetryPlacementController {
                 placement.pos.y + 0.5,
                 placement.pos.z + 0.5,
                 soundGroup.placeSound,
-                SoundCategory.BLOCKS,
+                SoundSource.BLOCKS,
                 (soundGroup.volume + 1.0f) / 2.0f,
                 soundGroup.pitch * 0.8f,
             )

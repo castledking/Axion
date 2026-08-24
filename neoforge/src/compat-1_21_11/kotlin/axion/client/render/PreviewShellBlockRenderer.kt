@@ -2,8 +2,8 @@ package axion.client.render
 import axion.client.compat.CameraAccess
 
 import axion.common.model.ClipboardBuffer
-import net.minecraft.client.MinecraftClient
-import net.minecraft.util.math.BlockPos
+import net.minecraft.client.Minecraft
+import net.minecraft.core.BlockPos
 
 /**
  * Renders preview blocks using AxionPreviewMeshCache for surface-block filtering
@@ -27,7 +27,7 @@ object PreviewShellBlockRenderer {
             return false
         }
 
-        val client = MinecraftClient.getInstance()
+        val client = Minecraft.getInstance()
         val world = client.world ?: return false
         val camera = client.gameRenderer.camera ?: return false
         val cameraPos = CameraAccess.getPos(camera)
@@ -77,7 +77,7 @@ object PreviewShellBlockRenderer {
         return rendered > 0
     }
 
-    private fun applyScale(matrixStack: net.minecraft.client.util.math.MatrixStack, scale: Float) {
+    private fun applyScale(matrixStack: com.mojang.blaze3d.addVertex.PoseStack, scale: Float) {
         if (scale == 1.0f) {
             return
         }

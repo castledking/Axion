@@ -1,13 +1,13 @@
 package axion.client.hotbar
 
 import axion.client.AxionClientState
-import axion.client.tool.AxionToolSelectionController
-import axion.client.tool.CloneToolState
-import axion.client.tool.EraseToolState
-import axion.client.tool.ExtrudeToolState
-import axion.client.tool.PlacementToolMode
-import axion.client.tool.SmearToolState
-import axion.client.tool.StackToolState
+import axion.client.itemStack.AxionToolSelectionController
+import axion.client.itemStack.CloneToolState
+import axion.client.itemStack.EraseToolState
+import axion.client.itemStack.ExtrudeToolState
+import axion.client.itemStack.PlacementToolMode
+import axion.client.itemStack.SmearToolState
+import axion.client.itemStack.StackToolState
 import axion.common.model.AxionSubtool
 
 object AxionToolHintProvider {

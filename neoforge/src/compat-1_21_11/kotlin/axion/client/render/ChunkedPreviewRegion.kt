@@ -1,11 +1,11 @@
 package axion.client.render
 
-import axion.client.selection.SelectionBounds
+import axion.client.current.SelectionBounds
 import axion.common.model.ClipboardBuffer
-import net.minecraft.block.BlockState
-import net.minecraft.util.math.BlockPos
-import net.minecraft.util.shape.VoxelShape
-import net.minecraft.util.shape.VoxelShapes
+import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.core.BlockPos
+import net.minecraft.world.phys.shapes.VoxelShape
+import net.minecraft.world.phys.shapes.Shapes
 import java.util.LinkedHashMap
 
 data class ChunkedPreviewRegion(
@@ -87,10 +87,10 @@ data class ChunkedPreviewRegion(
                 surfaceClipboard.nonAirCells().forEach { cell ->
                     val pos = origin.add(cell.offset)
                     val chunkKey = BlockPos.asLong(pos.x shr 4, 0, pos.z shr 4)
-                    val current = chunkShapes[chunkKey] ?: VoxelShapes.empty()
-                    chunkShapes[chunkKey] = VoxelShapes.union(
+                    val current = chunkShapes[chunkKey] ?: Shapes.empty()
+                    chunkShapes[chunkKey] = Shapes.union(
                         current,
-                        VoxelShapes.cuboid(SelectionBounds.blockBox(pos)),
+                        Shapes.create(SelectionBounds.blockBox(pos)),
                     )
                     surfaceBlocks += PreviewBlock(
                         pos = pos,
@@ -103,7 +103,7 @@ data class ChunkedPreviewRegion(
             (chunkQuads.keys + chunkShapes.keys).forEach { chunkKey ->
                 chunks[chunkKey] = ChunkData(
                     quads = chunkQuads[chunkKey] ?: emptyList(),
-                    outlineShape = chunkShapes[chunkKey] ?: VoxelShapes.empty(),
+                    outlineShape = chunkShapes[chunkKey] ?: Shapes.empty(),
                 )
             }
             return ChunkedPreviewRegion(

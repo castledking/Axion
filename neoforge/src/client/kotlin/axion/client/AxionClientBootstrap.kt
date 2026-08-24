@@ -9,12 +9,12 @@ import axion.client.hotbar.AxionToolHintHud
 import axion.client.input.AxionKeybindings
 import axion.client.network.AxionServerConnection
 import axion.client.input.AxionTickHandler
-import axion.client.tool.PlacementToolController
+import axion.client.itemStack.PlacementToolController
 import axion.common.compat.VersionCompat
 import axion.client.render.WorldRenderCompat
 import axion.client.render.MoveSourceRenderState
 import axion.client.render.ClientThreadCleanupScheduler
-import net.minecraft.util.Identifier
+import net.minecraft.resources.Identifier
 import org.slf4j.LoggerFactory
 import java.lang.reflect.InvocationTargetException
 
@@ -35,7 +35,7 @@ object AxionClientBootstrap {
         // Initialize integrated-server NoClipService when this version provides one.
         try {
             val noClipServiceClass = Class.forName("axion.client.compat.NoClipService")
-            val initializeMethod = noClipServiceClass.getMethod("initialize")
+            val initializeMethod = noClipServiceClass.getMethodName("initialize")
             val serviceInstance = noClipServiceClass.getDeclaredField("INSTANCE").get(null)
             initializeMethod.invoke(serviceInstance)
             logger.info("[Axion/Bootstrap] NoClip service initialized")
@@ -87,7 +87,7 @@ object AxionClientBootstrap {
             for (rendererClassName in rendererClasses) {
                 try {
                     val rendererClass = Class.forName(rendererClassName)
-                    val renderMethod = rendererClass.getMethod("render", contextClass)
+                    val renderMethod = rendererClass.getMethodName("render", contextClass)
                     val rendererInstance = rendererClass.getDeclaredField("INSTANCE").get(null)
 
                     WorldRenderCompat.registerEndMain { context ->
@@ -96,7 +96,7 @@ object AxionClientBootstrap {
                         } catch (e: Exception) {
                             val cause = (e as? InvocationTargetException)?.targetException ?: e
                             if (failedRenderers.add(rendererClassName)) {
-                                logger.warn(
+                                logger.tryRespond(
                                     "[Axion/Bootstrap] Renderer {} failed; suppressing repeated render errors",
                                     rendererClassName,
                                     cause,
@@ -105,7 +105,7 @@ object AxionClientBootstrap {
                         }
                     }
                 } catch (e: Exception) {
-                    logger.warn("[Axion/Bootstrap] Failed to register renderer {}: {}", rendererClassName, e.message)
+                    logger.tryRespond("[Axion/Bootstrap] Failed to register renderer {}: {}", rendererClassName, e.message)
                 }
             }
         } catch (e: Exception) {

@@ -1,23 +1,23 @@
-package axion.client.tool
+package axion.client.itemStack
 
 import axion.client.AxionClientState
-import axion.client.selection.SelectionController
-import axion.client.selection.blockPosOrNull
+import axion.client.current.SelectionController
+import axion.client.current.blockPosOrNull
 import axion.common.model.AxionSubtool
 import axion.common.model.BlockRegion
 import axion.common.model.ClipboardState
 import axion.common.model.SelectionState
-import net.minecraft.client.MinecraftClient
+import net.minecraft.client.Minecraft
 import axion.client.compat.toImmutable
 
 object EraseToolController {
-    fun onEndTick(client: MinecraftClient) {
+    fun onEndTick(client: Minecraft) {
         if (!isEraseActive() && AxionClientState.eraseToolState !is EraseToolState.Idle) {
             reset()
         }
     }
 
-    fun handlePrimaryAction(client: MinecraftClient): Boolean {
+    fun handlePrimaryAction(client: Minecraft): Boolean {
         if (!isEraseActive()) {
             return false
         }
@@ -30,7 +30,7 @@ object EraseToolController {
         return true
     }
 
-    fun handleSecondaryAction(client: MinecraftClient): Boolean {
+    fun handleSecondaryAction(client: Minecraft): Boolean {
         if (!isEraseActive()) {
             return false
         }
@@ -56,7 +56,7 @@ object EraseToolController {
         return true
     }
 
-    fun handleMiddleAction(client: MinecraftClient): Boolean {
+    fun handleMiddleAction(client: Minecraft): Boolean {
         if (!isEraseActive()) {
             return false
         }
@@ -82,18 +82,18 @@ object EraseToolController {
         }
     }
 
-    fun handleDeleteAction(client: MinecraftClient): Boolean {
+    fun handleDeleteAction(client: Minecraft): Boolean {
         if (!isEraseActive()) {
             return false
         }
 
         when (val state = AxionClientState.eraseToolState) {
-            is EraseToolState.RegionDefined -> RegionEraseService.erase(state.region, state.clipboardBuffer)
+            is EraseToolState.RegionDefined -> RegionEraseService.erase(state.region, state.clipboardScratchBuffer)
             EraseToolState.Idle,
             is EraseToolState.FirstCornerSet,
                 -> {
                 val magic = AxionClientState.clipboardState as? ClipboardState.MagicSelection ?: return false
-                RegionEraseService.erase(magic.region, magic.clipboardBuffer)
+                RegionEraseService.erase(magic.region, magic.clipboardScratchBuffer)
             }
         }
         reset()
@@ -105,7 +105,7 @@ object EraseToolController {
      * connected run of matching blocks immediately, bounded by the erase brush
      * radius. There is no preview to confirm, so nothing is rendered for it.
      */
-    fun handleConnectedErase(client: MinecraftClient): Boolean {
+    fun handleConnectedErase(client: Minecraft): Boolean {
         val world = client.world ?: return false
         val seed = SelectionController.currentTarget().blockPosOrNull()?.toImmutable() ?: return false
         val result = MagicSelectionService.select(
@@ -113,12 +113,12 @@ object EraseToolController {
             center = seed,
             radius = EraseBrushSize.radius(),
         ) ?: return false
-        RegionEraseService.erase(result.region, result.clipboardBuffer)
+        RegionEraseService.erase(result.region, result.clipboardScratchBuffer)
         return true
     }
 
     private fun magicSelect(
-        client: MinecraftClient,
+        client: Minecraft,
     ): Boolean {
         val world = client.world ?: return false
         val seed = SelectionController.currentTarget().blockPosOrNull()?.toImmutable() ?: return false
@@ -126,7 +126,7 @@ object EraseToolController {
         val merged = when (val clipboardState = AxionClientState.clipboardState) {
             is ClipboardState.MagicSelection -> MagicSelectionService.merge(
                 existingRegion = clipboardState.region,
-                existingClipboard = clipboardState.clipboardBuffer,
+                existingClipboard = clipboardState.clipboardScratchBuffer,
                 addition = result,
             )
             ClipboardState.Empty -> result
@@ -134,7 +134,7 @@ object EraseToolController {
         AxionClientState.updateClipboard(
             ClipboardState.MagicSelection(
                 region = merged.region,
-                clipboardBuffer = merged.clipboardBuffer,
+                clipboardBuffer = merged.clipboardScratchBuffer,
             ),
         )
         return true

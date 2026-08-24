@@ -1,6 +1,6 @@
 package axion.mixin.compat
 
-import net.minecraft.client.MinecraftClient
-import net.minecraft.client.gui.screen.Screen
+import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.screens.Screen
 
-fun currentScreenOf(client: MinecraftClient): Screen? = client.currentScreen
+fun currentScreenOf(client: Minecraft): Screen? = client.screen

@@ -1,9 +1,9 @@
 package axion.client.config
 
-import net.minecraft.block.Block
-import net.minecraft.item.Item
-import net.minecraft.item.Items
-import net.minecraft.registry.tag.BlockTags
+import net.minecraft.world.level.block.Block
+import net.minecraft.world.item.Item
+import net.minecraft.world.item.Items
+import net.minecraft.tags.BlockTags
 
 /**
  * Dyed blocks and items that Magic Select uses as rule icons, plus the one tag

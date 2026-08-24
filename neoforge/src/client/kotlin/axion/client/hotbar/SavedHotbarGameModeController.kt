@@ -4,7 +4,7 @@ import axion.client.compat.VersionCompatImpl
 import axion.client.network.AxionServerConnection
 import axion.protocol.AxionGameMode
 import axion.protocol.GameModeChangeRequest
-import net.minecraft.client.MinecraftClient
+import net.minecraft.client.Minecraft
 
 object SavedHotbarGameModeController {
     private var pendingTarget: AxionGameMode? = null
@@ -17,14 +17,14 @@ object SavedHotbarGameModeController {
         pendingTicks = 0
     }
 
-    fun onEndTick(client: MinecraftClient) {
+    fun onEndTick(client: Minecraft) {
         val target = pendingTarget ?: return
         pendingTicks += 1
         val player = client.player
         val observed = when {
             player == null -> null
             player.isSpectator -> AxionGameMode.SPECTATOR
-            axion.client.tool.AxionToolSelectionController.isCreativeModeAllowed() -> AxionGameMode.CREATIVE
+            axion.client.itemStack.AxionToolSelectionController.isCreativeModeAllowed() -> AxionGameMode.CREATIVE
             else -> AxionGameMode.SURVIVAL
         }
 
@@ -33,7 +33,7 @@ object SavedHotbarGameModeController {
         }
     }
 
-    fun request(client: MinecraftClient, action: SavedHotbarMenuAction) {
+    fun request(client: Minecraft, action: SavedHotbarMenuAction) {
         val gameModeId = action.gameModeId ?: return
         val gameMode = action.toProtocolGameMode() ?: return
         pendingTarget = gameMode

@@ -1,8 +1,8 @@
 package axion.client.render.gpu
 
 import java.util.concurrent.ConcurrentHashMap
-import net.minecraft.util.math.Vec3d
-import net.minecraft.util.math.Vec3i
+import net.minecraft.world.phys.Vec3
+import net.minecraft.core.Vec3i
 import org.joml.Matrix4f
 import org.joml.Matrix4fc
 import org.slf4j.LoggerFactory
@@ -32,7 +32,7 @@ object ChunkedPreviewLifecycle {
         val alpha: Int,
         val translationDelta: Vec3i,
         val baseModelView: Matrix4f,
-        val cameraPos: Vec3d?,
+        val cameraPos: Vec3?,
     )
 
     /**
@@ -67,7 +67,7 @@ object ChunkedPreviewLifecycle {
         alpha: Int,
         translationDelta: Vec3i,
         baseModelView: Matrix4f,
-        cameraPos: Vec3d? = null,
+        cameraPos: Vec3? = null,
     ) {
         synchronized(deferredDraws) {
             deferredDraws += DeferredDraw(session, color, alpha, translationDelta, Matrix4f(baseModelView), cameraPos)
@@ -80,7 +80,7 @@ object ChunkedPreviewLifecycle {
             ArrayList(deferredDraws).also { deferredDraws.clear() }
         }
         if (DEBUG_LOG) {
-            val now = System.currentTimeMillis()
+            val now = System.currentTimeMs()
             if (now - lastLogTime >= LOG_INTERVAL_MS) {
                 lastLogTime = now
                 logger.info(

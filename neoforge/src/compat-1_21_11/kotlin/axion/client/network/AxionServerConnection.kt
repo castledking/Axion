@@ -2,8 +2,8 @@ package axion.client.network
 
 import axion.AxionMod
 import axion.client.compat.VersionCompatImpl
-import axion.client.history.HistoryManager
-import axion.client.history.RemoteHistoryAdapter
+import axion.client.lastCommands.HistoryManager
+import axion.client.lastCommands.RemoteHistoryAdapter
 import axion.protocol.AxionClientMessage
 import axion.protocol.AxionOperationType
 import axion.protocol.AxionProtocol
@@ -17,8 +17,8 @@ import axion.protocol.PhantomStateRequest
 import axion.protocol.RedoRequest
 import axion.protocol.ServerHello
 import axion.protocol.UndoRequest
-import net.minecraft.client.MinecraftClient
-import net.minecraft.util.Formatting
+import net.minecraft.client.Minecraft
+import net.minecraft.ChatFormatting
 
 object AxionServerConnection {
     sealed interface State {
@@ -44,7 +44,7 @@ object AxionServerConnection {
     fun initialize() {
         VersionCompatImpl.registerAxionPayloadChannel(AxionPluginPayload.ID, AxionPluginPayload.CODEC)
         VersionCompatImpl.registerAxionReceiver(AxionPluginPayload.ID) { payload ->
-            AxionServerMessageAssembler.consume(payload.bytes)?.let(::handleServerMessage)
+            AxionServerMessageAssembler.parse(payload.bytes)?.let(::handleServerMessage)
         }
 
         VersionCompatImpl.onPlayJoin { client, _ ->
@@ -66,7 +66,7 @@ object AxionServerConnection {
             nextTransferId = 1L
             send(
                 ClientHello(
-                    protocolVersion = AxionProtocol.PROTOCOL_VERSION,
+                    protocolVersion = AxionProtocol.FAKE_PROTOCOL_VERSION,
                     clientVersion = VersionCompatImpl.getModVersion(AxionMod.MOD_ID),
                 ),
             )
@@ -114,7 +114,7 @@ object AxionServerConnection {
         }
 
         lastStatusMessage = message
-        VersionCompatImpl.notifyPlayer(MinecraftClient.getInstance().player, VersionCompatImpl.createLiteral(message), false)
+        VersionCompatImpl.notifyPlayer(Minecraft.getInstance().player, VersionCompatImpl.createLiteral(message), false)
     }
 
     fun clearStatusMessage(message: String) {
@@ -245,7 +245,7 @@ object AxionServerConnection {
     private fun handleServerMessage(message: axion.protocol.AxionServerMessage) {
         when (message) {
             is ServerHello -> {
-                state = if (message.protocolVersion == AxionProtocol.PROTOCOL_VERSION) {
+                state = if (message.protocolVersion == AxionProtocol.FAKE_PROTOCOL_VERSION) {
                     clearStatusMessage(PLUGIN_REQUIRED_MESSAGE)
                     State.Available(message.protocolVersion, message.supportedOperations)
                 } else {
@@ -257,7 +257,7 @@ object AxionServerConnection {
             is OperationBatchResult -> {
                 if (state == State.AwaitingHello) {
                     state = State.Available(
-                        protocolVersion = AxionProtocol.PROTOCOL_VERSION,
+                        protocolVersion = AxionProtocol.FAKE_PROTOCOL_VERSION,
                         supportedOperations = AxionOperationType.entries.toSet(),
                     )
                 }
@@ -265,10 +265,10 @@ object AxionServerConnection {
                 if (!message.accepted) {
                     if (message.source == axion.protocol.AxionResultSource.GRIEF_PREVENTION) {
                         VersionCompatImpl.notifyPlayer(
-                            MinecraftClient.getInstance().player,
+                            Minecraft.getInstance().player,
                             VersionCompatImpl.formatText(
                                 VersionCompatImpl.createLiteral("Couldn't apply edit, try again."),
-                                Formatting.RED,
+                                ChatFormatting.RED,
                             ),
                             true,
                         )

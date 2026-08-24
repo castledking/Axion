@@ -1,11 +1,11 @@
 package axion.client.compat
 
-import net.minecraft.client.MinecraftClient
+import net.minecraft.client.Minecraft
 import java.lang.reflect.Field
 
 /**
  * Reflection helper for the private `itemUseCooldown` field on
- * [MinecraftClient]. The field name has changed across versions
+ * [Minecraft]. The field name has changed across versions
  * (`itemUseCooldown` / `itemUseCooldownTicks` / `useCooldown`),
  * so we look it up by name at runtime.
  *
@@ -16,7 +16,7 @@ import java.lang.reflect.Field
  */
 object MinecraftClientAccess {
     private val itemUseCooldownField: Field? by lazy {
-        val clazz = MinecraftClient::class.java
+        val clazz = Minecraft::class.java
         sequenceOf("itemUseCooldown", "itemUseCooldownTicks", "useCooldown")
             .mapNotNull { name ->
                 try {
@@ -28,7 +28,7 @@ object MinecraftClientAccess {
             .firstOrNull()
     }
 
-    fun getItemUseCooldown(client: MinecraftClient): Int {
+    fun getItemUseCooldown(client: Minecraft): Int {
         val field = itemUseCooldownField ?: return 0
         return try {
             field.getInt(client)
@@ -37,7 +37,7 @@ object MinecraftClientAccess {
         }
     }
 
-    fun setItemUseCooldown(client: MinecraftClient, value: Int) {
+    fun setItemUseCooldown(client: Minecraft, value: Int) {
         val field = itemUseCooldownField ?: return
         try {
             field.setInt(client, value)

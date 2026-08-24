@@ -1,10 +1,10 @@
 package axion.client.render
 import axion.client.compat.CameraAccess
 
-import axion.client.selection.SelectionBounds
+import axion.client.current.SelectionBounds
 import axion.common.model.ClipboardBuffer
-import net.minecraft.client.MinecraftClient
-import net.minecraft.util.math.BlockPos
+import net.minecraft.client.Minecraft
+import net.minecraft.core.BlockPos
 
 object PreviewRegionOutlineRenderer {
     const val MAX_REGION_QUADS: Int = 16384
@@ -20,7 +20,7 @@ object PreviewRegionOutlineRenderer {
             return false
         }
 
-        val client = MinecraftClient.getInstance()
+        val client = Minecraft.getInstance()
         val camera = client.gameRenderer.camera ?: return false
         val cameraPos = CameraAccess.getPos(camera)
         val region = ChunkedPreviewRegion.getOrBuild(
@@ -29,11 +29,11 @@ object PreviewRegionOutlineRenderer {
             maxQuads = MAX_REGION_QUADS,
         )
         region.chunks.values.forEach { chunk ->
-            if (!chunk.outlineShape.isEmpty) {
+            if (!chunk.shape.isEmpty) {
                 VertexRenderingCompat.drawOutline(
                     context.matrices(),
                     context.consumers().getBuffer(RenderLayerCompat.lines()),
-                    chunk.outlineShape,
+                    chunk.shape,
                     -cameraPos.x,
                     -cameraPos.y,
                     -cameraPos.z,

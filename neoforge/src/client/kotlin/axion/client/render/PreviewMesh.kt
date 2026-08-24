@@ -1,8 +1,8 @@
 package axion.client.render
 
-import net.minecraft.block.BlockState
-import net.minecraft.util.math.Box
-import net.minecraft.util.math.Direction
+import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.world.phys.AABB
+import net.minecraft.core.Direction
 
 data class PreviewMesh(
     val quads: List<PreviewQuad>,
@@ -11,5 +11,5 @@ data class PreviewMesh(
 data class PreviewQuad(
     val state: BlockState,
     val face: Direction,
-    val bounds: Box,
+    val bounds: AABB,
 )

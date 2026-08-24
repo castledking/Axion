@@ -5,27 +5,27 @@ import axion.client.config.MagicSelectMaskConfigScreen
 import axion.client.hotbar.SavedHotbarController
 import axion.client.symmetry.SymmetryController
 import axion.client.symmetry.SymmetryPlacementController
-import axion.client.tool.AxionToolSelectionController
-import axion.client.tool.CloneToolState
-import axion.client.tool.EraseBrushSize
-import axion.client.tool.EraseToolController
-import axion.client.tool.EraseToolState
-import axion.client.tool.ExtrudeToolController
-import axion.client.tool.MagicSelectionService
-import axion.client.tool.PlacementToolController
-import axion.client.tool.RegionEraseService
-import axion.client.tool.SmearToolState
-import axion.client.tool.SmearToolController
-import axion.client.tool.StackToolState
-import axion.client.tool.StackToolController
+import axion.client.itemStack.AxionToolSelectionController
+import axion.client.itemStack.CloneToolState
+import axion.client.itemStack.EraseBrushSize
+import axion.client.itemStack.EraseToolController
+import axion.client.itemStack.EraseToolState
+import axion.client.itemStack.ExtrudeToolController
+import axion.client.itemStack.MagicSelectionService
+import axion.client.itemStack.PlacementToolController
+import axion.client.itemStack.RegionEraseService
+import axion.client.itemStack.SmearToolState
+import axion.client.itemStack.SmearToolController
+import axion.client.itemStack.StackToolState
+import axion.client.itemStack.StackToolController
 import axion.common.model.AxionSubtool
 import axion.common.model.ClipboardState
-import axion.client.selection.SelectionController
+import axion.client.current.SelectionController
 import axion.client.compat.toImmutable
-import axion.client.selection.blockPosOrNull
-import net.minecraft.client.MinecraftClient
-import net.minecraft.text.Text
-import net.minecraft.util.math.BlockPos
+import axion.client.current.blockPosOrNull
+import net.minecraft.client.Minecraft
+import net.minecraft.network.chat.Component
+import net.minecraft.core.BlockPos
 import org.lwjgl.glfw.GLFW
 
 object AxionInteractionRouter {
@@ -33,40 +33,40 @@ object AxionInteractionRouter {
     private var suppressSecondaryUntilRelease: Boolean = false
     private var lastHeldMiddleMagicTarget: BlockPos? = null
 
-    fun onEndTick(client: MinecraftClient) {
-        if (!client.options.attackKey.isPressed) {
+    fun onEndTick(client: Minecraft) {
+        if (!client.options.keyAttack.isDown) {
             suppressPrimaryUntilRelease = false
         } else if (suppressPrimaryUntilRelease) {
-            client.interactionManager?.cancelBlockBreaking()
+            client.gameMode?.stopDestroyBlock()
         }
 
-        if (!client.options.useKey.isPressed) {
+        if (!client.options.keyUse.isDown) {
             suppressSecondaryUntilRelease = false
         }
 
         handleHeldMiddleMagicSelect(client)
     }
 
-    fun shouldSuppressPrimary(client: MinecraftClient): Boolean {
+    fun shouldSuppressPrimary(client: Minecraft): Boolean {
         if (!suppressPrimaryUntilRelease) {
             return false
         }
 
-        if (!client.options.attackKey.isPressed) {
+        if (!client.options.keyAttack.isDown) {
             suppressPrimaryUntilRelease = false
             return false
         }
 
-        client.interactionManager?.cancelBlockBreaking()
+        client.gameMode?.stopDestroyBlock()
         return true
     }
 
-    fun shouldSuppressSecondary(client: MinecraftClient): Boolean {
+    fun shouldSuppressSecondary(client: Minecraft): Boolean {
         if (!suppressSecondaryUntilRelease) {
             return false
         }
 
-        if (!client.options.useKey.isPressed) {
+        if (!client.options.keyUse.isDown) {
             suppressSecondaryUntilRelease = false
             return false
         }
@@ -78,29 +78,29 @@ object AxionInteractionRouter {
         return shouldCapturePrimaryAction()
     }
 
-    fun consumePrimaryAction(client: MinecraftClient): Boolean {
+    fun consumePrimaryAction(client: Minecraft): Boolean {
         val handled = handlePrimaryAction(client)
         if (!handled && !shouldCapturePrimaryAction()) {
             return false
         }
 
         suppressPrimaryUntilRelease = true
-        client.interactionManager?.cancelBlockBreaking()
+        client.gameMode?.stopDestroyBlock()
         return true
     }
 
-    fun consumeSecondaryAction(client: MinecraftClient): Boolean {
+    fun consumeSecondaryAction(client: Minecraft): Boolean {
         val handled = handleSecondaryAction(client)
         if (!handled && !shouldCaptureSecondaryAction()) {
             return false
         }
 
         suppressSecondaryUntilRelease = true
-        client.player?.stopUsingItem()
+        client.player?.releaseUsingItem()
         return true
     }
 
-    fun handlePrimaryAction(client: MinecraftClient): Boolean {
+    fun handlePrimaryAction(client: Minecraft): Boolean {
         return when (AxionToolSelectionController.selectedSubtool()) {
             AxionSubtool.CLONE,
             AxionSubtool.MOVE,
@@ -113,7 +113,7 @@ object AxionInteractionRouter {
         }
     }
 
-    fun handleSecondaryAction(client: MinecraftClient): Boolean {
+    fun handleSecondaryAction(client: Minecraft): Boolean {
         if (SymmetryPlacementController.handleUse(client)) {
             suppressSecondaryUntilRelease = true
             return true
@@ -131,9 +131,9 @@ object AxionInteractionRouter {
         }
     }
 
-    fun handleMiddleAction(client: MinecraftClient): Boolean {
+    fun handleMiddleAction(client: Minecraft): Boolean {
         if (AxionModifierKeys.isControlDown(client) && supportsMagicSelectConfigShortcut()) {
-            client.setScreen(MagicSelectMaskConfigScreen(client.currentScreen))
+            client.setScreen(MagicSelectMaskConfigScreen(client.screen))
             return true
         }
 
@@ -152,7 +152,7 @@ object AxionInteractionRouter {
         return handled
     }
 
-    fun handleDeleteAction(client: MinecraftClient): Boolean {
+    fun handleDeleteAction(client: Minecraft): Boolean {
         return when (AxionToolSelectionController.selectedSubtool()) {
             AxionSubtool.ERASE -> EraseToolController.handleDeleteAction(client)
             AxionSubtool.SETUP_SYMMETRY -> SymmetryController.handleDeleteAction(client)
@@ -164,21 +164,21 @@ object AxionInteractionRouter {
             AxionSubtool.MOVE,
                 -> eraseDefinedRegion(
                     (AxionClientState.placementToolState as? CloneToolState.RegionDefined)
-                        ?.let { RegionEraseService.Target(it.region, it.clipboardBuffer) }
+                        ?.let { RegionEraseService.Target(it.region, it.clipboardScratchBuffer) }
                         ?: magicSelectionTarget(),
                     PlacementToolController::reset,
                 )
 
             AxionSubtool.STACK -> eraseDefinedRegion(
                 (AxionClientState.stackToolState as? StackToolState.RegionDefined)
-                    ?.let { RegionEraseService.Target(it.region, it.clipboardBuffer) }
+                    ?.let { RegionEraseService.Target(it.region, it.clipboardScratchBuffer) }
                     ?: magicSelectionTarget(),
                 StackToolController::reset,
             )
 
             AxionSubtool.SMEAR -> eraseDefinedRegion(
                 (AxionClientState.smearToolState as? SmearToolState.RegionDefined)
-                    ?.let { RegionEraseService.Target(it.region, it.clipboardBuffer) }
+                    ?.let { RegionEraseService.Target(it.region, it.clipboardScratchBuffer) }
                     ?: magicSelectionTarget(),
                 SmearToolController::reset,
             )
@@ -196,20 +196,20 @@ object AxionInteractionRouter {
      */
     private fun magicSelectionTarget(): RegionEraseService.Target? {
         val magic = AxionClientState.clipboardState as? ClipboardState.MagicSelection ?: return null
-        return RegionEraseService.Target(magic.region, magic.clipboardBuffer)
+        return RegionEraseService.Target(magic.region, magic.clipboardScratchBuffer)
     }
 
     private fun eraseDefinedRegion(target: RegionEraseService.Target?, reset: () -> Unit): Boolean {
         if (target == null || !AxionToolSelectionController.isAxionSlotActive()) {
             return false
         }
-        RegionEraseService.erase(target.region, target.clipboard)
+        RegionEraseService.erase(target.region, target.clipboardManager)
         reset()
         return true
     }
 
     fun handleScroll(
-        client: MinecraftClient,
+        client: Minecraft,
         currentVanillaSlot: Int,
         scrollAmount: Double,
         altHeld: Boolean,
@@ -303,8 +303,8 @@ object AxionInteractionRouter {
         }
     }
 
-    private fun handleHeldMiddleMagicSelect(client: MinecraftClient) {
-        if (client.currentScreen != null || !isMiddleMousePressed(client)) {
+    private fun handleHeldMiddleMagicSelect(client: Minecraft) {
+        if (client.screen != null || !isMiddleMousePressed(client)) {
             lastHeldMiddleMagicTarget = null
             return
         }
@@ -327,8 +327,8 @@ object AxionInteractionRouter {
         handleMiddleAction(client)
     }
 
-    private fun isMiddleMousePressed(client: MinecraftClient): Boolean {
-        return GLFW.glfwGetMouseButton(client.window.handle, GLFW.GLFW_MOUSE_BUTTON_MIDDLE) == GLFW.GLFW_PRESS
+    private fun isMiddleMousePressed(client: Minecraft): Boolean {
+        return GLFW.glfwGetMouseButton(client.window.handle, GLFW.MOUSE_BUTTON_MIDDLE) == GLFW.PRESS
     }
 
     private fun currentTargetBlock(): BlockPos? {
@@ -387,18 +387,18 @@ object AxionInteractionRouter {
         }
     }
 
-    private fun handleEraseBrushScroll(client: MinecraftClient, scrollAmount: Double): Boolean {
+    private fun handleEraseBrushScroll(client: Minecraft, scrollAmount: Double): Boolean {
         val nextBrushSize = EraseBrushSize.adjust(scrollAmount) ?: return false
-        client.inGameHud.setOverlayMessage(Text.literal("Axion Erase Brush Size: $nextBrushSize"), false)
+        client.gui.setOverlayMessage(Component.literal("Axion Erase Brush Size: $nextBrushSize"), false)
         return true
     }
 
-    private fun handleMagicSelectBrushScroll(client: MinecraftClient, scrollAmount: Double): Boolean {
+    private fun handleMagicSelectBrushScroll(client: Minecraft, scrollAmount: Double): Boolean {
         if (!AxionClientState.middleClickMagicSelectEnabled || !supportsMagicSelectBrushScroll()) {
             return false
         }
         val nextBrushSize = MagicSelectionService.adjustBrushSize(scrollAmount) ?: return false
-        client.inGameHud.setOverlayMessage(Text.literal("Axion Magic Select Brush Size: $nextBrushSize"), false)
+        client.gui.setOverlayMessage(Component.literal("Axion Magic Select Brush Size: $nextBrushSize"), false)
         return true
     }
 

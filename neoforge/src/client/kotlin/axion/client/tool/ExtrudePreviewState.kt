@@ -1,8 +1,8 @@
-package axion.client.tool
+package axion.client.itemStack
 
-import net.minecraft.block.BlockState
-import net.minecraft.util.math.BlockPos
-import net.minecraft.util.math.Direction
+import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.core.BlockPos
+import net.minecraft.core.Direction
 
 data class ExtrudePreviewState(
     val origin: BlockPos,

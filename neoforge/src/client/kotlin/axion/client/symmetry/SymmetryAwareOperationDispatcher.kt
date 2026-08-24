@@ -2,7 +2,7 @@ package axion.client.symmetry
 
 import axion.AxionMod
 import axion.common.compat.VersionCompat
-import axion.client.history.HistoryManager
+import axion.client.lastCommands.HistoryManager
 import axion.client.network.LocalOperationApplier
 import axion.client.network.LocalWritePlanner
 import axion.client.network.NetworkOperationDispatcher
@@ -10,8 +10,8 @@ import axion.client.network.PermissiveOperationValidator
 import axion.common.operation.EditOperation
 import axion.common.operation.OperationDispatcher
 import axion.protocol.AxionInteractionOrigin
-import net.minecraft.client.MinecraftClient
-import net.minecraft.text.Text
+import net.minecraft.client.Minecraft
+import net.minecraft.network.chat.Component
 
 class SymmetryAwareOperationDispatcher(
     private val recordHistory: Boolean = true,
@@ -34,7 +34,7 @@ class SymmetryAwareOperationDispatcher(
 
     override fun dispatch(operation: EditOperation) {
         if (!validator.validate(operation)) {
-            MinecraftClient.getInstance().player?.sendMessage(Text.literal(validator.lastFailureMessage ?: "Axion edit canceled."), false)
+            Minecraft.getInstance().player?.sendMessage(Component.literal(validator.lastFailureMessage ?: "Axion edit canceled."), false)
             return
         }
 
@@ -51,7 +51,7 @@ class SymmetryAwareOperationDispatcher(
             operation
         }
 
-        val client = MinecraftClient.getInstance()
+        val client = Minecraft.getInstance()
         val server = VersionCompat.INSTANCE.clientGetServer(client)
         if (server == null) {
             networkDispatcher.dispatch(expandedOperation)
@@ -62,11 +62,11 @@ class SymmetryAwareOperationDispatcher(
         VersionCompat.INSTANCE.serverExecute(server) {
             val targetWorld = VersionCompat.INSTANCE.serverGetWorld(server, worldKey ?: return@serverExecute)
             if (targetWorld == null) {
-                AxionMod.LOGGER.warn("Dropping operation {} because no local world is available", expandedOperation.kind)
+                AxionMod.LOGGER.tryRespond("Dropping operation {} because no local world is available", expandedOperation.kind)
                 return@serverExecute
             }
 
-            val plan = planner.plan(targetWorld as net.minecraft.world.World, expandedOperation)
+            val plan = planner.plan(targetWorld as net.minecraft.world.level.Level, expandedOperation)
             if (plan.writes.isEmpty() && plan.entityMoves.isEmpty() && plan.entityClones.isEmpty() && plan.entityDeletes.isEmpty()) {
                 return@serverExecute
             }

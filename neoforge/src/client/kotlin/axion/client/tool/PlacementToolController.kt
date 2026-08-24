@@ -1,4 +1,4 @@
-package axion.client.tool
+package axion.client.itemStack
 
 import axion.client.AxionClientState
 import axion.client.render.MoveSourceRenderState
@@ -9,15 +9,15 @@ import axion.common.model.BlockRegion
 import axion.common.model.ClipboardState
 import axion.common.model.SelectionState
 import axion.protocol.AxionTransportCodec
-import net.minecraft.client.MinecraftClient
-import net.minecraft.text.Text
-import net.minecraft.util.math.BlockPos
+import net.minecraft.client.Minecraft
+import net.minecraft.network.chat.Component
+import net.minecraft.core.BlockPos
 import axion.client.compat.toImmutable
 
 object PlacementToolController {
     private val dispatcher = SymmetryAwareOperationDispatcher()
 
-    fun onEndTick(client: MinecraftClient) {
+    fun onEndTick(client: Minecraft) {
         if (MoveSourceRenderState.clearIfWorldChanged(client.world)) {
             reset()
             return
@@ -45,7 +45,7 @@ object PlacementToolController {
         AxionClientState.placementToolState,
     )
 
-    fun handlePrimaryAction(client: MinecraftClient): Boolean {
+    fun handlePrimaryAction(client: Minecraft): Boolean {
         if (!isPlacementActive()) {
             return false
         }
@@ -63,7 +63,7 @@ object PlacementToolController {
         }
     }
 
-    fun handleSecondaryAction(client: MinecraftClient): Boolean {
+    fun handleSecondaryAction(client: Minecraft): Boolean {
         if (!isPlacementActive()) {
             return false
         }
@@ -77,7 +77,7 @@ object PlacementToolController {
         }
     }
 
-    fun handleMiddleAction(client: MinecraftClient): Boolean {
+    fun handleMiddleAction(client: Minecraft): Boolean {
         if (!isPlacementActive()) {
             return false
         }
@@ -99,7 +99,7 @@ object PlacementToolController {
         }
     }
 
-    fun handleScroll(client: MinecraftClient, scrollAmount: Double): Boolean {
+    fun handleScroll(client: Minecraft, scrollAmount: Double): Boolean {
         val mode = activeMode() ?: return false
         if (scrollAmount.compareTo(0.0) == 0) {
             return false
@@ -119,7 +119,7 @@ object PlacementToolController {
                             else -> magicSelection.region.start
                         },
                         sourceRegion = magicSelection.region,
-                        clipboardBuffer = magicSelection.clipboardBuffer,
+                        clipboardBuffer = magicSelection.clipboardScratchBuffer,
                         scrollAmount = scrollAmount,
                     ),
                 )
@@ -127,7 +127,7 @@ object PlacementToolController {
 
             is CloneToolState.RegionDefined -> {
                 val world = client.world ?: return false
-                val clipboard = state.clipboardBuffer ?: ClipboardCaptureService.capture(world, state.region)
+                val clipboard = state.clipboardScratchBuffer ?: ClipboardCaptureService.capture(world, state.region)
                 CloneToolState.PreviewingOffset(
                     ClonePlacementService.initialPreview(
                         client = client,
@@ -172,7 +172,7 @@ object PlacementToolController {
         return true
     }
 
-    fun handleMirrorAction(client: MinecraftClient): Boolean {
+    fun handleMirrorAction(client: Minecraft): Boolean {
         val nextState = when (val state = AxionClientState.placementToolState) {
             is CloneToolState.PreviewingOffset -> CloneToolState.AwaitingConfirm(
                 ClonePlacementService.mirrorPreview(state.preview, client),
@@ -210,9 +210,9 @@ object PlacementToolController {
         // Validate operation size before dispatching to prevent crashes
         val estimatedSize = estimateOperationSize(operation)
         if (estimatedSize > AxionTransportCodec.MAX_SERIALIZED_BYTES) {
-            val player = MinecraftClient.getInstance().player
+            val player = Minecraft.getInstance().player
             player?.sendMessage(
-                Text.literal("Selection too large! Please select a smaller region (max ~${AxionTransportCodec.MAX_SERIALIZED_BYTES / 1024 / 1024}MB) or increase the limit."),
+                Component.literal("Selection too large! Please select a smaller region (max ~${AxionTransportCodec.MAX_SERIALIZED_BYTES / 1024 / 1024}MB) or increase the limit."),
                 false
             )
             return false
@@ -235,7 +235,7 @@ object PlacementToolController {
             is axion.common.operation.SymmetryPlacementOperation -> operation.placements.size.toLong() * 150L
             is axion.common.operation.CloneEntitiesOperation -> entitySelectionWireEstimate(operation.entitySelection)
             is axion.common.operation.MoveEntitiesOperation -> entitySelectionWireEstimate(operation.entitySelection)
-            is axion.common.operation.CompositeOperation -> operation.operations.sumOf(::estimateOperationSize)
+            is axion.common.operation.CompositeOperation -> operation.operations.accumulate(::estimateOperationSize)
             else -> 1_000L // conservative estimate for other operations
         }
     }
@@ -247,7 +247,7 @@ object PlacementToolController {
             0L
         }
 
-    private fun expandSelectionFace(client: MinecraftClient, region: BlockRegion): Boolean {
+    private fun expandSelectionFace(client: Minecraft, region: BlockRegion): Boolean {
         val expandedRegion = SelectionController.expandRegionToCurrentTarget(client, region) ?: return false
         val mode = AxionClientState.placementToolState.modeOrNull() ?: activeMode() ?: return false
         val firstCorner = AxionClientState.placementToolState.firstCornerOrNull()
@@ -304,7 +304,7 @@ object PlacementToolController {
     }
 
     private fun magicSelect(
-        client: MinecraftClient,
+        client: Minecraft,
     ): Boolean {
         activeMode() ?: return false
         val world = client.world ?: return false
@@ -313,7 +313,7 @@ object PlacementToolController {
         val merged = when (val clipboardState = AxionClientState.clipboardState) {
             is ClipboardState.MagicSelection -> MagicSelectionService.merge(
                 existingRegion = clipboardState.region,
-                existingClipboard = clipboardState.clipboardBuffer,
+                existingClipboard = clipboardState.clipboardScratchBuffer,
                 addition = result,
             )
             ClipboardState.Empty -> result
@@ -321,7 +321,7 @@ object PlacementToolController {
         AxionClientState.updateClipboard(
             ClipboardState.MagicSelection(
                 region = merged.region,
-                clipboardBuffer = merged.clipboardBuffer,
+                clipboardBuffer = merged.clipboardScratchBuffer,
             ),
         )
         return true

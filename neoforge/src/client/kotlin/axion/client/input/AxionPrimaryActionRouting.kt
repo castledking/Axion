@@ -2,7 +2,7 @@ package axion.client.input
 
 import axion.client.mode.ClientModeController
 import axion.client.symmetry.SymmetryBreakController
-import net.minecraft.client.MinecraftClient
+import net.minecraft.client.Minecraft
 
 /** Keeps infinite-reach ownership ahead of the generic symmetry side effect. */
 object AxionPrimaryActionRouting {
@@ -13,7 +13,7 @@ object AxionPrimaryActionRouting {
      * Kotlin-generated runtime lambda leaves a direct mixin-class descriptor in
      * the target bytecode, which legacy Mixin loaders reject.
      */
-    fun route(client: MinecraftClient): Boolean = route(
+    fun route(client: Minecraft): Boolean = route(
         handleBulldozerInfiniteReach = {
             ClientModeController.handleBulldozerInfiniteReachBreaking(client)
         },

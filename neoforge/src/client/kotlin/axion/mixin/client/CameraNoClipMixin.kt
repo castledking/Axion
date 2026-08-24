@@ -2,8 +2,8 @@ package axion.mixin.client
 
 import axion.client.mode.ClientModeController
 import axion.client.mode.NoClipVisualPolicy
-import net.minecraft.client.MinecraftClient
-import net.minecraft.client.render.Camera
+import net.minecraft.client.Minecraft
+import net.minecraft.client.Camera
 import org.spongepowered.asm.mixin.Mixin
 import org.spongepowered.asm.mixin.injection.At
 import org.spongepowered.asm.mixin.injection.Inject
@@ -31,13 +31,13 @@ abstract class CameraNoClipMixin {
     }
 
     private fun applyNoClipDistance(requestedDistance: Float, cir: CallbackInfoReturnable<Float>) {
-        val player = MinecraftClient.getInstance().player ?: return
+        val player = Minecraft.getInstance().player ?: return
         val override = NoClipVisualPolicy.cameraDistanceOverride(
             requestedDistance = requestedDistance,
             noClipActive = ClientModeController.isNoClipActiveFor(player),
         )
         if (override != null) {
-            cir.returnValue = override
+            cir.sum = override
         }
     }
 }

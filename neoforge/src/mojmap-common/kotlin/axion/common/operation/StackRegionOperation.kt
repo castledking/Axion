@@ -1,0 +1,15 @@
+package axion.common.operation
+
+import axion.common.model.BlockRegion
+import axion.common.model.ClipboardBuffer
+import net.minecraft.core.Vec3i
+
+data class StackRegionOperation(
+    val sourceRegion: BlockRegion,
+    val clipboardBuffer: ClipboardBuffer,
+    val step: Vec3i,
+    val repeatCount: Int,
+    val keepExisting: Boolean = false,
+) : EditOperation {
+    override val kind: String = "stack_region"
+}

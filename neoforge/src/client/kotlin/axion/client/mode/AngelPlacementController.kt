@@ -3,18 +3,18 @@ package axion.client.mode
 import axion.client.AxionClientState
 import axion.client.compat.blockPosOfFloored
 import axion.client.config.AxionClientConfig
-import axion.client.tool.AxionToolSelectionController
+import axion.client.itemStack.AxionToolSelectionController
 import axion.common.operation.SymmetryBlockPlacement
-import net.minecraft.block.BlockState
-import net.minecraft.client.MinecraftClient
-import net.minecraft.item.BlockItem
-import net.minecraft.item.ItemPlacementContext
-import net.minecraft.util.Hand
-import net.minecraft.util.hit.BlockHitResult
-import net.minecraft.util.math.BlockPos
-import net.minecraft.util.math.Direction
-import net.minecraft.util.math.Vec3d
-import net.minecraft.world.RaycastContext
+import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.client.Minecraft
+import net.minecraft.world.item.BlockItem
+import net.minecraft.world.item.context.BlockPlaceContext
+import net.minecraft.world.InteractionHand
+import net.minecraft.world.phys.BlockHitResult
+import net.minecraft.core.BlockPos
+import net.minecraft.core.Direction
+import net.minecraft.world.phys.Vec3
+import net.minecraft.world.level.ClipContext
 
 /**
  * Angel Placement: puts a block in mid air when the crosshair has nothing to
@@ -40,7 +40,7 @@ object AngelPlacementController {
     /** The mid-air target for this tick, or null when Angel has nothing to offer. */
     fun currentGhost(): Ghost? = ghost
 
-    fun onEndTick(client: MinecraftClient) {
+    fun onEndTick(client: Minecraft) {
         ghost = resolveGhost(client)
     }
 
@@ -53,7 +53,7 @@ object AngelPlacementController {
      *
      * @return true when the click was consumed and vanilla must not run.
      */
-    fun consumeSecondaryAction(client: MinecraftClient): Boolean {
+    fun consumeSecondaryAction(client: Minecraft): Boolean {
         val target = ghost ?: return false
         if (AxionToolSelectionController.isAxionSlotActive()) {
             return false
@@ -65,7 +65,7 @@ object AngelPlacementController {
                 listOf(SymmetryBlockPlacement(target.pos, target.state)),
             ),
         )
-        player.swingHand(Hand.MAIN_HAND)
+        player.swing(InteractionHand.MAIN_HAND)
         return true
     }
 
@@ -74,23 +74,23 @@ object AngelPlacementController {
         suppressBlockUpdates = AxionCapabilityPolicy::suppressBlockUpdates,
     )
 
-    private fun resolveGhost(client: MinecraftClient): Ghost? {
+    private fun resolveGhost(client: Minecraft): Ghost? {
         val state = AxionClientState.globalModeState
         if (!state.angelPlacementEnabled) {
             return null
         }
-        if (client.currentScreen != null) {
+        if (client.screen != null) {
             return null
         }
         val player = client.player ?: return null
-        if (!player.isInCreativeMode) {
+        if (!player.hasInfiniteMaterials) {
             return null
         }
         if (AxionToolSelectionController.isAxionSlotActive()) {
             return null
         }
         val world = client.world ?: return null
-        val stack = player.getStackInHand(Hand.MAIN_HAND)
+        val stack = player.getItemInHand(InteractionHand.MAIN_HAND)
         val blockItem = stack.item as? BlockItem ?: return null
 
         val cameraEntity = client.cameraEntity ?: player
@@ -106,11 +106,11 @@ object AngelPlacementController {
             AngelPlacementPolicy.GHOST_DISTANCE
         }
         val hit = world.raycast(
-            RaycastContext(
+            ClipContext(
                 origin,
                 origin.add(look.multiply(searchDistance)),
-                RaycastContext.ShapeType.OUTLINE,
-                RaycastContext.FluidHandling.NONE,
+                ClipContext.ShapeType.OUTLINE,
+                ClipContext.FluidHandling.NONE,
                 cameraEntity,
             ),
         )
@@ -150,24 +150,24 @@ object AngelPlacementController {
      * player had clicked a wall in that spot.
      */
     private fun midAirPlacementState(
-        client: MinecraftClient,
+        client: Minecraft,
         blockItem: BlockItem,
-        stack: net.minecraft.item.ItemStack,
+        stack: net.minecraft.world.item.ItemStack,
         pos: BlockPos,
-        look: Vec3d,
+        look: Vec3,
     ): BlockState? {
         val player = client.player ?: return null
         val world = client.world ?: return null
         val side = nearestDirection(-look.x, -look.y, -look.z)
-        val hitPos = Vec3d(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5).add(
+        val hitPos = Vec3(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5).add(
             side.offsetX * 0.5,
             side.offsetY * 0.5,
             side.offsetZ * 0.5,
         )
-        val context = object : ItemPlacementContext(
+        val context = object : BlockPlaceContext(
             world,
             player,
-            Hand.MAIN_HAND,
+            InteractionHand.MAIN_HAND,
             stack,
             BlockHitResult(hitPos, side, pos, false),
         ) {
@@ -180,7 +180,7 @@ object AngelPlacementController {
             override fun canReplaceExisting(): Boolean = true
         }
         return ForcePlaceSupportBypass.withBypass(AxionCapabilityPolicy.ignoresSupportRequirements()) {
-            val adjusted = blockItem.getPlacementContext(context) ?: context
+            val adjusted = blockItem.updatePlacementContext(context) ?: context
             blockItem.block.getPlacementState(adjusted)
         }
     }

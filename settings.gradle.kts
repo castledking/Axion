@@ -7,7 +7,7 @@ pluginManagement {
         id("fabric-loom") version loomVersion
         id("net.fabricmc.fabric-loom") version loomVersion
         id("io.papermc.paperweight.userdev") version paperweightVersion
-        id("net.neoforged.moddev") version "2.0.49-beta"
+        id("net.neoforged.moddev") version "2.0.144"
         kotlin("jvm") version kotlinVersion
     }
 

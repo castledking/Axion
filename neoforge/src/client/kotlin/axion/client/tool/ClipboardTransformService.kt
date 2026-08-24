@@ -1,12 +1,12 @@
-package axion.client.tool
+package axion.client.itemStack
 
 import axion.common.model.ClipboardBuffer
 import axion.common.model.ClipboardCell
 import axion.common.model.StairMirrorPolicy
-import net.minecraft.block.StairsBlock
-import net.minecraft.util.BlockMirror
-import net.minecraft.util.BlockRotation
-import net.minecraft.util.math.Vec3i
+import net.minecraft.world.level.block.StairBlock
+import net.minecraft.world.level.block.Mirror
+import net.minecraft.world.level.block.Rotation
+import net.minecraft.core.Vec3i
 
 object ClipboardTransformService {
     fun transform(buffer: ClipboardBuffer, transform: PlacementTransform): ClipboardBuffer {
@@ -20,7 +20,7 @@ object ClipboardTransformService {
                 ClipboardCell(
                     offset = transformedOffset(buffer.size, cell.offset, transform),
                     state = transformState(cell.state, transform),
-                    blockEntityData = cell.blockEntityData?.copy(),
+                    blockEntityData = cell.blockData?.copy(),
                 )
             },
         )
@@ -50,22 +50,22 @@ object ClipboardTransformService {
     }
 
     private fun transformState(
-        state: net.minecraft.block.BlockState,
+        state: net.minecraft.world.level.block.state.BlockState,
         transform: PlacementTransform,
-    ): net.minecraft.block.BlockState {
+    ): net.minecraft.world.level.block.state.BlockState {
         val mirroredState = when (transform.mirrorAxis) {
             PlacementMirrorAxis.NONE -> state
-            PlacementMirrorAxis.X -> mirrored(state, BlockMirror.FRONT_BACK, BlockMirror.LEFT_RIGHT)
+            PlacementMirrorAxis.X -> mirrored(state, Mirror.FRONT_BACK, Mirror.LEFT_RIGHT)
             PlacementMirrorAxis.Y ->
-                mirrored(state, BlockMirror.FRONT_BACK, BlockMirror.LEFT_RIGHT).rotate(BlockRotation.CLOCKWISE_180)
-            PlacementMirrorAxis.Z -> mirrored(state, BlockMirror.LEFT_RIGHT, BlockMirror.FRONT_BACK)
+                mirrored(state, Mirror.FRONT_BACK, Mirror.LEFT_RIGHT).rotate(Rotation.CLOCKWISE_180)
+            PlacementMirrorAxis.Z -> mirrored(state, Mirror.LEFT_RIGHT, Mirror.FRONT_BACK)
         }
 
         return when (transform.normalizedRotationQuarterTurns) {
             0 -> mirroredState
-            1 -> mirroredState.rotate(BlockRotation.CLOCKWISE_90)
-            2 -> mirroredState.rotate(BlockRotation.CLOCKWISE_180)
-            else -> mirroredState.rotate(BlockRotation.COUNTERCLOCKWISE_90)
+            1 -> mirroredState.rotate(Rotation.CLOCKWISE_90)
+            2 -> mirroredState.rotate(Rotation.CLOCKWISE_180)
+            else -> mirroredState.rotate(Rotation.COUNTERCLOCKWISE_90)
         }
     }
 
@@ -81,19 +81,19 @@ object ClipboardTransformService {
      * Straight stairs pass through this unchanged, so it needs no shape check.
      */
     private fun mirrored(
-        state: net.minecraft.block.BlockState,
-        mirror: BlockMirror,
-        perpendicular: BlockMirror,
-    ): net.minecraft.block.BlockState {
+        state: net.minecraft.world.level.block.state.BlockState,
+        mirror: Mirror,
+        perpendicular: Mirror,
+    ): net.minecraft.world.level.block.state.BlockState {
         val mirroredState = state.mirror(mirror)
         if (!StairMirrorPolicy.needsHandednessFlip(
-                isStairs = state.block is StairsBlock,
+                isStairs = state.block is StairBlock,
                 mirrorLeftStateUnchanged = mirroredState == state,
             )
         ) {
             return mirroredState
         }
 
-        return state.mirror(perpendicular).rotate(BlockRotation.CLOCKWISE_180)
+        return state.mirror(perpendicular).rotate(Rotation.CLOCKWISE_180)
     }
 }

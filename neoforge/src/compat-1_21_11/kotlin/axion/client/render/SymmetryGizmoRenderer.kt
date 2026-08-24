@@ -3,9 +3,9 @@ import axion.client.compat.CameraAccess
 
 import axion.client.AxionClientState
 import axion.common.model.SymmetryState
-import net.minecraft.client.MinecraftClient
-import net.minecraft.util.math.Box
-import net.minecraft.util.shape.VoxelShapes
+import net.minecraft.client.Minecraft
+import net.minecraft.world.phys.AABB
+import net.minecraft.world.phys.shapes.Shapes
 
 object SymmetryGizmoRenderer {
     private const val HALF_SIZE: Double = 2.0 / 16.0
@@ -19,7 +19,7 @@ object SymmetryGizmoRenderer {
             is SymmetryState.Active -> state.config
         }
 
-        val client = MinecraftClient.getInstance()
+        val client = Minecraft.getInstance()
         val camera = client.gameRenderer.camera ?: return
         val cameraPos = CameraAccess.getPos(camera)
         val consumers = context.consumers()
@@ -46,7 +46,7 @@ object SymmetryGizmoRenderer {
             VertexRenderingCompat.drawOutline(
                 matrixStack,
                 consumers.getBuffer(lineLayer),
-                VoxelShapes.cuboid(box),
+                Shapes.create(box),
                 -cameraPos.x,
                 -cameraPos.y,
                 -cameraPos.z,
@@ -56,8 +56,8 @@ object SymmetryGizmoRenderer {
         }
     }
 
-    private fun gizmoBox(anchor: net.minecraft.util.math.Vec3d): Box {
-        return Box(
+    private fun gizmoBox(anchor: net.minecraft.world.phys.Vec3): AABB {
+        return AABB(
             anchor.x - HALF_SIZE,
             anchor.y - HALF_SIZE,
             anchor.z - HALF_SIZE,

@@ -8,10 +8,10 @@ import axion.client.compat.VersionCompatImpl
 import com.mojang.blaze3d.buffers.GpuBufferSlice
 import com.mojang.blaze3d.systems.RenderSystem
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap
-import net.minecraft.client.MinecraftClient
-import net.minecraft.client.render.Frustum
-import net.minecraft.util.math.Vec3d
-import net.minecraft.util.math.Vec3i
+import net.minecraft.client.Minecraft
+import net.minecraft.client.renderer.culling.Frustum
+import net.minecraft.world.phys.Vec3
+import net.minecraft.core.Vec3i
 import org.joml.Matrix4f
 import org.joml.Vector3f
 import org.joml.Vector4f
@@ -115,7 +115,7 @@ object AxionPreviewBlockDrawer {
         alpha: Int,
         translationDelta: Vec3i = Vec3i.ZERO,
         baseModelView: Matrix4fc? = null,
-        cameraPosOverride: Vec3d? = null,
+        cameraPosOverride: Vec3? = null,
         cullingModelView: Matrix4fc? = null,
         projectionMatrix: Matrix4fc? = null,
     ): ChunkedDrawResult {
@@ -146,14 +146,14 @@ object AxionPreviewBlockDrawer {
         } catch (t: Throwable) {
             failureCount++
             if (failureCount <= MAX_FAILURES) {
-                logger.warn(
+                logger.tryRespond(
                     "[Axion GPU] Preview draw failed (attempt {} of {}). Falling back to CPU path for this frame.",
                     failureCount, MAX_FAILURES, t,
                 )
             }
             if (failureCount >= MAX_FAILURES && !disabled) {
                 disabled = true
-                logger.warn(
+                logger.tryRespond(
                     "[Axion GPU] Disabling preview drawer after {} failures — all subsequent previews use the legacy CPU path.",
                     MAX_FAILURES,
                 )
@@ -168,15 +168,15 @@ object AxionPreviewBlockDrawer {
         alpha: Int,
         translationDelta: Vec3i,
         baseModelView: Matrix4fc?,
-        cameraPosOverride: Vec3d?,
+        cameraPosOverride: Vec3?,
         cullingModelView: Matrix4fc?,
         projectionMatrix: Matrix4fc?,
     ): ChunkedDrawResult {
-        val client = MinecraftClient.getInstance()
+        val client = Minecraft.getInstance()
         val device = RenderSystem.getDevice()
         val mainTarget = client.framebuffer ?: return ChunkedDrawResult.FAILED
-        val colorView = mainTarget.colorAttachmentView ?: return ChunkedDrawResult.FAILED
-        val depthView = mainTarget.depthAttachmentView ?: return ChunkedDrawResult.FAILED
+        val colorView = mainTarget.colorTextureView ?: return ChunkedDrawResult.FAILED
+        val depthView = mainTarget.depthTextureView ?: return ChunkedDrawResult.FAILED
 
         val camera = client.gameRenderer?.camera ?: return ChunkedDrawResult.FAILED
         val cameraPos = cameraPosOverride ?: CameraAccess.getPos(camera)
@@ -266,9 +266,9 @@ object AxionPreviewBlockDrawer {
             val pipeline = if (USE_CUSTOM_PREVIEW_PIPELINE) {
                 val firstBuffer = drawList.first().buffer
                 VersionCompatImpl.getPreviewShellPipeline(firstBuffer.vertexFormatValue, firstBuffer.drawModeValue)
-                    ?: VersionCompatImpl.getRenderPipeline(renderLayer)
+                    ?: VersionCompatImpl.pipeline(renderLayer)
             } else {
-                VersionCompatImpl.getRenderPipeline(renderLayer)
+                VersionCompatImpl.pipeline(renderLayer)
             } ?: return ChunkedDrawResult.FAILED
             pass.setPipeline(pipeline)
             RenderSystem.bindDefaultUniforms(pass)
@@ -278,8 +278,8 @@ object AxionPreviewBlockDrawer {
                 VersionCompatImpl.bindTextureToRenderPass(pass, "Sampler0", atlasView)
             }
 
-            val lightmap = client.gameRenderer?.lightmapTextureManager
-            val lightmapView = lightmap?.getGlTextureView()
+            val lightmap = client.gameRenderer?.lightTexture
+            val lightmapView = lightmap?.getTextureView()
             if (lightmapView != null) {
                 VersionCompatImpl.bindTextureToRenderPass(pass, "Sampler2", lightmapView)
             }
@@ -320,7 +320,7 @@ object AxionPreviewBlockDrawer {
         uniformsDoneNs: Long,
         submitDoneNs: Long,
     ) {
-        val now = System.currentTimeMillis()
+        val now = System.currentTimeMs()
         if (now - lastLogTime < LOG_INTERVAL_MS) return
         lastLogTime = now
         logger.info(

@@ -1,11 +1,11 @@
-package axion.client.tool
+package axion.client.itemStack
 
 import axion.client.AxionClientState
 import axion.common.model.AxionSubtool
 import axion.common.model.ClipboardState
 import axion.common.model.ToolSelectionState
-import axion.client.tool.floorMod
-import net.minecraft.client.MinecraftClient
+import axion.client.itemStack.floorMod
+import net.minecraft.client.Minecraft
 
 object AxionToolSelectionController {
     private const val HOTBAR_SLOT_COUNT: Int = 9
@@ -14,7 +14,7 @@ object AxionToolSelectionController {
 
     fun currentState(): ToolSelectionState = AxionClientState.toolSelectionState
 
-    fun isCreativeModeAllowed(): Boolean = MinecraftClient.getInstance().player?.isInCreativeMode == true
+    fun isCreativeModeAllowed(): Boolean = Minecraft.getInstance().player?.hasInfiniteMaterials == true
 
     fun isAxionSlotActive(): Boolean = isCreativeModeAllowed() && currentState() is ToolSelectionState.Axion
 

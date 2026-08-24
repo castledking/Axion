@@ -10,12 +10,33 @@ neoForge {
     neoFormVersion = neo_form_version
 }
 
+neoForge.addModdingDependenciesTo(sourceSets.main)
+
+configurations {
+    neoFormClasses
+}
+
 dependencies {
+    neoFormClasses(files("build/moddev/artifacts/vanilla-${neo_form_version}.jar"))
     implementation project(':protocol')
     compileOnly group: 'org.spongepowered', name: 'mixin', version: '0.8.5'
     compileOnly group: 'io.github.llamalad7', name: 'mixinextras-common', version: '0.3.5'
     annotationProcessor group: 'io.github.llamalad7', name: 'mixinextras-common', version: '0.3.5'
     testImplementation "org.jetbrains.kotlin:kotlin-test:${kotlin_version}"
+}
+
+configurations.compileClasspath {
+    extendsFrom(configurations.neoFormClasses)
+}
+configurations.runtimeClasspath {
+    extendsFrom(configurations.neoFormClasses)
+}
+
+tasks.named('compileJava') {
+    dependsOn 'createMinecraftArtifacts'
+}
+tasks.named('compileKotlin') {
+    dependsOn 'createMinecraftArtifacts'
 }
 
 tasks.named('test') {

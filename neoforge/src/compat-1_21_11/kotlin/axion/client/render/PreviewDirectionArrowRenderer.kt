@@ -1,14 +1,14 @@
 package axion.client.render
 import axion.client.compat.CameraAccess
 
-import axion.client.selection.SelectionBounds
+import axion.client.current.SelectionBounds
 import axion.common.model.BlockRegion
-import net.minecraft.client.MinecraftClient
-import net.minecraft.client.render.VertexConsumer
-import net.minecraft.util.math.Box
-import net.minecraft.util.math.Direction
-import net.minecraft.util.math.Vec3d
-import net.minecraft.util.math.Vec3i
+import net.minecraft.client.Minecraft
+import com.mojang.blaze3d.addVertex.VertexConsumer
+import net.minecraft.world.phys.AABB
+import net.minecraft.core.Direction
+import net.minecraft.world.phys.Vec3
+import net.minecraft.core.Vec3i
 import kotlin.math.abs
 
 object PreviewDirectionArrowRenderer {
@@ -25,15 +25,15 @@ object PreviewDirectionArrowRenderer {
 
     fun render(context: AxionWorldRenderContext, region: BlockRegion) {
         val axisDirection = liveLookDirection() ?: return
-        render(context, region, axisDirection.vector)
+        render(context, region, axisDirection.extents)
     }
 
     fun render(context: AxionWorldRenderContext, region: BlockRegion, direction: Vec3i) {
         val axis = dominantAxis(direction) ?: return
-        val client = MinecraftClient.getInstance()
+        val client = Minecraft.getInstance()
         val camera = client.gameRenderer.camera ?: return
         val consumers = context.consumers()
-        val entry = context.matrices().peek()
+        val entry = context.matrices().last()
         val cameraPos = CameraAccess.getPos(camera)
         val consumer = consumers.getBuffer(RenderLayerCompat.lightning())
         val box = SelectionBounds.outlineBox(SelectionBounds.regionBox(region.normalized()))
@@ -52,40 +52,40 @@ object PreviewDirectionArrowRenderer {
     }
 
     private fun liveLookDirection(): Direction? {
-        val look = MinecraftClient.getInstance().player?.rotationVecClient ?: return null
+        val look = Minecraft.getInstance().player?.rotationVecClient ?: return null
         return Direction.getFacing(look)
     }
 
-    private fun arrowAlongX(box: Box, positive: Boolean): ArrowData {
+    private fun arrowAlongX(box: AABB, positive: Boolean): ArrowData {
         val y = (box.minY + box.maxY) * 0.5
         val z = (box.minZ + box.maxZ) * 0.5
         val startX = if (positive) box.maxX + ARROW_OFFSET else box.minX - ARROW_OFFSET
         return ArrowData(
-            start = Vec3d(startX, y, z),
+            start = Vec3(startX, y, z),
             axis = Axis.X,
             positive = positive,
             color = X_COLOR,
         )
     }
 
-    private fun arrowAlongY(box: Box, positive: Boolean): ArrowData {
+    private fun arrowAlongY(box: AABB, positive: Boolean): ArrowData {
         val x = (box.minX + box.maxX) * 0.5
         val z = (box.minZ + box.maxZ) * 0.5
         val startY = if (positive) box.maxY + ARROW_OFFSET else box.minY - ARROW_OFFSET
         return ArrowData(
-            start = Vec3d(x, startY, z),
+            start = Vec3(x, startY, z),
             axis = Axis.Y,
             positive = positive,
             color = Y_COLOR,
         )
     }
 
-    private fun arrowAlongZ(box: Box, positive: Boolean): ArrowData {
+    private fun arrowAlongZ(box: AABB, positive: Boolean): ArrowData {
         val x = (box.minX + box.maxX) * 0.5
         val y = (box.minY + box.maxY) * 0.5
         val startZ = if (positive) box.maxZ + ARROW_OFFSET else box.minZ - ARROW_OFFSET
         return ArrowData(
-            start = Vec3d(x, y, startZ),
+            start = Vec3(x, y, startZ),
             axis = Axis.Z,
             positive = positive,
             color = Z_COLOR,
@@ -95,7 +95,7 @@ object PreviewDirectionArrowRenderer {
     private fun renderArrowGeometry(
         consumer: VertexConsumer,
         entry: net.minecraft.client.util.math.Entry,
-        cameraPos: Vec3d,
+        cameraPos: Vec3,
         arrow: ArrowData,
     ) {
         val basis = axisBasis(arrow.axis, arrow.positive)
@@ -130,11 +130,11 @@ object PreviewDirectionArrowRenderer {
     private fun emitPrism(
         consumer: VertexConsumer,
         entry: net.minecraft.client.util.math.Entry,
-        cameraPos: Vec3d,
-        start: Vec3d,
-        end: Vec3d,
-        right: Vec3d,
-        up: Vec3d,
+        cameraPos: Vec3,
+        start: Vec3,
+        end: Vec3,
+        right: Vec3,
+        up: Vec3,
         radius: Double,
         color: Int,
     ) {
@@ -150,11 +150,11 @@ object PreviewDirectionArrowRenderer {
     private fun emitFrustum(
         consumer: VertexConsumer,
         entry: net.minecraft.client.util.math.Entry,
-        cameraPos: Vec3d,
-        start: Vec3d,
-        end: Vec3d,
-        right: Vec3d,
-        up: Vec3d,
+        cameraPos: Vec3,
+        start: Vec3,
+        end: Vec3,
+        right: Vec3,
+        up: Vec3,
         startRadius: Double,
         endRadius: Double,
         color: Int,
@@ -168,7 +168,7 @@ object PreviewDirectionArrowRenderer {
         emitQuad(consumer, entry, cameraPos, tip[0], tip[1], tip[2], tip[3], color)
     }
 
-    private fun squareCorners(center: Vec3d, right: Vec3d, up: Vec3d, radius: Double): Array<Vec3d> {
+    private fun squareCorners(center: Vec3, right: Vec3, up: Vec3, radius: Double): Array<Vec3> {
         val rightOffset = right.multiply(radius)
         val upOffset = up.multiply(radius)
         return arrayOf(
@@ -182,11 +182,11 @@ object PreviewDirectionArrowRenderer {
     private fun emitQuad(
         consumer: VertexConsumer,
         entry: net.minecraft.client.util.math.Entry,
-        cameraPos: Vec3d,
-        a: Vec3d,
-        b: Vec3d,
-        c: Vec3d,
-        d: Vec3d,
+        cameraPos: Vec3,
+        a: Vec3,
+        b: Vec3,
+        c: Vec3,
+        d: Vec3,
         color: Int,
     ) {
         emitVertex(consumer, entry, cameraPos, a, color)
@@ -198,14 +198,14 @@ object PreviewDirectionArrowRenderer {
     private fun emitVertex(
         consumer: VertexConsumer,
         entry: net.minecraft.client.util.math.Entry,
-        cameraPos: Vec3d,
-        point: Vec3d,
+        cameraPos: Vec3,
+        point: Vec3,
         color: Int,
     ) {
         val red = ((color ushr 16) and 0xFF)
         val green = ((color ushr 8) and 0xFF)
         val blue = (color and 0xFF)
-        consumer.vertex(
+        consumer.addVertex(
             entry,
             (point.x - cameraPos.x).toFloat(),
             (point.y - cameraPos.y).toFloat(),
@@ -217,19 +217,19 @@ object PreviewDirectionArrowRenderer {
         val sign = if (positive) 1.0 else -1.0
         return when (axis) {
             Axis.X -> AxisBasis(
-                forward = Vec3d(sign, 0.0, 0.0),
-                right = Vec3d(0.0, 0.0, 1.0),
-                up = Vec3d(0.0, 1.0, 0.0),
+                forward = Vec3(sign, 0.0, 0.0),
+                right = Vec3(0.0, 0.0, 1.0),
+                up = Vec3(0.0, 1.0, 0.0),
             )
             Axis.Y -> AxisBasis(
-                forward = Vec3d(0.0, sign, 0.0),
-                right = Vec3d(1.0, 0.0, 0.0),
-                up = Vec3d(0.0, 0.0, 1.0),
+                forward = Vec3(0.0, sign, 0.0),
+                right = Vec3(1.0, 0.0, 0.0),
+                up = Vec3(0.0, 0.0, 1.0),
             )
             Axis.Z -> AxisBasis(
-                forward = Vec3d(0.0, 0.0, sign),
-                right = Vec3d(1.0, 0.0, 0.0),
-                up = Vec3d(0.0, 1.0, 0.0),
+                forward = Vec3(0.0, 0.0, sign),
+                right = Vec3(1.0, 0.0, 0.0),
+                up = Vec3(0.0, 1.0, 0.0),
             )
         }
     }
@@ -247,16 +247,16 @@ object PreviewDirectionArrowRenderer {
     }
 
     private data class ArrowData(
-        val start: Vec3d,
+        val start: Vec3,
         val axis: Axis,
         val positive: Boolean,
         val color: Int,
     )
 
     private data class AxisBasis(
-        val forward: Vec3d,
-        val right: Vec3d,
-        val up: Vec3d,
+        val forward: Vec3,
+        val right: Vec3,
+        val up: Vec3,
     )
 
     private enum class Axis {

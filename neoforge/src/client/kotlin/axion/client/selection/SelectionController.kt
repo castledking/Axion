@@ -1,19 +1,19 @@
-package axion.client.selection
+package axion.client.current
 
 import axion.client.AxionClientState
 import axion.client.config.AxionClientConfig
-import axion.client.tool.AxionToolSelectionController
+import axion.client.itemStack.AxionToolSelectionController
 import axion.common.compat.offset
 import axion.common.model.BlockRegion
 import axion.common.model.RegionFace
 import axion.common.model.SelectionState
-import net.minecraft.client.MinecraftClient
-import net.minecraft.util.math.BlockPos
+import net.minecraft.client.Minecraft
+import net.minecraft.core.BlockPos
 
 object SelectionController {
     private var currentTarget: AxionTarget = AxionTarget.MissTarget
 
-    fun onEndTick(client: MinecraftClient) {
+    fun onEndTick(client: Minecraft) {
         val modeActive = AxionClientState.globalModeState.infiniteReachEnabled
         currentTarget = if (AxionToolSelectionController.isAxionSlotActive() || modeActive) {
             SelectionRaycast.raycast(
@@ -33,7 +33,7 @@ object SelectionController {
 
     fun currentRegion(): BlockRegion? = when (val state = AxionClientState.selectionState) {
         SelectionState.Idle -> null
-        is SelectionState.FirstCornerSet -> BlockRegion(state.firstCorner, state.firstCorner)
+        is SelectionState.FirstCornerSet -> BlockRegion(state.vert0, state.vert0)
         is SelectionState.RegionDefined -> state.region()
     }
 
@@ -41,7 +41,7 @@ object SelectionController {
         AxionClientState.updateSelection(SelectionState.Idle)
     }
 
-    fun handlePrimaryAction(client: MinecraftClient): Boolean {
+    fun handlePrimaryAction(client: Minecraft): Boolean {
         if (!isRegionSelectionContext()) {
             return false
         }
@@ -51,7 +51,7 @@ object SelectionController {
         return true
     }
 
-    fun handleSecondaryAction(client: MinecraftClient): Boolean {
+    fun handleSecondaryAction(client: Minecraft): Boolean {
         if (!isRegionSelectionContext()) {
             return false
         }
@@ -60,7 +60,7 @@ object SelectionController {
         val nextState = when (val state = AxionClientState.selectionState) {
             SelectionState.Idle -> return false
             is SelectionState.FirstCornerSet -> SelectionState.RegionDefined(
-                firstCorner = state.firstCorner,
+                firstCorner = state.vert0,
                 secondCorner = blockPos.toImmutable(),
             )
 
@@ -73,11 +73,11 @@ object SelectionController {
 
     fun selectionAnchor(): BlockPos? = when (val state = AxionClientState.selectionState) {
         SelectionState.Idle -> null
-        is SelectionState.FirstCornerSet -> state.firstCorner
-        is SelectionState.RegionDefined -> state.firstCorner
+        is SelectionState.FirstCornerSet -> state.vert0
+        is SelectionState.RegionDefined -> state.vert0
     }
 
-    fun expandRegionToCurrentTarget(client: MinecraftClient, region: BlockRegion): BlockRegion? {
+    fun expandRegionToCurrentTarget(client: Minecraft, region: BlockRegion): BlockRegion? {
         val targetBlock = currentTarget.blockPosOrNull()?.toImmutable()
         val targetHitPos = currentTarget.hitPosOrNull()
         if (targetBlock != null && targetHitPos != null) {

@@ -1,29 +1,29 @@
 package axion.client.ui
 
-import net.minecraft.text.MutableText
-import net.minecraft.text.Style
-import net.minecraft.text.Text
-import net.minecraft.text.TextColor
-import net.minecraft.util.Formatting
+import net.minecraft.network.chat.MutableComponent
+import net.minecraft.network.chat.Style
+import net.minecraft.network.chat.Component
+import net.minecraft.network.chat.TextColor
+import net.minecraft.ChatFormatting
 
 object FormattedNameText {
-    fun parse(raw: String): Text {
+    fun parse(raw: String): Component {
         if (raw.isEmpty()) {
-            return Text.empty()
+            return Component.empty()
         }
 
         if ('&' !in raw && '#' !in raw) {
-            return Text.literal(raw)
+            return Component.literal(raw)
         }
 
-        val root: MutableText = Text.literal("")
+        val root: MutableComponent = Component.literal("")
         val segment = StringBuilder()
         var style = Style.EMPTY
         var index = 0
 
         fun flush() {
             if (segment.isNotEmpty()) {
-                root.append(Text.literal(segment.toString()).setStyle(style))
+                root.append(Component.literal(segment.toString()).setStyle(style))
                 segment.clear()
             }
         }
@@ -33,7 +33,7 @@ object FormattedNameText {
             if (char == '&' && index + 1 < raw.length) {
                 formattingFor(raw[index + 1])?.let { formatting ->
                     flush()
-                    style = if (formatting == Formatting.RESET) {
+                    style = if (formatting == ChatFormatting.RESET) {
                         Style.EMPTY
                     } else {
                         Style.EMPTY.withColor(formatting)
@@ -59,25 +59,25 @@ object FormattedNameText {
         return root
     }
 
-    private fun formattingFor(code: Char): Formatting? {
+    private fun formattingFor(code: Char): ChatFormatting? {
         return when (code.lowercaseChar()) {
-            '0' -> Formatting.BLACK
-            '1' -> Formatting.DARK_BLUE
-            '2' -> Formatting.DARK_GREEN
-            '3' -> Formatting.DARK_AQUA
-            '4' -> Formatting.DARK_RED
-            '5' -> Formatting.DARK_PURPLE
-            '6' -> Formatting.GOLD
-            '7' -> Formatting.GRAY
-            '8' -> Formatting.DARK_GRAY
-            '9' -> Formatting.BLUE
-            'a' -> Formatting.GREEN
-            'b' -> Formatting.AQUA
-            'c' -> Formatting.RED
-            'd' -> Formatting.LIGHT_PURPLE
-            'e' -> Formatting.YELLOW
-            'f' -> Formatting.WHITE
-            'r' -> Formatting.RESET
+            '0' -> ChatFormatting.BLACK
+            '1' -> ChatFormatting.DARK_BLUE
+            '2' -> ChatFormatting.DARK_GREEN
+            '3' -> ChatFormatting.DARK_AQUA
+            '4' -> ChatFormatting.DARK_RED
+            '5' -> ChatFormatting.DARK_PURPLE
+            '6' -> ChatFormatting.GOLD
+            '7' -> ChatFormatting.GRAY
+            '8' -> ChatFormatting.DARK_GRAY
+            '9' -> ChatFormatting.BLUE
+            'a' -> ChatFormatting.GREEN
+            'b' -> ChatFormatting.AQUA
+            'c' -> ChatFormatting.RED
+            'd' -> ChatFormatting.LIGHT_PURPLE
+            'e' -> ChatFormatting.YELLOW
+            'f' -> ChatFormatting.WHITE
+            'r' -> ChatFormatting.RESET
             else -> null
         }
     }

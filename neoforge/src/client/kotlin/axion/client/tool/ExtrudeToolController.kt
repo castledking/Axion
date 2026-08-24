@@ -1,16 +1,16 @@
-package axion.client.tool
+package axion.client.itemStack
 
 import axion.client.AxionClientState
-import axion.client.selection.SelectionController
+import axion.client.current.SelectionController
 import axion.client.symmetry.SymmetryAwareOperationDispatcher
 import axion.common.model.AxionSubtool
 import axion.common.operation.ExtrudeMode
-import net.minecraft.client.MinecraftClient
+import net.minecraft.client.Minecraft
 
 object ExtrudeToolController {
     private val dispatcher = SymmetryAwareOperationDispatcher()
 
-    fun onEndTick(client: MinecraftClient) {
+    fun onEndTick(client: Minecraft) {
         if (!isExtrudeActive()) {
             reset()
             return
@@ -39,7 +39,7 @@ object ExtrudeToolController {
         is ExtrudeToolState.Previewing -> state.preview
     }
 
-    fun handlePrimaryAction(client: MinecraftClient): Boolean {
+    fun handlePrimaryAction(client: Minecraft): Boolean {
         if (!isExtrudeActive()) {
             return false
         }
@@ -49,7 +49,7 @@ object ExtrudeToolController {
         return true
     }
 
-    fun handleSecondaryAction(client: MinecraftClient): Boolean {
+    fun handleSecondaryAction(client: Minecraft): Boolean {
         if (!isExtrudeActive()) {
             return false
         }

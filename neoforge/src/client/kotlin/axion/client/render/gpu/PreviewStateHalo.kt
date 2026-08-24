@@ -2,7 +2,7 @@ package axion.client.render.gpu
 
 import axion.common.model.ClipboardCell
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet
-import net.minecraft.util.math.BlockPos
+import net.minecraft.core.BlockPos
 
 /**
  * Keeps the exact block states needed while tessellating a precomputed preview

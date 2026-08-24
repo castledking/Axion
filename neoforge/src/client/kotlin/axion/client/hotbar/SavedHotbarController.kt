@@ -4,13 +4,13 @@ import axion.client.compat.LitematicaCompat
 import axion.client.config.AxionClientConfig
 import axion.client.config.SavedHotbarConfig
 import axion.client.input.AxionModifierKeys
-import axion.client.tool.AxionToolSelectionController
+import axion.client.itemStack.AxionToolSelectionController
 import axion.common.compat.VersionCompat
 import io.netty.buffer.Unpooled
-import net.minecraft.client.MinecraftClient
-import net.minecraft.item.ItemStack
-import net.minecraft.network.RegistryByteBuf
-import net.minecraft.util.math.MathHelper
+import net.minecraft.client.Minecraft
+import net.minecraft.world.item.ItemStack
+import net.minecraft.network.RegistryFriendlyByteBuf
+import net.minecraft.util.Mth
 import java.util.Base64
 
 object SavedHotbarController {
@@ -36,16 +36,16 @@ object SavedHotbarController {
 
     fun totalPages(): Int {
         val totalHotbarCount = AxionClientConfig.savedHotbars().size
-        return maxOf(1, MathHelper.ceil(totalHotbarCount.toDouble() / PAGE_SIZE.toDouble()))
+        return maxOf(1, Mth.ceil(totalHotbarCount.toDouble() / PAGE_SIZE.toDouble()))
     }
 
-    fun isOverlayActive(client: MinecraftClient): Boolean {
+    fun isOverlayActive(client: Minecraft): Boolean {
         return supportsSavedHotbars(client) &&
             AxionModifierKeys.isAltDown(client) &&
             !LitematicaCompat.isHoldingConfiguredTool(client)
     }
 
-    fun displayHotbarsForSelectedPage(client: MinecraftClient): List<DisplayHotbar> {
+    fun displayHotbarsForSelectedPage(client: Minecraft): List<DisplayHotbar> {
         val selectedIndex = selectedIndex()
         val activeIndex = activeIndex()
         val page = selectedPage()
@@ -87,7 +87,7 @@ object SavedHotbarController {
         pendingSelectionIndex = index
     }
 
-    fun handleScroll(client: MinecraftClient, scrollAmount: Double): Boolean {
+    fun handleScroll(client: Minecraft, scrollAmount: Double): Boolean {
         if (!supportsSavedHotbars(client)) {
             return false
         }
@@ -107,7 +107,7 @@ object SavedHotbarController {
         return true
     }
 
-    fun onEndTick(client: MinecraftClient) {
+    fun onEndTick(client: Minecraft) {
         SavedHotbarGameModeController.onEndTick(client)
         val isAltDown = AxionModifierKeys.isAltDown(client)
         val shouldRequestCreative = SavedHotbarAltPolicy.shouldRequestCreative(
@@ -153,35 +153,35 @@ object SavedHotbarController {
         AxionClientConfig.setActiveSavedHotbarIndex(pendingIndex)
     }
 
-    fun flushActiveHotbar(client: MinecraftClient) {
+    fun flushActiveHotbar(client: Minecraft) {
         if (!canPersistActiveHotbar(client)) {
             return
         }
         saveCurrentHotbar(client, AxionClientConfig.activeSavedHotbarIndex())
     }
 
-    private fun supportsSavedHotbars(client: MinecraftClient): Boolean {
+    private fun supportsSavedHotbars(client: Minecraft): Boolean {
         return isSavedHotbarContextEligible(client) &&
             AxionToolSelectionController.isCreativeModeAllowed() &&
             !AxionToolSelectionController.isAxionSlotActive()
     }
 
-    private fun isSavedHotbarContextEligible(client: MinecraftClient): Boolean {
-        return client.currentScreen == null &&
-            !client.options.hudHidden &&
+    private fun isSavedHotbarContextEligible(client: Minecraft): Boolean {
+        return client.screen == null &&
+            !client.options.hideGui &&
             !SavedHotbarGameModeController.isTransitionPending() &&
             !AxionToolSelectionController.isAxionSlotActive() &&
             !LitematicaCompat.isHoldingConfiguredTool(client)
     }
 
-    private fun canPersistActiveHotbar(client: MinecraftClient): Boolean {
+    private fun canPersistActiveHotbar(client: Minecraft): Boolean {
         return client.player != null &&
             client.world != null &&
             AxionToolSelectionController.isCreativeModeAllowed() &&
             !AxionToolSelectionController.isAxionSlotActive()
     }
 
-    private fun saveCurrentHotbar(client: MinecraftClient, hotbarIndex: Int) {
+    private fun saveCurrentHotbar(client: Minecraft, hotbarIndex: Int) {
         val player = client.player ?: return
         val world = client.world ?: return
         val hotbar = SavedHotbarConfig(
@@ -193,7 +193,7 @@ object SavedHotbarController {
         AxionClientConfig.updateSavedHotbar(hotbarIndex, hotbar)
     }
 
-    private fun loadSavedHotbar(client: MinecraftClient, hotbarIndex: Int) {
+    private fun loadSavedHotbar(client: Minecraft, hotbarIndex: Int) {
         val player = client.player ?: return
         val world = client.world ?: return
         val interactionManager = client.interactionManager ?: return
@@ -206,14 +206,14 @@ object SavedHotbarController {
     }
 
     fun deserializeStackForDisplay(
-        registryManager: net.minecraft.registry.DynamicRegistryManager,
+        registryManager: net.minecraft.core.RegistryAccess,
         serialized: String?,
     ): ItemStack {
         return deserializeStack(registryManager, serialized)
     }
 
     private fun stacksForDisplay(
-        client: MinecraftClient,
+        client: Minecraft,
         index: Int,
         activeIndex: Int,
         showLiveHotbar: Boolean,
@@ -250,7 +250,7 @@ object SavedHotbarController {
     }
 
     private fun serializeStack(
-        registryManager: net.minecraft.registry.DynamicRegistryManager,
+        registryManager: net.minecraft.core.RegistryAccess,
         stack: ItemStack,
     ): String? {
         if (stack.isEmpty) {
@@ -265,7 +265,7 @@ object SavedHotbarController {
 
         // Fallback to reflection for older versions
         return runCatching {
-            val buf = RegistryByteBuf(Unpooled.buffer(), registryManager)
+            val buf = RegistryFriendlyByteBuf(Unpooled.buffer(), registryManager)
             itemStackStreamCodec().javaClass
                 .methods
                 .first { it.name == "encode" && it.parameterTypes.size == 2 }
@@ -277,7 +277,7 @@ object SavedHotbarController {
     }
 
     private fun deserializeStack(
-        registryManager: net.minecraft.registry.DynamicRegistryManager,
+        registryManager: net.minecraft.core.RegistryAccess,
         serialized: String?,
     ): ItemStack {
         if (serialized.isNullOrBlank()) {
@@ -295,7 +295,7 @@ object SavedHotbarController {
 
         // Fallback to reflection for older versions
         return runCatching {
-            val buf = RegistryByteBuf(Unpooled.wrappedBuffer(bytes), registryManager)
+            val buf = RegistryFriendlyByteBuf(Unpooled.wrappedBuffer(bytes), registryManager)
             itemStackStreamCodec().javaClass
                 .methods
                 .first { it.name == "decode" && it.parameterTypes.size == 1 }

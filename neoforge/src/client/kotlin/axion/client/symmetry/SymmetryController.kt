@@ -1,22 +1,22 @@
 package axion.client.symmetry
 
 import axion.client.AxionClientState
-import axion.client.selection.SelectionController
-import axion.client.tool.AxionToolSelectionController
+import axion.client.current.SelectionController
+import axion.client.itemStack.AxionToolSelectionController
 import axion.common.model.AxionSubtool
 import axion.common.model.SymmetryConfig
 import axion.common.model.SymmetryMirrorAxis
 import axion.common.model.SymmetryState
-import net.minecraft.client.MinecraftClient
-import net.minecraft.client.toast.SystemToast
-import net.minecraft.text.Text
-import net.minecraft.util.math.Vec3d
+import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.components.toasts.SystemToast
+import net.minecraft.network.chat.Component
+import net.minecraft.world.phys.Vec3
 import kotlin.math.round
 
 object SymmetryController {
     private const val NUDGE_STEP: Double = 0.5
 
-    fun onEndTick(client: MinecraftClient) {
+    fun onEndTick(client: Minecraft) {
         if (!hasSymmetryConfig()) {
             AxionClientState.updateSymmetryPreview(null)
             return
@@ -39,11 +39,11 @@ object SymmetryController {
         }
     }
 
-    fun handlePrimaryAction(client: MinecraftClient): Boolean = moveAnchor()
+    fun handlePrimaryAction(client: Minecraft): Boolean = moveAnchor()
 
-    fun handleSecondaryAction(client: MinecraftClient): Boolean = moveAnchor()
+    fun handleSecondaryAction(client: Minecraft): Boolean = moveAnchor()
 
-    fun handleDeleteAction(client: MinecraftClient): Boolean {
+    fun handleDeleteAction(client: Minecraft): Boolean {
         if (!canToggleFromHotkey() || AxionClientState.symmetryState == SymmetryState.Inactive) {
             return false
         }
@@ -53,7 +53,7 @@ object SymmetryController {
         return true
     }
 
-    fun handleScroll(client: MinecraftClient, scrollAmount: Double): Boolean {
+    fun handleScroll(client: Minecraft, scrollAmount: Double): Boolean {
         if (!isSymmetrySetupActive()) {
             return false
         }
@@ -104,7 +104,7 @@ object SymmetryController {
         return true
     }
 
-    fun toggleMirror(client: MinecraftClient): Boolean {
+    fun toggleMirror(client: Minecraft): Boolean {
         if (!canToggleFromHotkey()) {
             return false
         }
@@ -149,8 +149,8 @@ object SymmetryController {
             hasSymmetryConfig()
     }
 
-    private fun quantizeToHalfGrid(position: Vec3d): Vec3d {
-        return Vec3d(
+    private fun quantizeToHalfGrid(position: Vec3): Vec3 {
+        return Vec3(
             quantizeToHalf(position.x),
             quantizeToHalf(position.y),
             quantizeToHalf(position.z),
@@ -162,14 +162,14 @@ object SymmetryController {
     }
 
     private fun showToggleFeedback(label: String, enabled: Boolean) {
-        val client = MinecraftClient.getInstance()
+        val client = Minecraft.getInstance()
         val status = if (enabled) "enabled" else "disabled"
-        client.inGameHud.setOverlayMessage(Text.literal("Axion $label symmetry $status"), false)
+        client.gui.setOverlayMessage(Component.literal("Axion $label symmetry $status"), false)
         SystemToast.add(
             client.toastManager,
             SystemToast.Type.PERIODIC_NOTIFICATION,
-            Text.literal("Axion $label symmetry"),
-            Text.literal(if (enabled) "Enabled" else "Disabled"),
+            Component.literal("Axion $label symmetry"),
+            Component.literal(if (enabled) "Enabled" else "Disabled"),
         )
     }
 

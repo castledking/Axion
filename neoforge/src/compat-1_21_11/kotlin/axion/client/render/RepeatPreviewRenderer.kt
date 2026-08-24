@@ -2,16 +2,16 @@ package axion.client.render
 
 import axion.client.network.BlockWrite
 import axion.client.network.LocalWritePlanner
-import axion.client.selection.SelectionBounds
-import axion.client.tool.RegionRepeatPlacementService
-import axion.client.tool.RepeatRegionPreview
+import axion.client.current.SelectionBounds
+import axion.client.itemStack.RegionRepeatPlacementService
+import axion.client.itemStack.RepeatRegionPreview
 import axion.common.model.BlockRegion
 import axion.common.model.ClipboardBuffer
 import axion.common.model.ClipboardCell
-import net.minecraft.client.MinecraftClient
-import net.minecraft.util.math.BlockPos
-import net.minecraft.util.math.Vec3i
-import net.minecraft.world.World
+import net.minecraft.client.Minecraft
+import net.minecraft.core.BlockPos
+import net.minecraft.core.Vec3i
+import net.minecraft.world.level.Level
 
 object RepeatPreviewRenderer {
     private const val MAX_REGION_OUTLINES: Int = 96
@@ -141,7 +141,7 @@ object RepeatPreviewRenderer {
             return
         }
 
-        val world = MinecraftClient.getInstance().world ?: return
+        val world = Minecraft.getInstance().world ?: return
         val layout = clippedSmearLayout(
             world = world,
             sourceRegion = preview.sourceRegion,
@@ -154,7 +154,7 @@ object RepeatPreviewRenderer {
         val sparseDestination = ClipboardSelectionRenderer.isSparse(layout.region, selectionClipboard)
         val nonAirCells = ghostClipboard.nonAirCells()
 
-        BlockPreviewPipeline.renderOverlay(
+        BlockPreviewPipeline.renderDecorations(
             context = context,
             scene = BlockPreviewPipeline.OverlayScene(
                 origins = if (nonAirCells.isNotEmpty()) listOf(layout.region.minCorner()) else emptyList(),
@@ -390,7 +390,7 @@ object RepeatPreviewRenderer {
     }
 
     private fun clippedSmearLayout(
-        world: World,
+        world: Level,
         sourceRegion: BlockRegion,
         clipboardBuffer: ClipboardBuffer,
         step: Vec3i,
@@ -455,7 +455,7 @@ object RepeatPreviewRenderer {
                         candidate.pos.z - min.z,
                     ),
                     state = candidate.cell.state,
-                    blockEntityData = candidate.cell.blockEntityData?.copy(),
+                    blockEntityData = candidate.cell.blockData?.copy(),
                 )
             }
 

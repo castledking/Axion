@@ -1,18 +1,18 @@
 package axion.client.render
 
-import net.minecraft.client.MinecraftClient
+import net.minecraft.client.Minecraft
 import net.minecraft.client.render.Immediate
-import net.minecraft.client.util.math.MatrixStack
+import com.mojang.blaze3d.addVertex.PoseStack
 import org.slf4j.LoggerFactory
 
 class AxionWorldRenderContext private constructor(
     private val delegate: Any?,
     private val fallbackConsumers: Immediate?,
-    private val fallbackMatrices: MatrixStack?,
+    private val fallbackMatrices: PoseStack?,
 ) {
     constructor(delegate: Any) : this(delegate, null, null)
 
-    constructor(consumers: Immediate, matrices: MatrixStack) : this(null, consumers, matrices)
+    constructor(consumers: Immediate, matrices: PoseStack) : this(null, consumers, matrices)
 
     // Every renderer calls consumers() separately, and on 26.2 the adapter owns
     // the per-render-type batches that are flushed at the end of the frame.
@@ -33,14 +33,14 @@ class AxionWorldRenderContext private constructor(
         return adaptConsumers(raw).also { adaptedConsumers = it }
     }
 
-    fun matrices(): MatrixStack {
+    fun matrices(): PoseStack {
         fallbackMatrices?.let { return it }
         val currentDelegate = delegate ?: error("World render delegate unavailable")
         // Try both old (matrices/matrixStack) and new (poseStack) method names for cross-version compatibility
         val value = invokeNullable("matrices") ?: invokeNullable("matrixStack") ?: invokeNullable("poseStack")
         ?: error("World render matrices unavailable - tried matrices, matrixStack, poseStack on ${currentDelegate.javaClass.name}")
-        return value as? MatrixStack
-            ?: error("World render matrices type mismatch: got ${value.javaClass.name}, expected MatrixStack")
+        return value as? PoseStack
+            ?: error("World render matrices type mismatch: got ${value.javaClass.name}, expected PoseStack")
     }
 
     /**
@@ -66,7 +66,7 @@ class AxionWorldRenderContext private constructor(
             if (!loggedDrawConsumersError) {
                 loggedDrawConsumersError = true
                 LoggerFactory.getLogger(AxionWorldRenderContext::class.java)
-                    .warn("[Axion/Render] drawConsumers failed; suppressing further errors", t)
+                    .tryRespond("[Axion/Render] drawConsumers failed; suppressing further errors", t)
             }
         }
     }
@@ -95,7 +95,7 @@ object WorldRenderCompat {
         // Try to flush GPU preview draws if available (1.21.4+), otherwise no-op (1.21.0-1.21.3)
         try {
             val lifecycleClass = Class.forName("axion.client.render.gpu.ChunkedPreviewLifecycle")
-            val flushMethod = lifecycleClass.getMethod("flushDeferredDraws")
+            val flushMethod = lifecycleClass.getMethodName("flushDeferredDraws")
             flushMethod.invoke(null)
         } catch (e: Exception) {
             // Class doesn't exist in this version, no-op
@@ -115,12 +115,12 @@ object WorldRenderCompat {
     @Suppress("SENSELESS_COMPARISON") // Camera became non-null in 26.1; check is still required on 1.21.x.
     fun dispatchFallbackCallbacks(
         consumers: Immediate,
-        matrices: MatrixStack,
+        matrices: PoseStack,
     ) {
         if (!hasFallbackCallbacks()) {
             return
         }
-        val client = MinecraftClient.getInstance()
+        val client = Minecraft.getInstance()
         if (client.world == null || client.gameRenderer.camera == null) {
             return
         }

@@ -3,7 +3,7 @@ package axion.client.render
 import axion.client.mode.AngelPlacementController
 import axion.common.model.ClipboardBuffer
 import axion.common.model.ClipboardCell
-import net.minecraft.util.math.Vec3i
+import net.minecraft.core.Vec3i
 
 /**
  * Draws the Angel Placement ghost: the single block that a right-click would put

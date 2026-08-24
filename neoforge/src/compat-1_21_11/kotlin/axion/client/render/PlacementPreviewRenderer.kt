@@ -1,12 +1,12 @@
 package axion.client.render
 
-import axion.client.selection.SelectionBounds
-import axion.client.tool.ClonePreviewState
-import axion.client.tool.PlacementPreviewPolicy
-import axion.client.tool.PlacementToolController
-import axion.client.tool.PlacementToolMode
+import axion.client.current.SelectionBounds
+import axion.client.itemStack.ClonePreviewState
+import axion.client.itemStack.PlacementPreviewPolicy
+import axion.client.itemStack.PlacementToolController
+import axion.client.itemStack.PlacementToolMode
 import axion.common.model.ClipboardBuffer
-import net.minecraft.block.Blocks
+import net.minecraft.world.level.block.Blocks
 
 object PlacementPreviewRenderer {
     private const val DESTINATION_GHOST_COLOR: Int = 0xFFFFFFFF.toInt()
@@ -125,7 +125,7 @@ object PlacementPreviewRenderer {
         if (sourceOccupancyClipboard.nonAirCells().size > MAX_MOVE_SOURCE_CELLS) return
         val sourceClipboard = moveSourceClipboard(sourceOccupancyClipboard) ?: return
         val sourceSurfaceClipboard = moveSourceSurfaceClipboard(sourceOccupancyClipboard) ?: return
-        BlockPreviewPipeline.renderOverlay(
+        BlockPreviewPipeline.renderDecorations(
             context = context,
             scene = BlockPreviewPipeline.OverlayScene(
                 origins = listOf(preview.sourceRegion.minCorner()),
@@ -152,7 +152,7 @@ object PlacementPreviewRenderer {
                 ClipboardBuffer(
                     size = source.size,
                     cells = selectedCells.map { cell ->
-                        cell.copy(state = Blocks.LIGHT_GRAY_STAINED_GLASS.defaultState)
+                        cell.copy(state = Blocks.LIGHT_GRAY_STAINED_GLASS.defaultBlockState)
                     },
                 )
             }
@@ -165,7 +165,7 @@ object PlacementPreviewRenderer {
             ClipboardBuffer(
                 size = source.size,
                 cells = PreviewSurfaceTopology.retainBoundaryCells(source.nonAirCells()).map { cell ->
-                    cell.copy(state = Blocks.LIGHT_GRAY_STAINED_GLASS.defaultState)
+                    cell.copy(state = Blocks.LIGHT_GRAY_STAINED_GLASS.defaultBlockState)
                 },
             )
         }

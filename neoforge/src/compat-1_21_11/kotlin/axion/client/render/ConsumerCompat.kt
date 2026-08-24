@@ -1,11 +1,11 @@
 package axion.client.render
 
-import net.minecraft.client.render.RenderLayer
-import net.minecraft.client.render.VertexConsumer
-import net.minecraft.client.render.VertexConsumerProvider
+import net.minecraft.client.renderer.rendertype.RenderType
+import com.mojang.blaze3d.addVertex.VertexConsumer
+import net.minecraft.client.renderer.MultiBufferSource
 
-fun Any.getBuffer(layer: RenderLayer): VertexConsumer =
-    (this as VertexConsumerProvider).getBuffer(layer)
+fun Any.getBuffer(layer: RenderType): VertexConsumer =
+    (this as MultiBufferSource).getBuffer(layer)
 
 /**
  * 26.2 deleted MultiBufferSource and hands renderers a SubmitNodeCollector, so

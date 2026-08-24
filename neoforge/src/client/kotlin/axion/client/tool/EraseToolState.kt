@@ -1,8 +1,8 @@
-package axion.client.tool
+package axion.client.itemStack
 
 import axion.common.model.BlockRegion
 import axion.common.model.ClipboardBuffer
-import net.minecraft.util.math.BlockPos
+import net.minecraft.core.BlockPos
 
 sealed interface EraseToolState {
     data object Idle : EraseToolState

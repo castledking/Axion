@@ -1,10 +1,10 @@
 package axion.client.config
 
-import net.minecraft.block.BlockState
-import net.minecraft.block.Blocks
-import net.minecraft.item.Item
-import net.minecraft.item.Items
-import net.minecraft.registry.tag.BlockTags
+import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.world.level.block.Blocks
+import net.minecraft.world.item.Item
+import net.minecraft.world.item.Items
+import net.minecraft.tags.BlockTags
 
 enum class MagicSelectRule(
     val id: String,
@@ -45,127 +45,127 @@ enum class MagicSelectRule(
         id = "slabs",
         displayName = "##slabs",
         icons = listOf(Items.OAK_SLAB),
-        matcher = ruleTagMatcher { it.isIn(BlockTags.SLABS) },
+        matcher = ruleTagMatcher { it.is(BlockTags.SLABS) },
     ),
     STAIRS(
         id = "stairs",
         displayName = "##stairs",
         icons = listOf(Items.OAK_STAIRS),
-        matcher = ruleTagMatcher { it.isIn(BlockTags.STAIRS) },
+        matcher = ruleTagMatcher { it.is(BlockTags.STAIRS) },
     ),
     WOOD(
         id = "wood",
         displayName = "##wood",
         icons = listOf(Items.OAK_PLANKS),
-        matcher = ruleTagMatcher { it.isIn(BlockTags.PLANKS) },
+        matcher = ruleTagMatcher { it.is(BlockTags.PLANKS) },
     ),
     LOGS(
         id = "logs",
         displayName = "##logs",
         icons = listOf(Items.OAK_LOG),
-        matcher = ruleTagMatcher { it.isIn(BlockTags.LOGS) },
+        matcher = ruleTagMatcher { it.is(BlockTags.LOGS) },
     ),
     LEAVES(
         id = "leaves",
         displayName = "##leaves",
         icons = listOf(Items.OAK_LEAVES),
-        matcher = ruleTagMatcher { it.isIn(BlockTags.LEAVES) },
+        matcher = ruleTagMatcher { it.is(BlockTags.LEAVES) },
     ),
     WOOL(
         id = "wool",
         displayName = "##wool",
         icons = listOf(MAGIC_SELECT_WOOL_ICON),
-        matcher = ruleTagMatcher { it.isIn(BlockTags.WOOL) },
+        matcher = ruleTagMatcher { it.is(BlockTags.WOOL) },
     ),
     CARPETS(
         id = "carpets",
         displayName = "##carpets",
         icons = listOf(MAGIC_SELECT_CARPET_ICON),
-        matcher = ruleTagMatcher { it.isIn(BlockTags.WOOL_CARPETS) },
+        matcher = ruleTagMatcher { it.is(BlockTags.WOOL_CARPETS) },
     ),
     DOORS(
         id = "doors",
         displayName = "##doors",
         icons = listOf(Items.OAK_DOOR),
-        matcher = ruleTagMatcher { it.isIn(BlockTags.DOORS) },
+        matcher = ruleTagMatcher { it.is(BlockTags.DOORS) },
     ),
     TRAPDOORS(
         id = "trapdoors",
         displayName = "##trapdoors",
         icons = listOf(Items.OAK_TRAPDOOR),
-        matcher = ruleTagMatcher { it.isIn(BlockTags.TRAPDOORS) },
+        matcher = ruleTagMatcher { it.is(BlockTags.TRAPDOORS) },
     ),
     FENCES(
         id = "fences",
         displayName = "##fences",
         icons = listOf(Items.OAK_FENCE),
-        matcher = ruleTagMatcher { it.isIn(BlockTags.FENCES) },
+        matcher = ruleTagMatcher { it.is(BlockTags.FENCES) },
     ),
     WALLS(
         id = "walls",
         displayName = "##walls",
         icons = listOf(Items.COBBLESTONE_WALL),
-        matcher = ruleTagMatcher { it.isIn(BlockTags.WALLS) },
+        matcher = ruleTagMatcher { it.is(BlockTags.WALLS) },
     ),
     FLOWERS(
         id = "flowers",
         displayName = "##flowers",
         icons = listOf(Items.DANDELION),
-        matcher = ruleTagMatcher { it.isIn(BlockTags.FLOWERS) },
+        matcher = ruleTagMatcher { it.is(BlockTags.FLOWERS) },
     ),
     SAPLINGS(
         id = "saplings",
         displayName = "##saplings",
         icons = listOf(Items.OAK_SAPLING),
-        matcher = ruleTagMatcher { it.isIn(MAGIC_SELECT_SAPLINGS_TAG) },
+        matcher = ruleTagMatcher { it.is(MAGIC_SELECT_SAPLINGS_TAG) },
     ),
     RAILS(
         id = "rails",
         displayName = "##rails",
         icons = listOf(Items.RAIL),
-        matcher = ruleTagMatcher { it.isIn(BlockTags.RAILS) },
+        matcher = ruleTagMatcher { it.is(BlockTags.RAILS) },
     ),
     BUTTONS(
         id = "buttons",
         displayName = "##buttons",
         icons = listOf(Items.OAK_BUTTON),
-        matcher = ruleTagMatcher { it.isIn(BlockTags.BUTTONS) },
+        matcher = ruleTagMatcher { it.is(BlockTags.BUTTONS) },
     ),
     PRESSURE_PLATES(
         id = "pressure_plates",
         displayName = "##pressure_plates",
         icons = listOf(Items.STONE_PRESSURE_PLATE),
-        matcher = ruleTagMatcher { it.isIn(BlockTags.PRESSURE_PLATES) },
+        matcher = ruleTagMatcher { it.is(BlockTags.PRESSURE_PLATES) },
     ),
     BEDS(
         id = "beds",
         displayName = "##beds",
         icons = listOf(MAGIC_SELECT_BED_ICON),
-        matcher = ruleTagMatcher { it.isIn(BlockTags.BEDS) },
+        matcher = ruleTagMatcher { it.is(BlockTags.BEDS) },
     ),
     CANDLES(
         id = "candles",
         displayName = "##candles",
         icons = listOf(Items.CANDLE),
-        matcher = ruleTagMatcher { it.isIn(BlockTags.CANDLES) },
+        matcher = ruleTagMatcher { it.is(BlockTags.CANDLES) },
     ),
     SAND(
         id = "sand",
         displayName = "##sand",
         icons = listOf(Items.SAND),
-        matcher = ruleTagMatcher { it.isIn(BlockTags.SAND) },
+        matcher = ruleTagMatcher { it.is(BlockTags.SAND) },
     ),
     TERRACOTTA(
         id = "terracotta",
         displayName = "##terracotta",
         icons = listOf(Items.TERRACOTTA),
-        matcher = ruleTagMatcher { it.isIn(BlockTags.TERRACOTTA) },
+        matcher = ruleTagMatcher { it.is(BlockTags.TERRACOTTA) },
     ),
     CROPS(
         id = "crops",
         displayName = "##crops",
         icons = listOf(Items.WHEAT),
-        matcher = ruleTagMatcher { it.isIn(BlockTags.CROPS) },
+        matcher = ruleTagMatcher { it.is(BlockTags.CROPS) },
     ),
     ;
 
@@ -231,7 +231,7 @@ private fun ruleTagMatcher(predicate: (BlockState) -> Boolean): (BlockState, Blo
     }
 }
 
-private fun ruleBlockSetMatcher(blocks: Set<net.minecraft.block.Block>): (BlockState, BlockState) -> Boolean {
+private fun ruleBlockSetMatcher(blocks: Set<net.minecraft.world.level.block.Block>): (BlockState, BlockState) -> Boolean {
     return { seedState, candidateState ->
         seedState.block in blocks && candidateState.block in blocks
     }

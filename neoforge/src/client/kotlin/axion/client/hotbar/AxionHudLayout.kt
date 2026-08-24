@@ -1,8 +1,8 @@
 package axion.client.hotbar
 
 import axion.common.model.AxionSubtool
-import net.minecraft.client.MinecraftClient
-import net.minecraft.util.Arm
+import net.minecraft.client.Minecraft
+import net.minecraft.world.entity.HumanoidArm
 
 object AxionHudLayout {
     private const val HOTBAR_HALF_WIDTH: Int = 91
@@ -87,11 +87,11 @@ object AxionHudLayout {
         }
     }
 
-    fun sideSlot(client: MinecraftClient, screenWidth: Int, screenHeight: Int): SlotBounds {
+    fun sideSlot(client: Minecraft, screenWidth: Int, screenHeight: Int): SlotBounds {
         val hotbarLeft = (screenWidth / 2) - HOTBAR_HALF_WIDTH
         val slotX = when (client.options.mainArm.value) {
-            Arm.LEFT -> hotbarLeft - SLOT_SIZE - STRIP_GAP
-            Arm.RIGHT -> hotbarLeft + (HOTBAR_HALF_WIDTH * 2) + STRIP_GAP
+            HumanoidArm.LEFT -> hotbarLeft - SLOT_SIZE - STRIP_GAP
+            HumanoidArm.RIGHT -> hotbarLeft + (HOTBAR_HALF_WIDTH * 2) + STRIP_GAP
         }
 
         return SlotBounds(
@@ -263,11 +263,11 @@ object AxionHudLayout {
         val btnHeight = FLY_BUTTON_HEIGHT
         val centerX = buttonX + (SAVED_HOTBAR_PAGE_BUTTON_WIDTH / 2)
 
-        val fontHeight = MinecraftClient.getInstance().textRenderer.fontHeight
+        val fontHeight = Minecraft.getInstance().font.fontHeight
         val plusY = buttonBottom + fontHeight + 6
         val trackY = plusY + btnHeight
 
-        val sideSlot = sideSlot(MinecraftClient.getInstance(), screenWidth, screenHeight)
+        val sideSlot = sideSlot(Minecraft.getInstance(), screenWidth, screenHeight)
         val axSlotTop = sideSlot.y
         val toolboxReserve = sideSlot.size + 2 + 6
         val minusGap = 0
@@ -287,7 +287,7 @@ object AxionHudLayout {
         )
     }
 
-    fun toolboxSlotBounds(client: MinecraftClient, screenWidth: Int, screenHeight: Int): SlotBounds {
+    fun toolboxSlotBounds(client: Minecraft, screenWidth: Int, screenHeight: Int): SlotBounds {
         val sideSlot = sideSlot(client, screenWidth, screenHeight)
         return SlotBounds(
             x = sideSlot.x,

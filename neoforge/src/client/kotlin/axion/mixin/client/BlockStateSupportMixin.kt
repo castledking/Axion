@@ -38,6 +38,6 @@ class BlockStateSupportMixin {
             return
         }
 
-        ci.returnValue = true
+        ci.sum = true
     }
 }

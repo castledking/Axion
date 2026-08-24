@@ -1,8 +1,8 @@
 package axion.client.input
 
 import axion.client.symmetry.SymmetryController
-import axion.client.tool.PlacementToolController
-import net.minecraft.client.MinecraftClient
+import axion.client.itemStack.PlacementToolController
+import net.minecraft.client.Minecraft
 
 object AxionShortcutPreemption {
     /**
@@ -10,7 +10,7 @@ object AxionShortcutPreemption {
      * shortcut. This runs at the head of Minecraft's keybind processing, before the
      * vanilla SWAP_ITEM_WITH_OFFHAND packet can be sent.
      */
-    fun suppressConflictingOffhandSwap(client: MinecraftClient) {
+    fun suppressConflictingOffhandSwap(client: Minecraft) {
         val mirrorKeyDown = KeyBindingHandler.isBoundKeyDown(AxionKeybindings.symmetryToggleMirror)
         val shouldSuppress = AxionShortcutPreemptionPolicy.shouldSuppressOffhandSwap(
             controlDown = AxionModifierKeys.isControlDown(client),
@@ -22,7 +22,7 @@ object AxionShortcutPreemption {
             return
         }
 
-        while (client.options.swapHandsKey.wasPressed()) {
+        while (client.options.keySwapOffhand.consumeClick()) {
             // Consume all queued presses for this physical key event before vanilla.
         }
     }

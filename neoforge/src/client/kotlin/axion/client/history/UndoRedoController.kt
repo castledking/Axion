@@ -1,10 +1,10 @@
-package axion.client.history
+package axion.client.lastCommands
 
 import axion.client.network.AxionServerConnection
-import net.minecraft.client.MinecraftClient
+import net.minecraft.client.Minecraft
 
 object UndoRedoController {
-    fun undo(client: MinecraftClient): Boolean {
+    fun undo(client: Minecraft): Boolean {
         if (client.server == null) {
             val entry = HistoryManager.peekUndoEntry() ?: return false
             AxionServerConnection.requestUndo(entry.id)
@@ -20,7 +20,7 @@ object UndoRedoController {
         return true
     }
 
-    fun redo(client: MinecraftClient): Boolean {
+    fun redo(client: Minecraft): Boolean {
         if (client.server == null) {
             val entry = HistoryManager.peekRedoEntry() ?: return false
             AxionServerConnection.requestRedo(entry.id)

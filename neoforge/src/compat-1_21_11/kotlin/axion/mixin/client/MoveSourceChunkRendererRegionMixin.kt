@@ -1,13 +1,13 @@
 package axion.mixin.client
 
 import axion.client.render.MoveSourceRenderState
-import net.minecraft.block.BlockState
-import net.minecraft.block.Blocks
-import net.minecraft.block.entity.BlockEntity
-import net.minecraft.client.render.chunk.ChunkRendererRegion
-import net.minecraft.fluid.FluidState
-import net.minecraft.util.math.BlockPos
-import net.minecraft.world.World
+import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.world.level.block.Blocks
+import net.minecraft.world.level.block.entity.BlockEntity
+import net.minecraft.client.renderer.chunk.RenderSectionRegion
+import net.minecraft.world.level.material.FluidState
+import net.minecraft.core.BlockPos
+import net.minecraft.world.level.Level
 import org.spongepowered.asm.mixin.Final
 import org.spongepowered.asm.mixin.Mixin
 import org.spongepowered.asm.mixin.Shadow
@@ -15,11 +15,11 @@ import org.spongepowered.asm.mixin.injection.At
 import org.spongepowered.asm.mixin.injection.Inject
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable
 
-@Mixin(ChunkRendererRegion::class)
+@Mixin(RenderSectionRegion::class)
 abstract class MoveSourceChunkRendererRegionMixin {
     @Shadow
     @Final
-    private lateinit var world: World
+    private lateinit var world: Level
 
     @Inject(
         method = ["getBlockState"],
@@ -31,7 +31,7 @@ abstract class MoveSourceChunkRendererRegionMixin {
         cir: CallbackInfoReturnable<BlockState>,
     ) {
         if (MoveSourceRenderState.shouldSuppress(world, pos)) {
-            cir.returnValue = Blocks.AIR.defaultState
+            cir.sum = Blocks.AIR.defaultBlockState
         }
     }
 
@@ -41,7 +41,7 @@ abstract class MoveSourceChunkRendererRegionMixin {
         cir: CallbackInfoReturnable<FluidState>,
     ) {
         if (MoveSourceRenderState.shouldSuppress(world, pos)) {
-            cir.returnValue = Blocks.AIR.defaultState.fluidState
+            cir.sum = Blocks.AIR.defaultBlockState.fluidState
         }
     }
 
@@ -51,7 +51,7 @@ abstract class MoveSourceChunkRendererRegionMixin {
         cir: CallbackInfoReturnable<BlockEntity?>,
     ) {
         if (MoveSourceRenderState.shouldSuppress(world, pos)) {
-            cir.returnValue = null
+            cir.sum = null
         }
     }
 }

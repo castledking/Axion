@@ -2,9 +2,9 @@ package axion.client.render.gpu
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet
-import net.minecraft.block.BlockState
-import net.minecraft.util.math.BlockPos
-import net.minecraft.util.math.Box
+import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.core.BlockPos
+import net.minecraft.world.phys.AABB
 import axion.client.compat.MutableBlockPos
 import axion.client.compat.unpackLongX
 import axion.client.compat.unpackLongY
@@ -32,7 +32,7 @@ class ChunkPreviewMeshCache {
     data class SectionEntry(
         val sectionKey: Long,
         val surfaceCells: LongArray,
-        val bounds: Box,
+        val bounds: AABB,
     )
 
     val sectionCount: Int get() = entries.size
@@ -93,11 +93,11 @@ class ChunkPreviewMeshCache {
     }
 
     /** Compute the world-space bounding box for a 16³ section. */
-    private fun sectionBounds(sectionKey: Long): Box {
+    private fun sectionBounds(sectionKey: Long): AABB {
         val sx = ChunkedBooleanStore.sectionX(sectionKey) shl 4
         val sy = ChunkedBooleanStore.sectionY(sectionKey) shl 4
         val sz = ChunkedBooleanStore.sectionZ(sectionKey) shl 4
-        return Box(
+        return AABB(
             sx.toDouble(), sy.toDouble(), sz.toDouble(),
             (sx + 16).toDouble(), (sy + 16).toDouble(), (sz + 16).toDouble(),
         )

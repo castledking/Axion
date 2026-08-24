@@ -5,7 +5,7 @@ import axion.client.compat.unpackLongY
 import axion.client.compat.unpackLongZ
 import axion.common.model.ClipboardCell
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet
-import net.minecraft.util.math.BlockPos
+import net.minecraft.core.BlockPos
 
 /**
  * Extracts the outside/cavity boundary of preview occupancy without consulting

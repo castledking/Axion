@@ -1,16 +1,16 @@
 package axion.client.render
 import axion.client.compat.CameraAccess
 
-import axion.client.selection.SelectionBounds
-import com.mojang.blaze3d.vertex.VertexFormat
-import net.minecraft.client.MinecraftClient
-import net.minecraft.client.render.RenderLayer
-import net.minecraft.client.render.VertexConsumer
+import axion.client.current.SelectionBounds
+import com.mojang.blaze3d.addVertex.VertexFormat
+import net.minecraft.client.Minecraft
+import net.minecraft.client.renderer.rendertype.RenderType
+import com.mojang.blaze3d.addVertex.VertexConsumer
 import net.minecraft.client.util.math.Entry
-import net.minecraft.client.util.math.MatrixStack
-import net.minecraft.util.math.Box
-import net.minecraft.util.math.Vec3d
-import net.minecraft.util.shape.VoxelShapes
+import com.mojang.blaze3d.addVertex.PoseStack
+import net.minecraft.world.phys.AABB
+import net.minecraft.world.phys.Vec3
+import net.minecraft.world.phys.shapes.Shapes
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -41,13 +41,13 @@ object PulsingCuboidRenderer {
 
     fun render(
         context: AxionWorldRenderContext,
-        box: Box,
+        box: AABB,
         outlineColor: Int,
         lineWidth: Float,
         minAlpha: Int = DEFAULT_MIN_ALPHA,
         maxAlpha: Int = DEFAULT_MAX_ALPHA,
     ) {
-        val client = MinecraftClient.getInstance()
+        val client = Minecraft.getInstance()
         val camera = client.gameRenderer.camera ?: return
         val consumers = context.consumers()
         val cameraPos = CameraAccess.getPos(camera)
@@ -69,7 +69,7 @@ object PulsingCuboidRenderer {
         VertexRenderingCompat.drawOutline(
             matrixStack,
             consumers.getBuffer(RenderLayerCompat.lines()),
-            VoxelShapes.cuboid(box),
+            Shapes.create(box),
             -cameraPos.x,
             -cameraPos.y,
             -cameraPos.z,
@@ -80,7 +80,7 @@ object PulsingCuboidRenderer {
 
     fun renderShell(
         context: AxionWorldRenderContext,
-        box: Box,
+        box: AABB,
         outlineColor: Int,
         lineWidth: Float,
         minAlpha: Int = DEFAULT_MIN_ALPHA,
@@ -88,7 +88,7 @@ object PulsingCuboidRenderer {
         baseFillColor: Int = SHELL_BASE_FILL_COLOR,
         pulseFillColor: Int = SHELL_PULSE_FILL_COLOR,
     ) {
-        val client = MinecraftClient.getInstance()
+        val client = Minecraft.getInstance()
         val camera = client.gameRenderer.camera ?: return
         val consumers = context.consumers()
         val cameraPos = CameraAccess.getPos(camera)
@@ -117,7 +117,7 @@ object PulsingCuboidRenderer {
         VertexRenderingCompat.drawOutline(
             matrixStack,
             consumers.getBuffer(RenderLayerCompat.lines()),
-            VoxelShapes.cuboid(SelectionBounds.outlineBox(box)),
+            Shapes.create(SelectionBounds.outlineBox(box)),
             -cameraPos.x,
             -cameraPos.y,
             -cameraPos.z,
@@ -128,7 +128,7 @@ object PulsingCuboidRenderer {
 
     fun renderSelectionBox(
         context: AxionWorldRenderContext,
-        box: Box,
+        box: AABB,
         outlineColor: Int,
         lineWidth: Float,
         baseFillColor: Int,
@@ -137,7 +137,7 @@ object PulsingCuboidRenderer {
         pulseMinAlpha: Int,
         pulseMaxAlpha: Int,
     ) {
-        val client = MinecraftClient.getInstance()
+        val client = Minecraft.getInstance()
         val camera = client.gameRenderer.camera ?: return
         val consumers = context.consumers()
         val cameraPos = CameraAccess.getPos(camera)
@@ -198,11 +198,11 @@ object PulsingCuboidRenderer {
 
     fun renderOutlineBox(
         context: AxionWorldRenderContext,
-        box: Box,
+        box: AABB,
         outlineColor: Int,
         lineWidth: Float,
     ) {
-        val client = MinecraftClient.getInstance()
+        val client = Minecraft.getInstance()
         val camera = client.gameRenderer.camera ?: return
         val consumers = context.consumers()
         val cameraPos = CameraAccess.getPos(camera)
@@ -236,12 +236,12 @@ object PulsingCuboidRenderer {
      * layer makes the outline behave like the symmetry gizmo.
      */
     fun renderXrayOutline(
-        matrixStack: MatrixStack,
+        matrixStack: PoseStack,
         consumer: VertexConsumer,
-        layer: RenderLayer,
-        originOffset: Vec3d,
-        viewPos: Vec3d,
-        box: Box,
+        layer: RenderType,
+        originOffset: Vec3,
+        viewPos: Vec3,
+        box: AABB,
         color: Int,
         lineWidth: Float,
     ) {
@@ -260,7 +260,7 @@ object PulsingCuboidRenderer {
         }
     }
 
-    private fun beamHalfThickness(viewPos: Vec3d, edge: Box, lineWidth: Float): Double {
+    private fun beamHalfThickness(viewPos: Vec3, edge: AABB, lineWidth: Float): Double {
         val dx = ((edge.minX + edge.maxX) * 0.5) - viewPos.x
         val dy = ((edge.minY + edge.maxY) * 0.5) - viewPos.y
         val dz = ((edge.minZ + edge.maxZ) * 0.5) - viewPos.z
@@ -270,29 +270,29 @@ object PulsingCuboidRenderer {
     }
 
     /** The twelve edges of [box] as degenerate boxes, ready to be inflated into beams. */
-    private inline fun forEachEdge(box: Box, action: (Box) -> Unit) {
-        action(Box(box.minX, box.minY, box.minZ, box.maxX, box.minY, box.minZ))
-        action(Box(box.minX, box.minY, box.maxZ, box.maxX, box.minY, box.maxZ))
-        action(Box(box.minX, box.maxY, box.minZ, box.maxX, box.maxY, box.minZ))
-        action(Box(box.minX, box.maxY, box.maxZ, box.maxX, box.maxY, box.maxZ))
+    private inline fun forEachEdge(box: AABB, action: (AABB) -> Unit) {
+        action(AABB(box.minX, box.minY, box.minZ, box.maxX, box.minY, box.minZ))
+        action(AABB(box.minX, box.minY, box.maxZ, box.maxX, box.minY, box.maxZ))
+        action(AABB(box.minX, box.maxY, box.minZ, box.maxX, box.maxY, box.minZ))
+        action(AABB(box.minX, box.maxY, box.maxZ, box.maxX, box.maxY, box.maxZ))
 
-        action(Box(box.minX, box.minY, box.minZ, box.minX, box.maxY, box.minZ))
-        action(Box(box.maxX, box.minY, box.minZ, box.maxX, box.maxY, box.minZ))
-        action(Box(box.minX, box.minY, box.maxZ, box.minX, box.maxY, box.maxZ))
-        action(Box(box.maxX, box.minY, box.maxZ, box.maxX, box.maxY, box.maxZ))
+        action(AABB(box.minX, box.minY, box.minZ, box.minX, box.maxY, box.minZ))
+        action(AABB(box.maxX, box.minY, box.minZ, box.maxX, box.maxY, box.minZ))
+        action(AABB(box.minX, box.minY, box.maxZ, box.minX, box.maxY, box.maxZ))
+        action(AABB(box.maxX, box.minY, box.maxZ, box.maxX, box.maxY, box.maxZ))
 
-        action(Box(box.minX, box.minY, box.minZ, box.minX, box.minY, box.maxZ))
-        action(Box(box.maxX, box.minY, box.minZ, box.maxX, box.minY, box.maxZ))
-        action(Box(box.minX, box.maxY, box.minZ, box.minX, box.maxY, box.maxZ))
-        action(Box(box.maxX, box.maxY, box.minZ, box.maxX, box.maxY, box.maxZ))
+        action(AABB(box.minX, box.minY, box.minZ, box.minX, box.minY, box.maxZ))
+        action(AABB(box.maxX, box.minY, box.minZ, box.maxX, box.minY, box.maxZ))
+        action(AABB(box.minX, box.maxY, box.minZ, box.minX, box.maxY, box.maxZ))
+        action(AABB(box.maxX, box.maxY, box.minZ, box.maxX, box.maxY, box.maxZ))
     }
 
     fun renderFilledBox(
-        matrixStack: MatrixStack,
+        matrixStack: PoseStack,
         consumer: VertexConsumer,
-        layer: RenderLayer,
-        cameraPos: Vec3d,
-        box: Box,
+        layer: RenderType,
+        cameraPos: Vec3,
+        box: AABB,
         alpha: Int,
         color: Int = 0xFFFFFFFF.toInt(),
     ) = renderFilledBox(matrixStack, consumer, layer, cameraPos, box, alpha.toFloat(), color)
@@ -309,11 +309,11 @@ object PulsingCuboidRenderer {
      * alpha values (every non-pulsing caller) byte-for-byte unchanged.
      */
     fun renderFilledBox(
-        matrixStack: MatrixStack,
+        matrixStack: PoseStack,
         consumer: VertexConsumer,
-        layer: RenderLayer,
-        cameraPos: Vec3d,
-        box: Box,
+        layer: RenderType,
+        cameraPos: Vec3,
+        box: AABB,
         alpha: Float,
         color: Int = 0xFFFFFFFF.toInt(),
     ) {
@@ -341,7 +341,7 @@ object PulsingCuboidRenderer {
         val maxX = (box.maxX - cameraPos.x).toFloat()
         val maxY = (box.maxY - cameraPos.y).toFloat()
         val maxZ = (box.maxZ - cameraPos.z).toFloat()
-        val entry = matrixStack.peek()
+        val entry = matrixStack.last()
         val red = (((color shr 16) and 0xFF) * colorScale).roundToInt()
         val green = (((color shr 8) and 0xFF) * colorScale).roundToInt()
         val blue = ((color and 0xFF) * colorScale).roundToInt()
@@ -441,10 +441,10 @@ object PulsingCuboidRenderer {
         blue: Int,
         alpha: Int,
     ) {
-        consumer.vertex(entry, x1, y1, z1).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
-        consumer.vertex(entry, x2, y2, z2).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
-        consumer.vertex(entry, x3, y3, z3).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
-        consumer.vertex(entry, x4, y4, z4).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
+        consumer.addVertex(entry, x1, y1, z1).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
+        consumer.addVertex(entry, x2, y2, z2).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
+        consumer.addVertex(entry, x3, y3, z3).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
+        consumer.addVertex(entry, x4, y4, z4).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
     }
 
     private fun emitTriangles(
@@ -494,9 +494,9 @@ object PulsingCuboidRenderer {
         blue: Int,
         alpha: Int,
     ) {
-        consumer.vertex(entry, x1, y1, z1).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
-        consumer.vertex(entry, x2, y2, z2).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
-        consumer.vertex(entry, x3, y3, z3).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
+        consumer.addVertex(entry, x1, y1, z1).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
+        consumer.addVertex(entry, x2, y2, z2).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
+        consumer.addVertex(entry, x3, y3, z3).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
     }
 
     fun pulsingAlpha(

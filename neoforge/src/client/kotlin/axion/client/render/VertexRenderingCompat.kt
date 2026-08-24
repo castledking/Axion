@@ -1,16 +1,16 @@
 package axion.client.render
 
-import net.minecraft.client.render.VertexConsumer
+import com.mojang.blaze3d.addVertex.VertexConsumer
 import net.minecraft.client.util.math.Entry
-import net.minecraft.client.util.math.MatrixStack
-import net.minecraft.util.math.Box
-import net.minecraft.util.shape.VoxelShape
+import com.mojang.blaze3d.addVertex.PoseStack
+import net.minecraft.world.phys.AABB
+import net.minecraft.world.phys.shapes.VoxelShape
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 
 object VertexRenderingCompat {
     private val drawOutlineMethod: Method? by lazy {
-        net.minecraft.client.render.VertexRendering::class.java.methods.firstOrNull { method ->
+        net.minecraft.client.renderer.ShapeRenderer::class.java.methods.firstOrNull { method ->
             if (!Modifier.isStatic(method.modifiers) || method.returnType != Void.TYPE) {
                 return@firstOrNull false
             }
@@ -19,7 +19,7 @@ object VertexRenderingCompat {
             when (params.size) {
                 7 -> params.contentEquals(
                     arrayOf(
-                        MatrixStack::class.java,
+                        PoseStack::class.java,
                         VertexConsumer::class.java,
                         VoxelShape::class.java,
                         Double::class.javaPrimitiveType,
@@ -31,7 +31,7 @@ object VertexRenderingCompat {
 
                 8 -> params.contentEquals(
                     arrayOf(
-                        MatrixStack::class.java,
+                        PoseStack::class.java,
                         VertexConsumer::class.java,
                         VoxelShape::class.java,
                         Double::class.javaPrimitiveType,
@@ -70,14 +70,14 @@ object VertexRenderingCompat {
     }
 
     private val drawFilledBoxMethod: Method? by lazy {
-        net.minecraft.client.render.VertexRendering::class.java.methods.firstOrNull { method ->
+        net.minecraft.client.renderer.ShapeRenderer::class.java.methods.firstOrNull { method ->
             if (!Modifier.isStatic(method.modifiers) || method.returnType != Void.TYPE) {
                 return@firstOrNull false
             }
 
             method.parameterTypes.contentEquals(
                 arrayOf(
-                    MatrixStack::class.java,
+                    PoseStack::class.java,
                     VertexConsumer::class.java,
                     Double::class.javaPrimitiveType,
                     Double::class.javaPrimitiveType,
@@ -95,7 +95,7 @@ object VertexRenderingCompat {
     }
 
     fun drawOutline(
-        matrixStack: MatrixStack,
+        matrixStack: PoseStack,
         consumer: VertexConsumer,
         shape: VoxelShape,
         cameraX: Double,
@@ -117,7 +117,7 @@ object VertexRenderingCompat {
     }
 
     fun drawOutlineNoOffset(
-        matrixStack: MatrixStack,
+        matrixStack: PoseStack,
         consumer: VertexConsumer,
         shape: VoxelShape,
         color: Int,
@@ -136,7 +136,7 @@ object VertexRenderingCompat {
     }
 
     private fun drawOutlineManual(
-        matrixStack: MatrixStack,
+        matrixStack: PoseStack,
         consumer: VertexConsumer,
         shape: VoxelShape,
         cameraX: Double,
@@ -146,14 +146,14 @@ object VertexRenderingCompat {
         lineWidth: Float,
     ) {
         val boxes = getBoxesMethod?.invoke(shape) as? List<*> ?: return
-        val entry = matrixStack.peek()
+        val entry = matrixStack.last()
         val red = (color shr 16) and 0xFF
         val green = (color shr 8) and 0xFF
         val blue = color and 0xFF
         val alpha = (color ushr 24) and 0xFF
 
         for (obj in boxes) {
-            val box = obj as? Box ?: continue
+            val box = obj as? AABB ?: continue
             val minX = outlineCoordinate(box.minX, cameraX)
             val minY = outlineCoordinate(box.minY, cameraY)
             val minZ = outlineCoordinate(box.minZ, cameraZ)
@@ -202,14 +202,14 @@ object VertexRenderingCompat {
         val normalY = (y2 - y1).coerceIn(-1f, 1f)
         val normalZ = (z2 - z1).coerceIn(-1f, 1f)
         val lwm = lineWidthMethod
-        consumer.vertex(entry, x1, y1, z1).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
+        consumer.addVertex(entry, x1, y1, z1).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
         lwm?.invoke(consumer, lineWidth)
-        consumer.vertex(entry, x2, y2, z2).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
+        consumer.addVertex(entry, x2, y2, z2).color(red, green, blue, alpha).normal(entry, normalX, normalY, normalZ)
         lwm?.invoke(consumer, lineWidth)
     }
 
     fun drawFilledBox(
-        matrixStack: MatrixStack,
+        matrixStack: PoseStack,
         consumer: VertexConsumer,
         minX: Double,
         minY: Double,

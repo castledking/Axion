@@ -1,15 +1,15 @@
 package axion.client.render
 
-import axion.client.tool.CloneToolState
-import axion.client.tool.PlacementPreviewPolicy
-import axion.client.tool.PlacementToolMode
+import axion.client.itemStack.CloneToolState
+import axion.client.itemStack.PlacementPreviewPolicy
+import axion.client.itemStack.PlacementToolMode
 import axion.common.model.ClipboardBuffer
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet
-import net.minecraft.block.BlockState
-import net.minecraft.block.Blocks
-import net.minecraft.client.MinecraftClient
-import net.minecraft.client.world.ClientWorld
-import net.minecraft.util.math.BlockPos
+import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.world.level.block.Blocks
+import net.minecraft.client.Minecraft
+import net.minecraft.client.multiplayer.ClientLevel
+import net.minecraft.core.BlockPos
 
 /**
  * Selected source blocks that must be absent from vanilla's baked chunk mesh
@@ -27,7 +27,7 @@ object MoveSourceRenderState {
     )
 
     private data class Snapshot(
-        val world: ClientWorld,
+        val world: ClientLevel,
         val clipboard: ClipboardBuffer,
         val sourceOrigin: BlockPos,
         val positions: LongOpenHashSet,
@@ -38,7 +38,7 @@ object MoveSourceRenderState {
     private var snapshot: Snapshot? = null
 
     fun synchronize(state: CloneToolState) {
-        val world = runCatching { MinecraftClient.getInstance().world }.getOrNull()
+        val world = runCatching { Minecraft.getInstance().world }.getOrNull()
         synchronize(world, state)
     }
 
@@ -52,14 +52,14 @@ object MoveSourceRenderState {
     }
 
     fun suppressedState(worldIdentity: Any, x: Int, y: Int, z: Int): BlockState? {
-        return if (shouldSuppress(worldIdentity, x, y, z)) Blocks.AIR.defaultState else null
+        return if (shouldSuppress(worldIdentity, x, y, z)) Blocks.AIR.defaultBlockState else null
     }
 
     /**
      * Drops a mask tied to an unloaded/different world. The caller resets the
      * placement preview too, since its captured source is not valid there.
      */
-    fun clearIfWorldChanged(world: ClientWorld?): Boolean {
+    fun clearIfWorldChanged(world: ClientLevel?): Boolean {
         val current = snapshot ?: return false
         if (current.world === world) return false
         snapshot = null
@@ -74,7 +74,7 @@ object MoveSourceRenderState {
         snapshot = null
     }
 
-    private fun synchronize(world: ClientWorld?, state: CloneToolState) {
+    private fun synchronize(world: ClientLevel?, state: CloneToolState) {
         val preview = PlacementPreviewPolicy.activePreview(state)
             ?.takeIf { it.mode == PlacementToolMode.MOVE }
         val previous = snapshot

@@ -3,8 +3,8 @@ package axion.client.render
 import com.mojang.blaze3d.buffers.GpuBuffer
 import com.mojang.blaze3d.systems.RenderPass
 import com.mojang.blaze3d.systems.RenderSystem
-import com.mojang.blaze3d.vertex.VertexFormat
-import net.minecraft.client.render.BuiltBuffer
+import com.mojang.blaze3d.addVertex.VertexFormat
+import com.mojang.blaze3d.addVertex.MeshData
 import net.minecraft.client.render.DrawMode
 import java.util.function.Supplier
 
@@ -41,20 +41,20 @@ class AxionPreviewBuffer : AutoCloseable {
     val indexCountValue: Int get() = indexCount
 
     /** Expose vertex format for custom preview pipelines. */
-    val vertexFormatValue: com.mojang.blaze3d.vertex.VertexFormat get() = RenderLayerCompat.blockTranslucentCull().vertexFormat
+    val vertexFormatValue: com.mojang.blaze3d.addVertex.VertexFormat get() = RenderLayerCompat.blockTranslucentCull().format
 
     /** Expose draw mode for custom preview pipelines. */
     val drawModeValue: DrawMode get() = drawMode
 
     /**
-     * Upload a BuiltBuffer to GPU. Follows ChunkRenderData.upload pattern:
+     * Upload a MeshData to GPU. Follows ChunkRenderData.upload pattern:
      * - If existing buffer is too small, close and recreate
      * - If existing buffer fits, use CommandEncoder.writeToBuffer for in-place update
      */
-    fun upload(builtBuffer: BuiltBuffer) {
-        val params = builtBuffer.drawParameters
+    fun upload(builtBuffer: MeshData) {
+        val params = builtBuffer.drawState
         val vertexData = builtBuffer.buffer
-        val indexData = builtBuffer.sortedBuffer
+        val indexData = builtBuffer.indexBuffer
 
         val device = RenderSystem.getDevice()
         val commandEncoder = device.createCommandEncoder()

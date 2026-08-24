@@ -1,20 +1,20 @@
-package axion.client.tool
+package axion.client.itemStack
 
 import axion.client.AxionClientState
-import axion.client.selection.SelectionController
-import axion.client.selection.blockPosOrNull
+import axion.client.current.SelectionController
+import axion.client.current.blockPosOrNull
 import axion.client.symmetry.SymmetryAwareOperationDispatcher
 import axion.common.model.AxionSubtool
 import axion.common.model.BlockRegion
 import axion.common.model.ClipboardState
 import axion.common.model.SelectionState
-import net.minecraft.client.MinecraftClient
+import net.minecraft.client.Minecraft
 import axion.client.compat.toImmutable
 
 object SmearToolController {
     private val dispatcher = SymmetryAwareOperationDispatcher()
 
-    fun onEndTick(client: MinecraftClient) {
+    fun onEndTick(client: Minecraft) {
         if (!isSmearActive() && AxionClientState.smearToolState !is SmearToolState.Idle) {
             reset()
         }
@@ -29,7 +29,7 @@ object SmearToolController {
         is SmearToolState.PreviewingSmear -> state.preview
     }
 
-    fun handlePrimaryAction(client: MinecraftClient): Boolean {
+    fun handlePrimaryAction(client: Minecraft): Boolean {
         if (!isSmearActive()) {
             return false
         }
@@ -47,7 +47,7 @@ object SmearToolController {
         }
     }
 
-    fun handleSecondaryAction(client: MinecraftClient): Boolean {
+    fun handleSecondaryAction(client: Minecraft): Boolean {
         if (!isSmearActive()) {
             return false
         }
@@ -60,7 +60,7 @@ object SmearToolController {
         }
     }
 
-    fun handleMiddleAction(client: MinecraftClient): Boolean {
+    fun handleMiddleAction(client: Minecraft): Boolean {
         if (!isSmearActive()) {
             return false
         }
@@ -89,7 +89,7 @@ object SmearToolController {
         }
     }
 
-    fun handleScroll(client: MinecraftClient, scrollAmount: Double): Boolean {
+    fun handleScroll(client: Minecraft, scrollAmount: Double): Boolean {
         if (!isSmearActive() || scrollAmount.compareTo(0.0) == 0) {
             return false
         }
@@ -106,7 +106,7 @@ object SmearToolController {
                         else -> magicSelection.region.start
                     },
                     sourceRegion = magicSelection.region,
-                    clipboardBuffer = magicSelection.clipboardBuffer,
+                    clipboardBuffer = magicSelection.clipboardScratchBuffer,
                     scrollAmount = scrollAmount,
                 ) ?: return false
                 SmearToolState.PreviewingSmear(preview)
@@ -114,7 +114,7 @@ object SmearToolController {
 
             is SmearToolState.RegionDefined -> {
                 val world = client.world ?: return false
-                val clipboard = state.clipboardBuffer ?: ClipboardCaptureService.capture(world, state.region)
+                val clipboard = state.clipboardScratchBuffer ?: ClipboardCaptureService.capture(world, state.region)
                 val preview = SmearPlacementService.createInitialPreview(
                     client = client,
                     firstCorner = state.firstCorner,
@@ -132,7 +132,7 @@ object SmearToolController {
                         state.preview.firstCorner,
                         state.preview.sourceRegion.oppositeCorner(state.preview.firstCorner),
                         state.preview.sourceRegion,
-                        state.preview.clipboardBuffer,
+                        state.preview.clipboardScratchBuffer,
                     )
                 } else {
                     SmearToolState.PreviewingSmear(preview)
@@ -188,7 +188,7 @@ object SmearToolController {
     }
 
     private fun magicSelect(
-        client: MinecraftClient,
+        client: Minecraft,
     ): Boolean {
         val world = client.world ?: return false
         val seed = SelectionController.currentTarget().blockPosOrNull()?.toImmutable() ?: return false
@@ -196,7 +196,7 @@ object SmearToolController {
         val merged = when (val clipboardState = AxionClientState.clipboardState) {
             is ClipboardState.MagicSelection -> MagicSelectionService.merge(
                 existingRegion = clipboardState.region,
-                existingClipboard = clipboardState.clipboardBuffer,
+                existingClipboard = clipboardState.clipboardScratchBuffer,
                 addition = result,
             )
             ClipboardState.Empty -> result
@@ -204,7 +204,7 @@ object SmearToolController {
         AxionClientState.updateClipboard(
             ClipboardState.MagicSelection(
                 region = merged.region,
-                clipboardBuffer = merged.clipboardBuffer,
+                clipboardBuffer = merged.clipboardScratchBuffer,
             ),
         )
         return true

@@ -1,10 +1,10 @@
 package axion.client.hotbar
 
 import axion.client.compat.VersionCompatImpl
-import net.minecraft.client.MinecraftClient
-import net.minecraft.client.gui.DrawContext
-import net.minecraft.client.gui.widget.ButtonWidget
-import net.minecraft.text.Text
+import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.GuiGraphics
+import net.minecraft.client.gui.components.Button
+import net.minecraft.network.chat.Component
 
 /**
  * Detached vanilla widgets used by the Alt HUD.
@@ -17,7 +17,7 @@ object VanillaHudButtonStore {
     const val CREATE_DISPLAY_ENTITY: String = "saved.create_display_entity"
     const val EDIT_BLOCK_ATTRIBUTES: String = "saved.edit_block_attributes"
     const val SURVIVAL: String = "saved.survival"
-    const val SPECTATOR: String = "saved.spectator"
+    const val SPECTATOR: String = "saved.isSpectator"
     const val CREATIVE: String = "saved.creative"
     const val MIDDLE_CLICK: String = "toolbar.middle_click"
     const val KEEP_EXISTING: String = "toolbar.keep_existing"
@@ -35,13 +35,13 @@ object VanillaHudButtonStore {
 
     private data class CachedButton(
         val spec: ButtonSpec,
-        val widget: ButtonWidget,
+        val widget: Button,
     )
 
     private val buttons = linkedMapOf<String, CachedButton>()
 
     fun render(
-        context: DrawContext,
+        context: GuiGraphics,
         key: String,
         label: String,
         x: Int,
@@ -55,7 +55,7 @@ object VanillaHudButtonStore {
         val button = buttons[key]
             ?.takeIf { it.spec == spec }
             ?.widget
-            ?: ButtonWidget.builder(Text.literal(label)) { }
+            ?: Button.builder(Component.literal(label)) { }
                 .dimensions(x, y, width, height)
                 .build()
                 .also { buttons[key] = CachedButton(spec, it) }
@@ -63,7 +63,7 @@ object VanillaHudButtonStore {
         button.active = enabled
         button.setFocused(selected)
 
-        val client = MinecraftClient.getInstance()
+        val client = Minecraft.getInstance()
         VersionCompatImpl.renderVanillaButton(
             context = context,
             button = button,
@@ -73,7 +73,7 @@ object VanillaHudButtonStore {
         )
     }
 
-    fun click(client: MinecraftClient, key: String, mouseButton: Int): Boolean {
+    fun click(client: Minecraft, key: String, mouseButton: Int): Boolean {
         val button = buttons[key]?.widget ?: return false
         return VersionCompatImpl.clickVanillaButton(
             client = client,

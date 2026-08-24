@@ -2,26 +2,26 @@ package axion.client.render
 
 import axion.client.render.gpu.PreviewOcclusionCompat
 import axion.client.render.gpu.PreviewOcclusionPolicy
-import net.minecraft.block.BlockRenderType
-import net.minecraft.block.BlockState
-import net.minecraft.block.Blocks
-import net.minecraft.block.entity.BlockEntity
-import net.minecraft.client.MinecraftClient
-import net.minecraft.client.render.VertexConsumer
-import net.minecraft.client.render.model.BlockModelPart
-import net.minecraft.client.util.math.MatrixStack
-import net.minecraft.util.math.BlockPos
-import net.minecraft.util.math.Direction
-import net.minecraft.util.math.random.Random
-import net.minecraft.world.BlockRenderView
-import net.minecraft.world.LightType
-import net.minecraft.world.biome.ColorResolver
-import net.minecraft.world.chunk.light.LightingProvider
+import net.minecraft.world.level.block.RenderShape
+import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.world.level.block.Blocks
+import net.minecraft.world.level.block.entity.BlockEntity
+import net.minecraft.client.Minecraft
+import com.mojang.blaze3d.vertex.VertexConsumer
+import net.minecraft.client.renderer.block.model.BlockModelPart
+import com.mojang.blaze3d.vertex.PoseStack
+import net.minecraft.core.BlockPos
+import net.minecraft.core.Direction
+import net.minecraft.util.RandomSource
+import net.minecraft.world.level.BlockAndTintGetter
+import net.minecraft.world.level.LightLayer
+import net.minecraft.world.level.ColorResolver
+import net.minecraft.world.level.lighting.LevelLightEngine
 
 /**
  * Tessellates blocks directly using blockRenderManager.renderBlock() instead of
  * the expensive renderBlockAsEntity() path. Caches BakedModel lookups and provides
- * a reusable BlockRenderView for preview regions.
+ * a reusable BlockAndTintGetter for preview regions.
  *
  * Avoids entity-rendering overhead,
  * caches model references, and supports ambient occlusion via the block pipeline.
@@ -29,7 +29,7 @@ import net.minecraft.world.chunk.light.LightingProvider
 object AxionBlockTessellator {
 
     /** Thread-local random for getting block model parts (avoids allocation per block). */
-    private val threadLocalRandom: ThreadLocal<Random> = ThreadLocal.withInitial { Random.create() }
+    private val threadLocalRandom: ThreadLocal<RandomSource> = ThreadLocal.withInitial { RandomSource.create() }
 
     /** Reusable list for collecting model parts (avoids allocation per block). */
     private val threadLocalParts: ThreadLocal<MutableList<BlockModelPart>> = ThreadLocal.withInitial { ArrayList(16) }
@@ -42,14 +42,14 @@ object AxionBlockTessellator {
      * Tessellate a single block into a VertexConsumer using the block render pipeline.
      * This bypasses the entity-rendering overhead of renderBlockAsEntity().
      *
-     * Gets the block's model parts via BlockStateModel.addParts() and passes them
+     * Gets the block's model parts via BlockStateModel.addCommonParts() and passes them
      * to renderBlock(). Previously passed emptyList() which produced zero vertices.
      */
     fun tessellateBlock(
         state: BlockState,
         pos: BlockPos,
-        world: BlockRenderView,
-        matrixStack: MatrixStack,
+        world: BlockAndTintGetter,
+        matrixStack: PoseStack,
         consumer: VertexConsumer,
         checkSides: Boolean = true,
         cameraX: Double = 0.0,
@@ -60,16 +60,16 @@ object AxionBlockTessellator {
         if (state.isAir) {
             return false
         }
-        val blockRenderManager = MinecraftClient.getInstance().blockRenderManager
+        val blockRenderManager = Minecraft.getInstance().blockRenderManager
         var rendered = false
 
-        if (state.renderType == BlockRenderType.MODEL) {
+        if (state.renderType == RenderShape.MODEL) {
             val model = blockRenderManager.getModel(state)
             val random = threadLocalRandom.get()
             val parts = threadLocalParts.get()
             parts.clear()
-            random.setSeed(state.getRenderingSeed(pos))
-            model.addParts(random, parts)
+            random.setSeed(state.getSeed(pos))
+            model.addCommonParts(random, parts)
             if (parts.isNotEmpty()) {
                 blockRenderManager.renderBlock(state, pos, world, matrixStack, consumer, checkSides, parts)
                 rendered = true
@@ -97,8 +97,8 @@ object AxionBlockTessellator {
      */
     fun tessellateBatch(
         blocks: List<PreviewBlockInfo>,
-        world: BlockRenderView,
-        matrixStack: MatrixStack,
+        world: BlockAndTintGetter,
+        matrixStack: PoseStack,
         consumer: VertexConsumer,
         cameraX: Double,
         cameraY: Double,
@@ -136,16 +136,16 @@ object AxionBlockTessellator {
     }
 
     /**
-     * A BlockRenderView that overlays preview block states onto the real world.
+     * A BlockAndTintGetter that overlays preview block states onto the real world.
      * Positions in the statesByPosition map return the preview state; all others
      * fall through to the actual ClientWorld.
      */
     class PreviewBlockRenderView(
-        val world: net.minecraft.client.world.ClientWorld,
+        val world: net.minecraft.client.multiplayer.ClientLevel,
         val statesByPosition: Map<Long, BlockState>,
         private val renderingPos: BlockPos? = null,
-    ) : BlockRenderView {
-        private val airState: BlockState = Blocks.AIR.defaultState
+    ) : BlockAndTintGetter {
+        private val airState: BlockState = Blocks.AIR.defaultBlockState
 
         override fun getBlockEntity(pos: BlockPos): BlockEntity? = null
 
@@ -179,9 +179,9 @@ object AxionBlockTessellator {
         override fun getBrightness(direction: Direction, shaded: Boolean): Float =
             previewBrightness(direction, shaded)
 
-        override fun getLightingProvider(): LightingProvider = world.lightingProvider
+        override fun getLightingProvider(): LevelLightEngine = world.lightEngine
 
-        override fun getLightLevel(type: LightType, pos: BlockPos): Int = 15
+        override fun getLightLevel(type: LightLayer, pos: BlockPos): Int = 15
 
         override fun getBaseLightLevel(pos: BlockPos, ambientDarkness: Int): Int = 15
 
@@ -192,16 +192,16 @@ object AxionBlockTessellator {
     }
 
     /**
-     * A BlockRenderView for template tessellation at offset positions.
+     * A BlockAndTintGetter for template tessellation at offset positions.
      * Returns AIR for non-clipboard positions so face culling and AO work
      * correctly regardless of real-world blocks at those coordinates.
      */
     class TemplateBlockRenderView(
-        val world: net.minecraft.client.world.ClientWorld,
+        val world: net.minecraft.client.multiplayer.ClientLevel,
         val statesByPosition: Map<Long, BlockState>,
         private val renderingPos: BlockPos? = null,
-    ) : BlockRenderView {
-        private val airState: BlockState = Blocks.AIR.defaultState
+    ) : BlockAndTintGetter {
+        private val airState: BlockState = Blocks.AIR.defaultBlockState
 
         override fun getBlockEntity(pos: BlockPos): BlockEntity? = null
 
@@ -235,9 +235,9 @@ object AxionBlockTessellator {
         override fun getBrightness(direction: Direction, shaded: Boolean): Float =
             previewBrightness(direction, shaded)
 
-        override fun getLightingProvider(): LightingProvider = world.lightingProvider
+        override fun getLightingProvider(): LevelLightEngine = world.lightEngine
 
-        override fun getLightLevel(type: LightType, pos: BlockPos): Int = 15
+        override fun getLightLevel(type: LightLayer, pos: BlockPos): Int = 15
 
         override fun getBaseLightLevel(pos: BlockPos, ambientDarkness: Int): Int = 15
 

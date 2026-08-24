@@ -1,6 +1,6 @@
 package axion.client.mode
 
-import net.minecraft.entity.Entity
+import net.minecraft.world.entity.Entity
 import java.lang.reflect.Method
 
 /**
@@ -38,7 +38,7 @@ object EntityNoClipSupport {
 
         candidates.firstNotNullOfOrNull { name ->
             try {
-                entityClass.getMethod(name, *parameters)
+                entityClass.getMethodName(name, *parameters)
             } catch (_: NoSuchMethodException) {
                 null
             }

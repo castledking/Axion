@@ -2,10 +2,10 @@ package axion.client.symmetry
 
 import axion.common.model.SymmetryConfig
 import axion.common.model.SymmetryMirrorAxis
-import net.minecraft.util.math.BlockPos
-import net.minecraft.util.math.Direction
-import net.minecraft.util.math.Vec3d
-import net.minecraft.util.math.Vec3i
+import net.minecraft.core.BlockPos
+import net.minecraft.core.Direction
+import net.minecraft.world.phys.Vec3
+import net.minecraft.core.Vec3i
 import kotlin.math.roundToInt
 
 object SymmetryTransformService {
@@ -45,7 +45,7 @@ object SymmetryTransformService {
 
     fun transformBlock(
         sourceBlock: BlockPos,
-        anchor: Vec3d,
+        anchor: Vec3,
         transform: SymmetryTransformSpec,
     ): BlockPos {
         val rawAnchorX2 = (anchor.x * 2.0).roundToInt()
@@ -87,7 +87,7 @@ object SymmetryTransformService {
     ): Direction {
         val coreVec = direction.vector
         val transformed = transformVector(
-            net.minecraft.util.math.Vec3i(coreVec.x, coreVec.y, coreVec.z),
+            net.minecraft.core.Vec3i(coreVec.x, coreVec.y, coreVec.z),
             transform
         )
         return Direction.entries.first { candidate ->
@@ -99,19 +99,19 @@ object SymmetryTransformService {
 
     private fun rotate(x: Int, y: Int, z: Int, quarterTurns: Int): Vec3i {
         return when (Math.floorMod(quarterTurns, 4)) {
-            0 -> net.minecraft.util.math.Vec3i(x, y, z)
-            1 -> net.minecraft.util.math.Vec3i(-z, y, x)
-            2 -> net.minecraft.util.math.Vec3i(-x, y, -z)
-            else -> net.minecraft.util.math.Vec3i(z, y, -x)
+            0 -> net.minecraft.core.Vec3i(x, y, z)
+            1 -> net.minecraft.core.Vec3i(-z, y, x)
+            2 -> net.minecraft.core.Vec3i(-x, y, -z)
+            else -> net.minecraft.core.Vec3i(z, y, -x)
         }
     }
 
     private fun mirror(vector: Vec3i, axis: SymmetryMirrorAxis?): Vec3i {
         return when (axis) {
             null -> vector
-            SymmetryMirrorAxis.X -> net.minecraft.util.math.Vec3i(-vector.x, vector.y, vector.z)
-            SymmetryMirrorAxis.Y -> net.minecraft.util.math.Vec3i(vector.x, -vector.y, vector.z)
-            SymmetryMirrorAxis.Z -> net.minecraft.util.math.Vec3i(vector.x, vector.y, -vector.z)
+            SymmetryMirrorAxis.X -> net.minecraft.core.Vec3i(-vector.x, vector.y, vector.z)
+            SymmetryMirrorAxis.Y -> net.minecraft.core.Vec3i(vector.x, -vector.y, vector.z)
+            SymmetryMirrorAxis.Z -> net.minecraft.core.Vec3i(vector.x, vector.y, -vector.z)
         }
     }
 

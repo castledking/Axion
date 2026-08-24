@@ -3,12 +3,12 @@ package axion.client.symmetry
 import axion.client.AxionClientState
 import axion.client.mode.AxionCapabilityPolicy
 import axion.client.mode.ModeTargeting
-import axion.client.tool.AxionToolSelectionController
+import axion.client.itemStack.AxionToolSelectionController
 import axion.common.model.BlockRegion
 import axion.common.operation.ClearRegionOperation
 import axion.common.operation.CompositeOperation
-import net.minecraft.client.MinecraftClient
-import net.minecraft.util.math.BlockPos
+import net.minecraft.client.Minecraft
+import net.minecraft.core.BlockPos
 import axion.protocol.AxionInteractionOrigin
 
 object SymmetryBreakController {
@@ -20,7 +20,7 @@ object SymmetryBreakController {
         suppressBlockUpdates = AxionCapabilityPolicy::suppressBlockUpdates,
     )
 
-    fun handlePrimaryAction(client: MinecraftClient): Boolean {
+    fun handlePrimaryAction(client: Minecraft): Boolean {
         if (!AxionToolSelectionController.isCreativeModeAllowed()) {
             return false
         }
@@ -39,7 +39,7 @@ object SymmetryBreakController {
     }
 
     fun dispatchDerivedBreaks(
-        client: MinecraftClient,
+        client: Minecraft,
         primaryPos: BlockPos,
         interactionOrigin: AxionInteractionOrigin = AxionInteractionOrigin.NONE,
     ): Boolean {

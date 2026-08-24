@@ -1,4 +1,4 @@
-package axion.client.tool
+package axion.client.itemStack
 
 import axion.client.AxionClientState
 import axion.common.operation.ClearRegionOperation
@@ -11,8 +11,8 @@ import axion.common.operation.FilteredCloneRegionOperation
 import axion.common.operation.MoveEntitiesOperation
 import axion.common.operation.SymmetryBlockPlacement
 import axion.common.operation.SymmetryPlacementOperation
-import net.minecraft.block.Blocks
-import net.minecraft.util.math.BlockPos
+import net.minecraft.world.level.block.Blocks
+import net.minecraft.core.BlockPos
 import axion.client.compat.toImmutable
 import axion.client.compat.add
 
@@ -81,7 +81,7 @@ object PlacementCommitService {
                     SymmetryBlockPlacement(
                         pos = destinationPos,
                         state = cell.state,
-                        blockEntityData = cell.blockEntityData?.copy(),
+                        blockEntityData = cell.blockData?.copy(),
                     )
                 }
             },
@@ -129,7 +129,7 @@ object PlacementCommitService {
                 SymmetryBlockPlacement(
                     pos = preview.destinationRegion.minCorner().add(cell.offset),
                     state = cell.state,
-                    blockEntityData = cell.blockEntityData?.copy(),
+                    blockEntityData = cell.blockData?.copy(),
                 )
             }
         }
@@ -143,7 +143,7 @@ object PlacementCommitService {
                     add(
                         SymmetryBlockPlacement(
                             pos = immutablePos,
-                            state = Blocks.AIR.defaultState,
+                            state = Blocks.AIR.defaultBlockState,
                             blockEntityData = null,
                         ),
                     )

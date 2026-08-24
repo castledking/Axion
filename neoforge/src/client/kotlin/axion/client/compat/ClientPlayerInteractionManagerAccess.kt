@@ -1,11 +1,11 @@
 package axion.client.compat
 
-import net.minecraft.client.network.ClientPlayerInteractionManager
+import net.minecraft.client.multiplayer.MultiPlayerGameMode
 import java.lang.reflect.Field
 
 /**
  * Reflection helper for the block-breaking cooldown field on
- * [ClientPlayerInteractionManager]. The field name has changed across
+ * [MultiPlayerGameMode]. The field name has changed across
  * versions (`blockBreakingCooldown` / `breakCooldown` / `cooldown`),
  * so we look it up by name at runtime.
  *
@@ -16,7 +16,7 @@ import java.lang.reflect.Field
  */
 object ClientPlayerInteractionManagerAccess {
     private val blockBreakingCooldownField: Field? by lazy {
-        val clazz = ClientPlayerInteractionManager::class.java
+        val clazz = MultiPlayerGameMode::class.java
         sequenceOf("blockBreakingCooldown", "breakCooldown", "cooldown")
             .mapNotNull { name ->
                 try {
@@ -28,7 +28,7 @@ object ClientPlayerInteractionManagerAccess {
             .firstOrNull()
     }
 
-    fun getBlockBreakingCooldown(manager: ClientPlayerInteractionManager): Int {
+    fun getBlockBreakingCooldown(manager: MultiPlayerGameMode): Int {
         val field = blockBreakingCooldownField ?: return 0
         return try {
             field.getInt(manager)
@@ -37,7 +37,7 @@ object ClientPlayerInteractionManagerAccess {
         }
     }
 
-    fun setBlockBreakingCooldown(manager: ClientPlayerInteractionManager, value: Int) {
+    fun setBlockBreakingCooldown(manager: MultiPlayerGameMode, value: Int) {
         val field = blockBreakingCooldownField ?: return
         try {
             field.setInt(manager, value)

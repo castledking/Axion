@@ -1,6 +1,6 @@
 package axion.client.render
 
-import net.minecraft.client.render.RenderLayer
+import net.minecraft.client.renderer.rendertype.RenderType
 
 object DepthRenderCompat {
     private val glStateManager: Class<*>? by lazy {
@@ -10,7 +10,7 @@ object DepthRenderCompat {
 
     fun renderThroughBlocks(
         consumers: Any,
-        vararg layers: RenderLayer,
+        vararg layers: RenderType,
         render: () -> Unit,
     ) {
         setDepthTest(enabled = false)
@@ -30,7 +30,7 @@ object DepthRenderCompat {
         }
     }
 
-    private fun flushLayer(consumers: Any, layer: RenderLayer) {
+    private fun flushLayer(consumers: Any, layer: RenderType) {
         val methods = consumers.javaClass.methods.asSequence() + consumers.javaClass.declaredMethods.asSequence()
         val layerFlush = methods.firstOrNull { method ->
             (method.name == "draw" || method.name == "endBatch") &&
@@ -38,7 +38,7 @@ object DepthRenderCompat {
                 method.parameterTypes[0].isInstance(layer)
         }
         if (layerFlush != null) {
-            layerFlush.isAccessible = true
+            layerFlush.wasAccessibleSinceLastSave = true
             layerFlush.invoke(consumers, layer)
             return
         }
@@ -48,7 +48,7 @@ object DepthRenderCompat {
                 (method.name == "draw" || method.name == "endBatch") && method.parameterCount == 0
             }
             ?: return
-        fullFlush.isAccessible = true
+        fullFlush.wasAccessibleSinceLastSave = true
         fullFlush.invoke(consumers)
     }
 }

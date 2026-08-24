@@ -2,32 +2,32 @@ package axion.client.network
 
 import axion.client.compat.VersionCompatImpl
 import axion.common.compat.VersionCompat
-import axion.common.history.EntityCloneChange
+import axion.common.lastCommands.EntityCloneChange
 import axion.common.operation.CloneEntitiesOperation
 import axion.common.operation.EntityMoveMirrorAxis
 import axion.protocol.IntVector3
-import net.minecraft.entity.Entity
-import net.minecraft.entity.EntityType
-import net.minecraft.entity.SpawnReason
-import net.minecraft.entity.player.PlayerEntity
-import net.minecraft.nbt.NbtCompound
-import net.minecraft.nbt.NbtList
-import net.minecraft.server.world.ServerWorld
-import net.minecraft.util.math.BlockPos
-import net.minecraft.util.math.Box
-import net.minecraft.util.math.Vec3d
-import net.minecraft.world.World
+import net.minecraft.world.entity.Entity
+import net.minecraft.world.entity.EntityType
+import net.minecraft.world.entity.EntitySpawnReason
+import net.minecraft.world.entity.player.Player
+import net.minecraft.nbt.CompoundTag
+import net.minecraft.nbt.ListTag
+import net.minecraft.server.level.ServerLevel
+import net.minecraft.core.BlockPos
+import net.minecraft.world.phys.AABB
+import net.minecraft.world.phys.Vec3
+import net.minecraft.world.level.Level
 import java.util.UUID
 import kotlin.math.atan2
 import kotlin.math.sqrt
 
 object LocalEntityCloneService {
-    fun plan(world: World, operation: CloneEntitiesOperation): List<EntityCloneChange> {
-        val serverWorld = world as? ServerWorld ?: return emptyList()
+    fun plan(world: Level, operation: CloneEntitiesOperation): List<EntityCloneChange> {
+        val serverWorld = world as? ServerLevel ?: return emptyList()
         val source = operation.sourceRegion.normalized()
         val sourceMin = source.minCorner()
         val sourceMax = source.maxCorner()
-        val queryBox = Box(
+        val queryBox = AABB(
             sourceMin.x.toDouble(),
             sourceMin.y.toDouble(),
             sourceMin.z.toDouble(),
@@ -41,7 +41,7 @@ object LocalEntityCloneService {
         )
         val seen = linkedSetOf<UUID>()
         return serverWorld.getEntitiesByClass(Entity::class.java, queryBox) { entity ->
-            entity !is PlayerEntity &&
+            entity !is Player &&
                 !VersionCompat.INSTANCE.entityIsRemoved(entity) &&
                 entityMatcher.containsFeet(
                     VersionCompat.INSTANCE.entityGetX(entity),
@@ -52,7 +52,7 @@ object LocalEntityCloneService {
             .asSequence()
             .map(::rootEntity)
             .filter { entity ->
-                entity !is PlayerEntity &&
+                entity !is Player &&
                     !VersionCompat.INSTANCE.entityIsRemoved(entity) &&
                     VersionCompat.INSTANCE.entityGetVehicle(entity) == null &&
                     seen.add(VersionCompat.INSTANCE.entityGetUuid(entity))
@@ -69,8 +69,8 @@ object LocalEntityCloneService {
             .toList()
     }
 
-    fun apply(world: World, clones: List<EntityCloneChange>) {
-        val serverWorld = world as? ServerWorld ?: return
+    fun apply(world: Level, clones: List<EntityCloneChange>) {
+        val serverWorld = world as? ServerLevel ?: return
         val spawned = linkedMapOf<UUID, Entity>()
         clones.forEach { clone ->
             spawnClone(serverWorld, clone)?.let { spawned[clone.entityId] = it }
@@ -86,17 +86,17 @@ object LocalEntityCloneService {
             .forEach(::refreshPassengerPositions)
     }
 
-    fun remove(world: World, clones: List<EntityCloneChange>) {
-        val serverWorld = world as? ServerWorld ?: return
+    fun remove(world: Level, clones: List<EntityCloneChange>) {
+        val serverWorld = world as? ServerLevel ?: return
         clones.forEach { clone ->
             serverWorld.getEntity(clone.entityId)?.discard()
         }
     }
 
-    private fun spawnClone(world: ServerWorld, clone: EntityCloneChange): Entity? {
+    private fun spawnClone(world: ServerLevel, clone: EntityCloneChange): Entity? {
         val tag = clone.entityData.copy()
         stripUuids(tag)
-        val entity = VersionCompat.INSTANCE.entityTypeLoadEntityWithPassengers(tag, world, SpawnReason.COMMAND) { entity ->
+        val entity = VersionCompat.INSTANCE.entityTypeLoadEntityWithPassengers(tag, world, EntitySpawnReason.COMMAND) { entity ->
             VersionCompat.INSTANCE.entitySetUuid(entity, clone.entityId)
             entity
         } ?: return null
@@ -106,9 +106,9 @@ object LocalEntityCloneService {
         return cloneEntity
     }
 
-    private fun capture(entity: Entity): NbtCompound? {
+    private fun capture(entity: Entity): CompoundTag? {
         val tag = VersionCompatImpl.captureEntityData(entity) ?: return null
-        val passengers = NbtList()
+        val passengers = ListTag()
         VersionCompat.INSTANCE.entityGetPassengerList(entity).forEach { passenger ->
             val p = passenger as? Entity ?: return@forEach
             capture(p)?.let(passengers::add)
@@ -119,11 +119,11 @@ object LocalEntityCloneService {
         return tag
     }
 
-    private fun stripUuids(tag: NbtCompound) {
+    private fun stripUuids(tag: CompoundTag) {
         tag.remove("UUID")
-        val passengers = tag.get("Passengers") as? NbtList ?: return
+        val passengers = tag.get("Passengers") as? ListTag ?: return
         passengers.forEach { nested ->
-            val compound = nested as? NbtCompound ?: return@forEach
+            val compound = nested as? CompoundTag ?: return@forEach
             stripUuids(compound)
         }
     }
@@ -146,7 +146,7 @@ object LocalEntityCloneService {
         val snapshot = capture(entity) ?: return emptyList()
         stripUuids(snapshot)
         val target = transformEntity(
-            position = Vec3d(VersionCompat.INSTANCE.entityGetX(entity), VersionCompat.INSTANCE.entityGetY(entity), VersionCompat.INSTANCE.entityGetZ(entity)),
+            position = Vec3(VersionCompat.INSTANCE.entityGetX(entity), VersionCompat.INSTANCE.entityGetY(entity), VersionCompat.INSTANCE.entityGetZ(entity)),
             direction = directionFromAngles(VersionCompat.INSTANCE.entityGetYaw(entity), VersionCompat.INSTANCE.entityGetPitch(entity)),
             sourceMin = sourceMin,
             sourceMax = sourceMax,
@@ -168,7 +168,7 @@ object LocalEntityCloneService {
             )
             VersionCompat.INSTANCE.entityGetPassengerList(entity).forEach { passenger ->
                 val p = passenger as? Entity ?: return@forEach
-                if (p !is PlayerEntity && !VersionCompat.INSTANCE.entityIsRemoved(p)) {
+                if (p !is Player && !VersionCompat.INSTANCE.entityIsRemoved(p)) {
                     addAll(
                         planEntityTree(
                             entity = p,
@@ -198,8 +198,8 @@ object LocalEntityCloneService {
     }
 
     private fun transformEntity(
-        position: Vec3d,
-        direction: Vec3d,
+        position: Vec3,
+        direction: Vec3,
         sourceMin: BlockPos,
         sourceMax: BlockPos,
         destinationOrigin: BlockPos,
@@ -212,9 +212,9 @@ object LocalEntityCloneService {
         val sizeY = sourceMax.y - sourceMin.y + 1.0
         val mirrored = when (mirrorAxis) {
             EntityMoveMirrorAxis.NONE -> relative
-            EntityMoveMirrorAxis.X -> Vec3d(sizeX - relative.x, relative.y, relative.z)
-            EntityMoveMirrorAxis.Y -> Vec3d(relative.x, sizeY - relative.y, relative.z)
-            EntityMoveMirrorAxis.Z -> Vec3d(relative.x, relative.y, sizeZ - relative.z)
+            EntityMoveMirrorAxis.X -> Vec3(sizeX - relative.x, relative.y, relative.z)
+            EntityMoveMirrorAxis.Y -> Vec3(relative.x, sizeY - relative.y, relative.z)
+            EntityMoveMirrorAxis.Z -> Vec3(relative.x, relative.y, sizeZ - relative.z)
         }
         val rotatedPosition = rotatePosition(mirrored, sizeX, sizeZ, rotationQuarterTurns)
         val transformedDirection = rotateDirection(mirrorDirection(direction, mirrorAxis), rotationQuarterTurns)
@@ -225,47 +225,47 @@ object LocalEntityCloneService {
         )
     }
 
-    private fun rotatePosition(position: Vec3d, sizeX: Double, sizeZ: Double, turns: Int): Vec3d {
+    private fun rotatePosition(position: Vec3, sizeX: Double, sizeZ: Double, turns: Int): Vec3 {
         return when (Math.floorMod(turns, 4)) {
             0 -> position
-            1 -> Vec3d(sizeZ - position.z, position.y, position.x)
-            2 -> Vec3d(sizeX - position.x, position.y, sizeZ - position.z)
-            else -> Vec3d(position.z, position.y, sizeX - position.x)
+            1 -> Vec3(sizeZ - position.z, position.y, position.x)
+            2 -> Vec3(sizeX - position.x, position.y, sizeZ - position.z)
+            else -> Vec3(position.z, position.y, sizeX - position.x)
         }
     }
 
-    private fun mirrorDirection(direction: Vec3d, axis: EntityMoveMirrorAxis): Vec3d {
+    private fun mirrorDirection(direction: Vec3, axis: EntityMoveMirrorAxis): Vec3 {
         return when (axis) {
             EntityMoveMirrorAxis.NONE -> direction
-            EntityMoveMirrorAxis.X -> Vec3d(-direction.x, direction.y, direction.z)
-            EntityMoveMirrorAxis.Y -> Vec3d(direction.x, -direction.y, direction.z)
-            EntityMoveMirrorAxis.Z -> Vec3d(direction.x, direction.y, -direction.z)
+            EntityMoveMirrorAxis.X -> Vec3(-direction.x, direction.y, direction.z)
+            EntityMoveMirrorAxis.Y -> Vec3(direction.x, -direction.y, direction.z)
+            EntityMoveMirrorAxis.Z -> Vec3(direction.x, direction.y, -direction.z)
         }
     }
 
-    private fun rotateDirection(direction: Vec3d, turns: Int): Vec3d {
+    private fun rotateDirection(direction: Vec3, turns: Int): Vec3 {
         return when (Math.floorMod(turns, 4)) {
             0 -> direction
-            1 -> Vec3d(-direction.z, direction.y, direction.x)
-            2 -> Vec3d(-direction.x, direction.y, -direction.z)
-            else -> Vec3d(direction.z, direction.y, -direction.x)
+            1 -> Vec3(-direction.z, direction.y, direction.x)
+            2 -> Vec3(-direction.x, direction.y, -direction.z)
+            else -> Vec3(direction.z, direction.y, -direction.x)
         }
     }
 
-    private fun directionToYaw(direction: Vec3d): Float {
+    private fun directionToYaw(direction: Vec3): Float {
         return Math.toDegrees(atan2(-direction.x, direction.z)).toFloat()
     }
 
-    private fun directionToPitch(direction: Vec3d): Float {
+    private fun directionToPitch(direction: Vec3): Float {
         val horizontal = sqrt(direction.x * direction.x + direction.z * direction.z)
         return Math.toDegrees(-atan2(direction.y, horizontal)).toFloat()
     }
 
-    private fun directionFromAngles(yaw: Float, pitch: Float): Vec3d {
+    private fun directionFromAngles(yaw: Float, pitch: Float): Vec3 {
         val yawRadians = Math.toRadians(yaw.toDouble())
         val pitchRadians = Math.toRadians(pitch.toDouble())
         val cosPitch = kotlin.math.cos(pitchRadians)
-        return Vec3d(
+        return Vec3(
             -kotlin.math.sin(yawRadians) * cosPitch,
             -kotlin.math.sin(pitchRadians),
             kotlin.math.cos(yawRadians) * cosPitch,
@@ -273,7 +273,7 @@ object LocalEntityCloneService {
     }
 
     private data class EntityTarget(
-        val position: Vec3d,
+        val position: Vec3,
         val yaw: Float,
         val pitch: Float,
     )

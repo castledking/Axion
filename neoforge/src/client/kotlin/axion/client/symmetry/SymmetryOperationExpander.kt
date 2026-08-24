@@ -99,7 +99,7 @@ object SymmetryOperationExpander {
      */
     private fun expandSymmetryPlacement(operation: SymmetryPlacementOperation, config: SymmetryConfig): List<EditOperation> {
         val transforms = SymmetryTransformService.activeTransforms(config)
-        val allPlacements = linkedMapOf<net.minecraft.util.math.BlockPos, SymmetryBlockPlacement>()
+        val allPlacements = linkedMapOf<net.minecraft.core.BlockPos, SymmetryBlockPlacement>()
         transforms.forEach { transform ->
             operation.placements.forEach { placement ->
                 val transformedPos = SymmetryTransformService.transformBlock(
@@ -110,7 +110,7 @@ object SymmetryOperationExpander {
                 allPlacements[transformedPos] = SymmetryBlockPlacement(
                     pos = transformedPos,
                     state = placement.state,
-                    blockEntityData = placement.blockEntityData?.copy(),
+                    blockEntityData = placement.blockData?.copy(),
                 )
             }
         }
@@ -122,7 +122,7 @@ object SymmetryOperationExpander {
             .map { transform ->
                 StackRegionOperation(
                     sourceRegion = transformRegion(operation.sourceRegion, config, transform),
-                    clipboardBuffer = operation.clipboardBuffer,
+                    clipboardBuffer = operation.clipboardScratchBuffer,
                     step = SymmetryTransformService.transformVector(operation.step, transform),
                     repeatCount = operation.repeatCount,
                     keepExisting = operation.keepExisting,
@@ -136,7 +136,7 @@ object SymmetryOperationExpander {
             .map { transform ->
                 SmearRegionOperation(
                     sourceRegion = transformRegion(operation.sourceRegion, config, transform),
-                    clipboardBuffer = operation.clipboardBuffer,
+                    clipboardBuffer = operation.clipboardScratchBuffer,
                     step = SymmetryTransformService.transformVector(operation.step, transform),
                     repeatCount = operation.repeatCount,
                 )
@@ -155,6 +155,6 @@ object SymmetryOperationExpander {
             config.anchor.position,
             transform,
         )
-        return normalized.offset(transformedMin.subtract(normalized.minCorner()).let { net.minecraft.util.math.Vec3i(it.x, it.y, it.z) }).normalized()
+        return normalized.offset(transformedMin.subtract(normalized.minCorner()).let { net.minecraft.core.Vec3i(it.x, it.y, it.z) }).normalized()
     }
 }

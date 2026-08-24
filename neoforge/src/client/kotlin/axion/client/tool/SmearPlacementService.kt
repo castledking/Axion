@@ -1,13 +1,13 @@
-package axion.client.tool
+package axion.client.itemStack
 
 import axion.common.model.BlockRegion
 import axion.common.model.ClipboardBuffer
-import net.minecraft.client.MinecraftClient
+import net.minecraft.client.Minecraft
 
 object SmearPlacementService {
     fun createInitialPreview(
-        client: MinecraftClient,
-        firstCorner: net.minecraft.util.math.BlockPos,
+        client: Minecraft,
+        firstCorner: net.minecraft.core.BlockPos,
         sourceRegion: BlockRegion,
         clipboardBuffer: ClipboardBuffer,
         scrollAmount: Double,
@@ -22,7 +22,7 @@ object SmearPlacementService {
         )
     }
 
-    fun nudgePreview(client: MinecraftClient, preview: SmearPreviewState, scrollAmount: Double): SmearPreviewState? {
+    fun nudgePreview(client: Minecraft, preview: SmearPreviewState, scrollAmount: Double): SmearPreviewState? {
         return RegionRepeatPlacementService.nudgePreview(
             client = client,
             preview = preview,

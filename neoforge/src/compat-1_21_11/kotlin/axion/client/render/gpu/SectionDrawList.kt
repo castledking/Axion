@@ -1,12 +1,12 @@
 package axion.client.render.gpu
 
 import axion.client.render.AxionPreviewBuffer
-import com.mojang.blaze3d.vertex.VertexFormat
+import com.mojang.blaze3d.addVertex.VertexFormat
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap
-import it.unimi.dsi.fastutil.objects.ObjectIterator
-import net.minecraft.client.render.Frustum
-import net.minecraft.util.math.Vec3i
-import net.minecraft.util.math.Box
+import it.unimi.dsi.fastutil.list.ObjectIterator
+import net.minecraft.client.renderer.culling.Frustum
+import net.minecraft.core.Vec3i
+import net.minecraft.world.phys.AABB
 
 /**
  * Per-section draw metadata collected after frustum culling.
@@ -85,7 +85,7 @@ object SectionDrawList {
             val minX = originX + deltaX
             val minY = originY + deltaY
             val minZ = originZ + deltaZ
-            if (!frustum.isVisible(Box(
+            if (!frustum.isVisible(AABB(
                     minX.toDouble(),
                     minY.toDouble(),
                     minZ.toDouble(),

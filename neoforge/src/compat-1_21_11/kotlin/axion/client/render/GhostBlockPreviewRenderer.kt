@@ -4,16 +4,16 @@ import axion.client.compat.CameraAccess
 import axion.client.network.BlockWrite
 import axion.client.compat.VersionCompatImpl
 import axion.common.model.ClipboardBuffer
-import net.minecraft.block.ShapeContext
-import net.minecraft.client.MinecraftClient
-import net.minecraft.client.render.LightmapTextureManager
-import net.minecraft.client.render.OverlayTexture
-import net.minecraft.client.render.RenderLayer
-import net.minecraft.client.render.VertexConsumer
-import net.minecraft.client.render.VertexConsumerProvider
-import net.minecraft.client.util.math.MatrixStack
-import net.minecraft.util.math.BlockPos
-import net.minecraft.util.math.Box
+import net.minecraft.world.phys.shapes.CollisionContext
+import net.minecraft.client.Minecraft
+import net.minecraft.client.renderer.LightTexture
+import net.minecraft.client.renderer.texture.OverlayTexture
+import net.minecraft.client.renderer.rendertype.RenderType
+import com.mojang.blaze3d.addVertex.VertexConsumer
+import net.minecraft.client.renderer.MultiBufferSource
+import com.mojang.blaze3d.addVertex.PoseStack
+import net.minecraft.core.BlockPos
+import net.minecraft.world.phys.AABB
 import org.slf4j.LoggerFactory
 
 object GhostBlockPreviewRenderer {
@@ -93,7 +93,7 @@ object GhostBlockPreviewRenderer {
                     scale,
                 )
                 if (DEBUG_LOG) {
-                    val now = System.currentTimeMillis()
+                    val now = System.currentTimeMs()
                     if (now - lastLogTime >= LOG_INTERVAL_MS) {
                         lastLogTime = now
                         logger.info(
@@ -127,7 +127,7 @@ object GhostBlockPreviewRenderer {
             return
         }
 
-        val client = MinecraftClient.getInstance()
+        val client = Minecraft.getInstance()
         val world = client.world ?: return
         val camera = client.gameRenderer.camera ?: return
         val consumers = context.consumers()
@@ -139,7 +139,7 @@ object GhostBlockPreviewRenderer {
         val consumer = consumers.getBuffer(fillLayer)
         val cameraPos = CameraAccess.getPos(camera)
         val matrixStack = context.matrices()
-        val shapeContext = ShapeContext.absent()
+        val shapeContext = CollisionContext.empty()
 
         boundedOrigins.forEach { origin ->
             occupiedCells.forEach { cell ->
@@ -180,7 +180,7 @@ object GhostBlockPreviewRenderer {
             return
         }
 
-        val client = MinecraftClient.getInstance()
+        val client = Minecraft.getInstance()
         val world = client.world ?: return
         val camera = client.gameRenderer.camera ?: return
         val consumers = context.consumers()
@@ -192,7 +192,7 @@ object GhostBlockPreviewRenderer {
         val consumer = consumers.getBuffer(fillLayer)
         val cameraPos = CameraAccess.getPos(camera)
         val matrixStack = context.matrices()
-        val shapeContext = ShapeContext.absent()
+        val shapeContext = CollisionContext.empty()
 
         boundedWrites.forEach { write ->
             renderShapeBoxes(world, matrixStack, consumer, fillLayer, cameraPos, write.pos, write.state, alpha, color, fullBlock, shapeContext)
@@ -208,12 +208,12 @@ object GhostBlockPreviewRenderer {
         scale: Float,
         color: Int,
     ) {
-        // Phase 3 (template GPU buffer) is disabled — RenderLayer.draw() creates its own
+        // Phase 3 (template GPU buffer) is disabled — RenderType.draw() creates its own
         // render pass which doesn't composite correctly during the Fabric world render callback.
         // Phase 1 below uses context.consumers() which renders through MC's normal pipeline.
 
         // Phase 1: per-frame tessellation from mesh cache
-        val client = MinecraftClient.getInstance()
+        val client = Minecraft.getInstance()
         val world = client.world ?: return
         val matrixStack = context.matrices()
         val camera = client.gameRenderer.camera ?: return
@@ -260,7 +260,7 @@ object GhostBlockPreviewRenderer {
         val occupiedCells = fallbackClipboard.nonAirCells()
         val consumers = context.consumers()
         val blockRenderManager = client.blockRenderManager
-        val alphaConsumers = TintedAlphaVertexConsumerProvider(consumers as VertexConsumerProvider, alphaScale, color)
+        val alphaConsumers = TintedAlphaVertexConsumerProvider(consumers as MultiBufferSource, alphaScale, color)
         origins.forEach { origin ->
             occupiedCells.forEach { cell ->
                 val blockPos = cell.absolutePos(origin)
@@ -275,8 +275,8 @@ object GhostBlockPreviewRenderer {
                     cell.state,
                     matrixStack,
                     alphaConsumers,
-                    LightmapTextureManager.MAX_LIGHT_COORDINATE,
-                    OverlayTexture.DEFAULT_UV,
+                    LightTexture.FULL_BRIGHT,
+                    OverlayTexture.NO_OVERLAY,
                 )
                 matrixStack.pop()
             }
@@ -290,13 +290,13 @@ object GhostBlockPreviewRenderer {
         scale: Float,
         color: Int,
     ) {
-        // Phase 2/3 (GPU buffer paths) are disabled — RenderLayer.draw() creates its own
+        // Phase 2/3 (GPU buffer paths) are disabled — RenderType.draw() creates its own
         // render pass which doesn't composite correctly during the Fabric world render callback.
         // Phase 1 below uses context.consumers() which renders through MC's normal pipeline.
         val blockInfos = writes.map { PreviewBlockInfo(it.pos, it.state) }
 
         // Phase 1: per-frame tessellation from mesh cache
-        val client = MinecraftClient.getInstance()
+        val client = Minecraft.getInstance()
         val world = client.world ?: return
         val matrixStack = context.matrices()
         val camera = client.gameRenderer.camera ?: return
@@ -334,7 +334,7 @@ object GhostBlockPreviewRenderer {
         // Fallback to entity rendering
         val consumers = context.consumers()
         val blockRenderManager = client.blockRenderManager
-        val alphaConsumers = TintedAlphaVertexConsumerProvider(consumers as VertexConsumerProvider, alphaScale, color)
+        val alphaConsumers = TintedAlphaVertexConsumerProvider(consumers as MultiBufferSource, alphaScale, color)
         writes.forEach { write ->
             matrixStack.push()
             matrixStack.translate(
@@ -347,14 +347,14 @@ object GhostBlockPreviewRenderer {
                 write.state,
                 matrixStack,
                 alphaConsumers,
-                LightmapTextureManager.MAX_LIGHT_COORDINATE,
-                OverlayTexture.DEFAULT_UV,
+                LightTexture.FULL_BRIGHT,
+                OverlayTexture.NO_OVERLAY,
             )
             matrixStack.pop()
         }
     }
 
-    private fun applyScale(matrixStack: MatrixStack, scale: Float) {
+    private fun applyScale(matrixStack: PoseStack, scale: Float) {
         if (scale == 1.0f) {
             return
         }
@@ -364,17 +364,17 @@ object GhostBlockPreviewRenderer {
     }
 
     private fun renderShapeBoxes(
-        world: net.minecraft.client.world.ClientWorld,
-        matrixStack: MatrixStack,
+        world: net.minecraft.client.multiplayer.ClientLevel,
+        matrixStack: PoseStack,
         consumer: VertexConsumer,
-        layer: RenderLayer,
-        cameraPos: net.minecraft.util.math.Vec3d,
+        layer: RenderType,
+        cameraPos: net.minecraft.world.phys.Vec3,
         blockPos: BlockPos,
-        state: net.minecraft.block.BlockState,
+        state: net.minecraft.world.level.block.state.BlockState,
         alpha: Int,
         color: Int,
         fullBlock: Boolean,
-        shapeContext: ShapeContext,
+        shapeContext: CollisionContext,
     ) {
         if (fullBlock) {
             PulsingCuboidRenderer.renderFilledBox(
@@ -382,7 +382,7 @@ object GhostBlockPreviewRenderer {
                 consumer = consumer,
                 layer = layer,
                 cameraPos = cameraPos,
-                box = Box(
+                box = AABB(
                     blockPos.x.toDouble(),
                     blockPos.y.toDouble(),
                     blockPos.z.toDouble(),
@@ -399,13 +399,13 @@ object GhostBlockPreviewRenderer {
         val shape = state.getOutlineShape(world, blockPos, shapeContext)
         if (shape.isEmpty) return
 
-        shape.forEachBox { minX, minY, minZ, maxX, maxY, maxZ ->
+        shape.forAllBoxes { minX, minY, minZ, maxX, maxY, maxZ ->
             PulsingCuboidRenderer.renderFilledBox(
                 matrixStack = matrixStack,
                 consumer = consumer,
                 layer = layer,
                 cameraPos = cameraPos,
-                box = Box(
+                box = AABB(
                     blockPos.x + minX,
                     blockPos.y + minY,
                     blockPos.z + minZ,
@@ -420,11 +420,11 @@ object GhostBlockPreviewRenderer {
     }
 
     private class TintedAlphaVertexConsumerProvider(
-        private val delegate: VertexConsumerProvider,
+        private val delegate: MultiBufferSource,
         private val alphaScale: Float,
         private val tintColor: Int,
-    ) : VertexConsumerProvider {
-        override fun getBuffer(layer: RenderLayer): VertexConsumer {
+    ) : MultiBufferSource {
+        override fun getBuffer(layer: RenderType): VertexConsumer {
             return TintedAlphaVertexConsumer(delegate.getBuffer(layer), alphaScale, tintColor)
         }
     }

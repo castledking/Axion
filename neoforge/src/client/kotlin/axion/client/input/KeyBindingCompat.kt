@@ -1,8 +1,8 @@
 package axion.client.input
 
 import axion.common.compat.VersionCompat
-import net.minecraft.client.option.KeyBinding
-import net.minecraft.util.Identifier
+import net.minecraft.client.KeyMapping
+import net.minecraft.resources.Identifier
 import java.lang.reflect.Constructor
 import java.lang.reflect.Method
 
@@ -13,7 +13,7 @@ object KeyBindingCompat {
      *  reference the same object — MC groups keybindings by category identity. */
     private val categoryCache = mutableMapOf<String, Any>()
 
-    fun create(translationKey: String, code: Int, categoryKey: String): KeyBinding {
+    fun create(translationKey: String, code: Int, categoryKey: String): KeyMapping {
         val categoryClass = resolveCategoryClass()
         val inputKeyClass = resolveInputKeyClass()
 
@@ -28,7 +28,7 @@ object KeyBindingCompat {
                     inputKeyClass,
                     categoryClass,
                 )?.let { constructor ->
-                    return constructor.newInstance(translationKey, keyForCode, category) as KeyBinding
+                    return constructor.newInstance(translationKey, keyForCode, category) as KeyMapping
                 }
             }
 
@@ -38,11 +38,11 @@ object KeyBindingCompat {
                 inputKeyClass,
                 String::class.java,
             )?.let { constructor ->
-                return constructor.newInstance(translationKey, keyForCode, categoryKey) as KeyBinding
+                return constructor.newInstance(translationKey, keyForCode, categoryKey) as KeyMapping
             }
         }
 
-        // Path 3: (String, int, Category) — pre-26.x Yarn KeyBinding with typed category
+        // Path 3: (String, int, Category) — pre-26.x Yarn KeyMapping with typed category
         if (categoryClass != null) {
             val category = categoryCache.getOrPut(categoryKey) { createCategory(categoryClass, categoryKey) }
             findConstructor(
@@ -50,30 +50,30 @@ object KeyBindingCompat {
                 primitiveInt,
                 categoryClass,
             )?.let { constructor ->
-                return constructor.newInstance(translationKey, code, category) as KeyBinding
+                return constructor.newInstance(translationKey, code, category) as KeyMapping
             }
         }
 
-        // Path 4: (String, int, String) — pre-26.x Yarn KeyBinding
+        // Path 4: (String, int, String) — pre-26.x Yarn KeyMapping
         findConstructor(
             String::class.java,
             primitiveInt,
             String::class.java,
         )?.let { constructor ->
-            return constructor.newInstance(translationKey, code, categoryKey) as KeyBinding
+            return constructor.newInstance(translationKey, code, categoryKey) as KeyMapping
         }
 
-        // Path 5: (String, InputConstants.Type, int, String) — older Yarn KeyBinding
+        // Path 5: (String, InputConstants.Type, int, String) — older Yarn KeyMapping
         val inputUtilType = resolveInputTypeClass()
         if (inputUtilType != null) {
-            val keySym = keySymValue(inputUtilType) ?: error("Unsupported KeyBinding input type")
+            val keySym = keySymValue(inputUtilType) ?: error("Unsupported KeyMapping input type")
             findConstructor(
                 String::class.java,
                 inputUtilType,
                 primitiveInt,
                 String::class.java,
             )?.let { constructor ->
-                return constructor.newInstance(translationKey, keySym, code, categoryKey) as KeyBinding
+                return constructor.newInstance(translationKey, keySym, code, categoryKey) as KeyMapping
             }
             if (categoryClass != null) {
                 val category = categoryCache.getOrPut(categoryKey) { createCategory(categoryClass, categoryKey) }
@@ -83,7 +83,7 @@ object KeyBindingCompat {
                     primitiveInt,
                     categoryClass,
                 )?.let { constructor ->
-                    return constructor.newInstance(translationKey, keySym, code, category) as KeyBinding
+                    return constructor.newInstance(translationKey, keySym, code, category) as KeyMapping
                 }
                 findConstructor(
                     String::class.java,
@@ -92,16 +92,16 @@ object KeyBindingCompat {
                     categoryClass,
                     primitiveInt,
                 )?.let { constructor ->
-                    return constructor.newInstance(translationKey, keySym, code, category, 0) as KeyBinding
+                    return constructor.newInstance(translationKey, keySym, code, category, 0) as KeyMapping
                 }
             }
         }
 
-        error("Unsupported KeyBinding constructor shape")
+        error("Unsupported KeyMapping constructor shape")
     }
 
     private fun categoryIdentifier(categoryKey: String): Identifier {
-        val suffix = categoryKey.removePrefix("keycategory.")
+        val suffix = categoryKey.replaceId("keycategory.")
         val separatorIndex = suffix.indexOf('.')
         return if (separatorIndex > 0) {
             VersionCompat.INSTANCE.identifierOf(suffix.substring(0, separatorIndex), suffix.substring(separatorIndex + 1))
@@ -112,17 +112,17 @@ object KeyBindingCompat {
 
     private fun findConstructor(vararg parameterTypes: Class<*>): Constructor<*>? {
         return runCatching {
-            KeyBinding::class.java.getConstructor(*parameterTypes)
+            KeyMapping::class.java.getConstructor(*parameterTypes)
         }.getOrNull()
     }
 
     private fun resolveCategoryClass(): Class<*>? {
-        // Look for KeyBinding.Category / KeyMapping.Category inner class
-        val categoryInner = KeyBinding::class.java.declaredClasses.firstOrNull { it.simpleName == "Category" }
+        // Look for KeyMapping.Category / KeyMapping.Category inner class
+        val categoryInner = KeyMapping::class.java.declaredClasses.firstOrNull { it.simpleName == "Category" }
         if (categoryInner != null) return categoryInner
 
         // Fallback: detect non-String 3rd param in constructors with int 2nd param
-        return KeyBinding::class.java.constructors.firstNotNullOfOrNull { constructor ->
+        return KeyMapping::class.java.constructors.firstNotNullOfOrNull { constructor ->
             val params = constructor.parameterTypes
             when {
                 params.size >= 3 &&
@@ -169,7 +169,7 @@ object KeyBindingCompat {
     }
 
     private fun resolveInputTypeClass(): Class<*>? {
-        return KeyBinding::class.java.constructors
+        return KeyMapping::class.java.constructors
             .asSequence()
             .flatMap { constructor -> constructor.parameterTypes.asSequence() }
             .firstOrNull { type ->
@@ -210,12 +210,12 @@ object KeyBindingCompat {
 
                 // Try Type.mapKey(int) factory method
                 runCatching {
-                    return typeClass.getMethod("mapKey", primitiveInt).invoke(keysym, code)
+                    return typeClass.getMethodName("mapKey", primitiveInt).invoke(keysym, code)
                 }
 
                 // 26.x: Type.getOrCreate(int) factory method
                 runCatching {
-                    return typeClass.getMethod("getOrCreate", primitiveInt).invoke(keysym, code)
+                    return typeClass.getMethodName("getOrCreate", primitiveInt).invoke(keysym, code)
                 }
             }
         }

@@ -4,29 +4,29 @@ import axion.common.model.SymmetryConfig
 import axion.client.compat.normalizeReplacePlacementState
 import axion.common.operation.SymmetryBlockPlacement
 import axion.common.operation.SymmetryPlacementOperation
-import net.minecraft.block.ShapeContext
-import net.minecraft.client.MinecraftClient
-import net.minecraft.item.BlockItem
-import net.minecraft.item.ItemPlacementContext
-import net.minecraft.util.function.BooleanBiFunction
-import net.minecraft.util.Hand
-import net.minecraft.util.hit.BlockHitResult
-import net.minecraft.util.math.BlockPos
-import net.minecraft.util.math.Direction
-import net.minecraft.util.math.Vec3d
-import net.minecraft.util.shape.VoxelShapes
+import net.minecraft.world.phys.shapes.CollisionContext
+import net.minecraft.client.Minecraft
+import net.minecraft.world.item.BlockItem
+import net.minecraft.world.item.context.BlockPlaceContext
+import net.minecraft.world.phys.shapes.BooleanOp
+import net.minecraft.world.InteractionHand
+import net.minecraft.world.phys.BlockHitResult
+import net.minecraft.core.BlockPos
+import net.minecraft.core.Direction
+import net.minecraft.world.phys.Vec3
+import net.minecraft.world.phys.shapes.Shapes
 
 object BuildPlacementService {
     fun createPlacementOperation(
-        client: MinecraftClient,
+        client: Minecraft,
         target: ModeTargeting.BlockTarget,
         symmetryConfig: SymmetryConfig? = null,
         replaceMode: Boolean = false,
-        hand: Hand = Hand.MAIN_HAND,
+        hand: InteractionHand = InteractionHand.MAIN_HAND,
     ): SymmetryPlacementOperation? {
         val player = client.player ?: return null
         val world = client.world ?: return null
-        val stack = player.getStackInHand(hand)
+        val stack = player.getItemInHand(hand)
         val blockItem = stack.item as? BlockItem ?: return null
 
         return withSupportBypass {
@@ -35,10 +35,10 @@ object BuildPlacementService {
     }
 
     private fun resolvePlacementOperation(
-        world: net.minecraft.client.world.ClientWorld,
-        player: net.minecraft.client.network.ClientPlayerEntity,
-        hand: Hand,
-        stack: net.minecraft.item.ItemStack,
+        world: net.minecraft.client.multiplayer.ClientLevel,
+        player: net.minecraft.client.player.LocalPlayer,
+        hand: InteractionHand,
+        stack: net.minecraft.world.item.ItemStack,
         blockItem: BlockItem,
         target: ModeTargeting.BlockTarget,
         symmetryConfig: SymmetryConfig?,
@@ -79,15 +79,15 @@ object BuildPlacementService {
     }
 
     fun createDerivedPlacementOperation(
-        client: MinecraftClient,
+        client: Minecraft,
         target: ModeTargeting.BlockTarget,
         symmetryConfig: SymmetryConfig,
         replaceMode: Boolean = false,
-        hand: Hand = Hand.MAIN_HAND,
+        hand: InteractionHand = InteractionHand.MAIN_HAND,
     ): SymmetryPlacementOperation? {
         val player = client.player ?: return null
         val world = client.world ?: return null
-        val stack = player.getStackInHand(hand)
+        val stack = player.getItemInHand(hand)
         val blockItem = stack.item as? BlockItem ?: return null
 
         return withSupportBypass {
@@ -96,10 +96,10 @@ object BuildPlacementService {
     }
 
     private fun resolveDerivedPlacementOperation(
-        world: net.minecraft.client.world.ClientWorld,
-        player: net.minecraft.client.network.ClientPlayerEntity,
-        hand: Hand,
-        stack: net.minecraft.item.ItemStack,
+        world: net.minecraft.client.multiplayer.ClientLevel,
+        player: net.minecraft.client.player.LocalPlayer,
+        hand: InteractionHand,
+        stack: net.minecraft.world.item.ItemStack,
         blockItem: BlockItem,
         target: ModeTargeting.BlockTarget,
         symmetryConfig: SymmetryConfig,
@@ -147,10 +147,10 @@ object BuildPlacementService {
         ForcePlaceSupportBypass.withBypass(AxionCapabilityPolicy.ignoresSupportRequirements(), block)
 
     private fun createPrimaryPlacement(
-        world: net.minecraft.client.world.ClientWorld,
-        player: net.minecraft.client.network.ClientPlayerEntity,
-        hand: Hand,
-        stack: net.minecraft.item.ItemStack,
+        world: net.minecraft.client.multiplayer.ClientLevel,
+        player: net.minecraft.client.player.LocalPlayer,
+        hand: InteractionHand,
+        stack: net.minecraft.world.item.ItemStack,
         blockItem: BlockItem,
         hitResult: BlockHitResult,
         replaceMode: Boolean,
@@ -177,10 +177,10 @@ object BuildPlacementService {
     }
 
     private fun createDerivedPlacements(
-        world: net.minecraft.client.world.ClientWorld,
-        player: net.minecraft.client.network.ClientPlayerEntity,
-        hand: Hand,
-        stack: net.minecraft.item.ItemStack,
+        world: net.minecraft.client.multiplayer.ClientLevel,
+        player: net.minecraft.client.player.LocalPlayer,
+        hand: InteractionHand,
+        stack: net.minecraft.world.item.ItemStack,
         blockItem: BlockItem,
         target: ModeTargeting.BlockTarget,
         symmetryConfig: SymmetryConfig?,
@@ -235,15 +235,15 @@ object BuildPlacementService {
     }
 
     private fun createAdjacentPlacement(
-        world: net.minecraft.client.world.ClientWorld,
-        player: net.minecraft.client.network.ClientPlayerEntity,
-        hand: Hand,
-        stack: net.minecraft.item.ItemStack,
+        world: net.minecraft.client.multiplayer.ClientLevel,
+        player: net.minecraft.client.player.LocalPlayer,
+        hand: InteractionHand,
+        stack: net.minecraft.world.item.ItemStack,
         blockItem: BlockItem,
         hitResult: BlockHitResult,
     ): PlacementResult? {
-        val rawContext = ItemPlacementContext(player, hand, stack, hitResult)
-        val placementContext = blockItem.getPlacementContext(rawContext) ?: return null
+        val rawContext = BlockPlaceContext(player, hand, stack, hitResult)
+        val placementContext = blockItem.updatePlacementContext(rawContext) ?: return null
         if (!placementContext.canPlace()) {
             return null
         }
@@ -262,17 +262,17 @@ object BuildPlacementService {
     }
 
     private fun createAdjacentPlacementAt(
-        world: net.minecraft.client.world.ClientWorld,
-        player: net.minecraft.client.network.ClientPlayerEntity,
-        hand: Hand,
-        stack: net.minecraft.item.ItemStack,
+        world: net.minecraft.client.multiplayer.ClientLevel,
+        player: net.minecraft.client.player.LocalPlayer,
+        hand: InteractionHand,
+        stack: net.minecraft.world.item.ItemStack,
         blockItem: BlockItem,
         pos: BlockPos,
         side: Direction,
     ): SymmetryBlockPlacement? {
         // Try the ideal support direction first (transformed side), then fall back
         // to any adjacent solid block. When the support pos is air/replaceable,
-        // Minecraft's ItemPlacementContext tries to place there instead of at pos.
+        // Minecraft's BlockPlaceContext tries to place there instead of at pos.
         val facesToTry = buildList {
             add(side)
             Direction.entries.forEach { d -> if (d != side) add(d) }
@@ -285,13 +285,13 @@ object BuildPlacementService {
                 face.offsetY * 0.5,
                 face.offsetZ * 0.5,
             )
-            val rawContext = ItemPlacementContext(
+            val rawContext = BlockPlaceContext(
                 player,
                 hand,
                 stack,
                 BlockHitResult(hitPos, face, supportPos, false),
             )
-            val placementContext = blockItem.getPlacementContext(rawContext) ?: continue
+            val placementContext = blockItem.updatePlacementContext(rawContext) ?: continue
             if (placementContext.blockPos != pos || !placementContext.canPlace()) continue
             val placementState = blockItem.block.getPlacementState(placementContext) ?: continue
             if (!placementState.canPlaceAt(world, pos)) continue
@@ -302,10 +302,10 @@ object BuildPlacementService {
     }
 
     private fun createReplacePlacement(
-        world: net.minecraft.client.world.ClientWorld,
-        player: net.minecraft.client.network.ClientPlayerEntity,
-        hand: Hand,
-        stack: net.minecraft.item.ItemStack,
+        world: net.minecraft.client.multiplayer.ClientLevel,
+        player: net.minecraft.client.player.LocalPlayer,
+        hand: InteractionHand,
+        stack: net.minecraft.world.item.ItemStack,
         blockItem: BlockItem,
         hitResult: BlockHitResult,
     ): PlacementResult? {
@@ -325,10 +325,10 @@ object BuildPlacementService {
     }
 
     private fun createReplacePlacementAt(
-        world: net.minecraft.client.world.ClientWorld,
-        player: net.minecraft.client.network.ClientPlayerEntity,
-        hand: Hand,
-        stack: net.minecraft.item.ItemStack,
+        world: net.minecraft.client.multiplayer.ClientLevel,
+        player: net.minecraft.client.player.LocalPlayer,
+        hand: InteractionHand,
+        stack: net.minecraft.world.item.ItemStack,
         blockItem: BlockItem,
         pos: BlockPos,
         hitResult: BlockHitResult,
@@ -337,12 +337,12 @@ object BuildPlacementService {
             return null
         }
 
-        val placementContext = object : ItemPlacementContext(world, player, hand, stack, hitResult) {
+        val placementContext = object : BlockPlaceContext(world, player, hand, stack, hitResult) {
             override fun getBlockPos(): BlockPos = pos
             override fun canPlace(): Boolean = true
             override fun canReplaceExisting(): Boolean = true
         }
-        val adjustedContext = blockItem.getPlacementContext(placementContext) ?: placementContext
+        val adjustedContext = blockItem.updatePlacementContext(placementContext) ?: placementContext
         val rawPlacementState = blockItem.block.getPlacementState(adjustedContext) ?: return null
         val placementState = normalizeReplacePlacementState(rawPlacementState, hitResult, pos)
         if (!placementState.canPlaceAt(world, pos)) {
@@ -359,10 +359,10 @@ object BuildPlacementService {
     }
 
     private fun createReplacePlacementAt(
-        world: net.minecraft.client.world.ClientWorld,
-        player: net.minecraft.client.network.ClientPlayerEntity,
-        hand: Hand,
-        stack: net.minecraft.item.ItemStack,
+        world: net.minecraft.client.multiplayer.ClientLevel,
+        player: net.minecraft.client.player.LocalPlayer,
+        hand: InteractionHand,
+        stack: net.minecraft.world.item.ItemStack,
         blockItem: BlockItem,
         pos: BlockPos,
         side: Direction,
@@ -390,12 +390,12 @@ object BuildPlacementService {
     )
 
     private fun wouldCollideWithPlayer(
-        world: net.minecraft.client.world.ClientWorld,
-        player: net.minecraft.client.network.ClientPlayerEntity,
+        world: net.minecraft.client.multiplayer.ClientLevel,
+        player: net.minecraft.client.player.LocalPlayer,
         pos: BlockPos,
-        state: net.minecraft.block.BlockState,
+        state: net.minecraft.world.level.block.state.BlockState,
     ): Boolean {
-        if (player.isSpectator || player.noClip) {
+        if (player.isSpectator || player.noPhysics) {
             return false
         }
         // Force place is exactly "place it anyway". Axion writes the block
@@ -404,19 +404,19 @@ object BuildPlacementService {
             return false
         }
 
-        val collisionShape = state.getCollisionShape(world, pos, ShapeContext.of(player))
+        val collisionShape = state.getCollisionShape(world, pos, CollisionContext.of(player))
         if (collisionShape.isEmpty) {
             return false
         }
 
-        val playerShape = VoxelShapes.cuboid(player.boundingBox.contract(1.0E-4))
-        return VoxelShapes.matchesAnywhere(
+        val playerShape = Shapes.create(player.boundingBox.contract(1.0E-4))
+        return Shapes.matchesAnywhere(
             collisionShape.offset(pos.x.toDouble(), pos.y.toDouble(), pos.z.toDouble()),
             playerShape,
-            BooleanBiFunction.AND,
+            BooleanOp.AND,
         )
     }
 
-    private fun centerOf(pos: BlockPos): Vec3d =
-        Vec3d(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5)
+    private fun centerOf(pos: BlockPos): Vec3 =
+        Vec3(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5)
 }

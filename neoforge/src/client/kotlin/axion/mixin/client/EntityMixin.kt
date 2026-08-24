@@ -2,9 +2,9 @@ package axion.mixin.client
 
 import axion.client.mode.ClientModeController
 import axion.client.mode.EntityNoClipSupport
-import net.minecraft.entity.Entity
-import net.minecraft.entity.MovementType
-import net.minecraft.util.math.Vec3d
+import net.minecraft.world.entity.Entity
+import net.minecraft.world.entity.MoverType
+import net.minecraft.world.phys.Vec3
 import org.spongepowered.asm.mixin.Mixin
 import org.spongepowered.asm.mixin.Shadow
 import org.spongepowered.asm.mixin.injection.At
@@ -26,7 +26,7 @@ abstract class EntityMixin {
     private fun self(): Entity = this as Entity
 
     @Inject(method = ["move"], at = [At("HEAD")], cancellable = true)
-    private fun axionApplyNoClipMovement(type: MovementType, movement: Vec3d, ci: CallbackInfo) {
+    private fun axionApplyNoClipMovement(type: MoverType, movement: Vec3, ci: CallbackInfo) {
         if (!ClientModeController.isNoClipActiveFor(self())) {
             return
         }
