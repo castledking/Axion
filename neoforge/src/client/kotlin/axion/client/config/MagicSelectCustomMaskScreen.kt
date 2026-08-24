@@ -134,7 +134,7 @@ class MagicSelectCustomMaskScreen(
                 if (currentMask != null) {
                     AxionClientConfig.updateMagicSelectCustomMask(
                         currentMask.copy(
-                            name = nameField.text,
+                            name = nameField.value,
                             ruleIds = selectedRuleIds.toSet(),
                             customBlockIds = selectedBlockIds.toSet(),
                             excludedBlockIds = excludedBlockIds.toSet(),
@@ -142,7 +142,7 @@ class MagicSelectCustomMaskScreen(
                     )
                 } else {
                     val customMaskId = AxionClientConfig.createMagicSelectCustomMask(
-                        name = nameField.text,
+                        name = nameField.value,
                         ruleIds = selectedRuleIds.toSet(),
                         customBlockIds = selectedBlockIds.toSet(),
                         excludedBlockIds = excludedBlockIds.toSet(),
@@ -240,7 +240,7 @@ class MagicSelectCustomMaskScreen(
         )
         context.drawCenteredString(
             font,
-            FormattedNameText.parse(nameField.text.ifEmpty { "New Custom Mask" }),
+            FormattedNameText.parse(nameField.value.ifEmpty { "New Custom Mask" }),
             centerX,
             62,
             0xFFFFFF,

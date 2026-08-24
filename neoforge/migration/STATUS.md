@@ -1,7 +1,7 @@
 # NeoForge migration status (feat/neoforge)
 
-Last updated: 2026-08-24 (WIP #2). Compile state: `:neoforge:compileKotlin` = **728 errors**
-(down from 1451 after WIP #1; fabric untouched and green).
+Last updated: 2026-08-24 (WIP #2). Compile state: `:neoforge:compileKotlin` = **~660 errors**
+(1451 -> 728 -> ~660; fabric untouched and green).
 
 ## What was done
 
@@ -61,6 +61,26 @@ API-shape divergences no mapping table covers.
 - MatrixStack.Entry import → `com.mojang.blaze3d.vertex.PoseStack.Pose`
 - `font.getWidth(` → `font.width(`; Direction offsetX/Y/Z → stepX/Y/Z;
   VertexConsumer `.color/.normal` → `.setColor/.setNormal`
+
+
+### Current top error files (WIP #3, ~660 total)
+```
+51 compat-1_21_11/.../VersionCompatImpl.kt     (fabric event wiring needs NeoForge port:
+                                                ServerTickEvents -> NeoForge.EVENT_BUS tick events,
+                                                payload registrar, NoClipService.onServerTick)
+50 client/.../AxionHotbarHud.kt
+42 client/.../MagicSelectRule.kt
+39 compat-1_21_11/.../AxionBlockTessellator.kt (vertex/tessellator API shapes)
+32 compat-1_21_11/.../PreviewDirectionArrowRenderer.kt (cascade: our 'extents' prop +
+                                                Direction.getFacing -> getNearest)
+30 client/.../ClientModeController.kt
+```
+Full current list: migration/current-errors.txt
+
+### Known remaining mechanical renames
+- `Direction.getFacing(` -> `getNearest(`
+- `hit.side` leftovers -> `direction`; `drawItem` -> `renderItem` (GuiGraphics)
+- `item.getStack`/`setStack` on ItemStack holders -> mojmap copyWithCount/setCount family (verify per site)
 
 ### Suggested next loop
 1. `grep "^e:" errs | grep -oE "'[a-zA-Z.]+'" | sort | uniq -c | sort -rn`

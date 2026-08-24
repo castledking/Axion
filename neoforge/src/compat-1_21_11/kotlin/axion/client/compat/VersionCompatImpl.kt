@@ -32,7 +32,7 @@ import net.minecraft.client.Camera
 import net.minecraft.client.renderer.rendertype.RenderType
 import net.minecraft.client.renderer.rendertype.RenderTypes
 import net.minecraft.client.DeltaTracker
-import net.minecraft.items.arguments.blocks.BlockStateParser
+import net.minecraft.commands.arguments.blocks.BlockStateParser
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.item.Item
 import net.minecraft.world.item.ItemStack
@@ -58,7 +58,7 @@ import net.minecraft.ChatFormatting
 import net.minecraft.server.MinecraftServer
 import net.neoforged.neoforge.client.event.RenderGuiLayerEvent
 import net.neoforged.neoforge.network.PacketDistributor
-import net.neoforged.neoforge.network.event.RegisterClientPayloadHandlersEvent
+import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent
 import net.neoforged.neoforge.network.registration.PayloadRegistrar
 import net.neoforged.fml.ModList
@@ -79,7 +79,7 @@ object VersionCompatImpl : VersionCompat {
     private val clientStoppingHandlers = mutableListOf<(Minecraft) -> Unit>()
     private val playJoinHandlers = mutableListOf<(Minecraft) -> Unit>()
     private val playDisconnectHandlers = mutableListOf<(Minecraft) -> Unit>()
-    private val clientPayloadHandlers = mutableMapOf<CustomPacketPayload.Id<AxionPluginPayload>, (AxionPluginPayload) -> Unit>()
+    private val clientPayloadHandlers = mutableMapOf<CustomPacketPayload.Type<AxionPluginPayload>, (AxionPluginPayload) -> Unit>()
     private var hudRenderer: ((GuiGraphics, DeltaTracker) -> Unit)? = null
     private var hintHudRenderer: ((GuiGraphics, DeltaTracker) -> Unit)? = null
 
@@ -125,7 +125,7 @@ object VersionCompatImpl : VersionCompat {
     }
 
     private fun getRegistryManager(): RegistryAccess? {
-        return Minecraft.getInstance().world?.registryAccess
+        return Minecraft.getInstance().level?.registryAccess()
     }
 
     private fun getRegistryOps(): com.mojang.serialization.DynamicOps<Tag>? {
@@ -139,29 +139,23 @@ object VersionCompatImpl : VersionCompat {
     }
 
     override fun getBlock(id: Identifier): Block? {
-        val block = BuiltInRegistries.BLOCK.get(id)
-        return if (block == net.minecraft.world.level.block.Blocks.AIR && id != BuiltInRegistries.BLOCK.getId(net.minecraft.world.level.block.Blocks.AIR)) {
-            null
-        } else {
-            block
-        }
+        val holder = BuiltInRegistries.BLOCK.get(id).orElse(null) ?: return null
+        val block = holder.value()
+        return if (block === net.minecraft.world.level.block.Blocks.AIR) null else block
     }
 
     override fun getItem(id: Identifier): Item? {
-        val item = BuiltInRegistries.ITEM.get(id)
-        return if (item == net.minecraft.world.item.Items.AIR && id != BuiltInRegistries.ITEM.getId(net.minecraft.world.item.Items.AIR)) {
-            null
-        } else {
-            item
-        }
+        val holder = BuiltInRegistries.ITEM.get(id).orElse(null) ?: return null
+        val item = holder.value()
+        return if (item === net.minecraft.world.item.Items.AIR) null else item
     }
 
     override fun getBlockId(block: Block): Identifier {
-        return BuiltInRegistries.BLOCK.getId(block)
+        return BuiltInRegistries.BLOCK.getKey(block)
     }
 
     override fun getItemId(item: Item): Identifier {
-        return BuiltInRegistries.ITEM.getId(item)
+        return BuiltInRegistries.ITEM.getKey(item)
     }
 
     override fun getAllBlocks(): Collection<Block> {
@@ -175,14 +169,14 @@ object VersionCompatImpl : VersionCompat {
     override fun parseIdentifier(id: String): Identifier {
         val parts = id.split(":", limit = 2)
         return if (parts.size == 2) {
-            Identifier.of(parts[0], parts[1])
+            Identifier.fromNamespaceAndPath(parts[0], parts[1])
         } else {
-            Identifier.of("minecraft", id)
+            Identifier.fromNamespaceAndPath("minecraft", id)
         }
     }
 
     override fun identifierOf(namespace: String, path: String): Identifier {
-        return Identifier.of(namespace, path)
+        return Identifier.fromNamespaceAndPath(namespace, path)
     }
 
     override fun blockStateToString(state: BlockState): String {
@@ -192,11 +186,10 @@ object VersionCompatImpl : VersionCompat {
     override fun stringToBlockState(str: String): BlockState? {
         val registryManager = getRegistryManager() ?: return null
         return try {
-            BlockStateParser.block(
-                registryManager.getOrThrow(Registries.BLOCK),
-                str,
-                false
-            ).blockState()
+            val holderLookup = registryManager.lookupOrThrow(Registries.BLOCK)
+            val result: net.minecraft.commands.arguments.blocks.BlockStateParser.BlockResult =
+                net.minecraft.commands.arguments.blocks.BlockStateParser.parseForBlock(holderLookup, str, false)
+            result.blockState()
         } catch (e: Exception) {
             null
         }
@@ -205,13 +198,13 @@ object VersionCompatImpl : VersionCompat {
     override fun itemStackToNbt(stack: ItemStack): CompoundTag {
         val nbt = CompoundTag()
         val ops = getRegistryOps() ?: return nbt
-        nbt.copyFromCodec(ItemStack.MAP_CODEC, ops, stack)
+        ItemStack.CODEC.encodeStart(ops, stack).result().ifPresent { encoded -> nbt.merge(encoded as CompoundTag) }
         return nbt
     }
 
     override fun nbtToItemStack(nbt: CompoundTag): ItemStack {
         val ops = getRegistryOps() ?: return ItemStack.EMPTY
-        return nbt.decode(ItemStack.MAP_CODEC, ops).orElse(ItemStack.EMPTY)
+        return ItemStack.CODEC.parse(ops, nbt).result().orElse(ItemStack.EMPTY)
     }
 
     override fun shouldUseNonConsumingKeybind(): Boolean {
@@ -259,7 +252,7 @@ object VersionCompatImpl : VersionCompat {
     }
 
     fun notifyPlayer(player: net.minecraft.client.player.LocalPlayer?, text: Component, overlay: Boolean) {
-        player?.sendMessage(text, overlay)
+        player?.displayClientMessage(text, overlay)
     }
 
     fun sendGameModeCommand(client: Minecraft, gameModeId: String) {
@@ -276,7 +269,7 @@ object VersionCompatImpl : VersionCompat {
             else -> return false
         }
         server.execute {
-            server.playerList.getPlayer(playerId)?.changeGameMode(gameMode)
+            server.playerList.getPlayer(playerId)?.setGameMode(gameMode)
         }
         return true
     }
@@ -289,15 +282,15 @@ object VersionCompatImpl : VersionCompat {
 
     fun createLiteral(text: String): MutableComponent = Component.literal(text)
 
-    fun formatText(text: MutableComponent, formatting: ChatFormatting): MutableComponent = text.formatted(formatting)
+    fun formatText(text: MutableComponent, formatting: ChatFormatting): MutableComponent = text.withStyle(formatting)
 
     fun captureBlockEntity(world: net.minecraft.world.level.Level, pos: BlockPos): BlockEntityDataSnapshot? {
         val blockEntity = world.getBlockEntity(pos) ?: return null
-        return BlockEntityDataSnapshot(blockEntity.saveWithFullMetadata(world.registryAccess).copy())
+        return BlockEntityDataSnapshot(blockEntity.saveWithFullMetadata(world.registryAccess()).copy())
     }
 
     fun applyBlockEntity(world: net.minecraft.world.level.Level, write: BlockWrite, suppressUpdates: Boolean = true) {
-        world.setBlockState(
+        world.setBlock(
             write.pos,
             write.state,
             BlockWriteUpdatePolicy.capabilityFlags(
@@ -309,9 +302,9 @@ object VersionCompatImpl : VersionCompat {
         if (payload == null) {
             world.removeBlockEntity(write.pos)
             val provider = write.state.block as? net.minecraft.world.level.block.EntityBlock ?: return
-            val blockEntity = provider.createBlockEntity(write.pos, write.state) ?: return
+            val blockEntity = provider.newBlockEntity(write.pos, write.state) ?: return
             world.getChunk(write.pos.x shr 4, write.pos.z shr 4).setBlockEntity(blockEntity)
-            blockEntity.markDirty()
+            blockEntity.setChanged()
             return
         }
 
@@ -319,22 +312,22 @@ object VersionCompatImpl : VersionCompat {
         restored.putInt("x", write.pos.x)
         restored.putInt("y", write.pos.y)
         restored.putInt("z", write.pos.z)
-        val blockEntity = net.minecraft.world.level.block.entity.BlockEntity.createFromNbt(write.pos, write.state, restored, world.registryAccess)
+        val blockEntity = net.minecraft.world.level.block.entity.BlockEntity.loadStatic(write.pos, write.state, restored, world.registryAccess())
             ?: return
         world.removeBlockEntity(write.pos)
         world.getChunk(write.pos.x shr 4, write.pos.z shr 4).setBlockEntity(blockEntity)
-        blockEntity.markDirty()
+        blockEntity.setChanged()
     }
 
     fun registerAxionPayloadChannel(
-        id: CustomPacketPayload.Id<AxionPluginPayload>,
+        id: CustomPacketPayload.Type<AxionPluginPayload>,
         codec: StreamCodec<RegistryFriendlyByteBuf, AxionPluginPayload>,
     ) {
         // NeoForge payload registration is deferred to the mod event bus.
     }
 
     fun registerAxionReceiver(
-        id: CustomPacketPayload.Id<AxionPluginPayload>,
+        id: CustomPacketPayload.Type<AxionPluginPayload>,
         handler: (AxionPluginPayload) -> Unit,
     ) {
         clientPayloadHandlers[id] = handler
@@ -562,7 +555,7 @@ object VersionCompatImpl : VersionCompat {
 
     override fun blockArgumentParserBlock(registry: Any, state: String): Any {
         return net.minecraft.items.arguments.blocks.BlockStateParser.block(
-            (registry as RegistryAccess).getOrThrow(Registries.BLOCK),
+            (registry as RegistryAccess).lookupOrThrow(Registries.BLOCK),
             state,
             false
         )
@@ -625,7 +618,7 @@ object VersionCompatImpl : VersionCompat {
 
     fun getBlockAtlasTextureView(client: Minecraft): GpuTextureView? {
         return try {
-            val atlas = client.atlasManager?.getAtlasOrThrow(net.minecraft.resources.Identifier.of("minecraft", "blocks"))
+            val atlas = client.atlasManager?.getAtlasOrThrow(net.minecraft.resources.Identifier.fromNamespaceAndPath("minecraft", "blocks"))
             currentAtlasSampler = blockAtlasSampler(atlas)
             val view = atlas?.getTextureView()
             if (!loggedAtlasResult) {
@@ -708,9 +701,9 @@ object VersionCompatImpl : VersionCompat {
         return try {
             previewShellPipelines.computeIfAbsent(drawMode) {
                 RenderPipeline.builder(RenderPipelines.MATRICES_PROJECTION_SNIPPET)
-                    .withLocation(Identifier.of("axion", "preview_shell"))
-                    .withVertexShader(Identifier.of("axion", "core/preview_shell"))
-                    .withFragmentShader(Identifier.of("axion", "core/preview_shell"))
+                    .withLocation(Identifier.fromNamespaceAndPath("axion", "preview_shell"))
+                    .withVertexShader(Identifier.fromNamespaceAndPath("axion", "core/preview_shell"))
+                    .withFragmentShader(Identifier.fromNamespaceAndPath("axion", "core/preview_shell"))
                     .withSampler("Sampler0")
                     .withBlend(BlendFunction.TRANSLUCENT)
                     .withDepthTestFunction(previewDepthTest)

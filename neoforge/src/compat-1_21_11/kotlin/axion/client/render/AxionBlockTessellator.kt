@@ -109,7 +109,7 @@ object AxionBlockTessellator {
     ): Int {
         var rendered = 0
         for (block in blocks) {
-            matrixStack.push()
+            matrixStack.pushPose()
             matrixStack.translate(
                 block.pos.x - cameraX,
                 block.pos.y - cameraY,
@@ -130,7 +130,7 @@ object AxionBlockTessellator {
             if (tessellateBlock(block.state, block.pos, blockWorld, matrixStack, consumer, blockCheckSides, cameraX, cameraY, cameraZ, scale)) {
                 rendered++
             }
-            matrixStack.pop()
+            matrixStack.popPose()
         }
         return rendered
     }

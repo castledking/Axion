@@ -10,11 +10,12 @@ import net.minecraft.resources.Identifier
 data class AxionPluginPayload(
     val bytes: ByteArray,
 ) : CustomPacketPayload {
-    override fun getId(): CustomPacketPayload.Id<out CustomPacketPayload> = ID
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = ID
 
     companion object {
-        val ID: CustomPacketPayload.Id<AxionPluginPayload> = CustomPacketPayload.Id(
-            VersionCompat.INSTANCE.identifierOf(AxionProtocol.CHANNEL_ID.substringBefore(':'), AxionProtocol.CHANNEL_ID.substringAfter(':')),
+        val ID: CustomPacketPayload.Type<AxionPluginPayload> = CustomPacketPayload.createType(
+            AxionProtocol.CHANNEL_ID,
+
         )
 
         @Suppress("UNCHECKED_CAST")

@@ -97,7 +97,7 @@ class MagicSelectTemplateEditScreen(
             Button.builder(Component.translatable("axion.config.magic_select.editWorld.save")) {
                 AxionClientConfig.updateMagicSelectTemplate(
                     currentTemplate.copy(
-                        name = nameField.text.trim().ifEmpty { currentTemplate.name },
+                        name = nameField.value.trim().ifEmpty { currentTemplate.name },
                         selectedCustomMaskIds = selectedCustomMaskIds.toSet(),
                     ),
                 )
@@ -151,7 +151,7 @@ class MagicSelectTemplateEditScreen(
         )
         context.drawCenteredString(
             font,
-            FormattedNameText.parse(nameField.text.ifEmpty { template.name }),
+            FormattedNameText.parse(nameField.value.ifEmpty { template.name }),
             centerX,
             58,
             0xFFFFFF,
@@ -210,7 +210,7 @@ class MagicSelectTemplateEditScreen(
     private fun persistDraft(currentTemplate: MagicSelectTemplateConfig = template) {
         AxionClientConfig.updateMagicSelectTemplate(
             currentTemplate.copy(
-                name = nameField.text.trim().ifEmpty { currentTemplate.name },
+                name = nameField.value.trim().ifEmpty { currentTemplate.name },
                 selectedCustomMaskIds = selectedCustomMaskIds.toSet(),
             ),
         )

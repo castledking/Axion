@@ -55,7 +55,7 @@ object PreviewBlockTessellator {
                 return@forEach
             }
 
-            matrices.push()
+            matrices.pushPose()
             matrices.translate(
                 block.pos.x - cameraPos.x,
                 block.pos.y - cameraPos.y,
@@ -70,7 +70,7 @@ object PreviewBlockTessellator {
                 true,
                 parts,
             )
-            matrices.pop()
+            matrices.popPose()
             rendered = true
         }
 

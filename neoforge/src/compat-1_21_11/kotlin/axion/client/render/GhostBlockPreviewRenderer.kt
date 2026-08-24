@@ -264,7 +264,7 @@ object GhostBlockPreviewRenderer {
         origins.forEach { origin ->
             occupiedCells.forEach { cell ->
                 val blockPos = cell.absolutePos(origin)
-                matrixStack.push()
+                matrixStack.pushPose()
                 matrixStack.translate(
                     blockPos.x - cameraPos.x,
                     blockPos.y - cameraPos.y,
@@ -278,7 +278,7 @@ object GhostBlockPreviewRenderer {
                     LightTexture.FULL_BRIGHT,
                     OverlayTexture.NO_OVERLAY,
                 )
-                matrixStack.pop()
+                matrixStack.popPose()
             }
         }
     }
@@ -336,7 +336,7 @@ object GhostBlockPreviewRenderer {
         val blockRenderManager = client.blockRenderManager
         val alphaConsumers = TintedAlphaVertexConsumerProvider(consumers as MultiBufferSource, alphaScale, color)
         writes.forEach { write ->
-            matrixStack.push()
+            matrixStack.pushPose()
             matrixStack.translate(
                 write.pos.x - cameraPos.x,
                 write.pos.y - cameraPos.y,
@@ -350,7 +350,7 @@ object GhostBlockPreviewRenderer {
                 LightTexture.FULL_BRIGHT,
                 OverlayTexture.NO_OVERLAY,
             )
-            matrixStack.pop()
+            matrixStack.popPose()
         }
     }
 

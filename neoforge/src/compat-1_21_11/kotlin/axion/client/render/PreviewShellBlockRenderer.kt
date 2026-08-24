@@ -71,7 +71,7 @@ object PreviewShellBlockRenderer {
 
         // Restore matrix stack
         if (scale != 1.0f) {
-            matrixStack.pop()
+            matrixStack.popPose()
         }
 
         return rendered > 0
@@ -81,7 +81,7 @@ object PreviewShellBlockRenderer {
         if (scale == 1.0f) {
             return
         }
-        matrixStack.push()
+        matrixStack.pushPose()
         matrixStack.translate(0.5, 0.5, 0.5)
         matrixStack.scale(scale, scale, scale)
         matrixStack.translate(-0.5, -0.5, -0.5)
