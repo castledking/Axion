@@ -33,6 +33,38 @@ object ChunkMeshTessellator {
      * fully hidden. Non-opaque neighbors (short_grass, flowers, crops,
      * etc.) do NOT count as occluders.
      */
+    /**
+     * Iterates every occupied cell in a section (no interior cull) — used for
+     * translucent ghost previews that must read as a solid mass.
+     */
+    fun buildSectionFull(
+        store: ChunkedBooleanStore,
+        sectionKey: Long,
+        statesByPosition: Map<Long, BlockState>? = null,
+    ): LongArray {
+        val section = store.rawSection(sectionKey) ?: return EMPTY
+        val baseX = ChunkedBooleanStore.sectionX(sectionKey) shl 4
+        val baseY = ChunkedBooleanStore.sectionY(sectionKey) shl 4
+        val baseZ = ChunkedBooleanStore.sectionZ(sectionKey) shl 4
+
+        val out = LongArray(4096)
+        var count = 0
+
+        for (z in 0..15) {
+            for (y in 0..15) {
+                val v = section[y + z * 16].toInt()
+                if (v == 0) continue
+                for (x in 0..15) {
+                    val mask = 1 shl x
+                    if ((v and mask) == 0) continue
+                    out[count++] = BlockPos.asLong(baseX + x, baseY + y, baseZ + z)
+                }
+            }
+        }
+
+        return if (count == 0) EMPTY else out.copyOf(count)
+    }
+
     fun buildSectionSurface(
         store: ChunkedBooleanStore,
         sectionKey: Long,

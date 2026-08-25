@@ -247,7 +247,7 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
         world: ClientLevel,
         statesByPosition: Map<Long, BlockState>,
     ): MeshData? {
-        val surface = ChunkMeshTessellator.buildSectionSurface(store, sectionKey, statesByPosition)
+        val surface = ChunkMeshTessellator.buildSectionFull(store, sectionKey, statesByPosition)
         if (surface.isEmpty()) return null
 
         val blocks = ArrayList<PreviewBlockInfo>(surface.size)
@@ -301,7 +301,7 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
         val blocks = ArrayList<PreviewBlockInfo>(64)
         for (sectionKey in chunkBuffers.keys) {
             blocks.clear()
-            val surface = ChunkMeshTessellator.buildSectionSurface(store, sectionKey, statesView)
+            val surface = ChunkMeshTessellator.buildSectionFull(store, sectionKey, statesView)
             for (packed in surface) {
                 val state = statesView[packed] ?: continue
                 if (state.isAir) continue

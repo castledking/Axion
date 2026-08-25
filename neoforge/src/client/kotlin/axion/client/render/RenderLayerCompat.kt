@@ -657,7 +657,10 @@ object RenderLayerCompat {
                 method.parameterTypes[0].isInstance(pipeline) &&
                 method.returnType.isInstance(pipeline)
         } ?: return pipeline
-        return register.invoke(null, pipeline) ?: pipeline
+        return runCatching {
+            register.isAccessible = true
+            register.invoke(null, pipeline) ?: pipeline
+        }.getOrDefault(pipeline)
     }
 
     private fun positionColorVertexFormat(): Any {
