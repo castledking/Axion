@@ -22,7 +22,9 @@ pluginManagement {
 
 rootProject.name = "Axion"
 
-include(":common")
+// "common" is not a buildable project — its Yarn-named sources are
+// inlined by :fabric via source dirs; :neoforge uses its own migrated copy
+// in neoforge/src/mojmap-common.
 include(":fabric")
 include(":neoforge")
 include(":protocol")

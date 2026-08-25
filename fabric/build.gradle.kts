@@ -13,10 +13,9 @@ plugins {
 }
 
 // Wire common source sets (Java + Kotlin) into this loader project
-val commonProject = project(":common")
-val commonKotlinSrc = commonProject.layout.projectDirectory.dir("src/main/kotlin").asFile.absolutePath
-val commonJavaSrc = commonProject.layout.projectDirectory.dir("src/main/java").asFile.absolutePath
-val commonResourcesDir = commonProject.layout.projectDirectory.dir("src/main/resources")
+val commonKotlinSrc = rootDir.resolve("common/src/main/kotlin").absolutePath
+val commonJavaSrc = rootDir.resolve("common/src/main/java").absolutePath
+val commonResourcesDir = rootDir.resolve("common/src/main/resources")
 
 sourceSets.main {
     java.srcDir(commonJavaSrc)
