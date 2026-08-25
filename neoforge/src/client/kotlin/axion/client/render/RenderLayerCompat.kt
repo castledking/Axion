@@ -283,8 +283,25 @@ object RenderLayerCompat {
 
     private fun createXrayQuadsLayer(): RenderType {
         val pipelineLayer = runCatching {
-            val pipeline = createXrayQuadsPipeline()
-            createModernLayer(pipeline) ?: createLegacyLayer(pipeline)
+            val pipeline = try {
+                createXrayQuadsPipeline()
+            } catch (t: Throwable) {
+                logger.warn("[RenderLayerCompat] createXrayQuadsPipeline failed", t)
+                throw t
+            }
+            createModernLayer(pipeline)?.also {
+                logger.info("[RenderLayerCompat] xrayQuads via createModernLayer")
+            } ?: run {
+                logger.warn("[RenderLayerCompat] createModernLayer returned null; trying legacy")
+                createLegacyLayer(pipeline)?.also {
+                    logger.info("[RenderLayerCompat] xrayQuads via createLegacyLayer")
+                } ?: run {
+                    logger.warn("[RenderLayerCompat] createLegacyLayer returned null")
+                    null
+                }
+            }
+        }.onFailure {
+            logger.warn("[RenderLayerCompat] xrayQuads pipeline path threw", it)
         }.getOrNull()
         if (pipelineLayer != null) {
             logger.info("[RenderLayerCompat] Created pipeline-backed xrayQuads layer")
@@ -576,6 +593,7 @@ object RenderLayerCompat {
         if (invokeAnyIfPresent(builder, setOf("translucent", "method_75937")) == null) {
             invokeIfPresent(builder, "sortOnUpload")
         }
+        logger.info("[RenderLayerCompat] createModernLayer: builderFactory + builder ok")
         val bufferSetter = builder.javaClass.declaredMethods.firstOrNull { method ->
             method.parameterCount == 1 &&
                 method.parameterTypes[0] == Int::class.javaPrimitiveType &&
@@ -593,8 +611,13 @@ object RenderLayerCompat {
         val renderSetup = build?.invoke(builder)
             ?: invokeIfPresent(builder, "build")
             ?: invokeIfPresent(builder, "createRenderSetup")
-            ?: return null
-        return factory.invoke(null, "axion_xray_quads", renderSetup) as RenderType
+            ?: run { logger.warn("[RenderLayerCompat] createModernLayer: no build method on RenderSetupBuilder"); return null }
+        return try {
+            factory.invoke(null, "axion_xray_quads", renderSetup) as RenderType
+        } catch (t: Throwable) {
+            logger.warn("[RenderLayerCompat] createModernLayer: RenderType.create threw", t)
+            throw t
+        }
     }
 
     private fun createLegacyLayer(pipeline: Any): RenderType? {
