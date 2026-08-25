@@ -24,25 +24,23 @@ abstract class InGameHudMixin {
         }
     }
 
-    @Group(name = "axionVanillaHotbarSelector", min = 1, max = 1)
     @ModifyExpressionValue(
+        require = 0,
         method = ["renderHotbar"],
         at = [At(
             value = "FIELD",
             target = "Lnet/minecraft/world/entity/player/Inventory;selected:I",
         )],
-        require = 0,
     )
     private fun axionHideLegacyVanillaSelector(originalSlot: Int): Int = selectorSlot(originalSlot)
 
-    @Group(name = "axionVanillaHotbarSelector", min = 1, max = 1)
     @ModifyExpressionValue(
+        require = 0,
         method = ["renderHotbar"],
         at = [At(
             value = "INVOKE",
             target = "Lnet/minecraft/world/entity/player/Inventory;getSelectedSlot()I",
         )],
-        require = 0,
     )
     private fun axionHideModernVanillaSelector(originalSlot: Int): Int = selectorSlot(originalSlot)
 
