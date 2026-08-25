@@ -110,7 +110,7 @@ object ClonePlacementService {
             sourceRegion = preview.sourceRegion,
             clipboardBuffer = preview.sourceClipboardBuffer,
             offset = preview.offset,
-            transform = preview.transform,
+            transform = preview.transform.rotateClockwise(),
             entitySelection = preview.entitySelection,
         )
     }
