@@ -26,7 +26,7 @@ abstract class InGameHudMixin {
 
     @ModifyExpressionValue(
         require = 0,
-        method = ["renderHotbar"],
+        method = ["renderItemHotbar"],
         at = [At(
             value = "FIELD",
             target = "Lnet/minecraft/world/entity/player/Inventory;selected:I",
@@ -36,7 +36,7 @@ abstract class InGameHudMixin {
 
     @ModifyExpressionValue(
         require = 0,
-        method = ["renderHotbar"],
+        method = ["renderItemHotbar"],
         at = [At(
             value = "INVOKE",
             target = "Lnet/minecraft/world/entity/player/Inventory;getSelectedSlot()I",
