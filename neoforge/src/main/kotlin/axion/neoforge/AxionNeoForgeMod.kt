@@ -5,6 +5,7 @@ import axion.client.AxionClientBootstrap
 import axion.client.compat.VersionCompatImpl
 import axion.client.compat.VersionCompatInit
 import axion.client.input.AxionKeybindings
+import axion.client.network.AxionPluginPayload
 import net.minecraft.client.Minecraft
 import net.neoforged.api.distmarker.Dist
 import net.neoforged.bus.api.IEventBus
@@ -20,31 +21,19 @@ import net.neoforged.neoforge.common.NeoForge
 import net.neoforged.neoforge.event.tick.ServerTickEvent
 import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent
+import net.neoforged.neoforge.network.registration.PayloadRegistrar
 import org.slf4j.LoggerFactory
 
 @Mod(AxionMod.MOD_ID)
 class AxionNeoForgeMod(modEventBus: IEventBus) {
     init {
         LOGGER.info("Initializing Axion core (NeoForge)")
-        modEventBus.addListener(::registerPayloadHandlers)
-    }
 
-    private fun registerPayloadHandlers(event: RegisterPayloadHandlersEvent) {
-        VersionCompatImpl.registerPayloadHandlers(event)
-    }
-
-    companion object {
-        val LOGGER = LoggerFactory.getLogger(AxionMod.MOD_ID)
-    }
-}
-
-@Mod(AxionMod.MOD_ID)
-class AxionNeoForgeClientMod(modEventBus: IEventBus) {
-    init {
         // Must run before any static initializer touches VersionCompat.INSTANCE
         // (keybinding registration happens before FMLClientSetupEvent).
         VersionCompatInit.init()
 
+        modEventBus.addListener(::registerPayloadHandlers)
         modEventBus.addListener(::onClientSetup)
         modEventBus.addListener(::registerKeyMappings)
         modEventBus.addListener(::registerClientPayloadHandlers)
@@ -52,8 +41,27 @@ class AxionNeoForgeClientMod(modEventBus: IEventBus) {
         NeoForge.EVENT_BUS.register(NeoForgeServerEvents::class.java)
     }
 
+    // Declares the C->S payload. The S->C handler is attached via
+    // RegisterClientPayloadHandlersEvent below - registering the same ID
+    // through both paths crashes NetworkRegistry.
+    private fun registerPayloadHandlers(event: RegisterPayloadHandlersEvent) {
+        val registrar: PayloadRegistrar = event.registrar("1")
+        registrar.playToServer(
+            AxionPluginPayload.ID,
+            AxionPluginPayload.CODEC,
+            ::onServerPayload,
+        )
+    }
+
     private fun onClientSetup(event: FMLClientSetupEvent) {
         event.enqueueWork(AxionClientBootstrap::initialize)
+    }
+
+    private fun onServerPayload(
+        @Suppress("UNUSED_PARAMETER") payload: AxionPluginPayload,
+        @Suppress("UNUSED_PARAMETER") context: net.neoforged.neoforge.network.handling.IPayloadContext,
+    ) {
+        // Server->client direction only; server receive is a no-op on the client jar.
     }
 
     private fun registerKeyMappings(event: RegisterKeyMappingsEvent) {
@@ -62,6 +70,10 @@ class AxionNeoForgeClientMod(modEventBus: IEventBus) {
 
     private fun registerClientPayloadHandlers(event: RegisterClientPayloadHandlersEvent) {
         VersionCompatImpl.registerClientPayloadHandlers(event)
+    }
+
+    companion object {
+        val LOGGER = LoggerFactory.getLogger(AxionMod.MOD_ID)
     }
 }
 

@@ -337,7 +337,6 @@ object VersionCompatImpl : VersionCompat {
     fun registerPayloadHandlers(event: RegisterPayloadHandlersEvent) {
         val registrar: PayloadRegistrar = event.registrar("1")
         registrar.playToServer(AxionPluginPayload.ID, AxionPluginPayload.CODEC) { _, _ -> }
-        registrar.playToClient(AxionPluginPayload.ID, AxionPluginPayload.CODEC)
     }
 
     fun registerClientPayloadHandlers(event: RegisterClientPayloadHandlersEvent) {
