@@ -66,6 +66,11 @@ tasks.processResources {
 }
 
 dependencies {
+    // Bundle the Kotlin runtime — production Minecraft has no kotlin-stdlib
+    // on the classpath (unlike Fabric, where fabric-language-kotlin provides it).
+    // Resolves the highest 2.x on the repositories; JarJar embeds it.
+    jarJar("org.jetbrains.kotlin:kotlin-stdlib:2.3.10")
+
     implementation(project(":protocol"))
     compileOnly("org.spongepowered:mixin:0.8.5")
     compileOnly("io.github.llamalad7:mixinextras-common:0.3.5")
