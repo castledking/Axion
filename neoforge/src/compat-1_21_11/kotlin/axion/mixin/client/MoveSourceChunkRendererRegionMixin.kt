@@ -19,7 +19,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable
 abstract class MoveSourceChunkRendererRegionMixin {
     @Shadow
     @Final
-    private lateinit var world: Level
+    private lateinit var level: Level
 
     @Inject(
         method = ["getBlockState"],
@@ -30,7 +30,7 @@ abstract class MoveSourceChunkRendererRegionMixin {
         pos: BlockPos,
         cir: CallbackInfoReturnable<BlockState>,
     ) {
-        if (MoveSourceRenderState.shouldSuppress(world, pos)) {
+        if (MoveSourceRenderState.shouldSuppress(level, pos)) {
 Blocks.AIR.defaultBlockState()
         }
     }
@@ -40,7 +40,7 @@ Blocks.AIR.defaultBlockState()
         pos: BlockPos,
         cir: CallbackInfoReturnable<FluidState>,
     ) {
-        if (MoveSourceRenderState.shouldSuppress(world, pos)) {
+        if (MoveSourceRenderState.shouldSuppress(level, pos)) {
 Blocks.AIR.defaultBlockState().fluidState
         }
     }
@@ -50,7 +50,7 @@ Blocks.AIR.defaultBlockState().fluidState
         pos: BlockPos,
         cir: CallbackInfoReturnable<BlockEntity?>,
     ) {
-        if (MoveSourceRenderState.shouldSuppress(world, pos)) {
+        if (MoveSourceRenderState.shouldSuppress(level, pos)) {
 null
         }
     }
