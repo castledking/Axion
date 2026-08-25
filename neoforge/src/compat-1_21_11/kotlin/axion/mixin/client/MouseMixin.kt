@@ -24,7 +24,7 @@ abstract class MouseMixin {
 
     // Modern version with MouseButtonInfo
     @Inject(
-        method = ["onMouseButton(JLnet.minecraft.client.input.MouseButtonInfo;I)V"],
+        method = ["onMouseButton(JLnet/minecraft/client/input/MouseButtonInfo;I)V"],
         at = [At("HEAD")],
         cancellable = true,
     )
@@ -77,7 +77,7 @@ abstract class MouseMixin {
     }
 
     // Yarn name: onMouseScroll (1.21.x)
-    @Inject(method = ["onMouseScroll"], at = [At("HEAD")], cancellable = true)
+    @Inject(method = ["onScroll"], at = [At("HEAD")], cancellable = true)
     private fun axionHandleScroll(window: Long, horizontal: Double, vertical: Double, ci: CallbackInfo) {
         val client = getClient()
         if (currentScreenOf(client) != null) {

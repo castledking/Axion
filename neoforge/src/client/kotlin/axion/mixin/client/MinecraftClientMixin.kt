@@ -17,15 +17,9 @@ abstract class MinecraftClientMixin {
     private fun self(): Minecraft = this as Minecraft
 
     // Drain a conflicting vanilla offhand click before its packet is emitted.
-    @Inject(method = ["handleInputEvents", "handleKeybinds"], at = [At("HEAD")], require = 0)
+    @Inject(method = ["handleKeybinds"], at = [At("HEAD")], require = 0)
     private fun axionPreemptConflictingOffhandSwap(ci: CallbackInfo) {
         AxionShortcutPreemption.suppressConflictingOffhandSwap(self())
-    }
-
-    // Yarn name: startAttack (1.21.x)
-    @Inject(method = ["doAttack"], at = [At("HEAD")], cancellable = true, require = 0)
-    private fun axionHandlePrimaryAction(ci: CallbackInfoReturnable<Boolean>) {
-        axionHandlePrimaryActionImpl(ci)
     }
 
     // 26.1.x official namespace: startAttack
@@ -71,12 +65,6 @@ abstract class MinecraftClientMixin {
         }
     }
 
-    // Yarn name: startUseItem (1.21.x)
-    @Inject(method = ["doItemUse"], at = [At("HEAD")], cancellable = true, require = 0)
-    private fun axionHandleSecondaryAction(ci: CallbackInfo) {
-        axionHandleSecondaryActionImpl(ci)
-    }
-
     // 26.1.x official namespace: startUseItem
     @Inject(method = ["startUseItem"], at = [At("HEAD")], cancellable = true, require = 0)
     private fun axionHandleSecondaryActionOfficial(ci: CallbackInfo) {
@@ -120,12 +108,6 @@ abstract class MinecraftClientMixin {
         }
     }
 
-    // Yarn name: handleBlockBreaking (1.21.x)
-    @Inject(method = ["handleBlockBreaking"], at = [At("HEAD")], cancellable = true, require = 0)
-    private fun axionHandleBlockBreaking(breaking: Boolean, ci: CallbackInfo) {
-        axionHandleBlockBreakingImpl(breaking, ci)
-    }
-
     // 26.1.x official namespace: continueAttack
     @Inject(method = ["continueAttack"], at = [At("HEAD")], cancellable = true, require = 0)
     private fun axionHandleBlockBreakingOfficial(breaking: Boolean, ci: CallbackInfo) {
@@ -158,14 +140,8 @@ abstract class MinecraftClientMixin {
         }
     }
 
-    // Yarn name: pickBlock (1.21.x)
-    @Inject(method = ["doItemPick"], at = [At("HEAD")], cancellable = true, require = 0)
-    private fun axionHandleMiddleAction(ci: CallbackInfo) {
-        axionHandleMiddleActionImpl(ci)
-    }
-
     // 26.1.x official namespace: pickBlockOrEntity
-    @Inject(method = ["pickBlockOrEntity"], at = [At("HEAD")], cancellable = true, require = 0)
+    @Inject(method = ["pickBlock"], at = [At("HEAD")], cancellable = true, require = 0)
     private fun axionHandleMiddleActionOfficial(ci: CallbackInfo) {
         axionHandleMiddleActionImpl(ci)
     }
