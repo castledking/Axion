@@ -44,32 +44,28 @@ class AxionNeoForgeMod(modEventBus: IEventBus) {
     // through both paths crashes NetworkRegistry.
     private fun registerPayloadHandlers(event: RegisterPayloadHandlersEvent) {
         val registrar: PayloadRegistrar = event.registrar("1")
-        // Clientbound: dispatch into Axion's handler registry on the main thread.
-        registrar.playToClient(
+        // Bidirectional: server->client dispatches on the main thread into
+        // Axion's handler registry; client->server is a no-op here.
+        registrar.playBidirectional(
             AxionPluginPayload.ID,
             AxionPluginPayload.CODEC,
+            ::onServerPayload,
         ) { payload, _ ->
             Minecraft.getInstance().execute {
                 VersionCompatImpl.consumeClientPayload(payload)
             }
         }
-        // Serverbound: the server ignores these on this side of the connection.
-        registrar.playToServer(
-            AxionPluginPayload.ID,
-            AxionPluginPayload.CODEC,
-            ::onServerPayload,
-        )
+    }
+
+    private fun onServerPayload(
+        payload: AxionPluginPayload,
+        context: net.neoforged.neoforge.network.handling.IPayloadContext,
+    ) {
+        // Server->client direction only; server receive is a no-op on the client jar.
     }
 
     private fun onClientSetup(event: FMLClientSetupEvent) {
         event.enqueueWork(AxionClientBootstrap::initialize)
-    }
-
-    private fun onServerPayload(
-        @Suppress("UNUSED_PARAMETER") payload: AxionPluginPayload,
-        @Suppress("UNUSED_PARAMETER") context: net.neoforged.neoforge.network.handling.IPayloadContext,
-    ) {
-        // Server->client direction only; server receive is a no-op on the client jar.
     }
 
     private fun registerKeyMappings(event: RegisterKeyMappingsEvent) {
