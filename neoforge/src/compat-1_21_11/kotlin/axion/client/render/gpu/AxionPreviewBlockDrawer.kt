@@ -199,6 +199,19 @@ object AxionPreviewBlockDrawer {
         } else {
             SectionDrawList.buildAll(sectionBuffers)
         }
+        // Translucent blending is order-dependent: draw far sections first so
+        // near shell faces composite over them instead of depth-rejecting them.
+        if (drawList.size > 1) {
+            val cx = cameraPos.x + translationDelta.x
+            val cy = cameraPos.y + translationDelta.y
+            val cz = cameraPos.z + translationDelta.z
+            drawList.sortByDescending { entry ->
+                val dx = entry.sectionOriginX + 8.0 - cx
+                val dy = entry.sectionOriginY + 8.0 - cy
+                val dz = entry.sectionOriginZ + 8.0 - cz
+                dx * dx + dy * dy + dz * dz
+            }
+        }
         val cullDoneNs = if (DEBUG_LOG) System.nanoTime() else 0L
         if (drawList.isEmpty()) {
             val result = if (useSectionFrustumCulling) {

@@ -27,6 +27,7 @@ object AxionTickHandler {
     // preview session is closed so GPU/CPU caches don't leak into the next
     // world with stale absolute-coord chunks.
     private var lastObservedWorld: ClientLevel? = null
+    private var dispatchLogs = 0
 
     fun onEndTick(client: Minecraft) {
         observeWorldLifecycle(client.level)
@@ -70,7 +71,15 @@ object AxionTickHandler {
             // can be consumed by conflicting vanilla bindings. wasCtrlComboPressed reads both
             // keys directly from GLFW and edge-detects the combo, bypassing both issues.
             if (KeyBindingHandler.wasCtrlComboPressed(AxionKeybindings.symmetryToggleRotation, allowShift = false)) {
-                if (!PlacementToolController.handleRotateAction()) {
+                val handled = PlacementToolController.handleRotateAction()
+                if (dispatchLogs < 12) {
+                    dispatchLogs++
+                    org.slf4j.LoggerFactory.getLogger(AxionTickHandler::class.java).info(
+                        "[Axion input] rotate combo → placementToolHandled={} placementState={}",
+                        handled, axion.client.AxionClientState.placementToolState::class.simpleName,
+                    )
+                }
+                if (!handled) {
                     SymmetryController.toggleRotational()
                 }
             }

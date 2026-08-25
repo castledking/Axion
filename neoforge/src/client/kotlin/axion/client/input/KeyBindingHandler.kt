@@ -20,6 +20,10 @@ object KeyBindingHandler {
     // true = the Ctrl+key combo was active last tick
     private val ctrlComboActive = mutableSetOf<Int>()
 
+    private val loggedUnresolved = mutableSetOf<Int>()
+    private var comboFireLogs = 0
+    private val LOGGER = org.slf4j.LoggerFactory.getLogger(KeyBindingHandler::class.java)
+
     // Cached reflection field for KeyMapping.key (protected in MC 1.21.11)
     private val boundKeyField: Field? by lazy {
         runCatching {
@@ -79,6 +83,12 @@ object KeyBindingHandler {
     fun wasCtrlComboPressed(keyBinding: KeyMapping, allowShift: Boolean = true): Boolean {
         val keyCode = getBoundKeyCode(keyBinding)
         if (keyCode == null || keyCode == GLFW.GLFW_KEY_UNKNOWN) {
+            if (loggedUnresolved.add(System.identityHashCode(keyBinding))) {
+                LOGGER.warn(
+                    "[Axion input] could not resolve GLFW code for '{}' — combo detection falls back to isDown edge, which 1.21.8+ modifier suppression breaks",
+                    keyBinding.name,
+                )
+            }
             // Can't resolve key code — fall back to MC's system
             return wasPressedNonConsuming(keyBinding)
         }
@@ -95,7 +105,15 @@ object KeyBindingHandler {
 
         if (comboActive) {
             ctrlComboActive.add(keyCode)
-            return !wasActive  // true only on the rising edge of the combo
+            val fired = !wasActive
+            if (fired && comboFireLogs < 12) {
+                comboFireLogs++
+                LOGGER.info(
+                    "[Axion input] combo fired for '{}' (glfw={} ctrl={} shift={})",
+                    keyBinding.name, keyCode, ctrlDown, shiftDown,
+                )
+            }
+            return fired  // true only on the rising edge of the combo
         } else {
             ctrlComboActive.remove(keyCode)
             return false
