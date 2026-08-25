@@ -250,7 +250,10 @@ class LocalWritePlanner {
         overlay: MutableMap<BlockPos, BlockWrite>,
         writes: MutableList<BlockWrite>,
     ) {
-        val immutablePos = pos
+        // betweenClosed/iterate yield a reused MutableBlockPos — copy it, or
+        // every planned write ends up pinned to the cursor's final position
+        // (which silently turned move's source-erase into a no-op).
+        val immutablePos = BlockPos(pos.x, pos.y, pos.z)
         val write = BlockWrite(immutablePos, state, blockEntityData?.copy())
         overlay[immutablePos] = write
         writes += write
