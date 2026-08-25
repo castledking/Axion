@@ -13,10 +13,10 @@ data class AxionPluginPayload(
     override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = ID
 
     companion object {
-        val ID: CustomPacketPayload.Type<AxionPluginPayload> = CustomPacketPayload.createType(
-            AxionProtocol.CHANNEL_ID,
-
-        )
+        // createType(s) applies the default 'minecraft' namespace; CHANNEL_ID
+        // is already namespaced ('axion:main'), so build the Type directly.
+        val ID: CustomPacketPayload.Type<AxionPluginPayload> =
+            CustomPacketPayload.Type(Identifier.parse(AxionProtocol.CHANNEL_ID))
 
         @Suppress("UNCHECKED_CAST")
         val CODEC: StreamCodec<RegistryFriendlyByteBuf, AxionPluginPayload> =
