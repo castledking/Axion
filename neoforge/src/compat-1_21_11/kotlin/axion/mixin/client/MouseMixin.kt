@@ -24,7 +24,7 @@ abstract class MouseMixin {
 
     // Modern version with MouseButtonInfo
     @Inject(
-        method = ["onMouseButton(JLnet/minecraft/client/input/MouseButtonInfo;I)V"],
+        method = ["onButton(JLnet/minecraft/client/input/MouseButtonInfo;I)V"],
         at = [At("HEAD")],
         cancellable = true,
     )
