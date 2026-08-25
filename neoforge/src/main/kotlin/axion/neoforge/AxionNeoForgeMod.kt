@@ -43,7 +43,9 @@ class AxionNeoForgeMod(modEventBus: IEventBus) {
     // RegisterClientPayloadHandlersEvent below - registering the same ID
     // through both paths crashes NetworkRegistry.
     private fun registerPayloadHandlers(event: RegisterPayloadHandlersEvent) {
-        val registrar: PayloadRegistrar = event.registrar("1")
+        // optional(): don't advertise axion:main as a required channel, so
+        // vanilla / non-NeoForge servers remain joinable.
+        val registrar: PayloadRegistrar = event.registrar("1").optional()
         // Bidirectional: server->client dispatches on the main thread into
         // Axion's handler registry; client->server is a no-op here.
         registrar.playBidirectional(
