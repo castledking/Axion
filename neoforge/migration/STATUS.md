@@ -146,3 +146,11 @@ minecraft range from gradle.properties.
 MC 1.21.10 NeoForge uses `ResourceLocation`; 1.21.11 renamed it to
 `Identifier`. The single source tree targets 1.21.11 only. A 1.21.10 jar
 needs either a shim typealias module or its own source pass.
+
+### Runtime fix (first launch)
+neoforge's copied mixins.json still listed two fabric-only mixins
+(GameRendererPostOutlineMixin, GuiMixin — they only exist in fabric's
+26_2 compat tree). FML aborted at mixin prepare. Both removed from
+axion.client.mixins.json and the -1.21.5 variant; config now matches
+the 20 compiled mixin classes exactly (CameraAccessor stays unlisted,
+same as fabric).
