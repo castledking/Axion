@@ -1,3 +1,5 @@
+evaluationDependsOn(":protocol")
+
 plugins {
     id("multiloader-loader")
     id("net.neoforged.moddev")
@@ -65,6 +67,10 @@ tasks.processResources {
     }
 }
 
+// Bundle the protocol classes into the mod jar (FML has no classpath for
+// sibling projects in production).
+val protocolOutput = project(":protocol").the<SourceSetContainer>()["main"].output
+
 dependencies {
     // Bundle the Kotlin runtime — production Minecraft has no kotlin-stdlib
     // on the classpath (unlike Fabric, where fabric-language-kotlin provides it).
@@ -96,4 +102,9 @@ kotlin {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget((findProperty("java_version") as String?) ?: "21"))
         freeCompilerArgs.add("-jvm-default=no-compatibility")
     }
+}
+
+tasks.jar {
+    from(protocolOutput)
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
