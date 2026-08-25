@@ -343,7 +343,10 @@ object VersionCompatImpl : VersionCompat {
     }
 
     fun sendAxionPayload(payload: AxionPluginPayload) {
-        ClientPacketDistributor.sendToServer(payload)
+        // Optional channel: vanilla / non-Axion servers never negotiated it.
+        // Swallow send failures instead of killing the connection (the
+        // handshake state machine marks the server as non-Axion on timeout).
+        runCatching { ClientPacketDistributor.sendToServer(payload) }
     }
 
     fun supportsChunkedPreview(): Boolean {

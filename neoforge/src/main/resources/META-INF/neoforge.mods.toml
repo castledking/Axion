@@ -8,6 +8,7 @@ version="${version}"
 displayName="${mod_name}"
 description="${description}"
 authors="${mod_author}"
+logoFile="assets/axion/icon.png"
 
 [[mixins]]
 config="axion.client.mixins.json"
