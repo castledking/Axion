@@ -101,12 +101,14 @@ object KeyBindingCompat {
     }
 
     private fun categoryIdentifier(categoryKey: String): Identifier {
+        // Constructed directly: this runs during static init of AxionKeybindings,
+        // which happens before VersionCompat.INSTANCE is assigned.
         val suffix = categoryKey.removePrefix("keycategory.")
         val separatorIndex = suffix.indexOf('.')
         return if (separatorIndex > 0) {
-            VersionCompat.INSTANCE.identifierOf(suffix.substring(0, separatorIndex), suffix.substring(separatorIndex + 1))
+            Identifier.fromNamespaceAndPath(suffix.substring(0, separatorIndex), suffix.substring(separatorIndex + 1))
         } else {
-            VersionCompat.INSTANCE.identifierOf("axion", suffix)
+            Identifier.fromNamespaceAndPath("axion", suffix)
         }
     }
 

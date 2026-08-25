@@ -3,6 +3,7 @@ package axion.neoforge
 import axion.AxionMod
 import axion.client.AxionClientBootstrap
 import axion.client.compat.VersionCompatImpl
+import axion.client.compat.VersionCompatInit
 import axion.client.input.AxionKeybindings
 import net.minecraft.client.Minecraft
 import net.neoforged.api.distmarker.Dist
@@ -40,6 +41,10 @@ class AxionNeoForgeMod(modEventBus: IEventBus) {
 @Mod(AxionMod.MOD_ID)
 class AxionNeoForgeClientMod(modEventBus: IEventBus) {
     init {
+        // Must run before any static initializer touches VersionCompat.INSTANCE
+        // (keybinding registration happens before FMLClientSetupEvent).
+        VersionCompatInit.init()
+
         modEventBus.addListener(::onClientSetup)
         modEventBus.addListener(::registerKeyMappings)
         modEventBus.addListener(::registerClientPayloadHandlers)
