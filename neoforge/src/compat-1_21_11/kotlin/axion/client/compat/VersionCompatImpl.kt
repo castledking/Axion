@@ -59,7 +59,6 @@ import net.minecraft.server.MinecraftServer
 import net.neoforged.neoforge.client.event.RenderGuiLayerEvent
 import net.neoforged.neoforge.client.network.ClientPacketDistributor
 import net.neoforged.neoforge.network.PacketDistributor
-import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent
 import net.neoforged.neoforge.network.registration.PayloadRegistrar
 import net.neoforged.fml.ModList
@@ -339,12 +338,8 @@ object VersionCompatImpl : VersionCompat {
         registrar.playToServer(AxionPluginPayload.ID, AxionPluginPayload.CODEC) { _, _ -> }
     }
 
-    fun registerClientPayloadHandlers(event: RegisterClientPayloadHandlersEvent) {
-        event.register(AxionPluginPayload.ID) { payload, _ ->
-            Minecraft.getInstance().execute {
-                clientPayloadHandlers[AxionPluginPayload.ID]?.invoke(payload)
-            }
-        }
+    fun consumeClientPayload(payload: AxionPluginPayload) {
+        clientPayloadHandlers[AxionPluginPayload.ID]?.invoke(payload)
     }
 
     fun sendAxionPayload(payload: AxionPluginPayload) {

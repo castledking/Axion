@@ -19,7 +19,6 @@ import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent
 import net.neoforged.neoforge.client.event.RenderGuiLayerEvent
 import net.neoforged.neoforge.common.NeoForge
 import net.neoforged.neoforge.event.tick.ServerTickEvent
-import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent
 import net.neoforged.neoforge.network.registration.PayloadRegistrar
 import org.slf4j.LoggerFactory
@@ -36,7 +35,6 @@ class AxionNeoForgeMod(modEventBus: IEventBus) {
         modEventBus.addListener(::registerPayloadHandlers)
         modEventBus.addListener(::onClientSetup)
         modEventBus.addListener(::registerKeyMappings)
-        modEventBus.addListener(::registerClientPayloadHandlers)
         NeoForge.EVENT_BUS.register(NeoForgeClientEvents::class.java)
         NeoForge.EVENT_BUS.register(NeoForgeServerEvents::class.java)
     }
@@ -46,6 +44,16 @@ class AxionNeoForgeMod(modEventBus: IEventBus) {
     // through both paths crashes NetworkRegistry.
     private fun registerPayloadHandlers(event: RegisterPayloadHandlersEvent) {
         val registrar: PayloadRegistrar = event.registrar("1")
+        // Clientbound: dispatch into Axion's handler registry on the main thread.
+        registrar.playToClient(
+            AxionPluginPayload.ID,
+            AxionPluginPayload.CODEC,
+        ) { payload, _ ->
+            Minecraft.getInstance().execute {
+                VersionCompatImpl.consumeClientPayload(payload)
+            }
+        }
+        // Serverbound: the server ignores these on this side of the connection.
         registrar.playToServer(
             AxionPluginPayload.ID,
             AxionPluginPayload.CODEC,
@@ -68,9 +76,6 @@ class AxionNeoForgeMod(modEventBus: IEventBus) {
         AxionKeybindings.register(event::register)
     }
 
-    private fun registerClientPayloadHandlers(event: RegisterClientPayloadHandlersEvent) {
-        VersionCompatImpl.registerClientPayloadHandlers(event)
-    }
 
     companion object {
         val LOGGER = LoggerFactory.getLogger(AxionMod.MOD_ID)
