@@ -31,7 +31,7 @@ abstract class MoveSourceChunkRendererRegionMixin {
         cir: CallbackInfoReturnable<BlockState>,
     ) {
         if (MoveSourceRenderState.shouldSuppress(level, pos)) {
-Blocks.AIR.defaultBlockState()
+            cir.returnValue = Blocks.AIR.defaultBlockState()
         }
     }
 
@@ -41,7 +41,7 @@ Blocks.AIR.defaultBlockState()
         cir: CallbackInfoReturnable<FluidState>,
     ) {
         if (MoveSourceRenderState.shouldSuppress(level, pos)) {
-Blocks.AIR.defaultBlockState().fluidState
+            cir.returnValue = Blocks.AIR.defaultBlockState().fluidState
         }
     }
 
@@ -51,7 +51,7 @@ Blocks.AIR.defaultBlockState().fluidState
         cir: CallbackInfoReturnable<BlockEntity?>,
     ) {
         if (MoveSourceRenderState.shouldSuppress(level, pos)) {
-null
+            cir.returnValue = null
         }
     }
 }
