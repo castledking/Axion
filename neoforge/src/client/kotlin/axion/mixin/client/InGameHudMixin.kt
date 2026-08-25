@@ -29,7 +29,7 @@ abstract class InGameHudMixin {
         method = ["renderHotbar"],
         at = [At(
             value = "FIELD",
-            target = "Lnet.minecraft.world.entity.player.Inventory;selectedSlot:I",
+            target = "Lnet/minecraft/world/entity/player/Inventory;selected:I",
         )],
         require = 0,
     )
@@ -40,7 +40,7 @@ abstract class InGameHudMixin {
         method = ["renderHotbar"],
         at = [At(
             value = "INVOKE",
-            target = "Lnet.minecraft.world.entity.player.Inventory;getSelectedSlot()I",
+            target = "Lnet/minecraft/world/entity/player/Inventory;getSelectedSlot()I",
         )],
         require = 0,
     )
