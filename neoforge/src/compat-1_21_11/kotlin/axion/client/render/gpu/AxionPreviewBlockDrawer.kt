@@ -118,6 +118,7 @@ object AxionPreviewBlockDrawer {
         cameraPosOverride: Vec3? = null,
         cullingModelView: Matrix4fc? = null,
         projectionMatrix: Matrix4fc? = null,
+        ignoreTextureAlpha: Boolean = true,
     ): ChunkedDrawResult {
         if (disabled || sectionBuffers.isEmpty()) return ChunkedDrawResult.FAILED
         if (ShaderPackCompat.shouldDisableDirectGpuPreview()) return ChunkedDrawResult.FAILED
@@ -132,6 +133,7 @@ object AxionPreviewBlockDrawer {
                 cameraPosOverride,
                 cullingModelView,
                 projectionMatrix,
+                ignoreTextureAlpha,
             )
             // Flush any deferred draws immediately after drawing
             ChunkedPreviewLifecycle.flushDeferredDraws(cullingModelView, projectionMatrix)
@@ -171,6 +173,7 @@ object AxionPreviewBlockDrawer {
         cameraPosOverride: Vec3?,
         cullingModelView: Matrix4fc?,
         projectionMatrix: Matrix4fc?,
+        ignoreTextureAlpha: Boolean,
     ): ChunkedDrawResult {
         val client = Minecraft.getInstance()
         val device = RenderSystem.getDevice()
@@ -278,7 +281,7 @@ object AxionPreviewBlockDrawer {
             val renderLayer = RenderLayerCompat.blockTranslucentCull()
             val pipeline = if (USE_CUSTOM_PREVIEW_PIPELINE) {
                 val firstBuffer = drawList.first().buffer
-                VersionCompatImpl.getPreviewShellPipeline(firstBuffer.vertexFormatValue, firstBuffer.drawModeValue)
+                VersionCompatImpl.getPreviewShellPipeline(firstBuffer.vertexFormatValue, firstBuffer.drawModeValue, ignoreTextureAlpha)
                     ?: VersionCompatImpl.getRenderPipeline(renderLayer)
             } else {
                 VersionCompatImpl.getRenderPipeline(renderLayer)

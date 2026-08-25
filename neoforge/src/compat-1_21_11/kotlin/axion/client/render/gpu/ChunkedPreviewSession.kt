@@ -205,6 +205,7 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
         return AxionPreviewBlockDrawer.drawChunked(
             chunkBuffers, color, alpha, translationDelta,
             baseModelView, cameraPos, cullingModelView, projectionMatrix,
+            ignoreTextureAlpha = axion.client.render.PreviewVisualPolicy.ignoresTextureAlpha(previewId),
         )
     }
 

@@ -73,7 +73,7 @@ import org.slf4j.LoggerFactory
 object VersionCompatImpl : VersionCompat {
     private val logger = LoggerFactory.getLogger(VersionCompatImpl::class.java)
     private var currentAtlasSampler: GpuSampler? = null
-    private val previewShellPipelines = java.util.EnumMap<VertexFormat.Mode, RenderPipeline>(VertexFormat.Mode::class.java)
+    private val previewShellPipelines = java.util.HashMap<Pair<VertexFormat.Mode, Boolean>, RenderPipeline>()
 
     private val clientTickHandlers = mutableListOf<(Minecraft) -> Unit>()
     private val clientStoppingHandlers = mutableListOf<(Minecraft) -> Unit>()
@@ -696,10 +696,14 @@ object VersionCompatImpl : VersionCompat {
         DepthTestFunction.LEQUAL_DEPTH_TEST
     }
 
-    fun getPreviewShellPipeline(vertexFormat: VertexFormat, drawMode: VertexFormat.Mode): RenderPipeline? {
+    fun getPreviewShellPipeline(
+        vertexFormat: VertexFormat,
+        drawMode: VertexFormat.Mode,
+        ignoreTextureAlpha: Boolean = true,
+    ): RenderPipeline? {
         return try {
-            previewShellPipelines.computeIfAbsent(drawMode) {
-                RenderPipeline.builder(RenderPipelines.MATRICES_PROJECTION_SNIPPET)
+            previewShellPipelines.computeIfAbsent(drawMode to ignoreTextureAlpha) {
+                var builder = RenderPipeline.builder(RenderPipelines.MATRICES_PROJECTION_SNIPPET)
                     .withLocation(Identifier.fromNamespaceAndPath("axion", "preview_shell"))
                     .withVertexShader(Identifier.fromNamespaceAndPath("axion", "core/preview_shell"))
                     .withFragmentShader(Identifier.fromNamespaceAndPath("axion", "core/preview_shell"))
@@ -712,7 +716,14 @@ object VersionCompatImpl : VersionCompat {
                     .withDepthWrite(true)
                     .withCull(PreviewVisualPolicy.CULL_GHOST_BACK_FACES)
                     .withVertexFormat(vertexFormat, drawMode)
-                    .build()
+                if (ignoreTextureAlpha) {
+                    // Destination ghosts take opacity from the modulator alone
+                    // (PreviewVisualPolicy.DESTINATION_ALPHA). Without this
+                    // define a translucent texel alpha (~0.4 for glass)
+                    // compounds in and the ghost reads as a faint shell.
+                    builder = builder.withShaderDefine(PreviewVisualPolicy.IGNORE_TEXTURE_ALPHA_DEFINE)
+                }
+                builder.build()
             }
         } catch (t: Throwable) {
             if (!loggedPipelineCreation) {
