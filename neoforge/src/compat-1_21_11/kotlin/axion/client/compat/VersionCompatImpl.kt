@@ -921,9 +921,13 @@ object VersionCompatImpl : VersionCompat {
 
         val encoder = java.lang.reflect.Proxy.newProxyInstance(encoderType.classLoader, arrayOf(encoderType)) { _, method, args ->
             if (method.name == "encode" && args != null && args.size == 2) {
-                val buf = args[0] as RegistryFriendlyByteBuf
-                val payload = args[1] as AxionPluginPayload
-                buf.writeBytes(payload.bytes)
+                // Encoder-style factories call encode(value, buffer); raw
+                // StreamCodec.encode is (buffer, value). Detect by type.
+                if (args[0] is AxionPluginPayload) {
+                    (args[1] as RegistryFriendlyByteBuf).writeBytes((args[0] as AxionPluginPayload).bytes)
+                } else {
+                    (args[0] as RegistryFriendlyByteBuf).writeBytes((args[1] as AxionPluginPayload).bytes)
+                }
             }
             null
         }
