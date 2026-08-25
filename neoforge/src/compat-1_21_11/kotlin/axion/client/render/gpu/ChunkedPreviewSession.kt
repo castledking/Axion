@@ -123,7 +123,11 @@ class ChunkedPreviewSession(val previewId: String) : AutoCloseable {
                 val pos = cell.absolutePos(origin)
                 states.put(pos, cell.state)
             }
-            surfaceCells.forEach { cell ->
+            // Bake every occupied cell, not just the surface shell: glass
+            // previews must read as a solid translucent mass (interior faces
+            // are still face-culled against occupied neighbors, so the GPU
+            // cost is bounded by the shell plus visible interior faces).
+            occupiedCells.forEach { cell ->
                 val pos = cell.absolutePos(origin)
                 store.add(pos)
                 states.put(pos, cell.state)

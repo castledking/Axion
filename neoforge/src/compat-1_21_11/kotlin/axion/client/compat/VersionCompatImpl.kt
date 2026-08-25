@@ -534,7 +534,9 @@ object VersionCompatImpl : VersionCompat {
 
     // Direction/BlockState API helpers for 1.21.11
     override fun directionGetVector(direction: Any): Any {
-        return (direction as net.minecraft.core.Direction).getUnitVec3()
+        // Block-grid step vector (Vec3i), not the unit Vec3 - callers use it
+        // for BlockPos offsets and protocol vectors.
+        return (direction as net.minecraft.core.Direction).getUnitVec3i()
     }
 
     override fun blockStateStringify(state: BlockState): String {
