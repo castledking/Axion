@@ -614,6 +614,7 @@ object VersionCompatImpl : VersionCompat {
     private const val BLOCK_ATLAS_SAMPLER_NAME: String = "Sampler0"
     private var loggedAtlasResult: Boolean = false
     private var loggedBindFailure: Boolean = false
+    private var bindSamplerMethod: java.lang.reflect.Method? = null
 
     fun getBlockAtlasTextureView(client: Minecraft): GpuTextureView? {
         return try {
@@ -666,22 +667,38 @@ object VersionCompatImpl : VersionCompat {
     }.getOrNull()
 
     fun bindTextureToRenderPass(pass: RenderPass, samplerName: String, textureView: GpuTextureView) {
-        // 1.21.11 replaced RenderPass.bindSampler(name, view) with
-        // bindTexture(name, view, sampler): there is no name-only binding left,
-        // so an unresolved sampler means the draw samples whatever sampler state
-        // the previous pass left on that texture unit.
+        // 1.21.8: pass.bindSampler(name, view) — 2 args, no sampler object
+        // 1.21.11: pass.bindTexture(name, view, sampler) — 3 args
+        // Resolve lazily on first call.
+        if (bindSamplerMethod == null) {
+            val cls = pass.javaClass
+            bindSamplerMethod = cls.methods.firstOrNull { m ->
+                m.name == "bindSampler" && m.parameterCount == 2
+            } ?: cls.methods.firstOrNull { m ->
+                m.name == "bindTexture" && m.parameterCount == 3
+            }
+        }
         val sampler = if (samplerName == BLOCK_ATLAS_SAMPLER_NAME) currentAtlasSampler else lightmapSampler()
-        if (sampler == null) {
+        try {
+            if (bindSamplerMethod?.parameterCount == 2) {
+                // 1.21.8 path: bindSampler(name, view)
+                bindSamplerMethod!!.invoke(pass, samplerName, textureView)
+            } else {
+                // 1.21.11 path: bindTexture(name, view, sampler)
+                if (sampler == null) {
+                    if (!loggedBindFailure) {
+                        loggedBindFailure = true
+                        logger.error("[Axion GPU] No block-atlas sampler resolved — GPU preview textures will be misfiltered")
+                    }
+                    return
+                }
+                bindSamplerMethod!!.invoke(pass, samplerName, textureView, sampler)
+            }
+        } catch (e: Exception) {
             if (!loggedBindFailure) {
                 loggedBindFailure = true
-                logger.error("[Axion GPU] No block-atlas sampler resolved — GPU preview textures will be misfiltered")
+                logger.warn("[Axion GPU] bindTexture failed for {}", samplerName, e)
             }
-            return
-        }
-        try {
-            pass.bindTexture(samplerName, textureView, sampler)
-        } catch (e: Exception) {
-            logger.warn("[Axion GPU] bindTexture failed for {}", samplerName, e)
         }
     }
 
