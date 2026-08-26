@@ -327,7 +327,7 @@ object AxionInteractionRouter {
     }
 
     private fun isMiddleMousePressed(client: Minecraft): Boolean {
-        return GLFW.glfwGetMouseButton(client.window.handle(), GLFW.GLFW_MOUSE_BUTTON_MIDDLE) == GLFW.GLFW_PRESS
+        return GLFW.glfwGetMouseButton(axion.client.compat.VersionCompatImpl.glfwWindowHandle(client), GLFW.GLFW_MOUSE_BUTTON_MIDDLE) == GLFW.GLFW_PRESS
     }
 
     private fun currentTargetBlock(): BlockPos? {
