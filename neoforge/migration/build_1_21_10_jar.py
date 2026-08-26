@@ -25,7 +25,51 @@ MC_RANGE_RE = re.compile(rb'(\[1\.21[\d.,\[\]]*\])')
 
 
 def rewrite_class(data: bytes) -> bytes:
-    return data.replace(SLASH, SLASH_REPL).replace(DOTTED, DOTTED_REPL)
+    """Rewrite the renamed internal name via a constant-pool walk.
+
+    A naive byte replace corrupts the file: CONSTANT_Utf8 entries carry a
+    2-byte length prefix, and Identifier -> ResourceLocation changes length.
+    We parse the pool, rewrite only Utf8 payloads (class names, descriptors,
+    signature strings, mixin targets all live there), and copy the rest
+    verbatim — everything outside the pool references entries by index.
+    """
+    if SLASH not in data and DOTTED not in data:
+        return data
+    if data[:4] != b"\xca\xfe\xba\xbe":
+        raise ValueError("not a class file")
+    pos = 8  # magic(4) + minor(2) + major(2)
+    count = int.from_bytes(data[pos : pos + 2], "big")
+    pos += 2
+    out = bytearray(data[:pos])
+    index = 1
+    while index < count:
+        tag = data[pos]
+        pos += 1
+        if tag == 1:  # Utf8
+            length = int.from_bytes(data[pos : pos + 2], "big")
+            pos += 2
+            payload = data[pos : pos + length]
+            pos += length
+            new = payload.replace(SLASH, SLASH_REPL).replace(DOTTED, DOTTED_REPL)
+            out += bytes((1,)) + len(new).to_bytes(2, "big") + new
+        elif tag == 15:  # MethodHandle: u1 kind + u2 index
+            out += bytes((tag,)) + data[pos : pos + 3]
+            pos += 3
+        elif tag in (7, 8, 16, 19, 20):  # Class/Str/MethodType/Module/Package
+            out += bytes((tag,)) + data[pos : pos + 2]
+            pos += 2
+        elif tag in (3, 4, 9, 10, 11, 12, 17, 18):
+            out += bytes((tag,)) + data[pos : pos + 4]
+            pos += 4
+        elif tag in (5, 6):  # Long/Double take two pool slots
+            out += bytes((tag,)) + data[pos : pos + 8]
+            pos += 8
+            index += 1
+        else:
+            raise ValueError(f"unknown constant pool tag {tag}")
+        index += 1
+    out += data[pos:]
+    return bytes(out)
 
 
 def mc_range_for(target_mc_version: str) -> str:
