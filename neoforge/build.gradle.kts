@@ -114,3 +114,22 @@ tasks.jar {
     from(protocolOutput)
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
+
+// The raw build output must never load in production: it targets whichever
+// MC version this source tree compiled against, and the shared fabric range
+// from gradle.properties lets FML accept it on incompatible versions. Pin it
+// to the compiled version; build-axion.sh derives per-version variants from
+// this jar via migration/build_1_21_10_jar.py.
+val pinRawJarRange = tasks.register<Exec>("pinRawJarRange") {
+    dependsOn(tasks.named("jar"))
+    workingDir(rootDir)
+    commandLine(
+        "python3",
+        "neoforge/migration/build_1_21_10_jar.py",
+        tasks.named("jar", Jar::class.java).get().archiveFile.get().asFile.absolutePath,
+        tasks.named("jar", Jar::class.java).get().archiveFile.get().asFile.absolutePath,
+        minecraftVersion,
+    )
+}
+
+tasks.named("jar") { finalizedBy(pinRawJarRange) }

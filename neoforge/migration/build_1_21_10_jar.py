@@ -38,6 +38,8 @@ def mc_range_for(target_mc_version: str) -> str:
 
 def main(src: str, dst: str, target_mc_version: str) -> None:
     replaced_classes = 0
+    if src == dst:
+        dst = src + ".rewritten"
     with zipfile.ZipFile(src, "r") as zin, zipfile.ZipFile(
         dst, "w", zipfile.ZIP_DEFLATED
     ) as zout:
@@ -52,8 +54,11 @@ def main(src: str, dst: str, target_mc_version: str) -> None:
                     mc_range_for(target_mc_version).encode(), data
                 )
             zout.writestr(item, data)
+    if dst.endswith(".rewritten"):
+        import os
+        os.replace(dst, src)
     print(
-        f"[mc{target_mc_version}-rewrite] {replaced_classes} classes rewritten -> {dst}"
+        f"[mc{target_mc_version}-rewrite] {replaced_classes} classes rewritten -> {src if dst.endswith('.rewritten') else dst}"
     )
 
 
