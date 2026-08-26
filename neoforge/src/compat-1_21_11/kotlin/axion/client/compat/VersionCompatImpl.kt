@@ -984,19 +984,16 @@ object VersionCompatImpl : VersionCompat {
     // MC 1.21.11: Window.handle()    (public long handle())
     // MC 1.21.6-1.21.8: Window.getWindow()  (public long getWindow())
     private var handleMethod: java.lang.reflect.Method? = null
-    private var windowClass: Class<*>? = null
-
-    init {
-        val cls = net.minecraft.client.Minecraft.getInstance().window.javaClass
-        windowClass = cls
-        handleMethod = cls.methods.firstOrNull { m ->
-            m.name == "handle" && m.parameterCount == 0 && m.returnType == java.lang.Long::class.javaPrimitiveType
-        } ?: cls.methods.firstOrNull { m ->
-            m.name == "getWindow" && m.parameterCount == 0 && m.returnType == java.lang.Long::class.javaPrimitiveType
-        }
-    }
 
     fun glfwWindowHandle(client: Minecraft): Long {
+        if (handleMethod == null) {
+            val cls = client.window.javaClass
+            handleMethod = cls.methods.firstOrNull { m ->
+                m.name == "handle" && m.parameterCount == 0 && m.returnType == java.lang.Long::class.javaPrimitiveType
+            } ?: cls.methods.firstOrNull { m ->
+                m.name == "getWindow" && m.parameterCount == 0 && m.returnType == java.lang.Long::class.javaPrimitiveType
+            }
+        }
         return (handleMethod?.invoke(client.window) as? Long)
             ?: throw NoSuchMethodError("No Window handle/getWindow accessor found")
     }
