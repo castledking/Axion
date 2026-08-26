@@ -619,7 +619,6 @@ build_range() {
                 1.21.10) neoforge_version="21.10.64" ;;
                 *)       neoforge_version="21.11.45" ;;
             esac
-            local neoforge_jar="AxionNeoForge-v${MOD_VERSION}-${range_tag}.jar"
             echo "==> Building AxionNeoForge for ${compile_version} (NeoForge ${neoforge_version})"
             if run_gradle_with_retry :neoforge:build \
                 -Pmod_version="${MOD_VERSION}" \
@@ -630,8 +629,28 @@ build_range() {
                 if [[ -n "${staged_neoforge_jar}" && -s "${staged_neoforge_jar}" ]] &&
                    jar tf "${staged_neoforge_jar}" >/dev/null 2>&1; then
                     mkdir -p "${mod_output_dir}"
-                    mv -f "${staged_neoforge_jar}" "${mod_output_dir}/${neoforge_jar}"
-                    echo "  ${mod_output_dir}/${neoforge_jar}"
+                    # Pin the 1.21.11 jar's metadata range and derive the
+                    # 1.21.10 variant: 1.21.11 renamed ResourceLocation ->
+                    # Identifier upstream, so the 1.21.10 build rewrites the
+                    # compiled constant pools (incl. mixin target descriptors)
+                    # back to the 1.21.10 name. Each jar only loads on its own
+                    # version — they are not interchangeable.
+                    local neoforge_11_jar="AxionNeoForge-v${MOD_VERSION}-mc1.21.11.jar"
+                    local neoforge_10_jar="AxionNeoForge-v${MOD_VERSION}-mc1.21.10.jar"
+                    if python3 neoforge/migration/build_1_21_10_jar.py \
+                        "${staged_neoforge_jar}" \
+                        "${mod_output_dir}/${neoforge_11_jar}" 1.21.11 &&
+                       python3 neoforge/migration/build_1_21_10_jar.py \
+                        "${mod_output_dir}/${neoforge_11_jar}" \
+                        "${mod_output_dir}/${neoforge_10_jar}" 1.21.10 &&
+                       jar tf "${mod_output_dir}/${neoforge_11_jar}" >/dev/null 2>&1 &&
+                       jar tf "${mod_output_dir}/${neoforge_10_jar}" >/dev/null 2>&1; then
+                        echo "  ${mod_output_dir}/${neoforge_11_jar}"
+                        echo "  ${mod_output_dir}/${neoforge_10_jar}"
+                    else
+                        echo "WARNING: NeoForge version variants failed; skipping staging." >&2
+                        return 1
+                    fi
                 else
                     echo "WARNING: NeoForge jar missing or invalid; skipping staging." >&2
                     return 1

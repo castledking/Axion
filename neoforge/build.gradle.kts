@@ -11,6 +11,12 @@ group = (findProperty("maven_group") as String?) ?: "codes.castled.axion"
 
 val minecraftVersion = findProperty("minecraft_version") as String
 
+// Pin this jar to the exact compiled MC version. The 1.21.11 build is NOT
+// loadable on 1.21.10 (upstream renamed ResourceLocation -> Identifier); the
+// 1.21.10 variant is derived by neoforge/migration/build_1_21_10_jar.py,
+// which flips this range to [1.21.10] in the rewritten jar.
+ext["minecraft_version_range"] = "[$minecraftVersion]"
+
 val neoforgeVersion = (findProperty("neoforge_version") as String?)
     ?.takeIf { it.isNotBlank() && it != "21.11.8" }
     ?: when {
@@ -51,7 +57,7 @@ tasks.processResources {
         "version" to (version as String),
         "group" to ((group as String?) ?: "codes.castled.axion"),
         "minecraft_version" to minecraftVersion,
-        "minecraft_version_range" to ((findProperty("minecraft_version_range") as String?) ?: "[1.21.9,1.21.11]"),
+        "minecraft_version_range" to ((findProperty("neoforge_minecraft_version_range") as String?) ?: "[$minecraftVersion]"),
         "mod_name" to (findProperty("mod_name") as String),
         "mod_author" to (findProperty("mod_author") as String),
         "mod_id" to (findProperty("mod_id") as String),
