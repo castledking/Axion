@@ -14,10 +14,20 @@ import re
 import sys
 import zipfile
 
-SLASH = b"net/minecraft/resources/Identifier"
-SLASH_REPL = b"net/minecraft/resources/ResourceLocation"
-DOTTED = b"net.minecraft.resources.Identifier"
-DOTTED_REPL = b"net.minecraft.resources.ResourceLocation"
+# 1.21.10 -> 1.21.11 internal-name renames (verified by diffing the
+# neoforge-21.10.64/-21.11.45 merged class lists against our jar's refs).
+RENAMES = [
+    (b"net/minecraft/resources/Identifier",
+     b"net/minecraft/resources/ResourceLocation"),
+    (b"net/minecraft/client/renderer/rendertype/RenderType",
+     b"net/minecraft/client/renderer/RenderType"),
+]
+DOTTED_RENAMES = [
+    (b"net.minecraft.resources.Identifier",
+     b"net.minecraft.resources.ResourceLocation"),
+    (b"net.minecraft.client.renderer.rendertype.RenderType",
+     b"net.minecraft.client.renderer.RenderType"),
+]
 
 # The convention plugin stamps gradle.properties' shared fabric range into
 # neoforge.mods.toml; pin whatever we find to the requested exact version.
@@ -33,7 +43,7 @@ def rewrite_class(data: bytes) -> bytes:
     signature strings, mixin targets all live there), and copy the rest
     verbatim — everything outside the pool references entries by index.
     """
-    if SLASH not in data and DOTTED not in data:
+    if not any(a in data for a, _ in RENAMES + DOTTED_RENAMES):
         return data
     if data[:4] != b"\xca\xfe\xba\xbe":
         raise ValueError("not a class file")
@@ -50,7 +60,9 @@ def rewrite_class(data: bytes) -> bytes:
             pos += 2
             payload = data[pos : pos + length]
             pos += length
-            new = payload.replace(SLASH, SLASH_REPL).replace(DOTTED, DOTTED_REPL)
+            new = payload
+            for a, b in RENAMES + DOTTED_RENAMES:
+                new = new.replace(a, b)
             out += bytes((1,)) + len(new).to_bytes(2, "big") + new
         elif tag == 15:  # MethodHandle: u1 kind + u2 index
             out += bytes((tag,)) + data[pos : pos + 3]
@@ -90,7 +102,9 @@ def main(src: str, dst: str, target_mc_version: str) -> None:
         for item in zin.infolist():
             data = zin.read(item.filename)
             if item.filename.endswith(".class"):
-                if target_mc_version == "1.21.10" and (SLASH in data or DOTTED in data):
+                if target_mc_version == "1.21.10" and any(
+                    a in data for a, _ in RENAMES + DOTTED_RENAMES
+                ):
                     data = rewrite_class(data)
                     replaced_classes += 1
             elif item.filename.endswith("neoforge.mods.toml"):
