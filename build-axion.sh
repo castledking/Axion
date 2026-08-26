@@ -613,12 +613,10 @@ build_range() {
     # NeoForge jar (modern range only — no NeoForge exists for MC 1.21.9,
     # and the neoforge sources target the 1.21.10/1.21.11 Mojmap API).
     case "$compile_version" in
-        1.21.10|1.21.11)
-            local neoforge_version
-            case "$compile_version" in
-                1.21.10) neoforge_version="21.10.64" ;;
-                *)       neoforge_version="21.11.45" ;;
-            esac
+        1.21.6|1.21.7|1.21.8|1.21.10|1.21.11)
+            # The neoforge sources always compile against the 1.21.11 API;
+            # per-version jars are derived by the constant-pool rewriter.
+            local neoforge_version="21.11.45"
             echo "==> Building AxionNeoForge for ${compile_version} (NeoForge ${neoforge_version})"
             if run_gradle_with_retry :neoforge:build \
                 -Pmod_version="${MOD_VERSION}" \
@@ -639,19 +637,26 @@ build_range() {
                     local neoforge_output_dir="neoforge/build/libs"
                     local neoforge_11_dir="${neoforge_output_dir}/mc1.21.11"
                     local neoforge_10_dir="${neoforge_output_dir}/mc1.21.9-1.21.10"
-                    mkdir -p "${neoforge_11_dir}" "${neoforge_10_dir}"
+                    local neoforge_8_dir="${neoforge_output_dir}/mc1.21.6-1.21.8"
+                    mkdir -p "${neoforge_11_dir}" "${neoforge_10_dir}" "${neoforge_8_dir}"
                     local neoforge_11_jar="AxionNeoForge-v${MOD_VERSION}-mc1.21.11.jar"
                     local neoforge_10_jar="AxionNeoForge-v${MOD_VERSION}-mc1.21.9-1.21.10.jar"
+                    local neoforge_8_jar="AxionNeoForge-v${MOD_VERSION}-mc1.21.6-1.21.8.jar"
                     if python3 neoforge/migration/build_1_21_10_jar.py \
                         "${staged_neoforge_jar}" \
                         "${neoforge_11_dir}/${neoforge_11_jar}" 1.21.11 &&
                        python3 neoforge/migration/build_1_21_10_jar.py \
                         "${neoforge_11_dir}/${neoforge_11_jar}" \
                         "${neoforge_10_dir}/${neoforge_10_jar}" 1.21.10 &&
+                       python3 neoforge/migration/build_1_21_10_jar.py \
+                        "${neoforge_11_dir}/${neoforge_11_jar}" \
+                        "${neoforge_8_dir}/${neoforge_8_jar}" 1.21.8 &&
                        jar tf "${neoforge_11_dir}/${neoforge_11_jar}" >/dev/null 2>&1 &&
-                       jar tf "${neoforge_10_dir}/${neoforge_10_jar}" >/dev/null 2>&1; then
+                       jar tf "${neoforge_10_dir}/${neoforge_10_jar}" >/dev/null 2>&1 &&
+                       jar tf "${neoforge_8_dir}/${neoforge_8_jar}" >/dev/null 2>&1; then
                         echo "  ${neoforge_11_dir}/${neoforge_11_jar}"
                         echo "  ${neoforge_10_dir}/${neoforge_10_jar}"
+                        echo "  ${neoforge_8_dir}/${neoforge_8_jar}"
                     else
                         echo "WARNING: NeoForge version variants failed; skipping staging." >&2
                         return 1

@@ -8,7 +8,6 @@ import axion.client.mode.ClientModeController
 import axion.mixin.compat.currentScreenOf
 import net.minecraft.client.Minecraft
 import net.minecraft.client.MouseHandler
-import net.minecraft.client.input.MouseButtonInfo
 import org.spongepowered.asm.mixin.Mixin
 import org.spongepowered.asm.mixin.injection.At
 import org.spongepowered.asm.mixin.injection.Inject
@@ -22,15 +21,18 @@ import org.lwjgl.glfw.GLFW
 abstract class MouseMixin {
     private fun getClient(): Minecraft = Minecraft.getInstance()
 
-    // Modern version with MouseButtonInfo
+    // Legacy signature (MC 1.21.6-1.21.8): GLFW callback ints, mojmap onPress.
+    // require=0 keeps this a silent no-op on modern jars where the legacy
+    // mixin config entry is stripped instead.
     @Inject(
-        method = ["onButton(JLnet/minecraft/client/input/MouseButtonInfo;I)V"],
+        method = ["onPress"],
         at = [At("HEAD")],
         cancellable = true,
+        require = 0,
     )
-    private fun axionHandleMouseButtonModern(window: Long, mouseInput: MouseButtonInfo, action: Int, ci: CallbackInfo) {
+    private fun axionHandleMouseButtonLegacy(window: Long, button: Int, action: Int, mods: Int, ci: CallbackInfo) {
         val client = getClient()
-        if (AxionAltMenuController.handleMouseButton(client, mouseInput.button(), action)) {
+        if (AxionAltMenuController.handleMouseButton(client, button, action)) {
             ci.cancel()
             return
         }
@@ -39,34 +41,27 @@ abstract class MouseMixin {
             return
         }
 
-        // For infinite reach without fast place, let vanilla handle the event
-        // so that doItemUse is called and continuous placement works
-        if (mouseInput.button() == GLFW.GLFW_MOUSE_BUTTON_RIGHT &&
+        if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT &&
             ClientModeController.shouldLetVanillaHandleSecondaryAction(client)) {
             return
         }
 
-        // For fast place mode, let vanilla handle so doItemUse is called
-        // which triggers our mixin and enables manual key tracking
-        if (mouseInput.button() == GLFW.GLFW_MOUSE_BUTTON_RIGHT &&
+        if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT &&
             ClientModeController.isFastPlaceEnabled(client)) {
             return
         }
 
-        // For infinite reach without bulldozer, let vanilla handle the event
-        // so that doAttack is called and continuous breaking works
-        if (mouseInput.button() == GLFW.GLFW_MOUSE_BUTTON_LEFT &&
+        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT &&
             ClientModeController.shouldLetVanillaHandlePrimaryAction(client)) {
             return
         }
 
-        // For bulldozer + infinite reach, also let vanilla handle for continuous multi-block breaking
-        if (mouseInput.button() == GLFW.GLFW_MOUSE_BUTTON_LEFT &&
+        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT &&
             ClientModeController.shouldLetVanillaHandleBulldozerInfiniteReach(client)) {
             return
         }
 
-        val consumed = when (mouseInput.button()) {
+        val consumed = when (button) {
             GLFW.GLFW_MOUSE_BUTTON_LEFT -> ClientModeController.consumePrimaryAction(client)
             GLFW.GLFW_MOUSE_BUTTON_RIGHT -> ClientModeController.consumeSecondaryAction(client)
             else -> false

@@ -847,14 +847,35 @@ object VersionCompatImpl : VersionCompat {
         mouseX: Double,
         mouseY: Double,
         mouseButton: Int,
-    ): Boolean = button.mouseClicked(
-        net.minecraft.client.input.MouseButtonEvent(
-            mouseX,
-            mouseY,
-            net.minecraft.client.input.MouseButtonInfo(mouseButton, 0),
-        ),
-        false,
-    )
+    ): Boolean {
+        // 1.21.9+ takes a MouseButtonEvent; 1.21.6-1.21.8 takes (DDZ). The
+        // event class does not exist on old versions, so resolve reflectively.
+        val eventCtor = runCatching {
+            net.minecraft.client.input.MouseButtonEvent::class.java.getConstructor(
+                Double::class.javaPrimitiveType,
+                Double::class.javaPrimitiveType,
+                net.minecraft.client.input.MouseButtonInfo::class.java,
+            )
+        }.getOrNull()
+        return if (eventCtor != null) {
+            val event = eventCtor.newInstance(
+                mouseX,
+                mouseY,
+                net.minecraft.client.input.MouseButtonInfo(mouseButton, 0),
+            )
+            button.mouseClicked(event, false)
+        } else {
+            // 1.21.6-1.21.8: mouseClicked(DDZ). Not present at compile time,
+            // resolved reflectively.
+            val legacy = button.javaClass.methods.firstOrNull { m ->
+                m.name == "mouseClicked" && m.parameterCount == 3 &&
+                    m.parameterTypes[0] == Double::class.javaPrimitiveType &&
+                    m.parameterTypes[1] == Double::class.javaPrimitiveType &&
+                    m.parameterTypes[2] == Boolean::class.javaPrimitiveType
+            } ?: return false
+            legacy.invoke(button, mouseX, mouseY, mouseButton) as Boolean
+        }
+    }
 
     fun drawGuiTextureRegion(
         context: GuiGraphics,

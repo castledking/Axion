@@ -22,6 +22,10 @@ val neoforgeVersion = (findProperty("neoforge_version") as String?)
     ?: when {
     minecraftVersion.startsWith("26.") -> findProperty("neoforge_version") as String
     minecraftVersion == "1.21.10" -> "21.10.64"
+    minecraftVersion == "1.21.8" -> "21.8.54"
+    // 1.21.6/1.21.7 have no stable NeoForge — the range compiles against 1.21.8.
+    minecraftVersion == "1.21.7" -> "21.8.54"
+    minecraftVersion == "1.21.6" -> "21.8.54"
     minecraftVersion.startsWith("1.21.11") -> "21.11.45"
     else -> findProperty("neoforge_version") as String
 }

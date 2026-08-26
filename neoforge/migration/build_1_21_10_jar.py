@@ -34,6 +34,13 @@ DOTTED_RENAMES = [
 MC_RANGE_RE = re.compile(rb'(\[1\.21[\d.,\[\]]*\])')
 
 
+def strip_mixins(data: bytes, remove: set) -> bytes:
+    import json
+    cfg = json.loads(data)
+    cfg["client"] = [m for m in cfg["client"] if m not in remove]
+    return json.dumps(cfg, indent=2).encode()
+
+
 def rewrite_class(data: bytes) -> bytes:
     """Rewrite the renamed internal name via a constant-pool walk.
 
@@ -84,11 +91,22 @@ def rewrite_class(data: bytes) -> bytes:
     return bytes(out)
 
 
+# Mixin classes that import 1.21.9+ types (MouseButtonInfo,
+# LevelRenderState). The 1.21.6-1.21.8 jar must not list them — the mixin
+# engine would fail to load the class. The legacy variants
+# (MouseMixin.onPress, WorldRendererFallbackLegacyMixin) ship everywhere.
+PRE_1_21_9_MIXINS = ["MouseModernMixin", "WorldRendererFallbackMixin"]
+
+
 def mc_range_for(target_mc_version: str) -> str:
     if target_mc_version == "1.21.10":
         # 1.21.9 and 1.21.10 share one Mojmap API surface (both served by
         # NeoForge 21.10.x), so the rewritten jar ranges across both.
         return "[1.21.9,1.21.11)"
+    if target_mc_version == "1.21.8":
+        # 1.21.6-1.21.8 share one API surface (compiled against 1.21.8,
+        # NeoForge 21.8.x).
+        return "[1.21.6,1.21.9)"
     return f"[{target_mc_version}]"
 
 
@@ -102,7 +120,7 @@ def main(src: str, dst: str, target_mc_version: str) -> None:
         for item in zin.infolist():
             data = zin.read(item.filename)
             if item.filename.endswith(".class"):
-                if target_mc_version == "1.21.10" and any(
+                if target_mc_version in ("1.21.10", "1.21.8") and any(
                     a in data for a, _ in RENAMES + DOTTED_RENAMES
                 ):
                     data = rewrite_class(data)
@@ -111,6 +129,9 @@ def main(src: str, dst: str, target_mc_version: str) -> None:
                 data = MC_RANGE_RE.sub(
                     mc_range_for(target_mc_version).encode(), data
                 )
+            elif item.filename.endswith("axion.client.mixins.json"):
+                if target_mc_version == "1.21.8":
+                    data = strip_mixins(data, set(PRE_1_21_9_MIXINS))
             zout.writestr(item, data)
     if dst.endswith(".rewritten"):
         import os
