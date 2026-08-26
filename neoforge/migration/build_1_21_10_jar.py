@@ -28,6 +28,14 @@ def rewrite_class(data: bytes) -> bytes:
     return data.replace(SLASH, SLASH_REPL).replace(DOTTED, DOTTED_REPL)
 
 
+def mc_range_for(target_mc_version: str) -> str:
+    if target_mc_version == "1.21.10":
+        # 1.21.9 and 1.21.10 share one Mojmap API surface (both served by
+        # NeoForge 21.10.x), so the rewritten jar ranges across both.
+        return "[1.21.9,1.21.11)"
+    return f"[{target_mc_version}]"
+
+
 def main(src: str, dst: str, target_mc_version: str) -> None:
     replaced_classes = 0
     with zipfile.ZipFile(src, "r") as zin, zipfile.ZipFile(
@@ -41,7 +49,7 @@ def main(src: str, dst: str, target_mc_version: str) -> None:
                     replaced_classes += 1
             elif item.filename.endswith("neoforge.mods.toml"):
                 data = MC_RANGE_RE.sub(
-                    f"[{target_mc_version}]".encode(), data
+                    mc_range_for(target_mc_version).encode(), data
                 )
             zout.writestr(item, data)
     print(

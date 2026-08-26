@@ -636,7 +636,7 @@ build_range() {
                     # back to the 1.21.10 name. Each jar only loads on its own
                     # version — they are not interchangeable.
                     local neoforge_11_jar="AxionNeoForge-v${MOD_VERSION}-mc1.21.11.jar"
-                    local neoforge_10_jar="AxionNeoForge-v${MOD_VERSION}-mc1.21.10.jar"
+                    local neoforge_10_jar="AxionNeoForge-v${MOD_VERSION}-mc1.21.9-1.21.10.jar"
                     if python3 neoforge/migration/build_1_21_10_jar.py \
                         "${staged_neoforge_jar}" \
                         "${mod_output_dir}/${neoforge_11_jar}" 1.21.11 &&
