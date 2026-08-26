@@ -43,19 +43,52 @@ class AxionNeoForgeMod(modEventBus: IEventBus) {
     // RegisterClientPayloadHandlersEvent below - registering the same ID
     // through both paths crashes NetworkRegistry.
     private fun registerPayloadHandlers(event: RegisterPayloadHandlersEvent) {
-        // optional(): don't advertise axion:main as a required channel, so
-        // vanilla / non-NeoForge servers remain joinable.
         val registrar: PayloadRegistrar = event.registrar("1").optional()
-        // Bidirectional: server->client dispatches on the main thread into
-        // Axion's handler registry; client->server is a no-op here.
-        registrar.playBidirectional(
-            AxionPluginPayload.ID,
-            AxionPluginPayload.CODEC,
-            ::onServerPayload,
-        ) { payload, _ ->
-            Minecraft.getInstance().execute {
-                VersionCompatImpl.consumeClientPayload(payload)
+        // NeoForge 21.8+ has a 4-arg playBidirectional(Type, Codec,
+        // serverHandler, clientHandler). NeoForge 21.6-21.7 only has the
+        // 3-arg form (Type, codec, combinedHandler) — the same handler
+        // receives both directions. Resolve reflectively so one jar
+        // works across the full 1.21.6-1.21.11 range.
+        val bidirectional4 = runCatching {
+            registrar.javaClass.getMethod(
+                "playBidirectional",
+                net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type::class.java,
+                net.minecraft.network.codec.StreamCodec::class.java,
+                net.neoforged.neoforge.network.handling.IPayloadHandler::class.java,
+                net.neoforged.neoforge.network.handling.IPayloadHandler::class.java,
+            )
+        }.getOrNull()
+
+        if (bidirectional4 != null) {
+            val serverHandler = object : net.neoforged.neoforge.network.handling.IPayloadHandler<AxionPluginPayload> {
+                override fun handle(payload: AxionPluginPayload, context: net.neoforged.neoforge.network.handling.IPayloadContext) {
+                    onServerPayload(payload, context)
+                }
             }
+            val clientHandler = object : net.neoforged.neoforge.network.handling.IPayloadHandler<AxionPluginPayload> {
+                override fun handle(payload: AxionPluginPayload, context: net.neoforged.neoforge.network.handling.IPayloadContext) {
+                    Minecraft.getInstance().execute {
+                        VersionCompatImpl.consumeClientPayload(payload)
+                    }
+                }
+            }
+            bidirectional4.invoke(registrar, AxionPluginPayload.ID, AxionPluginPayload.CODEC, serverHandler, clientHandler)
+        } else {
+            // 21.6-21.7: single handler — ignores server direction.
+            val bidirectional3 = registrar.javaClass.getMethod(
+                "playBidirectional",
+                net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type::class.java,
+                net.minecraft.network.codec.StreamCodec::class.java,
+                net.neoforged.neoforge.network.handling.IPayloadHandler::class.java,
+            )
+            val combinedHandler = object : net.neoforged.neoforge.network.handling.IPayloadHandler<AxionPluginPayload> {
+                override fun handle(payload: AxionPluginPayload, context: net.neoforged.neoforge.network.handling.IPayloadContext) {
+                    Minecraft.getInstance().execute {
+                        VersionCompatImpl.consumeClientPayload(payload)
+                    }
+                }
+            }
+            bidirectional3.invoke(registrar, AxionPluginPayload.ID, AxionPluginPayload.CODEC, combinedHandler)
         }
     }
 
