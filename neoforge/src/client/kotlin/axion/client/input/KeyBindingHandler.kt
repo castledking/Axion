@@ -24,10 +24,15 @@ object KeyBindingHandler {
     private var comboFireLogs = 0
     private val LOGGER = org.slf4j.LoggerFactory.getLogger(KeyBindingHandler::class.java)
 
-    // Cached reflection field for KeyMapping.key (protected in MC 1.21.11)
+    // Cached reflection field for KeyMapping's bound key. 1.21.11 names it
+    // boundKey; 1.21.9/1.21.10 use different names AND may mark the field
+    // final, so the fallback accepts any non-static Key-typed field and both
+    // paths setAccessible — without it field.get throws on private fields
+    // and combo detection silently degrades to plain-key edge detection.
     private val boundKeyField: Field? by lazy {
         runCatching {
             KeyMapping::class.java.getDeclaredField("boundKey").also {
+                it.isAccessible = true
             }
         }.getOrElse {
             // Fallback: search for InputUtil/InputConstants.Key typed non-static mutable fields
@@ -35,10 +40,8 @@ object KeyBindingHandler {
             val fallback = KeyMapping::class.java.declaredFields.firstOrNull { f ->
                 val isKeyClass = isInputKeyClass(f.type) || f.type.name.contains("class_3675")
                 isKeyClass && !java.lang.reflect.Modifier.isStatic(f.modifiers)
-                    && !java.lang.reflect.Modifier.isFinal(f.modifiers)
             }
-            fallback?.also { }
-            fallback
+            fallback?.also { it.isAccessible = true }
         }
     }
 
