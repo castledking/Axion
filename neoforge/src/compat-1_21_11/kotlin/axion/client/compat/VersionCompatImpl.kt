@@ -617,9 +617,21 @@ object VersionCompatImpl : VersionCompat {
 
     fun getBlockAtlasTextureView(client: Minecraft): GpuTextureView? {
         return try {
-            val atlas = client.atlasManager?.getAtlasOrThrow(net.minecraft.resources.Identifier.fromNamespaceAndPath("minecraft", "blocks"))
-            currentAtlasSampler = blockAtlasSampler(atlas)
-            val view = atlas?.getTextureView()
+            val atlasLoc = net.minecraft.resources.Identifier.fromNamespaceAndPath("minecraft", "blocks")
+            // Try 1.21.9+ path: client.getAtlasManager().getAtlasOrThrow(loc)
+            // Then fall back to 1.21.6-1.21.8 path: client.getModelManager().getAtlas(loc)
+            val atlas = runCatching {
+                val am = client.javaClass.getMethod("getAtlasManager").invoke(client)
+                am?.javaClass?.getMethod("getAtlasOrThrow", net.minecraft.resources.Identifier::class.java)
+                    ?.invoke(am, atlasLoc) as? net.minecraft.client.renderer.texture.TextureAtlas
+            }.getOrNull()
+                ?: runCatching {
+                    val mm = client.javaClass.getMethod("getModelManager").invoke(client) ?: return@runCatching null
+                    mm.javaClass.getMethod("getAtlas", net.minecraft.resources.Identifier::class.java)
+                        .invoke(mm, atlasLoc) as? net.minecraft.client.renderer.texture.TextureAtlas
+                }.getOrNull()
+            currentAtlasSampler = atlas?.let { blockAtlasSampler(it) }
+            val view = atlas?.textureView
             if (!loggedAtlasResult) {
                 loggedAtlasResult = true
                 logger.info("[Axion GPU] Atlas lookup: view={}, sampler={}", view != null, currentAtlasSampler != null)
