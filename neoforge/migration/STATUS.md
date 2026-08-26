@@ -154,3 +154,48 @@ neoforge's copied mixins.json still listed two fabric-only mixins
 axion.client.mixins.json and the -1.21.5 variant; config now matches
 the 20 compiled mixin classes exactly (CameraAccessor stays unlisted,
 same as fabric).
+
+## 2026-08-25: 1.21.11 feature-complete, per-version jars shipped
+
+The port is feature-complete against MC 1.21.11 / NeoForge 21.11.45 and
+compiles clean. Recent fix rounds (all verified in-game by the user):
+
+- Hotbar selector hide retargeted to Gui.renderItemHotbar (1.21.11 split),
+  with renderHotbar as an alternate target for 1.21.9/1.21.10.
+- rotatePreview lost `.rotateClockwise()` in migration (Ctrl+R no-op).
+- LocalWritePlanner.appendWrite copies positions: blockPosIterate wraps
+  BlockPos.betweenClosed (reused MutableBlockPos); fabric's stripped
+  .toImmutable() made move's source-erase a no-op on singleplayer.
+- Move-source suppression mixin lost cir.returnValue in migration — the
+  stained-glass replacement drew over the still-visible source (shell look).
+- IGNORE_TEXTURE_ALPHA define wired into the preview shell pipeline cache
+  (keyed by drawMode+flag; move-source glass keeps texel alpha).
+- GPU preview sections sorted back-to-front for translucent compositing.
+
+### Version range strategy
+
+One binary cannot span 1.21.9-1.21.11: 1.21.11 renamed
+ResourceLocation -> Identifier upstream (Mojmap has no stable
+intermediary). build-axion.sh modern stages two jars from the single
+1.21.11 build via migration/build_1_21_10_jar.py:
+
+- AxionNeoForge-v<ver>-mc1.21.9-1.21.10.jar: constant-pool-aware rewrite
+  of Identifier back to ResourceLocation (12 classes), range
+  [1.21.9,1.21.11). NeoForge 21.10.x serves both 1.21.9 and 1.21.10
+  (same API surface; see CrowBar version21_9 for the precedent).
+- AxionNeoForge-v<ver>-mc1.21.11.jar: range [1.21.11].
+
+A pinRawJarRange gradle task pins the RAW build output to [1.21.11] so
+the unstaged jar cannot be loaded on the wrong version (it crashed 1.21.9
+with NoClassDefFoundError before this). The rewriter must walk the
+constant pool — naive byte replacement corrupts classes (Utf8 length
+prefixes; JVM reports "Unknown constant tag 66").
+
+### Open runtime risks on 1.21.9/1.21.10 (unverified in-game)
+
+- The compat-1_21_11 sources compile against the 21.11.45 API; only the
+  Identifier rename is rewritten. Any other 1.21.11-only direct API
+  reference would fail at runtime on 1.21.9/10 (reflection-based compat
+  paths are safe).
+- Preview pipeline snippet names (RenderPipelines.MATRICES_PROJECTION_SNIPPET)
+  and Gui/HUD mixin sites on 1.21.9/1.21.10 need in-game confirmation.
