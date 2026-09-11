@@ -182,6 +182,13 @@ object AxionEditorMode {
     }
 
     fun onEndTick(client: MinecraftClient) {
+        if (AxionEditorUiBridge.consumeDisableRequest() && isEnabled) {
+            // The panels failed (see AxionEditorUiBridge). Without them the
+            // editor would keep owning the mouse with nothing to click, so hand
+            // control back to vanilla.
+            disable(client)
+            showStateMessage(client, "ui_failed")
+        }
         if (client.player == null || client.world == null) {
             // Left the world (disconnect / title). Drop state without writing
             // game modes — there is no player left to restore.

@@ -163,13 +163,17 @@ object KeyBindingCompat {
      * The registering factory, which is the only way into the list the Controls
      * screen iterates (SORT_ORDER). The public constructor also produces a
      * working category, but an unregistered one: its binds fire, yet the Axion
-     * section never appears in Controls. Yarn names the factory `create`; the
-     * 26.x official namespace names it `register`.
+     * section never appears in Controls.
+     *
+     * Matched by signature, not name: yarn calls it `create` and 26.x
+     * `register`, and production 1.21.x jars run on intermediary names where it
+     * is neither. The signature — public static, one Identifier, returning the
+     * category — is unique on every supported version (the String overloads
+     * are excluded by parameter type, and 26.x's is private anyway).
      */
     private fun findCategoryFactory(categoryClass: Class<*>): Method? {
         return categoryClass.methods.firstOrNull { method ->
-            (method.name == "create" || method.name == "register") &&
-                java.lang.reflect.Modifier.isStatic(method.modifiers) &&
+            java.lang.reflect.Modifier.isStatic(method.modifiers) &&
                 method.parameterCount == 1 &&
                 method.parameterTypes[0] == Identifier::class.java &&
                 method.returnType == categoryClass

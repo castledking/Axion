@@ -38,6 +38,7 @@ object AxionHotbarHud {
     private const val TOOL_SELECTED_WIDTH: Int = 24
     private const val TOOL_SELECTED_HEIGHT: Int = 24
     private const val TOOL_ICON_SIZE: Int = 16
+    private const val TOOLTIP_MAX_TEXT_WIDTH: Int = 200
 
     // Sprite regions on hotbar_swapper.png (256×256 atlas)
     private val SEL_HIGHLIGHT = SpriteRegion(0, 0, 184, 24)
@@ -409,22 +410,53 @@ object AxionHotbarHud {
         y: Int,
     ) {
         if (lines.isEmpty()) return
-        val lineWidths = lines.map { textRenderer.getWidth(it.first) }
-        val maxWidth = lineWidths.max()
         val padding = 4
+        val screenWidth = context.scaledWindowWidth
+        val screenHeight = context.scaledWindowHeight
+        // Long descriptions (Phantom's lists six blocks) were drawn as one line
+        // wider than the screen, which made the clamp range below empty and
+        // coerceIn threw — crashing the game on hover. Wrap to a readable width
+        // that also always fits the screen.
+        val wrapWidth = minOf(TOOLTIP_MAX_TEXT_WIDTH, screenWidth - padding * 2).coerceAtLeast(1)
+        val wrapped = lines.flatMap { (text, color) ->
+            wrapTooltipLine(textRenderer, text, wrapWidth).map { it to color }
+        }
+        val maxWidth = wrapped.maxOf { textRenderer.getWidth(it.first) }
         val bgX = x + 12
         val bgY = y - 12
         val bgW = maxWidth + padding * 2
-        val bgH = lines.size * (textRenderer.fontHeight + 2) + padding
-        val screenWidth = context.scaledWindowWidth
-        val screenHeight = context.scaledWindowHeight
-        val clampedBgX = bgX.coerceIn(0, screenWidth - bgW)
-        val clampedBgY = bgY.coerceIn(0, screenHeight - bgH)
+        val bgH = wrapped.size * (textRenderer.fontHeight + 2) + padding
+        // Never an empty range, even if a single unbreakable word is wider than
+        // the screen: pin to the left/top edge instead of throwing.
+        val clampedBgX = bgX.coerceIn(0, (screenWidth - bgW).coerceAtLeast(0))
+        val clampedBgY = bgY.coerceIn(0, (screenHeight - bgH).coerceAtLeast(0))
         context.fill(clampedBgX, clampedBgY, clampedBgX + bgW, clampedBgY + bgH, 0xF0100010.toInt())
         context.drawStrokedRectangleCompat(clampedBgX, clampedBgY, bgW, bgH, 0x505000FF)
-        lines.forEachIndexed { i, (text, color) ->
+        wrapped.forEachIndexed { i, (text, color) ->
             context.drawTextWithShadow(textRenderer, text, clampedBgX + padding, clampedBgY + padding + i * (textRenderer.fontHeight + 2), opaqueTextColor(color))
         }
+    }
+
+    /** Greedy word wrap; a single word wider than [maxWidth] keeps its own line. */
+    private fun wrapTooltipLine(
+        textRenderer: net.minecraft.client.font.TextRenderer,
+        text: String,
+        maxWidth: Int,
+    ): List<String> {
+        if (textRenderer.getWidth(text) <= maxWidth) return listOf(text)
+        val result = mutableListOf<String>()
+        var current = ""
+        for (word in text.split(' ')) {
+            val candidate = if (current.isEmpty()) word else "$current $word"
+            if (current.isNotEmpty() && textRenderer.getWidth(candidate) > maxWidth) {
+                result += current
+                current = word
+            } else {
+                current = candidate
+            }
+        }
+        if (current.isNotEmpty()) result += current
+        return result
     }
 
     private fun opaqueTextColor(color: Int): Int {

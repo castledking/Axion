@@ -37,6 +37,54 @@ object AxionTickHandler {
         AxionEditorMode.onStartTick(client)
     }
 
+    /**
+     * Right Shift opens the Axiom-style editor; Open Config is unbound by
+     * default so the two never fight over it.
+     *
+     * Before the editor existed Open Config defaulted to Right Shift, and
+     * Minecraft saves every binding to options.txt, so upgraded installs keep
+     * both on the same key. How that goes wrong depends on the version: up to
+     * 1.21.8 a key feeds exactly one binding, and here it was Open Config, so
+     * the editor never opened; from 1.21.9 (and on 26.x) both receive the
+     * press, and the config press the editor branch "skipped" stayed queued and
+     * opened the config screen a tick later. When both share a key, the editor
+     * wins: every queued press is drained each tick, and a press that reached
+     * either binding counts once, as an editor toggle.
+     */
+    private fun handleEditorAndConfigKeys(client: MinecraftClient) {
+        val editorPresses = drainPresses(AxionKeybindings.toggleEditorUi)
+        val configPresses = drainPresses(AxionKeybindings.openConfigScreen)
+        val sharedKey = !AxionKeybindings.toggleEditorUi.isUnbound &&
+            AxionKeybindings.toggleEditorUi.boundKeyTranslationKey ==
+            AxionKeybindings.openConfigScreen.boundKeyTranslationKey
+        // One physical press reaches both bindings on 1.21.9+ and only one of
+        // them before that, so presses on a shared key are counted once.
+        val editorToggles = if (sharedKey) maxOf(editorPresses, configPresses) else editorPresses
+        val configOpens = if (sharedKey) 0 else configPresses
+
+        repeat(editorToggles) {
+            if (AxionEditorUiBridge.isAvailable()) {
+                AxionEditorMode.toggle(client)
+            } else {
+                // owo-lib is optional. Without it there is no editor, and the
+                // editor key falls back to what Right Shift did before the editor
+                // existed: opening the config screen.
+                client.setScreen(AxionConfigScreen(client.currentScreen as? Screen))
+            }
+        }
+        repeat(configOpens) {
+            client.setScreen(AxionConfigScreen(client.currentScreen as? Screen))
+        }
+    }
+
+    private fun drainPresses(binding: net.minecraft.client.option.KeyBinding): Int {
+        var presses = 0
+        while (binding.wasPressed()) {
+            presses++
+        }
+        return presses
+    }
+
     fun onEndTick(client: MinecraftClient) {
         observeWorldLifecycle(client.world)
         AxionEditorMode.onEndTick(client)
@@ -103,29 +151,7 @@ object AxionTickHandler {
                 UndoRedoController.redo(client)
             }
 
-            // Right Shift toggles the Axiom-style editor. When the editor
-            // keybind fires, the config screen binding is skipped for this
-            // tick so a user who rebinds both onto Right Shift gets the
-            // editor, not two competing actions.
-            var editorToggled = false
-            while (AxionKeybindings.toggleEditorUi.wasPressed()) {
-                if (AxionEditorUiBridge.isAvailable()) {
-                    AxionEditorMode.toggle(client)
-                } else {
-                    // owo-lib is optional. Without it there is no editor, and
-                    // Right Shift falls back to what it did before the editor
-                    // existed — opening the config screen, whose own binding is
-                    // unbound by default to leave Right Shift to the editor.
-                    client.setScreen(AxionConfigScreen(client.currentScreen as? Screen))
-                }
-                editorToggled = true
-            }
-
-            if (!editorToggled) {
-                while (AxionKeybindings.openConfigScreen.wasPressed()) {
-                    client.setScreen(AxionConfigScreen(client.currentScreen as? Screen))
-                }
-            }
+            handleEditorAndConfigKeys(client)
 
             while (AxionKeybindings.toggleSameBlockMagicSelect.wasPressed()) {
                 val enabled = AxionClientConfig.toggleSameBlockMagicSelect()

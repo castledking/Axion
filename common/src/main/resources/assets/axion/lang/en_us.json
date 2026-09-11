@@ -76,5 +76,6 @@
   "axion.editor.enabled": "Axion Editor enabled — hold Right Click to look around, Right Shift to exit",
   "axion.editor.disabled": "Axion Editor disabled",
   "axion.editor.requires_creative": "Axion Editor requires creative mode",
-  "axion.editor.requires_owo": "Axion Editor requires owo-lib — install it to use the editor"
+  "axion.editor.requires_owo": "Axion Editor requires owo-lib — install it to use the editor",
+  "axion.editor.ui_failed": "Axion Editor stopped — its panels failed to render (details in the log)"
 }

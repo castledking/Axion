@@ -35,6 +35,10 @@ fun MultiPlayerGameMode.cancelBlockBreaking() {
 
 fun KeyBinding.wasPressed(): Boolean = consumeClick()
 
+/** Yarn's getBoundKeyTranslationKey, e.g. "key.keyboard.right.shift"; 26.x calls it saveString. */
+val KeyBinding.boundKeyTranslationKey: String
+    get() = saveString()
+
 val KeyBinding.isPressed: Boolean
     get() = isDown
 

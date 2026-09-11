@@ -39,8 +39,26 @@ object AxionEditorUiBridge {
     @Volatile
     private var linkageFailed: Boolean = false
 
+    @Volatile
+    private var uiFailed: Boolean = false
+
+    @Volatile
+    private var disablePending: Boolean = false
+
     /** True when the editor panels can actually be used this session. */
-    fun isAvailable(): Boolean = owoLoaded && !linkageFailed
+    fun isAvailable(): Boolean = owoLoaded && !linkageFailed && !uiFailed
+
+    /**
+     * True once, after the panels failed; the editor tick uses it to switch the
+     * editor off from a safe point instead of from inside the render call.
+     */
+    fun consumeDisableRequest(): Boolean {
+        if (!disablePending) {
+            return false
+        }
+        disablePending = false
+        return true
+    }
 
     val flightSpeedPercent: Int
         get() = call(DEFAULT_FLIGHT_SPEED_PERCENT) { AxionEditorUi.flightSpeedPercent }
@@ -67,9 +85,24 @@ object AxionEditorUiBridge {
             block()
         } catch (error: LinkageError) {
             linkageFailed = true
+            disablePending = true
             logger.error(
                 "[Axion/Editor] The installed owo-lib is incompatible with this Axion build; " +
                     "the editor is disabled for this session.",
+                error,
+            )
+            fallback
+        } catch (error: RuntimeException) {
+            // The panels are optional; a failure inside them must not take the
+            // game down. Seen with owo 0.12.15 alongside ImmediatelyFast, whose
+            // HUD batching bypasses the draw hook owo relies on to record quads,
+            // so owo's submitQuads dereferences a null buffer on every frame.
+            uiFailed = true
+            disablePending = true
+            logger.error(
+                "[Axion/Editor] The editor panels failed and the editor is disabled for this " +
+                    "session. Another mod that changes GUI rendering (ImmediatelyFast, for " +
+                    "example) may be conflicting with owo-lib.",
                 error,
             )
             fallback

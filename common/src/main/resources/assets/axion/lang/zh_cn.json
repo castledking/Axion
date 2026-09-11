@@ -71,5 +71,6 @@
   "axion.editor.enabled": "Axion 编辑器已启用 — 按住右键环顾四周，右 Shift 退出",
   "axion.editor.disabled": "Axion 编辑器已禁用",
   "axion.editor.requires_creative": "Axion 编辑器需要创造模式",
-  "axion.editor.requires_owo": "Axion 编辑器需要 owo-lib — 请安装后使用编辑器"
+  "axion.editor.requires_owo": "Axion 编辑器需要 owo-lib — 请安装后使用编辑器",
+  "axion.editor.ui_failed": "Axion 编辑器已停止 — 面板渲染失败（详见日志）"
 }
