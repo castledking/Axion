@@ -107,6 +107,14 @@ object VersionCompatImpl : VersionCompat {
         return Registries.ITEM.getId(item)
     }
 
+    override fun getItemId(stack: ItemStack): Identifier {
+        return Registries.ITEM.getId(stack.item)
+    }
+
+    override fun getItemIdString(stack: ItemStack): String {
+        return Registries.ITEM.getId(stack.item).toString()
+    }
+
     override fun getAllBlocks(): Collection<Block> {
         return Registries.BLOCK.toList()
     }
@@ -338,6 +346,15 @@ object VersionCompatImpl : VersionCompat {
         // 1.21.7 UniformUploader only supports float varargs, not GpuBufferSlice.
         // Cannot upload DynamicTransforms UBO through the per-object callback.
         return false
+    }
+
+    fun registerEditorHudElement(
+        editorId: Identifier,
+        editorRenderer: (DrawContext, RenderTickCounter) -> Unit,
+    ) {
+        net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback.EVENT.register { context, tickCounter ->
+            editorRenderer(context, tickCounter)
+        }
     }
 
     fun registerHudElements(

@@ -2,6 +2,7 @@ package axion.client.mode
 import axion.client.AxionClientState
 import axion.client.compat.VersionCompatImpl
 import axion.client.config.AxionClientConfig
+import axion.client.editor.AxionEditorMode
 import axion.client.input.AxionKeybindings
 import axion.client.network.AxionServerConnection
 import axion.client.symmetry.ActiveSymmetryConfig
@@ -1066,7 +1067,9 @@ object ClientModeController {
 
     private fun applyNoClip(client: MinecraftClient) {
         val player = client.player ?: return
-        val active = AxionClientState.globalModeState.noClipEnabled
+        // The editor counts as a NoClip consumer too: it promises free flight
+        // through terrain even when the spectator swap could not happen.
+        val active = AxionClientState.globalModeState.noClipEnabled || AxionEditorMode.isActive()
         if (!active) {
             noClipEscapeTicks = 0
         } else if (!player.abilities.flying && isInsideSolidBlock(player)) {
@@ -1099,7 +1102,8 @@ object ClientModeController {
     }
 
     private fun syncRemoteNoClip(client: MinecraftClient) {
-        val armed = canUseModes(client) && AxionClientState.globalModeState.noClipEnabled
+        val armed = (canUseModes(client) && AxionClientState.globalModeState.noClipEnabled) ||
+            AxionEditorMode.isActive()
 
         // In singleplayer, arm the matching integrated-server player directly
         // so server collision handling cannot rubber-band the local player.
@@ -1143,7 +1147,15 @@ object ClientModeController {
     fun isNoClipActiveFor(entity: Entity): Boolean {
         val playerEntity = entity as? PlayerEntity ?: return false
         val clientPlayer = MinecraftClient.getInstance().player ?: return false
-        if (!AxionClientState.globalModeState.noClipEnabled || playerEntity.uuid != clientPlayer.uuid) {
+        if (playerEntity.uuid != clientPlayer.uuid) {
+            return false
+        }
+        // The editor owns flight: phase through terrain regardless of which
+        // gamemode the swap landed on.
+        if (AxionEditorMode.isActive()) {
+            return true
+        }
+        if (!AxionClientState.globalModeState.noClipEnabled) {
             return false
         }
         // NoClip only active when flying or during escape assist

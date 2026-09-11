@@ -92,9 +92,18 @@ object AxionKeybindings {
         category,
     )
 
+    // Right Shift now toggles the Axiom-style editor by default; the config
+    // screen keeps its binding registered but unbound so the two never fight
+    // over the same key out of the box.
+    val toggleEditorUi: KeyBinding = KeyBindingCompat.create(
+        "key.${AxionMod.MOD_ID}.toggle_editor_ui",
+        GLFW.GLFW_KEY_RIGHT_SHIFT,
+        category,
+    )
+
     val openConfigScreen: KeyBinding = KeyBindingCompat.create(
         "key.${AxionMod.MOD_ID}.open_config_screen",
-        GLFW.GLFW_KEY_RIGHT_SHIFT,
+        GLFW.GLFW_KEY_UNKNOWN,
         category,
     )
 
@@ -143,6 +152,7 @@ object AxionKeybindings {
         KeyBindingHelper.registerKeyBinding(symmetryToggleConstruct)
         KeyBindingHelper.registerKeyBinding(undoAction)
         KeyBindingHelper.registerKeyBinding(redoAction)
+        KeyBindingHelper.registerKeyBinding(toggleEditorUi)
         KeyBindingHelper.registerKeyBinding(openConfigScreen)
         KeyBindingHelper.registerKeyBinding(toggleSameBlockMagicSelect)
         KeyBindingHelper.registerKeyBinding(togglePhantom)

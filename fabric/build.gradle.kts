@@ -125,6 +125,18 @@ repositories {
     maven("https://maven.fabricmc.net/")
     maven("https://repo.papermc.io/repository/maven-public/")
     maven("https://maven.terraformersmc.com/releases/")
+    // Paper's proxy answers 502 for unknown groups, which aborts resolution
+    // instead of falling through — keep wispforest artifacts off its path.
+    exclusiveContent {
+        forRepository {
+            maven("https://maven.wispforest.io/")
+        }
+        filter {
+            includeGroup("io.wispforest")
+            includeGroupAndSubgroups("io.wispforest")
+        }
+    }
+    maven("https://jitpack.io/")
     mavenCentral()
 }
 
@@ -144,6 +156,14 @@ extensions.configure<LoomGradleExtensionAPI>("loom") {
             configName = "Axion Client"
             runDir = (findProperty("axion_run_dir") as String?) ?: "run"
         }
+    }
+}
+
+if (rangeMc12101 || rangeMc12123 || rangeMc1214 || rangeMc1215) {
+    // These ranges use different present/scissor entry points than 1.21.6+;
+    // the compat dirs provide matching LegacyRenderTargetFrameMixin variants.
+    sourceSets.named("client") {
+        kotlin.exclude("axion/mixin/client/RenderTargetFrameMixin*")
     }
 }
 
@@ -190,6 +210,12 @@ sourceSets.named("client") {
         kotlin.srcDir("$mc26CompatDir/kotlin")
         // InGameHud does not exist in 26.x (HUD is HudElement-based)
         kotlin.exclude("axion/mixin/client/InGameHudMixin*")
+        // Editor frame squish is yarn-only for now: 26.x's render-pass system
+        // owns viewport/scissor state per pass, so its present path needs the
+        // render-area route before framing can ship there. The editor itself
+        // (panels, flight, input) is unaffected and still builds on 26.x.
+        kotlin.exclude("axion/mixin/client/WindowFrameMixin*")
+        kotlin.exclude("axion/mixin/client/RenderTargetFrameMixin*")
 
     } else {
         // 1.21.9+: registry-manager-based serialization, has MouseInput / WorldRenderState
@@ -255,6 +281,41 @@ dependencies {
         add("modCompileOnly", "com.terraformersmc:modmenu:${property("modmenu_version")}")
         add("modLocalRuntime", "com.terraformersmc:modmenu:${property("modmenu_version")}")
     }
+
+    // owo-ui drives the in-game editor panels, and it is an OPTIONAL dependency:
+    // compiled against, never bundled, and never declared in `depends`. Axion
+    // must start without it — the editor simply reports that it needs owo-lib.
+    // That only holds because owo types are confined to axion/client/editor/ui
+    // and reached through AxionEditorUiBridge; verifyOwoOptional enforces it.
+    //
+    // Dev runs get owo on the runtime classpath so the editor can be exercised.
+    // Pass -Paxion_without_owo=true to launch without it and test the
+    // optional path end to end.
+    val owoVersion = when {
+        rangeMc261x -> "0.13.1+26.1"
+        rangeMc262x -> "0.13.1+26.2"
+        rangeMc12101 -> "0.12.15+1.21"
+        rangeMc12123 -> "0.12.16+1.21.2"
+        rangeMc1214 -> "0.12.20+1.21.4"
+        rangeMc1215 -> "0.12.21+1.21.5"
+        // The 1.21.8 build's declared floor (>=1.21.6) covers 1.21.7, which
+        // upstream never published a dedicated jar for.
+        exactMc1216 || rangeLegacy || minecraftVersion == "1.21.8" -> "0.12.23+1.21.8"
+        rangeModern -> if (minecraftVersion == "1.21.11") "0.13.0+1.21.11" else "0.12.24+1.21.9"
+        else -> throw GradleException("No owo-lib mapping for Minecraft $minecraftVersion")
+    }
+    val owoInDevRuntime = (findProperty("axion_without_owo") as String?)?.toBoolean() != true
+    if (rangeMc26x) {
+        compileOnly("io.wispforest:owo-lib:$owoVersion")
+        if (owoInDevRuntime) {
+            runtimeOnly("io.wispforest:owo-lib:$owoVersion")
+        }
+    } else {
+        add("modCompileOnly", "io.wispforest:owo-lib:$owoVersion")
+        if (owoInDevRuntime) {
+            add("modLocalRuntime", "io.wispforest:owo-lib:$owoVersion")
+        }
+    }
     testImplementation(kotlin("test"))
 }
 
@@ -308,35 +369,49 @@ tasks.named<ProcessResources>("processClientResources") {
             }
         }
     }
-    if (rangeMc26x) {
-        doLast {
-            val mixinConfig = layout.buildDirectory.file(
-                "resources/client/axion.client.mixins.json",
-            ).get().asFile
-            val parsed = groovy.json.JsonSlurper().parse(mixinConfig) as Map<*, *>
-            val normalized = linkedMapOf<String, Any?>()
-            parsed.forEach { (key, value) -> normalized[key.toString()] = value }
-            val excludedMixins = setOf(
-                "InGameHudMixin",
-                "WorldRendererFallbackMixin",
-            )
-            val clientMixins = normalized["client"] as? List<*>
-                ?: throw GradleException("Mixin config has no client array: $mixinConfig")
-            normalized["client"] = clientMixins.filterNot { it in excludedMixins }
-            mixinConfig.writeText(
-                groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(normalized)) + "\n",
-            )
-        }
-    } else {
-        filesMatching("axion.client.mixins.json") {
-            filter { line ->
-                when {
-                    line.contains("\"GameRendererPostOutlineMixin\"") -> null
-                    line.contains("\"GuiMixin\"") -> null
-                    else -> line
-                }
-            }
-        }
+    // The final mixin list is rewritten structurally for EVERY range, from an
+    // explicit per-range policy. Two source configs exist and the doFirst copy
+    // above can race the normal resource copy, so filtering either source file
+    // line by line left the outcome dependent on which copy won. Rewriting the
+    // processed file makes the result the same whichever one landed.
+    // verifyMixinConfigIntegrity then proves every entry has a compiled class.
+    val excludedMixins: Set<String> = when {
+        rangeMc26x -> setOf(
+            // InGameHud does not exist in 26.x; the hotbar hook is GuiMixin.
+            "InGameHudMixin",
+            "WorldRendererFallbackMixin",
+            // Editor frame squish is yarn-only (see the source exclusions).
+            "WindowFrameMixin",
+            "RenderTargetFrameMixin",
+            "LegacyRenderTargetFrameMixin",
+        )
+        rangeMc12101 || rangeMc12123 || rangeMc1214 || rangeMc1215 -> setOf(
+            "GameRendererPostOutlineMixin",
+            "GuiMixin",
+            // Pre-1.21.6 present path: the compat Legacy variant replaces it.
+            "RenderTargetFrameMixin",
+        )
+        else -> setOf(
+            "GameRendererPostOutlineMixin",
+            "GuiMixin",
+            // Only the pre-1.21.6 compat dirs compile the Legacy variant.
+            "LegacyRenderTargetFrameMixin",
+        )
+    }
+    inputs.property("excluded_mixins", excludedMixins.sorted().joinToString(","))
+    doLast {
+        val mixinConfig = layout.buildDirectory.file(
+            "resources/client/axion.client.mixins.json",
+        ).get().asFile
+        val parsed = groovy.json.JsonSlurper().parse(mixinConfig) as Map<*, *>
+        val normalized = linkedMapOf<String, Any?>()
+        parsed.forEach { (key, value) -> normalized[key.toString()] = value }
+        val clientMixins = normalized["client"] as? List<*>
+            ?: throw GradleException("Mixin config has no client array: $mixinConfig")
+        normalized["client"] = clientMixins.filterNot { it in excludedMixins }
+        mixinConfig.writeText(
+            groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(normalized)) + "\n",
+        )
     }
 }
 
@@ -451,6 +526,138 @@ val verifyIntegratedNoClipWiring by tasks.registering {
                 "Minecraft $minecraftVersion hotbar mixin must target Hud; " +
                     "Gui is the screen manager there and the mixin would silently never apply"
             }
+        }
+    }
+}
+
+/**
+ * Proves the processed client mixin config is internally consistent.
+ *
+ * The earlier feat/neoforge merge shipped jars whose config listed mixins that
+ * were never compiled, and dropped others outright — MinecraftClientMixin,
+ * MouseMixin, EntityMixin, ClientPlayerEntityMixin, InGameHudMixin — which is
+ * what took out keybinds, the Alt menu, no-clip and the hotbar selector
+ * together. Both failure modes are checked here, against the final file.
+ */
+val verifyMixinConfigIntegrity by tasks.registering {
+    group = "verification"
+    description = "Verifies every processed client mixin is compiled and the core mixins are enabled."
+    dependsOn("clientClasses")
+
+    doLast {
+        val classRoots = listOf(
+            layout.buildDirectory.dir("classes/kotlin/client").get().asFile,
+            layout.buildDirectory.dir("classes/java/client").get().asFile,
+        )
+        val mixinConfig = layout.buildDirectory.file("resources/client/axion.client.mixins.json").get().asFile
+        val parsed = groovy.json.JsonSlurper().parse(mixinConfig) as Map<*, *>
+        val packagePath = (parsed["package"] as String).replace('.', '/')
+        val clientMixins = (parsed["client"] as? List<*>)?.filterIsInstance<String>()
+            ?: throw GradleException("Processed mixin config has no client array: $mixinConfig")
+
+        fun isCompiled(mixin: String) = classRoots.any { it.resolve("$packagePath/$mixin.class").isFile }
+
+        val uncompiled = clientMixins.filterNot(::isCompiled)
+        check(uncompiled.isEmpty()) {
+            "Minecraft $minecraftVersion mixin config lists mixins with no compiled class " +
+                "(the config is marked required, so this crashes on launch): $uncompiled"
+        }
+        val duplicated = clientMixins.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
+        check(duplicated.isEmpty()) {
+            "Minecraft $minecraftVersion mixin config lists mixins more than once: $duplicated"
+        }
+
+        val coreMixins = listOf(
+            "MinecraftClientMixin",
+            "MouseMixin",
+            "EntityMixin",
+            "ClientPlayerEntityMixin",
+            "CameraNoClipMixin",
+            "PlayerEntityPoseMixin",
+            "InGameOverlayRendererMixin",
+            "ServerEntityMixin",
+            "BlockStateSupportMixin",
+            // The hotbar hook: InGameHud on yarn, Gui/Hud on 26.x.
+            if (rangeMc26x) "GuiMixin" else "InGameHudMixin",
+        )
+        val absentCore = coreMixins.filterNot { it in clientMixins }
+        check(absentCore.isEmpty()) {
+            "Minecraft $minecraftVersion mixin config is missing core mixins: $absentCore"
+        }
+
+        val frameMixins = setOf("WindowFrameMixin", "RenderTargetFrameMixin", "LegacyRenderTargetFrameMixin")
+        val expectedFrameMixins = when {
+            rangeMc26x -> emptySet()
+            rangeMc12101 || rangeMc12123 || rangeMc1214 || rangeMc1215 ->
+                setOf("WindowFrameMixin", "LegacyRenderTargetFrameMixin")
+            else -> setOf("WindowFrameMixin", "RenderTargetFrameMixin")
+        }
+        val actualFrameMixins = clientMixins.filter { it in frameMixins }.toSet()
+        check(actualFrameMixins == expectedFrameMixins) {
+            "Minecraft $minecraftVersion editor frame mixins are $actualFrameMixins, expected $expectedFrameMixins"
+        }
+    }
+}
+
+/**
+ * Enforces that owo-lib stays an optional dependency.
+ *
+ * Declaring owo in `suggests` is not enough on its own: any class that loads
+ * unconditionally and references an owo type throws NoClassDefFoundError when
+ * owo is absent. The rule is structural — owo types live only in
+ * axion/client/editor/ui, and AxionEditorUiBridge is the only class outside it
+ * allowed to reach in — so it is checked against the compiled bytecode rather
+ * than trusted to review.
+ */
+val verifyOwoOptional by tasks.registering {
+    group = "verification"
+    description = "Verifies owo-lib is only referenced behind the editor UI bridge and never required."
+    dependsOn("classes", "clientClasses")
+
+    doLast {
+        val uiPackage = "axion/client/editor/ui/"
+        val bridge = "axion/client/editor/AxionEditorUiBridge"
+        val classRoots = listOf(
+            "classes/kotlin/client",
+            "classes/java/client",
+            "classes/kotlin/main",
+            "classes/java/main",
+        ).map { layout.buildDirectory.dir(it).get().asFile }.filter { it.isDirectory }
+
+        val owoLeaks = mutableListOf<String>()
+        val uiLeaks = mutableListOf<String>()
+        classRoots.forEach { root ->
+            root.walkTopDown()
+                .filter { it.isFile && it.name.endsWith(".class") }
+                .forEach { classFile ->
+                    val relative = classFile.relativeTo(root).invariantSeparatorsPath
+                    if (relative.startsWith(uiPackage)) {
+                        return@forEach
+                    }
+                    // Constant-pool names are modified UTF-8, which is plain ASCII
+                    // for these identifiers, so a byte scan finds every reference.
+                    val bytes = String(classFile.readBytes(), Charsets.ISO_8859_1)
+                    if ("io/wispforest" in bytes) {
+                        owoLeaks += relative
+                    }
+                    if (uiPackage in bytes && !relative.startsWith(bridge)) {
+                        uiLeaks += relative
+                    }
+                }
+        }
+        check(owoLeaks.isEmpty()) {
+            "Minecraft $minecraftVersion classes outside $uiPackage reference owo-lib, " +
+                "so Axion would crash without it: $owoLeaks"
+        }
+        check(uiLeaks.isEmpty()) {
+            "Minecraft $minecraftVersion classes reach into $uiPackage without going through " +
+                "AxionEditorUiBridge: $uiLeaks"
+        }
+
+        val modJson = groovy.json.JsonSlurper().parse(file("src/main/resources/fabric.mod.json")) as Map<*, *>
+        val depends = modJson["depends"] as? Map<*, *> ?: emptyMap<Any, Any>()
+        check("owo" !in depends.keys) {
+            "fabric.mod.json declares owo-lib as a hard dependency; it must stay in suggests"
         }
     }
 }
@@ -1193,12 +1400,10 @@ val verifyPreviewVisualCoverage by tasks.registering {
         check("\"GameRendererPostOutlineMixin\"" in file("src/client/resources/axion.client.mixins.json").readText()) {
             "26.x post-entity-outline preview mixin is not enabled"
         }
-        check(
-            "line.contains(\"\\\"GameRendererPostOutlineMixin\\\"\") -> null" in
-                file("build.gradle.kts").readText()
-        ) {
-            "The 26.x-only post-outline mixin is not filtered out of legacy jars"
-        }
+        // Legacy jars must not list the 26.x-only post-outline mixin. That used
+        // to be checked by grepping this script for a line filter; it is now
+        // proven behaviourally by verifyMixinConfigIntegrity, which fails any
+        // processed config that lists a mixin with no compiled class.
 
         val normalizedReloadInvalidators = mutableSetOf<String>()
         listOf("src/compat-26_1", "src/compat-26_2").forEach { compatDir ->
@@ -2088,6 +2293,8 @@ val verifyAuthoritativeHistoryReplay by tasks.registering {
 
 tasks.named("check") {
     dependsOn(verifyIntegratedNoClipWiring)
+    dependsOn(verifyMixinConfigIntegrity)
+    dependsOn(verifyOwoOptional)
     dependsOn(verifyGpuPreviewCoverage)
     dependsOn(verifyFabricServerRangeCompatibility)
     dependsOn(verifyMoveSourceReplacementCoverage)

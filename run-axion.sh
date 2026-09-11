@@ -413,6 +413,7 @@ resolve_paper_version() {
     case "$1" in
         1.21) echo "1.21-R0.1-SNAPSHOT" ;;
         1.21.1) echo "1.21.1-R0.1-SNAPSHOT" ;;
+        1.21.2) echo "1.21.2-R0.1-SNAPSHOT" ;;
         1.21.3) echo "1.21.3-R0.1-SNAPSHOT" ;;
         1.21.4) echo "1.21.4-R0.1-SNAPSHOT" ;;
         1.21.5) echo "1.21.5-R0.1-SNAPSHOT" ;;
@@ -1375,7 +1376,13 @@ start_client() {
 
     (
         cd "$gradle_dir"
-        ./gradlew --no-daemon :runClient \
+        # The Fabric mod is the :fabric subproject; the root project only
+        # declares plugins, so a bare :runClient no longer exists.
+        # AXION_WITHOUT_OWO=true launches without owo-lib to exercise the
+        # optional-dependency path (Axion must start; the editor reports it
+        # needs owo-lib).
+        ./gradlew --no-daemon :fabric:runClient \
+            -Paxion_without_owo="${AXION_WITHOUT_OWO:-false}" \
             -Pminecraft_version="$mc_version" \
             -Pyarn_mappings="$yarn_mappings" \
             -Ploader_version="$loader_version" \

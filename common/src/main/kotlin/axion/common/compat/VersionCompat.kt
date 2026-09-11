@@ -21,11 +21,13 @@ interface VersionCompat {
         }
     }
 
-    // Registry operations
+// Registry operations
     fun getBlock(id: Identifier): Block?
     fun getItem(id: Identifier): Item?
     fun getBlockId(block: Block): Identifier
     fun getItemId(item: Item): Identifier
+    fun getItemId(stack: ItemStack): Identifier
+    fun getItemIdString(stack: ItemStack): String
     fun getAllBlocks(): Collection<Block>
     fun getAllItems(): Collection<Item>
 

@@ -4,6 +4,8 @@ import axion.client.compat.CrowBarCompat
 import axion.client.compat.VersionCompatImpl
 import axion.client.config.AxionClientConfig
 import axion.client.config.AxionConfigScreen
+import axion.client.editor.AxionEditorMode
+import axion.client.editor.AxionEditorUiBridge
 import axion.client.hotbar.AxionAltMenuController
 import axion.client.hotbar.SavedHotbarController
 import axion.client.hotbar.SavedHotbarGameModeController
@@ -19,6 +21,7 @@ import axion.client.tool.PlacementToolController
 import axion.client.tool.SmearToolController
 import axion.client.tool.StackToolController
 import net.minecraft.client.MinecraftClient
+import net.minecraft.client.gui.screen.Screen
 import net.minecraft.client.world.ClientWorld
 
 object AxionTickHandler {
@@ -28,8 +31,15 @@ object AxionTickHandler {
     // world with stale absolute-coord chunks.
     private var lastObservedWorld: ClientWorld? = null
 
+    fun onStartTick(client: MinecraftClient) {
+        // Runs before the player tick so the editor's velocity override is
+        // what vanilla's travel integrates this tick.
+        AxionEditorMode.onStartTick(client)
+    }
+
     fun onEndTick(client: MinecraftClient) {
         observeWorldLifecycle(client.world)
+        AxionEditorMode.onEndTick(client)
         AxionServerConnection.onEndTick()
         SelectionController.onEndTick(client)
         AxionInteractionRouter.onEndTick(client)
@@ -93,8 +103,28 @@ object AxionTickHandler {
                 UndoRedoController.redo(client)
             }
 
-            while (AxionKeybindings.openConfigScreen.wasPressed()) {
-                client.setScreen(AxionConfigScreen(client.currentScreen))
+            // Right Shift toggles the Axiom-style editor. When the editor
+            // keybind fires, the config screen binding is skipped for this
+            // tick so a user who rebinds both onto Right Shift gets the
+            // editor, not two competing actions.
+            var editorToggled = false
+            while (AxionKeybindings.toggleEditorUi.wasPressed()) {
+                if (AxionEditorUiBridge.isAvailable()) {
+                    AxionEditorMode.toggle(client)
+                } else {
+                    // owo-lib is optional. Without it there is no editor, and
+                    // Right Shift falls back to what it did before the editor
+                    // existed — opening the config screen, whose own binding is
+                    // unbound by default to leave Right Shift to the editor.
+                    client.setScreen(AxionConfigScreen(client.currentScreen as? Screen))
+                }
+                editorToggled = true
+            }
+
+            if (!editorToggled) {
+                while (AxionKeybindings.openConfigScreen.wasPressed()) {
+                    client.setScreen(AxionConfigScreen(client.currentScreen as? Screen))
+                }
             }
 
             while (AxionKeybindings.toggleSameBlockMagicSelect.wasPressed()) {

@@ -8,8 +8,8 @@ import net.minecraft.client.gui.screen.Screen
 import net.minecraft.client.multiplayer.MultiPlayerGameMode
 import net.minecraft.client.option.KeyBinding
 
-val MinecraftClient.currentScreen: Screen?
-    get() = screen as? Screen
+val MinecraftClient.currentScreen: net.minecraft.client.gui.screens.Screen?
+    get() = screen
 
 val MinecraftClient.interactionManager
     get() = gameMode

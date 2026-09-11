@@ -6,3 +6,6 @@ import net.minecraft.util.Hand
 
 val PlayerEntity.mainHandStack: ItemStack
     get() = getItemInHand(Hand.MAIN_HAND)
+
+val PlayerEntity.offHandStack: ItemStack
+    get() = getItemInHand(Hand.OFF_HAND)
