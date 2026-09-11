@@ -16,7 +16,6 @@
   "key.axion.undo_action": "Axion 撤销",
   "key.axion.redo_action": "Axion 重做",
   "key.axion.toggle_editor_ui": "切换 Axion 编辑器",
-  "key.axion.open_config_screen": "打开 Axion 配置",
   "key.axion.toggle_same_block_magic_select": "切换同方块魔法选择",
   "key.axion.toggle_phantom": "切换 Axion 幽灵模式",
   "key.axion.toggle_no_updates": "切换 Axion 无更新模式",

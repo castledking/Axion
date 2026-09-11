@@ -6,6 +6,7 @@ import axion.client.compat.VersionCompatImpl
 import axion.client.input.AxionModifierKeys
 import axion.client.tool.AxionToolSelectionController
 import axion.client.ui.drawStrokedRectangleCompat
+import axion.client.ui.withGuiLayer
 import axion.common.compat.VersionCompat
 import axion.common.model.AxionSubtool
 import kotlin.math.sqrt
@@ -39,6 +40,9 @@ object AxionHotbarHud {
     private const val TOOL_SELECTED_HEIGHT: Int = 24
     private const val TOOL_ICON_SIZE: Int = 16
     private const val TOOLTIP_MAX_TEXT_WIDTH: Int = 200
+    private const val OVERLAY_LAYER_Z: Float = 200f
+    // Above the overlay (200) plus the extra depth item icons render at.
+    private const val TOOLTIP_LAYER_Z: Float = 600f
 
     // Sprite regions on hotbar_swapper.png (256×256 atlas)
     private val SEL_HIGHLIGHT = SpriteRegion(0, 0, 184, 24)
@@ -313,57 +317,61 @@ object AxionHotbarHud {
         context: DrawContext,
         client: MinecraftClient,
     ) {
-        val matrices = context.matrices
-        pushMatrices(matrices)
-        translateMatrices(matrices, 0.0, 0.0, 200.0)
         pendingTooltip = null
         try {
-            val page = SavedHotbarController.selectedPage()
-            val displayRows = SavedHotbarController.displayHotbarsForSelectedPage(client)
-            val rowBounds = AxionHudLayout.savedHotbarRows(context.scaledWindowWidth, context.scaledWindowHeight, page)
+            context.withGuiLayer(OVERLAY_LAYER_Z) {
+                val page = SavedHotbarController.selectedPage()
+                val displayRows = SavedHotbarController.displayHotbarsForSelectedPage(client)
+                val rowBounds = AxionHudLayout.savedHotbarRows(context.scaledWindowWidth, context.scaledWindowHeight, page)
 
-            // 9×9 grid background
-            val centerX = context.scaledWindowWidth / 2
-            drawHotbarSwapperRegion(context, HOTBAR_GRID_BG, centerX - 91, context.scaledWindowHeight - 182)
-            renderSavedHotbarActionButtons(context, client, page)
-            if (AxionDevTestSession.isActive) {
-                renderFinishTestingButton(
-                    context,
-                    AxionHudLayout.finishTestingSavedHotbarBounds(
-                        context.scaledWindowWidth,
-                        context.scaledWindowHeight,
-                        page,
-                    ),
-                )
-            }
-
-            val hoveredSlot = findHoveredSlot(client, context.scaledWindowWidth, context.scaledWindowHeight, rowBounds)
-
-            rowBounds.zip(displayRows).forEach { (bounds, display) ->
-                if (display.selected) {
-                    drawHotbarSwapperRegion(context, SEL_HIGHLIGHT, bounds.x - 1, bounds.y - 1)
+                // 9×9 grid background
+                val centerX = context.scaledWindowWidth / 2
+                drawHotbarSwapperRegion(context, HOTBAR_GRID_BG, centerX - 91, context.scaledWindowHeight - 182)
+                renderSavedHotbarActionButtons(context, client, page)
+                if (AxionDevTestSession.isActive) {
+                    renderFinishTestingButton(
+                        context,
+                        AxionHudLayout.finishTestingSavedHotbarBounds(
+                            context.scaledWindowWidth,
+                            context.scaledWindowHeight,
+                            page,
+                        ),
+                    )
                 }
-                renderSavedHotbarItems(context, bounds.x + 1, bounds.y + 1, bounds.index, display.stacks, hoveredSlot)
-            }
 
-            val topBounds = rowBounds.last()
-            context.drawTextWithShadow(
-                client.textRenderer,
-                "Page ${page + 1}",
-                topBounds.x + topBounds.width + 8,
-                topBounds.y + 2,
-                TEXT_SELECTED,
-            )
-            renderSavedHotbarPageButtons(context, client, page)
-            renderFlyingSpeedSlider(context, client, page)
-            renderToolboxButton(context, client)
-            renderCapabilities(context, client)
-            renderBinSlot(context, client)
-            renderGrabbedItem(context, client)
+                val hoveredSlot = findHoveredSlot(client, context.scaledWindowWidth, context.scaledWindowHeight, rowBounds)
+
+                rowBounds.zip(displayRows).forEach { (bounds, display) ->
+                    if (display.selected) {
+                        drawHotbarSwapperRegion(context, SEL_HIGHLIGHT, bounds.x - 1, bounds.y - 1)
+                    }
+                    renderSavedHotbarItems(context, bounds.x + 1, bounds.y + 1, bounds.index, display.stacks, hoveredSlot)
+                }
+
+                val topBounds = rowBounds.last()
+                context.drawTextWithShadow(
+                    client.textRenderer,
+                    "Page ${page + 1}",
+                    topBounds.x + topBounds.width + 8,
+                    topBounds.y + 2,
+                    TEXT_SELECTED,
+                )
+                renderSavedHotbarPageButtons(context, client, page)
+                renderFlyingSpeedSlider(context, client, page)
+                renderToolboxButton(context, client)
+                renderCapabilities(context, client)
+                renderBinSlot(context, client)
+                renderGrabbedItem(context, client)
+            }
         } finally {
-            popMatrices(matrices)
+            // Drawn last and on its own, higher layer: up to 1.21.5 the GUI is
+            // depth-sorted and the saved-hotbar item icons sit well above the
+            // overlay's own depth, so a tooltip left at the overlay's layer
+            // rendered underneath them.
             pendingTooltip?.let { (textRenderer, lines, mx, my) ->
-                renderTooltipNow(context, textRenderer, lines, mx, my)
+                context.withGuiLayer(TOOLTIP_LAYER_Z) {
+                    renderTooltipNow(context, textRenderer, lines, mx, my)
+                }
             }
             pendingTooltip = null
         }
@@ -475,31 +483,6 @@ object AxionHotbarHud {
         y: Int,
     ) {
         pendingTooltip = PendingTooltip(textRenderer, lines, x, y)
-    }
-
-    private fun pushMatrices(matrices: Any) {
-        invokeNoArg(matrices, "push") ?: invokeNoArg(matrices, "pushMatrix")
-    }
-
-    private fun popMatrices(matrices: Any) {
-        invokeNoArg(matrices, "pop") ?: invokeNoArg(matrices, "popMatrix")
-    }
-
-    private fun translateMatrices(matrices: Any, x: Double, y: Double, z: Double) {
-        matrices.javaClass.methods.firstOrNull {
-            it.name == "translate" && it.parameterCount == 3 &&
-                it.parameterTypes[0] == Double::class.javaPrimitiveType &&
-                it.parameterTypes[1] == Double::class.javaPrimitiveType &&
-                it.parameterTypes[2] == Double::class.javaPrimitiveType
-        }?.invoke(matrices, x, y, z) ?: matrices.javaClass.methods.firstOrNull {
-            it.name == "translate" && it.parameterCount == 2 &&
-                it.parameterTypes[0] == Float::class.javaPrimitiveType &&
-                it.parameterTypes[1] == Float::class.javaPrimitiveType
-        }?.invoke(matrices, x.toFloat(), y.toFloat())
-    }
-
-    private fun invokeNoArg(target: Any, name: String): Any? {
-        return target.javaClass.methods.firstOrNull { it.name == name && it.parameterCount == 0 }?.invoke(target)
     }
 
     /** Calls drawStackOverlay if it exists (1.21.4+), otherwise falls back to drawItemInSlot (1.21.0-1.21.1). */
