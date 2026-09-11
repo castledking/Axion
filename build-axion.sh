@@ -557,6 +557,7 @@ build_range() {
         :fabric:verifyIntegratedNoClipWiring
         :fabric:verifyMixinConfigIntegrity
         :fabric:verifyOwoOptional
+        :fabric:verifyLegacyShaderExclusion
     )
     if [[ "$compile_version" == 26.* ]]; then
         echo "    Fabric client/mod 26.x builds in the official namespace; using jar instead of remapJar."
@@ -572,6 +573,7 @@ build_range() {
             :fabric:verifyIntegratedNoClipWiring
         :fabric:verifyMixinConfigIntegrity
         :fabric:verifyOwoOptional
+        :fabric:verifyLegacyShaderExclusion
         )
     fi
 

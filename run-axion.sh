@@ -1358,7 +1358,12 @@ start_client() {
         CLIENT_MATRIX_MARKERS=("$matrix_marker")
     fi
     gradle_dir="$(prepare_client_workspace "$version")"
-    gradle_run_dir="$(relative_path "$gradle_dir" "$client_run_dir")"
+    # Loom resolves runDir against the project that owns runClient — the :fabric
+    # subproject since the fabric/ restructure — not the workspace root. Relative
+    # to the root, the client silently ran in .run-workspaces/run/clients/<v>:
+    # without the mods placed here, and without the .axion-test-matrix marker,
+    # which is what hid the "Finish testing" button.
+    gradle_run_dir="$(relative_path "$gradle_dir/fabric" "$client_run_dir")"
 
     echo "  Launching Minecraft $mc_version client (run dir: $client_run_dir, workspace: $gradle_dir, gradle runDir: $gradle_run_dir)..."
     ensure_client_auth_mod "$mc_version" "$client_run_dir"
@@ -1378,11 +1383,7 @@ start_client() {
         cd "$gradle_dir"
         # The Fabric mod is the :fabric subproject; the root project only
         # declares plugins, so a bare :runClient no longer exists.
-        # AXION_WITHOUT_OWO=true launches without owo-lib to exercise the
-        # optional-dependency path (Axion must start; the editor reports it
-        # needs owo-lib).
         ./gradlew --no-daemon :fabric:runClient \
-            -Paxion_without_owo="${AXION_WITHOUT_OWO:-false}" \
             -Pminecraft_version="$mc_version" \
             -Pyarn_mappings="$yarn_mappings" \
             -Ploader_version="$loader_version" \

@@ -288,9 +288,13 @@ dependencies {
     // That only holds because owo types are confined to axion/client/editor/ui
     // and reached through AxionEditorUiBridge; verifyOwoOptional enforces it.
     //
-    // Dev runs get owo on the runtime classpath so the editor can be exercised.
-    // Pass -Paxion_without_owo=true to launch without it and test the
-    // optional path end to end.
+    // Dev runs and unit tests get owo on the runtime classpath. It has to stay
+    // transitive there: owo's injected interfaces put endec's MapCarrier onto
+    // BlockPos and friends in the dev Minecraft jar, so endec must be present
+    // or nothing touching BlockPos loads. Only fabric-api and fabric-loader are
+    // excluded — owo's POM declares them as runtime dependencies, and Gradle's
+    // highest-version resolution otherwise replaced this range's pinned ones
+    // (1.21.5 ran Fabric API 0.119.9 and Loader 0.16.13 instead of its own).
     val owoVersion = when {
         rangeMc261x -> "0.13.1+26.1"
         rangeMc262x -> "0.13.1+26.2"
@@ -304,17 +308,16 @@ dependencies {
         rangeModern -> if (minecraftVersion == "1.21.11") "0.13.0+1.21.11" else "0.12.24+1.21.9"
         else -> throw GradleException("No owo-lib mapping for Minecraft $minecraftVersion")
     }
-    val owoInDevRuntime = (findProperty("axion_without_owo") as String?)?.toBoolean() != true
+    val owoDevRuntime: ExternalModuleDependency.() -> Unit = {
+        exclude(group = "net.fabricmc.fabric-api")
+        exclude(group = "net.fabricmc", module = "fabric-loader")
+    }
     if (rangeMc26x) {
         compileOnly("io.wispforest:owo-lib:$owoVersion")
-        if (owoInDevRuntime) {
-            runtimeOnly("io.wispforest:owo-lib:$owoVersion")
-        }
+        runtimeOnly("io.wispforest:owo-lib:$owoVersion", owoDevRuntime)
     } else {
         add("modCompileOnly", "io.wispforest:owo-lib:$owoVersion")
-        if (owoInDevRuntime) {
-            add("modLocalRuntime", "io.wispforest:owo-lib:$owoVersion")
-        }
+        add("modLocalRuntime", "io.wispforest:owo-lib:$owoVersion", owoDevRuntime)
     }
     testImplementation(kotlin("test"))
 }
@@ -350,6 +353,17 @@ tasks.processResources {
 
 tasks.named<ProcessResources>("processClientResources") {
     inputs.property("minecraft_version", minecraftVersion)
+
+    // preview_shell imports minecraft:dynamictransforms.glsl and projection.glsl,
+    // which only exist from 1.21.6. From 1.21.2 the ShaderLoader compiles every
+    // shader in every namespace up front, so shipping it to 1.21.2-1.21.5 fails
+    // the whole resource reload — a black screen or a stuck loading screen.
+    // The shader lives in the client resource set, which is why the matching
+    // exclusion on processResources above never applied after the fabric/
+    // restructure. verifyLegacyShaderExclusion keeps it that way.
+    if (rangeMc12101 || rangeMc12123 || rangeMc1214 || rangeMc1215) {
+        exclude("assets/axion/shaders/core/preview_shell.*")
+    }
 
     doFirst {
         delete(layout.buildDirectory.dir("resources/client"))
@@ -658,6 +672,32 @@ val verifyOwoOptional by tasks.registering {
         val depends = modJson["depends"] as? Map<*, *> ?: emptyMap<Any, Any>()
         check("owo" !in depends.keys) {
             "fabric.mod.json declares owo-lib as a hard dependency; it must stay in suggests"
+        }
+    }
+}
+
+/**
+ * Pre-1.21.6 jars must not carry the preview_shell shader: its imports do not
+ * exist there, and from 1.21.2 one unresolvable import aborts the entire
+ * resource reload. Checked against the processed resources, since the
+ * exclusion has already silently stopped applying once.
+ */
+val verifyLegacyShaderExclusion by tasks.registering {
+    group = "verification"
+    description = "Verifies the 1.21.6+-only preview shader is not shipped to older ranges."
+    dependsOn("processClientResources", "processResources")
+
+    doLast {
+        val legacy = rangeMc12101 || rangeMc12123 || rangeMc1214 || rangeMc1215
+        val shipped = listOf("resources/client", "resources/main")
+            .map { layout.buildDirectory.dir(it).get().asFile }
+            .filter { it.isDirectory }
+            .flatMap { root -> root.walkTopDown().filter { it.isFile && it.name.startsWith("preview_shell.") }.toList() }
+        if (legacy) {
+            check(shipped.isEmpty()) {
+                "Minecraft $minecraftVersion would ship preview_shell, whose shader imports only " +
+                    "exist from 1.21.6; the resource reload fails on 1.21.2+: $shipped"
+            }
         }
     }
 }
@@ -2295,6 +2335,7 @@ tasks.named("check") {
     dependsOn(verifyIntegratedNoClipWiring)
     dependsOn(verifyMixinConfigIntegrity)
     dependsOn(verifyOwoOptional)
+    dependsOn(verifyLegacyShaderExclusion)
     dependsOn(verifyGpuPreviewCoverage)
     dependsOn(verifyFabricServerRangeCompatibility)
     dependsOn(verifyMoveSourceReplacementCoverage)

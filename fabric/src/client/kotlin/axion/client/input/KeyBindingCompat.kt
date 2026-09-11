@@ -159,9 +159,17 @@ object KeyBindingCompat {
         }.getOrNull() ?: error("Cannot create category instance for $categoryClass")
     }
 
+    /**
+     * The registering factory, which is the only way into the list the Controls
+     * screen iterates (SORT_ORDER). The public constructor also produces a
+     * working category, but an unregistered one: its binds fire, yet the Axion
+     * section never appears in Controls. Yarn names the factory `create`; the
+     * 26.x official namespace names it `register`.
+     */
     private fun findCategoryFactory(categoryClass: Class<*>): Method? {
         return categoryClass.methods.firstOrNull { method ->
-            method.name == "create" &&
+            (method.name == "create" || method.name == "register") &&
+                java.lang.reflect.Modifier.isStatic(method.modifiers) &&
                 method.parameterCount == 1 &&
                 method.parameterTypes[0] == Identifier::class.java &&
                 method.returnType == categoryClass

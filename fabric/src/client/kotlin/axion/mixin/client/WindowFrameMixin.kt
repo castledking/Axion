@@ -42,8 +42,10 @@ abstract class WindowFrameMixin {
     @Final
     private var handle: Long = 0
 
-    @Shadow
-    private var scaleFactor: Double = 0.0
+    // No @Shadow for scaleFactor: it is a double up to 1.21.5 and an int from
+    // 1.21.6, and Mixin matches shadows by name AND type, so a typed shadow here
+    // crashes every launch on the other half of the ranges. The scale is read
+    // back through the public getter instead (see axionFrameSetScaleFactor).
 
     @Shadow
     private var scaledWidth: Int = 0
@@ -134,8 +136,17 @@ abstract class WindowFrameMixin {
         cir.returnValue = j
     }
 
-    @Inject(method = ["setScaleFactor"], at = [At("HEAD")], cancellable = true)
-    private fun axionFrameSetScaleFactor(newScale: Double, ci: CallbackInfo) {
+    /**
+     * Rescales the GUI against the framed framebuffer rather than the real one.
+     *
+     * setScaleFactor takes a double up to 1.21.5 and an int from 1.21.6, so the
+     * handler declares no arguments (Mixin allows omitting them all) and runs at
+     * RETURN: vanilla has stored the new scale by then, and only the scaled size
+     * it derived from the real framebuffer needs replacing. `window.scaleFactor`
+     * is compiled per range, so it resolves to the right getter on each one.
+     */
+    @Inject(method = ["setScaleFactor"], at = [At("RETURN")])
+    private fun axionFrameSetScaleFactor(ci: CallbackInfo) {
         if (!framing()) {
             return
         }
@@ -143,11 +154,12 @@ abstract class WindowFrameMixin {
         val fbw = framedFramebufferWidth()
         val fbh = framedFramebufferHeight()
 
-        this.scaleFactor = newScale
-        val i = (fbw / newScale).toInt()
-        this.scaledWidth = if (fbw / newScale > i) i + 1 else i
-        val j = (fbh / newScale).toInt()
-        this.scaledHeight = if (fbh / newScale > j) j + 1 else j
-        ci.cancel()
+        @Suppress("CAST_NEVER_SUCCEEDS")
+        val window = this as Any as Window
+        val scale = window.scaleFactor.toDouble()
+        val i = (fbw / scale).toInt()
+        this.scaledWidth = if (fbw / scale > i) i + 1 else i
+        val j = (fbh / scale).toInt()
+        this.scaledHeight = if (fbh / scale > j) j + 1 else j
     }
 }
