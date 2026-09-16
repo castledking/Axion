@@ -5,6 +5,9 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
 SUPPORTED_VERSION_LIST=("1.21" "1.21.1" "1.21.2" "1.21.3" "1.21.4" "1.21.5" "1.21.6" "1.21.7" "1.21.8" "1.21.9" "1.21.10" "1.21.11" "26.1" "26.2")
+# Minecraft versions an AxionNeoForge jar exists for (build-axion.sh stages
+# mc1.21.6-1.21.8, mc1.21.9-1.21.10 and mc1.21.11).
+NEOFORGE_VERSION_LIST=("1.21.6" "1.21.7" "1.21.8" "1.21.9" "1.21.10" "1.21.11")
 
 # Parse command line arguments
 VERSION_ARG=""
@@ -12,7 +15,7 @@ ARGS_PROVIDED=false
 if [[ $# -gt 0 ]]; then
     ARGS_PROVIDED=true
 fi
-if [[ $# -gt 0 && "$1" != -* && "$1" != "paper" && "$1" != "fabric" && "$1" != "with" ]]; then
+if [[ $# -gt 0 && "$1" != -* && "$1" != "paper" && "$1" != "fabric" && "$1" != "neoforge" && "$1" != "both-loaders" && "$1" != "with" ]]; then
     VERSION_ARG="$1"
     shift
 fi
@@ -22,6 +25,9 @@ WITH_FABRIC="${WITH_FABRIC:-false}"
 QUICKPLAY="${QUICKPLAY:-false}"
 BUILD_FIRST="${BUILD_FIRST:-false}"
 BUILD_ONLY="${BUILD_ONLY:-false}"
+# Which loader the clients run on: fabric, neoforge, or both (each selected
+# version on Fabric, then on NeoForge where Axion supports it).
+CLIENT_LOADER="${CLIENT_LOADER:-fabric}"
 STARTED_SERVER_PIDS=()
 STARTED_CLIENT_PIDS=()
 CLIENT_MATRIX_MARKERS=()
@@ -33,6 +39,12 @@ while [[ $# -gt 0 ]]; do
             ;;
         fabric|with-fabric|with_fabric|--fabric)
             WITH_FABRIC=true
+            ;;
+        neoforge|--neoforge)
+            CLIENT_LOADER=neoforge
+            ;;
+        both-loaders|--both-loaders)
+            CLIENT_LOADER=both
             ;;
         quickplay|--quickplay)
             QUICKPLAY=true
@@ -125,6 +137,18 @@ if [[ "$ARGS_PROVIDED" == "false" && $# -eq 0 ]]; then
     fi
 
     echo ""
+    echo "Client loader:"
+    echo "  1) Fabric (default)"
+    echo "  2) NeoForge (1.21.6 - 1.21.11 only)"
+    echo "  3) Both (Fabric, then NeoForge where supported)"
+    read -r -p "Enter choice [1-3]: " loader_choice
+    case "$loader_choice" in
+        2) CLIENT_LOADER=neoforge ;;
+        3) CLIENT_LOADER=both ;;
+        *) CLIENT_LOADER=fabric ;;
+    esac
+
+    echo ""
     read -r -p "Start Paper server? [y/N]: " paper_choice
     if [[ "$paper_choice" =~ ^[Yy]$ ]]; then
         WITH_PAPER=true
@@ -154,6 +178,7 @@ if [[ "$ARGS_PROVIDED" == "false" && $# -eq 0 ]]; then
     echo ""
     echo "Configuration:"
     echo "  Version: $VERSION_ARG"
+    echo "  Client loader: $CLIENT_LOADER"
     echo "  Paper: $WITH_PAPER"
     echo "  Fabric: $WITH_FABRIC"
     echo "  Quickplay: $QUICKPLAY"
@@ -162,9 +187,22 @@ if [[ "$ARGS_PROVIDED" == "false" && $# -eq 0 ]]; then
     echo ""
 fi
 
-# Default to 26.2 if no version specified
+case "$CLIENT_LOADER" in
+    fabric|neoforge|both) ;;
+    *)
+        echo "Unknown CLIENT_LOADER: $CLIENT_LOADER (expected fabric, neoforge or both)" >&2
+        exit 1
+        ;;
+esac
+
+# Default to 26.2 if no version specified (1.21.11 for NeoForge-only runs,
+# which have no 26.x build)
 if [[ -z "$VERSION_ARG" ]]; then
-    VERSION_ARG="26.2"
+    if [[ "$CLIENT_LOADER" == "neoforge" ]]; then
+        VERSION_ARG="1.21.11"
+    else
+        VERSION_ARG="26.2"
+    fi
 fi
 
 # Display usage
@@ -178,6 +216,10 @@ if [[ "$VERSION_ARG" == "-h" || "$VERSION_ARG" == "--help" ]]; then
     echo "OPTIONS:"
     echo "  paper, --paper      Also start Paper server(s)"
     echo "  fabric, --fabric    Start Fabric server for 1.21.11"
+    echo "  neoforge, --neoforge Run NeoForge clients instead of Fabric (1.21.6 - 1.21.11;"
+    echo "                      'all' means every NeoForge version)"
+    echo "  both-loaders, --both-loaders"
+    echo "                      Run each version on Fabric, then on NeoForge where supported"
     echo "  quickplay, --quickplay Auto-join server or latest world"
     echo "  build, --build      Build only, don't launch clients"
     echo ""
@@ -187,6 +229,13 @@ if [[ "$VERSION_ARG" == "-h" || "$VERSION_ARG" == "--help" ]]; then
     echo "  QUICKPLAY=true      Auto-join server or latest world"
     echo "  BUILD_FIRST=true    Build before launching (default: false)"
     echo "  BUILD_ONLY=true     Build only, don't launch clients"
+    echo "  CLIENT_LOADER=...   fabric (default), neoforge or both"
+    echo ""
+    echo "NEOFORGE CLIENTS:"
+    echo "  Supported: ${NEOFORGE_VERSION_LIST[*]}"
+    echo "  The NeoForge jar is built from source once per run (1.21.11 API), rewritten"
+    echo "  for older versions the same way build-axion.sh does, and placed in"
+    echo "  run/neoforge/<version>/mods of a NeoForge client of that exact version."
     echo ""
     echo "MULTI-VERSION TESTING:"
     echo "  Clients run one at a time. In a world, hold Alt and click 'Finish testing'"
@@ -201,12 +250,17 @@ if [[ "$VERSION_ARG" == "-h" || "$VERSION_ARG" == "--help" ]]; then
     echo "  ./run-axion.sh 1.21.6,1.21.7 paper"
     echo "  ./run-axion.sh all paper fabric quickplay"
     echo "  ./run-axion.sh all build"
+    echo "  ./run-axion.sh 1.21.8,1.21.11 neoforge"
+    echo "  ./run-axion.sh all neoforge"
+    echo "  ./run-axion.sh 1.21.11 both-loaders"
     echo "  WITH_PAPER=true QUICKPLAY=true ./run-axion.sh 26.2"
     echo "  BUILD_FIRST=true ./run-axion.sh 26.2"
     exit 0
 fi
 
-if [[ "$VERSION_ARG" == "all" ]]; then
+if [[ "$VERSION_ARG" == "all" && "$CLIENT_LOADER" == "neoforge" ]]; then
+    VERSIONS=("${NEOFORGE_VERSION_LIST[@]}")
+elif [[ "$VERSION_ARG" == "all" ]]; then
     VERSIONS=("${SUPPORTED_VERSION_LIST[@]}")
 else
     IFS=',' read -r -a VERSIONS <<< "$VERSION_ARG"
@@ -216,7 +270,39 @@ for i in "${!VERSIONS[@]}"; do
     VERSIONS[$i]="$(printf '%s' "${VERSIONS[$i]}" | xargs)"
 done
 
-if [[ ${#VERSIONS[@]} -gt 1 && "$(uname -s)" != "Linux" ]]; then
+is_neoforge_version() {
+    local candidate
+    for candidate in "${NEOFORGE_VERSION_LIST[@]}"; do
+        [[ "$candidate" == "$1" ]] && return 0
+    done
+    return 1
+}
+
+# One "<loader>:<version>" entry per client launch, in launch order.
+CLIENT_TARGETS=()
+for version in "${VERSIONS[@]}"; do
+    case "$CLIENT_LOADER" in
+        fabric)
+            CLIENT_TARGETS+=("fabric:$version")
+            ;;
+        neoforge)
+            if ! is_neoforge_version "$version"; then
+                echo "AxionNeoForge does not support Minecraft $version (supported: ${NEOFORGE_VERSION_LIST[*]})." >&2
+                exit 1
+            fi
+            CLIENT_TARGETS+=("neoforge:$version")
+            ;;
+        both)
+            CLIENT_TARGETS+=("fabric:$version")
+            if is_neoforge_version "$version"; then
+                CLIENT_TARGETS+=("neoforge:$version")
+            fi
+            ;;
+    esac
+done
+CLIENT_TARGET_COUNT=${#CLIENT_TARGETS[@]}
+
+if [[ $CLIENT_TARGET_COUNT -gt 1 && "$(uname -s)" != "Linux" ]]; then
     echo "Multiple clients are currently only supported on Linux." >&2
     exit 1
 fi
@@ -229,7 +315,7 @@ exec > >(tee -a "$RUN_AXION_LOG_FILE") 2>&1
 
 echo "Run log: $ROOT_DIR/$RUN_AXION_LOG_FILE"
 echo "Versions: ${VERSIONS[*]}"
-echo "Options: WITH_PAPER=$WITH_PAPER WITH_FABRIC=$WITH_FABRIC"
+echo "Options: WITH_PAPER=$WITH_PAPER WITH_FABRIC=$WITH_FABRIC CLIENT_LOADER=$CLIENT_LOADER"
 echo "Started: $(date -Is)"
 echo
 
@@ -1092,7 +1178,7 @@ ensure_immediatelyfast_mod() {
 
 client_run_dir_for() {
     local version="$1"
-    if [[ ${#VERSIONS[@]} -gt 1 ]]; then
+    if [[ $CLIENT_TARGET_COUNT -gt 1 ]]; then
         echo "$ROOT_DIR/run/clients/${version}"
     else
         echo "$ROOT_DIR/run"
@@ -1353,7 +1439,7 @@ start_client() {
     prepare_client_run_dir "$client_run_dir"
     matrix_marker="$client_run_dir/.axion-test-matrix"
     rm -f -- "$matrix_marker"
-    if [[ ${#VERSIONS[@]} -gt 1 ]]; then
+    if [[ $CLIENT_TARGET_COUNT -gt 1 ]]; then
         printf '%s\n' "Created by ./run-axion.sh for sequential Axion client testing." > "$matrix_marker"
         CLIENT_MATRIX_MARKERS=("$matrix_marker")
     fi
@@ -1403,6 +1489,127 @@ start_client() {
     echo "  Client for $mc_version started with PID: $client_pid"
 }
 
+# NeoForge build that runs each Minecraft version. 1.21.6, 1.21.7 and 1.21.9 only
+# have beta NeoForge releases; they are the newest ones published.
+resolve_neoforge_run_version() {
+    case "$1" in
+        1.21.6) echo "21.6.20-beta" ;;
+        1.21.7) echo "21.7.25-beta" ;;
+        1.21.8) echo "21.8.54" ;;
+        1.21.9) echo "21.9.16-beta" ;;
+        1.21.10) echo "21.10.64" ;;
+        1.21.11) echo "21.11.45" ;;
+        *) echo "" ;;
+    esac
+}
+
+# Target passed to neoforge/migration/build_1_21_10_jar.py — the same variants
+# build-axion.sh stages as mc1.21.6-1.21.8, mc1.21.9-1.21.10 and mc1.21.11.
+resolve_neoforge_jar_target() {
+    case "$1" in
+        1.21.6|1.21.7|1.21.8) echo "1.21.8" ;;
+        1.21.9|1.21.10) echo "1.21.10" ;;
+        1.21.11) echo "1.21.11" ;;
+        *) echo "" ;;
+    esac
+}
+
+NEOFORGE_BASE_JAR=""
+
+# Builds the 1.21.11 NeoForge jar once per run-axion.sh invocation; every
+# NeoForge client derives its jar from it.
+ensure_neoforge_base_jar() {
+    local gradle_dir="$1"
+    local mod_version
+
+    if [[ -n "$NEOFORGE_BASE_JAR" && -s "$NEOFORGE_BASE_JAR" ]]; then
+        return 0
+    fi
+
+    mod_version="$(sed -n 's/^mod_version=//p' "$gradle_dir/gradle.properties" | head -1)"
+    local jar="$gradle_dir/neoforge/build/libs/axion-neoforge-1.21.11-${mod_version}.jar"
+
+    echo "  Building AxionNeoForge (1.21.11 API, NeoForge 21.11.45)..."
+    rm -f -- "$jar"
+    if ! (
+        cd "$gradle_dir"
+        ./gradlew --no-daemon :neoforge:jar \
+            -Pminecraft_version=1.21.11 \
+            -Pneoforge_version=21.11.45
+    ); then
+        echo "  ERROR: AxionNeoForge build failed." >&2
+        return 1
+    fi
+    if [[ ! -s "$jar" ]]; then
+        echo "  ERROR: AxionNeoForge build did not produce $jar" >&2
+        return 1
+    fi
+    NEOFORGE_BASE_JAR="$jar"
+}
+
+start_neoforge_client() {
+    local version="$1"
+    local neoforge_version
+    local jar_target
+    local client_run_dir
+    local gradle_dir
+    local matrix_marker
+
+    neoforge_version="$(resolve_neoforge_run_version "$version")"
+    jar_target="$(resolve_neoforge_jar_target "$version")"
+    if [[ -z "$neoforge_version" || -z "$jar_target" ]]; then
+        echo "  ERROR: AxionNeoForge does not support Minecraft $version (supported: ${NEOFORGE_VERSION_LIST[*]})." >&2
+        exit 1
+    fi
+
+    # Always a per-version directory: Fabric-only mods in a shared run/mods
+    # (Sodium, IAS, ...) would stop NeoForge from starting.
+    client_run_dir="$ROOT_DIR/run/neoforge/$version"
+    prepare_client_run_dir "$client_run_dir"
+    matrix_marker="$client_run_dir/.axion-test-matrix"
+    rm -f -- "$matrix_marker"
+    if [[ $CLIENT_TARGET_COUNT -gt 1 ]]; then
+        printf '%s\n' "Created by ./run-axion.sh for sequential Axion client testing." > "$matrix_marker"
+        CLIENT_MATRIX_MARKERS=("$matrix_marker")
+    fi
+
+    gradle_dir="$(prepare_client_workspace neoforge)"
+    if ! ensure_neoforge_base_jar "$gradle_dir"; then
+        rm -f -- "$matrix_marker"
+        LAST_STARTED_CLIENT_PID=""
+        LAST_STARTED_CLIENT_VERSION="NeoForge $version"
+        LAST_STARTED_CLIENT_MARKER="$matrix_marker"
+        return 1
+    fi
+
+    local mods_dir="$client_run_dir/mods"
+    mkdir -p "$mods_dir"
+    find "$mods_dir" -maxdepth 1 -type f -iname 'axion*.jar' -delete
+    if ! python3 "$gradle_dir/neoforge/migration/build_1_21_10_jar.py" \
+        "$NEOFORGE_BASE_JAR" "$mods_dir/AxionNeoForge-dev-mc${jar_target}.jar" "$jar_target"; then
+        echo "  ERROR: Could not derive the NeoForge jar for Minecraft $version." >&2
+        LAST_STARTED_CLIENT_PID=""
+        LAST_STARTED_CLIENT_VERSION="NeoForge $version"
+        LAST_STARTED_CLIENT_MARKER="$matrix_marker"
+        return 1
+    fi
+
+    echo "  Launching NeoForge $neoforge_version client for Minecraft $version (run dir: $client_run_dir, jar: mc${jar_target})..."
+    (
+        cd "$gradle_dir"
+        ./gradlew --no-daemon :neoforge-run:runClient \
+            -Paxion_neoforge_run_version="$neoforge_version" \
+            -Paxion_run_dir="$client_run_dir"
+    ) &
+
+    local client_pid=$!
+    STARTED_CLIENT_PIDS+=("$client_pid")
+    LAST_STARTED_CLIENT_PID="$client_pid"
+    LAST_STARTED_CLIENT_VERSION="NeoForge $version"
+    LAST_STARTED_CLIENT_MARKER="$matrix_marker"
+    echo "  NeoForge client for $version started with PID: $client_pid"
+}
+
 # Run
 echo
 echo "==> Running Minecraft versions: ${VERSIONS[*]}"
@@ -1440,12 +1647,23 @@ if [[ "$WITH_FABRIC" == "true" ]]; then
 fi
 
 client_status=0
-for i in "${!VERSIONS[@]}"; do
-    version="${VERSIONS[$i]}"
+for i in "${!CLIENT_TARGETS[@]}"; do
+    loader="${CLIENT_TARGETS[$i]%%:*}"
+    version="${CLIENT_TARGETS[$i]#*:}"
     echo
-    echo "==> Client $((i + 1))/${#VERSIONS[@]}: $version"
-    start_client "$version"
-    if [[ ${#VERSIONS[@]} -gt 1 ]]; then
+    echo "==> Client $((i + 1))/$CLIENT_TARGET_COUNT: $version ($loader)"
+    if [[ "$loader" == "neoforge" ]]; then
+        if ! start_neoforge_client "$version"; then
+            client_status=1
+            echo "  WARNING: NeoForge $version could not be launched; continuing the test matrix." >&2
+            rm -f -- "$LAST_STARTED_CLIENT_MARKER"
+            CLIENT_MATRIX_MARKERS=()
+            continue
+        fi
+    else
+        start_client "$version"
+    fi
+    if [[ $CLIENT_TARGET_COUNT -gt 1 ]]; then
         echo "  Test Minecraft $LAST_STARTED_CLIENT_VERSION, then hold Alt in the Axion menu and click 'Finish testing'."
     fi
     if wait "$LAST_STARTED_CLIENT_PID"; then

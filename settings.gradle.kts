@@ -27,6 +27,8 @@ rootProject.name = "Axion"
 // in neoforge/src/mojmap-common.
 include(":fabric")
 include(":neoforge")
+// Source-less NeoForge client launcher for ./run-axion.sh (see its build file).
+include(":neoforge-run")
 include(":protocol")
 include(":paper-plugin")
 include(":fabric-server")
