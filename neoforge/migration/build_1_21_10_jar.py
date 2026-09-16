@@ -31,7 +31,7 @@ DOTTED_RENAMES = [
 
 # The convention plugin stamps gradle.properties' shared fabric range into
 # neoforge.mods.toml; pin whatever we find to the requested exact version.
-MC_RANGE_RE = re.compile(rb'(\[1\.21[\d.,\[\]]*\])')
+MC_RANGE_RE = re.compile(rb'[\[(]1\.21[\d.,]*[\])]')
 
 
 def strip_mixins(data: bytes, remove: set) -> bytes:
@@ -129,6 +129,11 @@ def main(src: str, dst: str, target_mc_version: str) -> None:
                 data = MC_RANGE_RE.sub(
                     mc_range_for(target_mc_version).encode(), data
                 )
+                expected = f'versionRange="{mc_range_for(target_mc_version)}"'.encode()
+                if expected not in data:
+                    raise SystemExit(
+                        f"neoforge.mods.toml Minecraft range was not pinned to {mc_range_for(target_mc_version)}"
+                    )
             elif item.filename.endswith("axion.client.mixins.json"):
                 if target_mc_version == "1.21.8":
                     data = strip_mixins(data, set(PRE_1_21_9_MIXINS))

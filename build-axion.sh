@@ -284,7 +284,11 @@ prefetch_modmenu_dependency() {
 
 run_gradle_with_retry() {
     local attempt=1
-    local max_attempts=3
+    # Upstream Maven repos (repo.papermc.io in particular) return 502s for
+    # stretches longer than a few seconds. The old 5s/10s schedule gave up after
+    # ~15s and failed CI on a blip; exponential backoff rides out ~4 minutes.
+    local max_attempts=5
+    local delay=15
     local status
 
     while true; do
@@ -299,9 +303,10 @@ run_gradle_with_retry() {
             return "$status"
         fi
 
-        echo "Gradle attempt ${attempt} failed; retrying this range in $((attempt * 5)) seconds..." >&2
-        sleep $((attempt * 5))
+        echo "Gradle attempt ${attempt} failed; retrying this range in ${delay} seconds..." >&2
+        sleep "$delay"
         ((attempt += 1))
+        ((delay *= 2))
     done
 }
 
@@ -628,8 +633,10 @@ build_range() {
                 -Pmod_version="${MOD_VERSION}" \
                 -Pminecraft_version="${compile_version}" \
                 -Pneoforge_version="${neoforge_version}"; then
-                local staged_neoforge_jar
-                staged_neoforge_jar="$(find neoforge/build/libs -maxdepth 1 -type f -name 'axion-neoforge-*.jar' ! -name '*-sources*' ! -name '*-javadoc*' -print -quit 2>/dev/null)"
+                # Name the exact jar this build produced: older
+                # axion-neoforge-<mc>-<ver>.jar files from earlier builds sit in
+                # the same directory, and `find -quit` would pick one at random.
+                local staged_neoforge_jar="neoforge/build/libs/axion-neoforge-${compile_version}-${MOD_VERSION}.jar"
                 if [[ -n "${staged_neoforge_jar}" && -s "${staged_neoforge_jar}" ]] &&
                    jar tf "${staged_neoforge_jar}" >/dev/null 2>&1; then
                     mkdir -p "${mod_output_dir}"

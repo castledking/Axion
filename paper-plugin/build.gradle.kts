@@ -38,6 +38,15 @@ repositories {
     mavenCentral()
 }
 
+// 1.21.x Paper dev bundles are -SNAPSHOT versions, which Gradle treats as
+// changing and re-checks against repo.papermc.io every 24 hours. When that repo
+// returns 502 the whole range fails to configure even though the bundle is
+// already cached. Reuse a cached bundle for a week instead; a brand-new cache
+// still resolves normally.
+configurations.matching { it.name == "paperweightDevelopmentBundle" }.configureEach {
+    resolutionStrategy.cacheChangingModulesFor(7, "days")
+}
+
 dependencies {
     implementation(project(":protocol"))
     paperweight.paperDevBundle("${property("paper_version")}")
